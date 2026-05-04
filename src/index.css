@@ -1,0 +1,383 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Imagick.ai Design System - Unified with imagick-web */
+
+@layer base {
+  :root {
+    /* Base dark colors — matches imagick-web dark mode */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    /* Card */
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Primary - Neon Pink (matches imagick-web) */
+    --primary: 330 100% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Purple brand color */
+    --secondary: 270 75% 60%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Muted for subtle backgrounds */
+    --muted: 240 10% 15%;
+    --muted-foreground: 240 5% 60%;
+
+    /* Accent - Purple brand (matches imagick-web --accent) */
+    --accent: 270 100% 65%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 10% 15%;
+    --input: 240 10% 15%;
+    --ring: 330 100% 60%;
+
+    --radius: 0.75rem;
+
+    /* Neon color tokens (matches imagick-web) */
+    --neon-pink: 330 100% 60%;
+    --neon-purple: 270 100% 65%;
+    --neon-blue: 210 100% 60%;
+
+    /* Gradient tokens */
+    --gradient-start: 330 100% 60%;
+    --gradient-end: 270 100% 65%;
+
+    /* Sidebar */
+    --sidebar-background: 240 10% 5%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 330 100% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 10% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 10% 15%;
+    --sidebar-ring: 330 100% 60%;
+
+    /* Custom glow tokens */
+    --glow-primary: 330 100% 60%;
+    --glow-secondary: 270 100% 65%;
+    --glow-accent: 240 10% 25%;
+
+    /* Rating star color */
+    --rating: 45 93% 47%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(330, 100%, 60%) 0%, hsl(270, 100%, 65%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(330, 100%, 60%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(240, 10%, 25%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(240, 10%, 6%) 0%, hsl(240, 10%, 3.9%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(330, 100%, 60%, 0.15) 0%, transparent 70%);
+
+    /* Glass effect */
+    --glass-background: hsla(240, 10%, 12%, 0.6);
+    --glass-border: hsla(0, 0%, 98%, 0.08);
+  }
+
+  /* Light mode */
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 10%;
+    --card: 0 0% 98%;
+    --card-foreground: 240 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+    --primary: 330 85% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 60% 55%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 5% 92%;
+    --muted-foreground: 240 5% 45%;
+    /* Accent - Purple brand (matches imagick-web light mode --accent) */
+    --accent: 270 80% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5% 88%;
+    --input: 240 5% 92%;
+    --ring: 330 85% 50%;
+
+    /* Neon tokens */
+    --neon-pink: 330 100% 60%;
+    --neon-purple: 270 100% 65%;
+    --neon-blue: 210 100% 60%;
+
+    /* Gradient tokens */
+    --gradient-start: 330 85% 50%;
+    --gradient-end: 270 80% 55%;
+
+    /* Sidebar light */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5% 35%;
+    --sidebar-primary: 330 85% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 94%;
+    --sidebar-accent-foreground: 240 10% 10%;
+    --sidebar-border: 240 5% 88%;
+    --sidebar-ring: 330 85% 50%;
+
+    /* Light glow tokens */
+    --glow-primary: 330 85% 50%;
+    --glow-secondary: 270 80% 55%;
+
+    /* Light mode glass */
+    --glass-background: hsla(0, 0%, 100%, 0.8);
+    --glass-border: hsla(240, 5%, 85%, 0.5);
+
+    /* Light gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(330, 85%, 50%) 0%, hsl(270, 80%, 55%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(270, 80%, 55%) 0%, hsl(330, 85%, 50%) 100%);
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 330 100% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 75% 60%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 10% 15%;
+    --muted-foreground: 240 5% 60%;
+    --accent: 270 100% 65%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 10% 15%;
+    --input: 240 10% 15%;
+    --ring: 330 100% 60%;
+
+    --neon-pink: 330 100% 60%;
+    --neon-purple: 270 100% 65%;
+    --neon-blue: 210 100% 60%;
+    --gradient-start: 330 100% 60%;
+    --gradient-end: 270 100% 65%;
+
+    /* Sidebar dark */
+    --sidebar-background: 240 10% 5%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 330 100% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 10% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 10% 15%;
+    --sidebar-ring: 330 100% 60%;
+
+    --glow-primary: 330 100% 60%;
+    --glow-secondary: 270 100% 65%;
+    --glow-accent: 240 10% 25%;
+
+    /* Dark mode glass */
+    --glass-background: hsla(240, 10%, 12%, 0.6);
+    --glass-border: hsla(0, 0%, 98%, 0.08);
+
+    --gradient-primary: linear-gradient(135deg, hsl(330, 100%, 60%) 0%, hsl(270, 100%, 65%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(330, 100%, 60%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(240, 10%, 25%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(240, 10%, 6%) 0%, hsl(240, 10%, 3.9%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(330, 100%, 60%, 0.15) 0%, transparent 70%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/30;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  /* Glass card effect */
+  .glass-card {
+    background: var(--glass-background);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+  }
+
+  /* Glow effects */
+  .glow-primary {
+    box-shadow: 0 0 30px -5px hsl(var(--glow-primary) / 0.4);
+  }
+
+  .glow-secondary {
+    box-shadow: 0 0 30px -5px hsl(var(--glow-secondary) / 0.4);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 30px -5px hsl(var(--glow-accent) / 0.4);
+  }
+
+  /* Text gradients */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[hsl(var(--gradient-start))] to-[hsl(var(--gradient-end))];
+  }
+
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-secondary {
+    background: var(--gradient-secondary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Background patterns */
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .bg-dots-pattern {
+    background-image: radial-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Gradient borders */
+  .gradient-border {
+    position: relative;
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: var(--gradient-primary);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* Glow effects (matches imagick-web) */
+  .glow-pink {
+    box-shadow: 0 4px 20px hsl(330 85% 50% / 0.2), 0 8px 40px hsl(330 85% 50% / 0.1);
+  }
+
+  .dark .glow-pink {
+    box-shadow: 0 0 40px hsl(330 100% 60% / 0.3), 0 0 80px hsl(330 100% 60% / 0.1);
+  }
+
+  /* Glow text effect (matches imagick-web) */
+  .glow-text {
+    text-shadow: 0 2px 10px hsl(330 85% 50% / 0.3);
+  }
+
+  .dark .glow-text {
+    text-shadow: 0 0 30px hsl(330 100% 60% / 0.5);
+  }
+}
+
+/* Keyframes */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(330 100% 60% / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(330 100% 60% / 0.5);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+@keyframes neon-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px hsl(var(--primary) / 0.6);
+  }
+  50% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.9), 0 0 40px hsl(var(--primary) / 0.3);
+  }
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 1.5s ease-in-out infinite;
+}

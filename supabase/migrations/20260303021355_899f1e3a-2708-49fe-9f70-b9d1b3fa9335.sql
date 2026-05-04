@@ -1,0 +1,1 @@
+ALTER TABLE public.galleries ADD COLUMN IF NOT EXISTS gallery_type TEXT;

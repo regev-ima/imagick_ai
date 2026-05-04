@@ -1,0 +1,1 @@
+ALTER TABLE public.image_edits ADD CONSTRAINT image_edits_image_id_style_id_unique UNIQUE (image_id, style_id);
