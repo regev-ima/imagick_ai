@@ -203,6 +203,9 @@ DROP POLICY IF EXISTS "Admins select lead_email_opens" ON public.lead_email_open
 CREATE POLICY "Admins select lead_email_opens" ON public.lead_email_opens FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 10) Function: normalize_email
+-- Drop first because earlier migration defined this with a different parameter name (p_email);
+-- CREATE OR REPLACE cannot rename parameters.
+DROP FUNCTION IF EXISTS public.normalize_email(text);
 CREATE OR REPLACE FUNCTION public.normalize_email(raw text)
 RETURNS text
 LANGUAGE sql IMMUTABLE
