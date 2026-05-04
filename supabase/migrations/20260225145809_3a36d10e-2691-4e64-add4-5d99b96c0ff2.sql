@@ -1,1 +1,3 @@
-ALTER TABLE public.image_edits ADD CONSTRAINT image_edits_image_id_style_id_unique UNIQUE (image_id, style_id);
+DO $$ BEGIN
+  ALTER TABLE public.image_edits ADD CONSTRAINT image_edits_image_id_style_id_unique UNIQUE (image_id, style_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
