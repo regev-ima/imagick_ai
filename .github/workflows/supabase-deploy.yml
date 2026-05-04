@@ -35,6 +35,20 @@ jobs:
         with:
           version: latest
 
+      - name: Verify secrets are present
+        run: |
+          missing=()
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing+=("SUPABASE_ACCESS_TOKEN")
+          [ -n "$SUPABASE_DB_PASSWORD" ] || missing+=("SUPABASE_DB_PASSWORD")
+          [ -n "$SUPABASE_PROJECT_ID" ] || missing+=("SUPABASE_PROJECT_ID")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "SUPABASE_ACCESS_TOKEN length: ${#SUPABASE_ACCESS_TOKEN}"
+          echo "SUPABASE_DB_PASSWORD length: ${#SUPABASE_DB_PASSWORD}"
+          echo "SUPABASE_PROJECT_ID:         $SUPABASE_PROJECT_ID"
+
       - name: Link project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
