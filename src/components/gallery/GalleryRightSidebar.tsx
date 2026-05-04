@@ -1,0 +1,1073 @@
+import { useState } from "react";
+import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, PanelRightClose, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Sparkles, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import type { FilterOptions } from "@/components/gallery/filter-types";
+
+// Culling rating tiers
+const CULLING_TIERS = [
+  { stars: 5, label: "Top Picks", color: "text-yellow-500" },
+  { stars: 4, label: "Strong Candidates", color: "text-yellow-500/80" },
+  { stars: 3, label: "Decent Options", color: "text-muted-foreground" },
+  { stars: 2, label: "Less Relevant", color: "text-muted-foreground" },
+  { stars: 1, label: "Not Recommended", color: "text-muted-foreground" },
+] as const;
+
+// Style color palette for visual distinction
+const STYLE_COLORS = [
+  "bg-primary",
+  "bg-secondary",
+  "bg-green-500",
+  "bg-blue-500",
+  "bg-orange-500",
+  "bg-cyan-500",
+];
+
+type SidebarSection = "styles" | "filter" | "info" | null;
+
+interface GalleryRightSidebarProps {
+  // Applied Styles
+  availableStyles: Array<{ id: string; name: string; apiId?: string; coverUrl?: string }>;
+  selectedStyle: string;
+  onStyleChange: (styleId: string) => void;
+
+  // Culling data
+  hasCullingData: boolean;
+  cullingCounts: Record<number, number>;
+
+  // Similar Images / Grouping
+  similarityLevel: "loose" | "medium" | "strict";
+  onSimilarityLevelChange: (level: "loose" | "medium" | "strict") => void;
+  duplicateLimit: number;
+  onDuplicateLimitChange: (limit: number) => void;
+  groupCounts: { loose: number; medium: number; strict: number };
+
+  // Action callbacks
+  onAddImages?: () => void;
+  onRunCulling?: () => void;
+  isCullingRunning?: boolean;
+  isCullingStuck?: boolean;
+  hasActiveFilters?: boolean;
+
+  // Face search
+  onOpenFaceSearch?: () => void;
+  faceSearchStatus?: string;
+
+  // New props
+  onShare?: () => void;
+  onToggleLikedFilter?: () => void;
+  isLikedFilterActive?: boolean;
+  onOpenSettings?: () => void;
+  onDownload?: () => void;
+  filters?: FilterOptions;
+  onFiltersChange?: (filters: FilterOptions) => void;
+  availableTags?: string[];
+
+  // Label filtering
+  availableLabels?: Array<{ label: string; count: number }>;
+
+  // Gallery analytics
+  canViewAnalytics?: boolean;
+  galleryTimingData?: {
+    createdAt: string | null;
+    uploadStartedAt: string | null;
+    uploadCompletedAt: string | null;
+    processingStartedAt: string | null;
+    processingCompletedAt: string | null;
+    cullingStartedAt: string | null;
+    cullingCompletedAt: string | null;
+    sourceType: "google" | "upload";
+    totalImages: number;
+  };
+
+  // Processing progress
+  processingStats?: {
+    total: number;
+    ready: number;
+    processing: number;
+    error: number;
+    percentage: number;
+  };
+
+  className?: string;
+  isMobileSheet?: boolean;
+}
+
+export function GalleryRightSidebar({
+  availableStyles,
+  selectedStyle,
+  onStyleChange,
+  hasCullingData,
+  cullingCounts,
+  similarityLevel,
+  onSimilarityLevelChange,
+  duplicateLimit,
+  onDuplicateLimitChange,
+  groupCounts,
+  onAddImages,
+  onRunCulling,
+  isCullingRunning,
+  isCullingStuck,
+  hasActiveFilters,
+  onOpenFaceSearch,
+  faceSearchStatus,
+  onShare,
+  onToggleLikedFilter,
+  isLikedFilterActive,
+  onOpenSettings,
+  onDownload,
+  filters,
+  onFiltersChange,
+  availableTags = [],
+  availableLabels = [],
+  canViewAnalytics,
+  galleryTimingData,
+  processingStats,
+  className,
+  isMobileSheet,
+}: GalleryRightSidebarProps) {
+  const [activeSection, setActiveSection] = useState<SidebarSection>(null);
+
+  const totalCullingImages = Object.values(cullingCounts).reduce((a, b) => a + b, 0);
+
+  const allStyles = [
+    { id: "original", name: "Original", apiId: undefined },
+    ...availableStyles,
+  ];
+
+  const toggleSection = (section: SidebarSection) => {
+    setActiveSection(prev => (prev === section ? null : section));
+  };
+
+  const isExpanded = activeSection !== null;
+
+  // In mobile sheet mode, always show expanded content
+  if (isMobileSheet) {
+    return (
+      <div className={cn("flex flex-col h-full", className)}>
+        <ScrollArea className="flex-1">
+          <div className="p-3 space-y-4">
+            {/* Action buttons */}
+            <div className="flex gap-2 flex-wrap">
+              {onAddImages && (
+                <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onAddImages}>
+                  <Images className="w-3.5 h-3.5" />
+                  Add Images
+                </Button>
+              )}
+              {onRunCulling && (
+                <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onRunCulling} disabled={isCullingRunning}>
+                  {isCullingRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                  AI Culling
+                </Button>
+              )}
+              {onOpenFaceSearch && (
+                <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onOpenFaceSearch}>
+                  {faceSearchStatus === "processing" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanFace className="w-3.5 h-3.5" />}
+                  Faces
+                </Button>
+              )}
+              {onShare && (
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={onShare}>
+                  <Share2 className="w-3.5 h-3.5" />
+                  Share
+                </Button>
+              )}
+            </div>
+            <Separator />
+            <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} />
+            <Separator />
+            {filters && onFiltersChange && (
+              <UnifiedFilterPanel
+                hasCullingData={hasCullingData}
+                cullingCounts={cullingCounts}
+                totalCullingImages={totalCullingImages}
+                filters={filters}
+                onFiltersChange={onFiltersChange}
+                availableLabels={availableLabels}
+                availableTags={availableTags}
+                similarityLevel={similarityLevel}
+                onSimilarityLevelChange={onSimilarityLevelChange}
+                duplicateLimit={duplicateLimit}
+                onDuplicateLimitChange={onDuplicateLimitChange}
+                groupCounts={groupCounts}
+                onRunCulling={onRunCulling}
+                onToggleLikedFilter={onToggleLikedFilter}
+              />
+            )}
+            {canViewAnalytics && galleryTimingData && (
+              <>
+                <Separator />
+                <GalleryInfoPanel data={galleryTimingData} processingStats={processingStats} />
+              </>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "shrink-0 border-l border-border/50 glass-card flex transition-all duration-200 h-full",
+        isExpanded ? "w-[280px]" : "w-12",
+        className
+      )}
+    >
+      {/* Expanded Panel Content */}
+      {isExpanded && (
+        <ScrollArea className="flex-1 min-w-0">
+          <div className="p-3">
+            {/* Close button */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {activeSection === "styles" && "Styles"}
+                {activeSection === "filter" && "Filters"}
+                {activeSection === "info" && "Gallery Info"}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-6 h-6"
+                onClick={() => setActiveSection(null)}
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+            <Separator className="mb-3" />
+
+            {activeSection === "styles" && (
+              <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} />
+            )}
+            {activeSection === "filter" && filters && onFiltersChange && (
+              <UnifiedFilterPanel
+                hasCullingData={hasCullingData}
+                cullingCounts={cullingCounts}
+                totalCullingImages={totalCullingImages}
+                filters={filters}
+                onFiltersChange={onFiltersChange}
+                availableLabels={availableLabels}
+                availableTags={availableTags}
+                similarityLevel={similarityLevel}
+                onSimilarityLevelChange={onSimilarityLevelChange}
+                duplicateLimit={duplicateLimit}
+                onDuplicateLimitChange={onDuplicateLimitChange}
+                groupCounts={groupCounts}
+                onRunCulling={onRunCulling}
+                onToggleLikedFilter={onToggleLikedFilter}
+              />
+            )}
+            {activeSection === "info" && galleryTimingData && (
+              <GalleryInfoPanel data={galleryTimingData} processingStats={processingStats} />
+            )}
+          </div>
+        </ScrollArea>
+      )}
+
+      {/* Icon Toolbar Strip */}
+      <div className="w-12 shrink-0 flex flex-col items-center py-2 gap-1 border-l border-border/30">
+        <TooltipProvider delayDuration={300}>
+          {/* Section toggles */}
+          <ToolbarIconButton
+            icon={<Layers className="w-4 h-4" />}
+            label="Applied Styles"
+            isActive={activeSection === "styles"}
+            onClick={() => toggleSection("styles")}
+          />
+
+          <Separator className="my-1.5 w-6" />
+
+          <ToolbarIconButton
+            icon={<Filter className="w-4 h-4" />}
+            label="Filters"
+            isActive={activeSection === "filter" || hasActiveFilters || isLikedFilterActive}
+            onClick={() => toggleSection("filter")}
+          />
+
+          <Separator className="my-1.5 w-6" />
+
+          {/* Action buttons */}
+          {onAddImages && (
+            <ToolbarIconButton
+              icon={<Images className="w-4 h-4" />}
+              label="Add Images"
+              onClick={onAddImages}
+            />
+          )}
+          {onRunCulling && (
+            <ToolbarIconButton
+              icon={isCullingRunning ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : isCullingStuck ? <Wand2 className="w-4 h-4 text-orange-500" /> : <Wand2 className="w-4 h-4" />}
+              label={isCullingStuck ? "Culling seems stuck — click to retry" : isCullingRunning ? "AI Culling in progress... will complete in a few minutes" : "Run AI Culling"}
+              onClick={onRunCulling}
+              disabled={isCullingRunning}
+            />
+          )}
+          {onOpenFaceSearch && (
+            <ToolbarIconButton
+              icon={faceSearchStatus === "processing" ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : faceSearchStatus === "completed" ? <ScanFace className="w-4 h-4 text-green-500" /> : <ScanFace className="w-4 h-4" />}
+              label={faceSearchStatus === "processing" ? "Face detection in progress..." : faceSearchStatus === "completed" ? "View detected faces" : "Face Search"}
+              onClick={onOpenFaceSearch}
+            />
+          )}
+          {onShare && (
+            <ToolbarIconButton
+              icon={<Share2 className="w-4 h-4" />}
+              label="Share Gallery"
+              onClick={onShare}
+            />
+          )}
+          {onDownload && (
+            <ToolbarIconButton
+              icon={<Download className="w-4 h-4" />}
+              label="Download Gallery"
+              onClick={onDownload}
+            />
+          )}
+          {onOpenSettings && (
+            <ToolbarIconButton
+              icon={<Settings className="w-4 h-4" />}
+              label="Gallery Settings"
+              onClick={onOpenSettings}
+            />
+          )}
+          {canViewAnalytics && galleryTimingData && (
+            <ToolbarIconButton
+              icon={<Info className="w-4 h-4" />}
+              label="Gallery Info"
+              isActive={activeSection === "info"}
+              onClick={() => toggleSection("info")}
+            />
+          )}
+
+          {/* Collapse button - only when expanded */}
+          {isExpanded && (
+            <>
+              <Separator className="my-1.5 w-6" />
+              <ToolbarIconButton
+                icon={<PanelRightClose className="w-4 h-4" />}
+                label="Collapse Sidebar"
+                onClick={() => setActiveSection(null)}
+              />
+            </>
+          )}
+        </TooltipProvider>
+      </div>
+    </div>
+  );
+}
+
+/* ── Toolbar Icon Button ── */
+function ToolbarIconButton({
+  icon,
+  label,
+  isActive,
+  onClick,
+  disabled,
+  badge,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  isActive?: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  badge?: number;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "w-8 h-8 relative",
+            isActive && "bg-primary/15 text-primary",
+            disabled && "opacity-40"
+          )}
+          onClick={onClick}
+          disabled={disabled}
+        >
+          {icon}
+          {badge !== undefined && (
+            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[9px] leading-none rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5">
+              {badge > 99 ? "99+" : badge}
+            </span>
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="left" className="text-xs">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/* ── Styles Panel ── */
+function StylesPanel({
+  allStyles,
+  selectedStyle,
+  onStyleChange,
+}: {
+  allStyles: Array<{ id: string; name: string; apiId?: string; coverUrl?: string }>;
+  selectedStyle: string;
+  onStyleChange: (id: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      {allStyles.map((style, i) => {
+        const isSelected = selectedStyle === style.id;
+        const isOriginal = style.id === "original";
+        const color = isOriginal ? "bg-muted-foreground" : STYLE_COLORS[i % STYLE_COLORS.length];
+
+        return (
+          <button
+            key={style.id}
+            className={cn(
+              "w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-all text-left",
+              isSelected
+                ? "bg-primary/15 text-foreground ring-1 ring-primary/30"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
+            onClick={() => onStyleChange(style.id)}
+          >
+            {/* Thumbnail or color dot */}
+            {style.coverUrl ? (
+              <div className={cn(
+                "w-8 h-8 rounded-full shrink-0 overflow-hidden ring-2 transition-all",
+                isSelected ? "ring-primary" : "ring-border/50"
+              )}>
+                <img
+                  src={style.coverUrl}
+                  alt={style.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-full shrink-0 flex items-center justify-center ring-2 transition-all",
+                  isSelected ? "ring-primary" : "ring-border/50",
+                  isOriginal ? "bg-muted" : `${color}/20`
+                )}
+              >
+                {isOriginal ? (
+                  <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                ) : (
+                  <Sparkles className={cn("w-3.5 h-3.5", color.replace("bg-", "text-"))} />
+                )}
+              </div>
+            )}
+            <span className="truncate flex-1 font-medium">{style.name}</span>
+            {isSelected && (
+              <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Unified Filter Panel ── */
+function UnifiedFilterPanel({
+  hasCullingData,
+  cullingCounts,
+  totalCullingImages,
+  filters,
+  onFiltersChange,
+  availableLabels,
+  availableTags,
+  similarityLevel,
+  onSimilarityLevelChange,
+  duplicateLimit,
+  onDuplicateLimitChange,
+  groupCounts,
+  onRunCulling,
+  onToggleLikedFilter,
+}: {
+  hasCullingData: boolean;
+  cullingCounts: Record<number, number>;
+  totalCullingImages: number;
+  filters: FilterOptions;
+  onFiltersChange: (filters: FilterOptions) => void;
+  availableLabels: Array<{ label: string; count: number }>;
+  availableTags: string[];
+  similarityLevel: "loose" | "medium" | "strict";
+  onSimilarityLevelChange: (level: "loose" | "medium" | "strict") => void;
+  duplicateLimit: number;
+  onDuplicateLimitChange: (limit: number) => void;
+  groupCounts: { loose: number; medium: number; strict: number };
+  onRunCulling?: () => void;
+  onToggleLikedFilter?: () => void;
+}) {
+  const toggleRating = (star: number) => {
+    const current = filters.selectedRatings || [];
+    const next = current.includes(star)
+      ? current.filter(s => s !== star)
+      : [...current, star];
+    onFiltersChange({ ...filters, selectedRatings: next, minRating: 0 });
+  };
+
+  const toggleLabel = (label: string) => {
+    const current = filters.selectedLabels || [];
+    const next = current.includes(label)
+      ? current.filter(l => l !== label)
+      : [...current, label];
+    onFiltersChange({ ...filters, selectedLabels: next });
+  };
+
+  const toggleTag = (tag: string) => {
+    onFiltersChange({
+      ...filters,
+      selectedTags: filters.selectedTags.includes(tag)
+        ? filters.selectedTags.filter(t => t !== tag)
+        : [...filters.selectedTags, tag]
+    });
+  };
+
+  const hasAnyActiveFilter =
+    filters.selectedTags.length > 0 ||
+    filters.showHeroOnly ||
+    filters.showLikedOnly ||
+    (filters.selectedRatings?.length || 0) > 0 ||
+    (filters.selectedLabels?.length || 0) > 0 ||
+    duplicateLimit !== 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Quick Filters */}
+      <div className="space-y-2">
+        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Quick Filters</Label>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            onClick={() => onToggleLikedFilter?.()}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all border",
+              filters.showLikedOnly
+                ? "bg-pink-500/15 border-pink-500/30 text-pink-400"
+                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
+          >
+            <Heart className={cn("w-3.5 h-3.5", filters.showLikedOnly && "fill-pink-400")} />
+            Liked
+          </button>
+          <button
+            onClick={() => onFiltersChange({ ...filters, showHeroOnly: !filters.showHeroOnly })}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all border",
+              filters.showHeroOnly
+                ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
+          >
+            <Star className={cn("w-3.5 h-3.5", filters.showHeroOnly && "fill-amber-400")} />
+            Hero
+          </button>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Star Rating */}
+      {hasCullingData ? (
+        <div className="space-y-2">
+          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Star Rating</Label>
+          <div className="space-y-0.5">
+            {CULLING_TIERS.map(tier => {
+              const count = cullingCounts[tier.stars] || 0;
+              const isSelected = filters.selectedRatings.includes(tier.stars);
+              const pct = totalCullingImages > 0 ? Math.round((count / totalCullingImages) * 100) : 0;
+              return (
+                <button
+                  key={tier.stars}
+                  onClick={() => toggleRating(tier.stars)}
+                  className={cn(
+                    "w-full relative flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all overflow-hidden",
+                    isSelected
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "absolute inset-y-0 left-0 rounded-lg transition-all",
+                      isSelected ? "bg-rating/15" : "bg-muted/30"
+                    )}
+                    style={{ width: `${Math.max(pct, 4)}%` }}
+                  />
+                  <div className="relative flex items-center gap-1.5">
+                    {isSelected && <Check className="w-3 h-3 text-primary" />}
+                    <div className="flex items-center gap-0.5">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={cn(
+                            "w-2.5 h-2.5",
+                            i < tier.stars ? "text-rating fill-rating" : "text-muted-foreground/20"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <span className="relative text-[10px] tabular-nums font-medium">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">AI Features</Label>
+          <div className="rounded-xl border border-border/50 bg-gradient-to-br from-violet-500/5 via-primary/5 to-amber-500/5 p-3 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-primary/20 flex items-center justify-center shrink-0">
+                <Wand2 className="w-4 h-4 text-violet-400" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-foreground">AI Culling</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">Auto-rate, categorize & find duplicates</p>
+              </div>
+            </div>
+            {onRunCulling && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5 text-xs h-8 bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
+                onClick={onRunCulling}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Run AI Culling
+              </Button>
+            )}
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
+              <div className="text-center">
+                <Star className="w-3.5 h-3.5 text-amber-400 mx-auto mb-0.5" />
+                <p className="text-[9px] text-muted-foreground leading-tight">Star Ratings</p>
+              </div>
+              <div className="text-center">
+                <Tag className="w-3.5 h-3.5 text-cyan-400 mx-auto mb-0.5" />
+                <p className="text-[9px] text-muted-foreground leading-tight">Categories</p>
+              </div>
+              <div className="text-center">
+                <Copy className="w-3.5 h-3.5 text-pink-400 mx-auto mb-0.5" />
+                <p className="text-[9px] text-muted-foreground leading-tight">Duplicates</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Categories (only when culling data exists and labels available) */}
+      {hasCullingData && availableLabels.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Categories</Label>
+              <button
+                onClick={() => {
+                  const allSelected = availableLabels.every(({ label }) => filters.selectedLabels?.includes(label));
+                  if (allSelected) {
+                    availableLabels.forEach(({ label }) => {
+                      if (filters.selectedLabels?.includes(label)) toggleLabel(label);
+                    });
+                  } else {
+                    availableLabels.forEach(({ label }) => {
+                      if (!filters.selectedLabels?.includes(label)) toggleLabel(label);
+                    });
+                  }
+                }}
+                className="text-[10px] text-primary hover:text-primary/80 font-medium transition-colors"
+              >
+                {availableLabels.every(({ label }) => filters.selectedLabels?.includes(label)) ? "Clear" : "Select All"}
+              </button>
+            </div>
+            <div className="space-y-0.5 max-h-48 overflow-y-auto">
+              {(() => {
+                const maxCount = Math.max(...availableLabels.map(l => l.count), 1);
+                return availableLabels.map(({ label, count }) => {
+                  const isSelected = filters.selectedLabels?.includes(label);
+                  const pct = Math.round((count / maxCount) * 100);
+                  return (
+                    <button
+                      key={label}
+                      onClick={() => toggleLabel(label)}
+                      className={cn(
+                        "w-full relative flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-all overflow-hidden",
+                        isSelected
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "absolute inset-y-0 left-0 rounded-lg transition-all",
+                          isSelected ? "bg-primary/15" : "bg-muted/30"
+                        )}
+                        style={{ width: `${pct}%` }}
+                      />
+                      <div className="relative flex items-center gap-1.5">
+                        {isSelected && <Check className="w-3 h-3 text-primary" />}
+                        <span className="font-medium">{label}</span>
+                      </div>
+                      <span className="relative text-[10px] tabular-nums opacity-70">{count}</span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Tags */}
+      {availableTags.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-1.5">
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Tags</Label>
+            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+              {availableTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => toggleTag(tag)}
+                  className={cn(
+                    "px-2 py-1 rounded-full text-[10px] font-medium transition-all",
+                    filters.selectedTags.includes(tag)
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Duplicates (only show section when culling data exists) */}
+      {hasCullingData && (
+        <>
+          <Separator />
+          <div className="space-y-2">
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Duplicates</Label>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1.5 block">Sensitivity</label>
+                <div className="flex gap-1">
+                  {(
+                    [
+                      { value: "loose", label: "Low", desc: "50%" },
+                      { value: "medium", label: "Med", desc: "70%" },
+                      { value: "strict", label: "High", desc: "90%" },
+                    ] as const
+                  ).map((opt) => (
+                    <Button
+                      key={opt.value}
+                      variant={similarityLevel === opt.value ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1 text-xs h-7 px-1"
+                      onClick={() => onSimilarityLevelChange(opt.value)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex justify-between mt-1">
+                  {(
+                    [
+                      { value: "loose", count: groupCounts.loose },
+                      { value: "medium", count: groupCounts.medium },
+                      { value: "strict", count: groupCounts.strict },
+                    ] as const
+                  ).map((g) => (
+                    <span
+                      key={g.value}
+                      className="text-[10px] text-muted-foreground flex-1 text-center tabular-nums"
+                    >
+                      {g.count} groups
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1.5 block">Limit</label>
+                <Select
+                  value={String(duplicateLimit)}
+                  onValueChange={(v) => onDuplicateLimitChange(Number(v))}
+                >
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Keep 1 per group</SelectItem>
+                    <SelectItem value="2">Keep 2 per group</SelectItem>
+                    <SelectItem value="3">Keep 3 per group</SelectItem>
+                    <SelectItem value="5">Keep 5 per group</SelectItem>
+                    <SelectItem value="0">No limit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <Separator />
+
+      {/* Reset All Filters */}
+      {hasAnyActiveFilter && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            onFiltersChange({
+              ...filters,
+              selectedRatings: [],
+              minRating: 0,
+              selectedLabels: [],
+              selectedTags: [],
+              showHeroOnly: false,
+              showLikedOnly: false,
+            });
+            onDuplicateLimitChange(0);
+          }}
+        >
+          <RotateCcw className="w-3 h-3" />
+          Reset All Filters
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/* ── Gallery Info Panel (visual timeline) ── */
+function GalleryInfoPanel({
+  data,
+  processingStats,
+}: {
+  data: NonNullable<GalleryRightSidebarProps["galleryTimingData"]>;
+  processingStats?: GalleryRightSidebarProps["processingStats"];
+}) {
+  const formatTime = (iso: string | null) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  };
+
+  const formatDate = (iso: string | null) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+  };
+
+  const duration = (start: string | null, end: string | null) => {
+    if (!start || !end) return null;
+    const ms = new Date(end).getTime() - new Date(start).getTime();
+    if (ms < 0) return null;
+    const secs = Math.floor(ms / 1000);
+    if (secs < 60) return `${secs}s`;
+    const mins = Math.floor(secs / 60);
+    const remSecs = secs % 60;
+    if (mins < 60) return `${mins}m ${remSecs}s`;
+    const hrs = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return `${hrs}h ${remMins}m`;
+  };
+
+  type StageStatus = "completed" | "active" | "idle";
+
+  const stages: Array<{
+    icon: React.ReactNode;
+    label: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    status: StageStatus;
+    color: string;
+    bgColor: string;
+  }> = [
+    {
+      icon: <Upload className="w-3.5 h-3.5" />,
+      label: "Upload",
+      startedAt: data.uploadStartedAt,
+      completedAt: data.uploadCompletedAt,
+      status: data.uploadCompletedAt ? "completed" : data.uploadStartedAt ? "active" : "idle",
+      color: "text-cyan-400",
+      bgColor: "bg-cyan-500",
+    },
+    {
+      icon: <Scissors className="w-3.5 h-3.5" />,
+      label: "Processing",
+      startedAt: data.processingStartedAt,
+      completedAt: data.processingCompletedAt,
+      status: data.processingCompletedAt ? "completed" : data.processingStartedAt ? "active" : "idle",
+      color: "text-violet-400",
+      bgColor: "bg-violet-500",
+    },
+    {
+      icon: <Wand2 className="w-3.5 h-3.5" />,
+      label: "AI Culling",
+      startedAt: data.cullingStartedAt,
+      completedAt: data.cullingCompletedAt,
+      status: data.cullingCompletedAt ? "completed" : data.cullingStartedAt ? "active" : "idle",
+      color: "text-amber-400",
+      bgColor: "bg-amber-500",
+    },
+  ];
+
+  // Total pipeline duration (from first start to last completion)
+  const allStarts = [data.uploadStartedAt, data.processingStartedAt, data.cullingStartedAt].filter(Boolean) as string[];
+  const allEnds = [data.uploadCompletedAt, data.processingCompletedAt, data.cullingCompletedAt].filter(Boolean) as string[];
+  const pipelineStart = allStarts.length > 0 ? allStarts.reduce((a, b) => a < b ? a : b) : null;
+  const pipelineEnd = allEnds.length > 0 ? allEnds.reduce((a, b) => a > b ? a : b) : null;
+  const totalDuration = duration(pipelineStart, pipelineEnd);
+
+  return (
+    <div className="space-y-3">
+      {/* Gallery summary */}
+      <div className="rounded-lg bg-muted/30 border border-border/50 p-2.5 space-y-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <ImageIcon className="w-3 h-3" />
+            {data.totalImages} images
+          </span>
+          <span className="text-muted-foreground">
+            {data.sourceType === "google" ? "Google Drive" : "Direct Upload"}
+          </span>
+        </div>
+        {data.createdAt && (
+          <p className="text-[10px] text-muted-foreground/70">
+            Created {formatDate(data.createdAt)} {formatTime(data.createdAt)}
+          </p>
+        )}
+      </div>
+
+      {/* Processing progress (shown when processing is active or has errors) */}
+      {processingStats && (
+        <div className="rounded-lg bg-muted/30 border border-border/50 p-2.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-foreground">Processing Progress</span>
+            <span className="text-[10px] tabular-nums text-muted-foreground font-medium">
+              {processingStats.percentage}%
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
+              style={{ width: `${processingStats.percentage}%` }}
+            />
+          </div>
+          {/* Status badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
+              <Check className="w-2.5 h-2.5" />
+              {processingStats.ready} Ready
+            </span>
+            {processingStats.processing > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium">
+                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                {processingStats.processing} Processing
+              </span>
+            )}
+            {processingStats.error > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 font-medium">
+                <X className="w-2.5 h-2.5" />
+                {processingStats.error} Error
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Visual pipeline timeline */}
+      <div className="relative">
+        {stages.map((stage, i) => {
+          const dur = duration(stage.startedAt, stage.completedAt);
+          const isLast = i === stages.length - 1;
+
+          return (
+            <div key={stage.label} className="relative flex gap-2.5">
+              {/* Timeline line + dot */}
+              <div className="flex flex-col items-center">
+                <div
+                  className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors",
+                    stage.status === "completed" && `${stage.bgColor}/20 ${stage.color}`,
+                    stage.status === "active" && `${stage.bgColor}/30 ${stage.color} ring-2 ring-offset-1 ring-offset-background ring-current`,
+                    stage.status === "idle" && "bg-muted/50 text-muted-foreground/40"
+                  )}
+                >
+                  {stage.status === "completed" ? (
+                    <Check className="w-3.5 h-3.5" />
+                  ) : stage.status === "active" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    stage.icon
+                  )}
+                </div>
+                {/* Connector line */}
+                {!isLast && (
+                  <div
+                    className={cn(
+                      "w-px flex-1 min-h-[16px]",
+                      stage.status === "completed" ? `${stage.bgColor}/30` : "bg-border/50"
+                    )}
+                  />
+                )}
+              </div>
+
+              {/* Content */}
+              <div className={cn("pb-3 flex-1 min-w-0", isLast && "pb-0")}>
+                <div className="flex items-center justify-between gap-1">
+                  <span
+                    className={cn(
+                      "text-xs font-medium",
+                      stage.status === "idle" ? "text-muted-foreground/50" : "text-foreground"
+                    )}
+                  >
+                    {stage.label}
+                  </span>
+                  {dur && (
+                    <span className={cn("text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full", `${stage.bgColor}/15 ${stage.color}`)}>
+                      {dur}
+                    </span>
+                  )}
+                  {stage.status === "active" && (
+                    <span className="text-[10px] text-amber-400 animate-pulse">In progress</span>
+                  )}
+                </div>
+                {stage.startedAt && (
+                  <p className="text-[10px] text-muted-foreground/70 tabular-nums mt-0.5">
+                    {formatTime(stage.startedAt)}
+                    {stage.completedAt && ` → ${formatTime(stage.completedAt)}`}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Total duration footer */}
+      {totalDuration && (
+        <div className="rounded-lg bg-primary/5 border border-primary/10 px-2.5 py-1.5 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Total pipeline
+          </span>
+          <span className="text-xs font-semibold text-primary tabular-nums">{totalDuration}</span>
+        </div>
+      )}
+    </div>
+  );
+}

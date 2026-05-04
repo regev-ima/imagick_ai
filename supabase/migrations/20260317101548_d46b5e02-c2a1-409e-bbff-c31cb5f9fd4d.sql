@@ -1,0 +1,1 @@
+UPDATE public.styles SET status = 'ready', error_details = '{}', training_completion_date = now() WHERE id = '6679ce0b-b6ab-4a1d-b56a-56cc7556bc12'

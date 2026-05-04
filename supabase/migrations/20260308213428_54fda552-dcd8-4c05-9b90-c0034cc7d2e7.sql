@@ -1,0 +1,1 @@
+ALTER TABLE public.user_subscriptions ADD COLUMN preferred_language text NOT NULL DEFAULT 'en';

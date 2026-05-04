@@ -1,0 +1,126 @@
+project_id = "nzfnqgmphepxgrjkkgkq"
+
+[functions.count-files]
+verify_jwt = false
+
+[functions.verify-gallery-password]
+verify_jwt = false
+
+[functions.send-gallery-invite]
+verify_jwt = false
+
+[functions.update-gallery-password]
+verify_jwt = false
+ 
+[functions.image-upload]
+verify_jwt = false
+
+[functions.process-images]
+verify_jwt = false
+
+[functions.image-webhook]
+verify_jwt = false
+
+[functions.fetch-culling-data]
+verify_jwt = false
+
+[functions.start-grouping]
+verify_jwt = false
+
+[functions.grouping-webhook]
+verify_jwt = false
+
+[functions.gd-transfer]
+verify_jwt = false
+
+[functions.gd-transfer-webhook]
+verify_jwt = false
+
+[functions.train-style]
+verify_jwt = false
+
+[functions.train-webhook]
+verify_jwt = false
+
+[functions.extract-exif]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.send-test-email]
+verify_jwt = false
+
+[functions.send-password-reset]
+verify_jwt = false
+
+[functions.admin-list-users]
+verify_jwt = false
+
+[functions.notify-whatsapp]
+verify_jwt = false
+
+[functions.track-session]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
+[functions.process-journey]
+verify_jwt = false
+
+[functions.journey-unsubscribe]
+verify_jwt = false
+
+[functions.paypal-setup-plans]
+verify_jwt = false
+
+[functions.paypal-client-token]
+verify_jwt = false
+
+[functions.download-invoice]
+verify_jwt = false
+
+[functions.generate-invoice]
+verify_jwt = false
+
+[functions.admin-import-leads-chunk]
+verify_jwt = false
+
+[functions.admin-finalize-lead-import]
+verify_jwt = false
+
+[functions.process-lead-email-queue]
+verify_jwt = false
+
+[functions.lead-open-track]
+verify_jwt = false
+
+[functions.lead-unsubscribe]
+verify_jwt = false
+
+[functions.admin-lead-observability]
+verify_jwt = false
+
+[functions.billing-cron]
+verify_jwt = false
+
+[functions.paypal-cancel-subscription]
+verify_jwt = false
+
+[functions.paypal-capture-addon]
+verify_jwt = false
+
+[functions.paypal-change-plan]
+verify_jwt = false
+
+[functions.paypal-create-addon-order]
+verify_jwt = false
+
+[functions.paypal-create-subscription]
+verify_jwt = false
+
+[functions.paypal-webhook]
+verify_jwt = false
+
+[functions.process-gallery-faces]
+verify_jwt = false
