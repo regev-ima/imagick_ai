@@ -73,6 +73,8 @@ WHERE slug = 'studio';
 ALTER TABLE public.user_addons
 DROP CONSTRAINT IF EXISTS user_addons_addon_type_check;
 
-ALTER TABLE public.user_addons
+DO $$ BEGIN
+  ALTER TABLE public.user_addons
 ADD CONSTRAINT user_addons_addon_type_check
 CHECK (addon_type IN ('extra_model', 'extra_storage', 'priority_processing'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
