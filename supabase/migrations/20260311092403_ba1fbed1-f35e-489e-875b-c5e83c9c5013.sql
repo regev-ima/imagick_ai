@@ -214,6 +214,7 @@ AS $$
 $$;
 
 -- 11) Function: lookup_registered_emails
+DROP FUNCTION IF EXISTS public.lookup_registered_emails(text[]);
 CREATE OR REPLACE FUNCTION public.lookup_registered_emails(p_emails text[])
 RETURNS TABLE(email_normalized text)
 LANGUAGE sql STABLE SECURITY DEFINER
