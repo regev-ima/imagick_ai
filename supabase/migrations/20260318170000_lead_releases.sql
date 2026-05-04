@@ -1,5 +1,5 @@
 -- Lead release batches: track each release with stats
-CREATE TABLE public.lead_releases (
+CREATE TABLE IF NOT EXISTS public.lead_releases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_id uuid NOT NULL REFERENCES public.lead_campaigns(id),
   created_by uuid NOT NULL,

@@ -8,7 +8,7 @@ DROP TABLE IF EXISTS public.lead_campaign_steps CASCADE;
 DROP TABLE IF EXISTS public.lead_campaigns CASCADE;
 
 -- 2) Recreate lead_campaigns with full schema
-CREATE TABLE public.lead_campaigns (
+CREATE TABLE IF NOT EXISTS public.lead_campaigns (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   description text,
@@ -26,7 +26,7 @@ CREATE POLICY "Admins manage lead_campaigns" ON public.lead_campaigns FOR ALL US
 CREATE POLICY "Admins select lead_campaigns" ON public.lead_campaigns FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 3) Recreate lead_campaign_steps WITH body_html
-CREATE TABLE public.lead_campaign_steps (
+CREATE TABLE IF NOT EXISTS public.lead_campaign_steps (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_id uuid NOT NULL REFERENCES public.lead_campaigns(id) ON DELETE CASCADE,
   step_order integer NOT NULL DEFAULT 1,
@@ -44,7 +44,7 @@ CREATE POLICY "Admins manage lead_campaign_steps" ON public.lead_campaign_steps 
 CREATE POLICY "Admins select lead_campaign_steps" ON public.lead_campaign_steps FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 4) lead_contacts
-CREATE TABLE public.lead_contacts (
+CREATE TABLE IF NOT EXISTS public.lead_contacts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email_raw text NOT NULL,
   email_normalized text NOT NULL,
@@ -66,7 +66,7 @@ CREATE POLICY "Admins manage lead_contacts" ON public.lead_contacts FOR ALL USIN
 CREATE POLICY "Admins select lead_contacts" ON public.lead_contacts FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 5) lead_import_jobs
-CREATE TABLE public.lead_import_jobs (
+CREATE TABLE IF NOT EXISTS public.lead_import_jobs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   created_by uuid NOT NULL,
   file_name text,
@@ -93,7 +93,7 @@ CREATE POLICY "Admins manage lead_import_jobs" ON public.lead_import_jobs FOR AL
 CREATE POLICY "Admins select lead_import_jobs" ON public.lead_import_jobs FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 6) lead_import_job_rows
-CREATE TABLE public.lead_import_job_rows (
+CREATE TABLE IF NOT EXISTS public.lead_import_job_rows (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   import_job_id uuid NOT NULL REFERENCES public.lead_import_jobs(id) ON DELETE CASCADE,
   row_number integer NOT NULL DEFAULT 0,
@@ -115,7 +115,7 @@ CREATE POLICY "Admins manage lead_import_job_rows" ON public.lead_import_job_row
 CREATE POLICY "Admins select lead_import_job_rows" ON public.lead_import_job_rows FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 7) lead_enrollments
-CREATE TABLE public.lead_enrollments (
+CREATE TABLE IF NOT EXISTS public.lead_enrollments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id uuid NOT NULL REFERENCES public.lead_contacts(id) ON DELETE CASCADE,
   campaign_id uuid NOT NULL REFERENCES public.lead_campaigns(id),
@@ -136,7 +136,7 @@ CREATE POLICY "Admins manage lead_enrollments" ON public.lead_enrollments FOR AL
 CREATE POLICY "Admins select lead_enrollments" ON public.lead_enrollments FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 8) lead_scheduled_emails
-CREATE TABLE public.lead_scheduled_emails (
+CREATE TABLE IF NOT EXISTS public.lead_scheduled_emails (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   enrollment_id uuid NOT NULL REFERENCES public.lead_enrollments(id) ON DELETE CASCADE,
   lead_id uuid NOT NULL REFERENCES public.lead_contacts(id),
@@ -170,7 +170,7 @@ CREATE POLICY "Admins manage lead_scheduled_emails" ON public.lead_scheduled_ema
 CREATE POLICY "Admins select lead_scheduled_emails" ON public.lead_scheduled_emails FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 9) lead_email_opens
-CREATE TABLE public.lead_email_opens (
+CREATE TABLE IF NOT EXISTS public.lead_email_opens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   scheduled_email_id uuid NOT NULL REFERENCES public.lead_scheduled_emails(id) ON DELETE CASCADE,
   lead_id uuid REFERENCES public.lead_contacts(id),

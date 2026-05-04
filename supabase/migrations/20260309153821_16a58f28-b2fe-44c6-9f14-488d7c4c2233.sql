@@ -1,5 +1,5 @@
 
-CREATE TABLE public.user_addons (
+CREATE TABLE IF NOT EXISTS public.user_addons (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   addon_type text NOT NULL,

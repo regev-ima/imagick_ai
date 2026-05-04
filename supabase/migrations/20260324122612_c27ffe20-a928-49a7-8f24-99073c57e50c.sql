@@ -1,5 +1,5 @@
 -- face_clusters: one row per person-group per gallery
-CREATE TABLE face_clusters (
+CREATE TABLE IF NOT EXISTS face_clusters (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   gallery_id uuid NOT NULL REFERENCES galleries(id) ON DELETE CASCADE,
   representative_image_id uuid REFERENCES gallery_images(id) ON DELETE SET NULL,
@@ -11,7 +11,7 @@ CREATE TABLE face_clusters (
 CREATE INDEX idx_face_clusters_gallery ON face_clusters(gallery_id);
 
 -- face_detections: one row per detected face per image
-CREATE TABLE face_detections (
+CREATE TABLE IF NOT EXISTS face_detections (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   image_id uuid NOT NULL REFERENCES gallery_images(id) ON DELETE CASCADE,
   gallery_id uuid NOT NULL REFERENCES galleries(id) ON DELETE CASCADE,

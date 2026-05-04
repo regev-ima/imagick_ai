@@ -1,6 +1,6 @@
 
 -- Create gallery_sessions table for password-protected gallery access
-CREATE TABLE public.gallery_sessions (
+CREATE TABLE IF NOT EXISTS public.gallery_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   gallery_id uuid NOT NULL REFERENCES public.galleries(id) ON DELETE CASCADE,
   session_token text NOT NULL UNIQUE,

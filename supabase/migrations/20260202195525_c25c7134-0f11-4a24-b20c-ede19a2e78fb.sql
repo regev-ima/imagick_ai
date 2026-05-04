@@ -1,5 +1,5 @@
 -- Create galleries table
-CREATE TABLE public.galleries (
+CREATE TABLE IF NOT EXISTS public.galleries (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -18,7 +18,7 @@ CREATE TABLE public.galleries (
 );
 
 -- Create gallery_images table
-CREATE TABLE public.gallery_images (
+CREATE TABLE IF NOT EXISTS public.gallery_images (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -40,7 +40,7 @@ CREATE TABLE public.gallery_images (
 );
 
 -- Create styles table
-CREATE TABLE public.styles (
+CREATE TABLE IF NOT EXISTS public.styles (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -55,7 +55,7 @@ CREATE TABLE public.styles (
 );
 
 -- Create gallery_styles junction table
-CREATE TABLE public.gallery_styles (
+CREATE TABLE IF NOT EXISTS public.gallery_styles (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   gallery_id UUID NOT NULL REFERENCES public.galleries(id) ON DELETE CASCADE,
   style_id UUID NOT NULL REFERENCES public.styles(id) ON DELETE CASCADE,
@@ -63,7 +63,7 @@ CREATE TABLE public.gallery_styles (
 );
 
 -- Create client_interactions table for tracking client likes/feedback
-CREATE TABLE public.client_interactions (
+CREATE TABLE IF NOT EXISTS public.client_interactions (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   gallery_id UUID NOT NULL REFERENCES public.galleries(id) ON DELETE CASCADE,

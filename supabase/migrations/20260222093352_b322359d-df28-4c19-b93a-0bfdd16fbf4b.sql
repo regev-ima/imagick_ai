@@ -1,5 +1,5 @@
 
-CREATE TABLE public.user_sessions (
+CREATE TABLE IF NOT EXISTS public.user_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),

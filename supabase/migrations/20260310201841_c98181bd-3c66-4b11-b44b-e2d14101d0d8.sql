@@ -1,5 +1,5 @@
 
-CREATE TABLE public.lead_campaigns (
+CREATE TABLE IF NOT EXISTS public.lead_campaigns (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   description text,
@@ -20,7 +20,7 @@ CREATE POLICY "Admins can manage lead campaigns" ON public.lead_campaigns
 CREATE POLICY "Admins can view lead campaigns" ON public.lead_campaigns
   FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
-CREATE TABLE public.lead_campaign_steps (
+CREATE TABLE IF NOT EXISTS public.lead_campaign_steps (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_id uuid NOT NULL REFERENCES public.lead_campaigns(id) ON DELETE CASCADE,
   step_order integer NOT NULL DEFAULT 1,
