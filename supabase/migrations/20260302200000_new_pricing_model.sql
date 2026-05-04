@@ -77,4 +77,4 @@ DO $$ BEGIN
   ALTER TABLE public.user_addons
 ADD CONSTRAINT user_addons_addon_type_check
 CHECK (addon_type IN ('extra_model', 'extra_storage', 'priority_processing'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table OR unique_violation THEN NULL; END $$;

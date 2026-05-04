@@ -5,7 +5,7 @@ DO $$ BEGIN
   ALTER TABLE public.lead_scheduled_emails
   ADD CONSTRAINT lead_scheduled_emails_status_check
   CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'cancelled', 'skipped', 'held'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table OR unique_violation THEN NULL; END $$;
 
 -- 2) Update cancel_lead_on_signup() to also cancel 'held' emails when a lead converts
 CREATE OR REPLACE FUNCTION public.cancel_lead_on_signup()
