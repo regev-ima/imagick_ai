@@ -226,6 +226,12 @@ AS $$
 $$;
 
 -- 12) Function: claim_pending_lead_emails (duplicate-safe atomic claim)
+-- Fix open_token type: an earlier migration created lead_scheduled_emails.open_token as text;
+-- the function below expects uuid. Coerce the column type before defining the function.
+-- Existing data in the column is hex (not UUID-shaped), so drop+re-add — the table is empty
+-- on a fresh push.
+ALTER TABLE public.lead_scheduled_emails DROP COLUMN IF EXISTS open_token;
+ALTER TABLE public.lead_scheduled_emails ADD COLUMN open_token uuid NOT NULL DEFAULT gen_random_uuid();
 DROP FUNCTION IF EXISTS public.claim_pending_lead_emails(integer);
 CREATE OR REPLACE FUNCTION public.claim_pending_lead_emails(p_limit integer DEFAULT 20)
 RETURNS TABLE(
