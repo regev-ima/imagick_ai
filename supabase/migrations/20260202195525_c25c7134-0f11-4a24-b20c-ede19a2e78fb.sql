@@ -196,21 +196,26 @@ CREATE TRIGGER update_styles_updated_at
 
 -- Create storage bucket for gallery images
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('gallery-images', 'gallery-images', true);
+VALUES ('gallery-images', 'gallery-images', true)
+ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies for gallery images
+DROP POLICY IF EXISTS "Users can upload their own gallery images" ON storage.objects;
 CREATE POLICY "Users can upload their own gallery images"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'gallery-images' AND auth.uid()::text = (storage.foldername(name))[1]);
 
+DROP POLICY IF EXISTS "Users can update their own gallery images" ON storage.objects;
 CREATE POLICY "Users can update their own gallery images"
   ON storage.objects FOR UPDATE
   USING (bucket_id = 'gallery-images' AND auth.uid()::text = (storage.foldername(name))[1]);
 
+DROP POLICY IF EXISTS "Users can delete their own gallery images" ON storage.objects;
 CREATE POLICY "Users can delete their own gallery images"
   ON storage.objects FOR DELETE
   USING (bucket_id = 'gallery-images' AND auth.uid()::text = (storage.foldername(name))[1]);
 
+DROP POLICY IF EXISTS "Gallery images are publicly viewable" ON storage.objects;
 CREATE POLICY "Gallery images are publicly viewable"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'gallery-images');
