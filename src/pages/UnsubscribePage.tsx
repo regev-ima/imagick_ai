@@ -10,7 +10,7 @@ const TRACE_VERSION = "unsubscribe-retention-v2-2026-03-11";
 const AUTH_URL = "https://studio.imagick.ai/auth";
 const REQUEST_TIMEOUT_MS = 9000;
 const LOGO_DARK_URL =
-  "https://nzfnqgmphepxgrjkkgkq.supabase.co/storage/v1/object/public/gallery-images/brand%2Fimagick-logo-dark.png";
+  "https://zfcltfqgrhytpvgqkkfo.supabase.co/storage/v1/object/public/gallery-images/brand%2Fimagick-logo-dark.png";
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
