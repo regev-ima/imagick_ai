@@ -18,16 +18,19 @@ CREATE TABLE IF NOT EXISTS public.onboarding_questions (
 ALTER TABLE public.onboarding_questions ENABLE ROW LEVEL SECURITY;
 
 -- Everyone can read active questions
+DROP POLICY IF EXISTS "Anyone can read active questions" ON public.onboarding_questions;
 CREATE POLICY "Anyone can read active questions"
   ON public.onboarding_questions FOR SELECT
   USING (is_active = true);
 
 -- Admins can read all (including inactive)
+DROP POLICY IF EXISTS "Admins can read all questions" ON public.onboarding_questions;
 CREATE POLICY "Admins can read all questions"
   ON public.onboarding_questions FOR SELECT
   USING (is_admin(auth.uid()));
 
 -- Admins can manage questions
+DROP POLICY IF EXISTS "Admins can manage questions" ON public.onboarding_questions;
 CREATE POLICY "Admins can manage questions"
   ON public.onboarding_questions FOR ALL
   USING (is_admin(auth.uid()));
@@ -45,18 +48,22 @@ CREATE TABLE IF NOT EXISTS public.onboarding_answers (
 
 ALTER TABLE public.onboarding_answers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own answers" ON public.onboarding_answers;
 CREATE POLICY "Users can read own answers"
   ON public.onboarding_answers FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own answers" ON public.onboarding_answers;
 CREATE POLICY "Users can insert own answers"
   ON public.onboarding_answers FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own answers" ON public.onboarding_answers;
 CREATE POLICY "Users can update own answers"
   ON public.onboarding_answers FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can read all answers" ON public.onboarding_answers;
 CREATE POLICY "Admins can read all answers"
   ON public.onboarding_answers FOR SELECT
   USING (is_admin(auth.uid()));
@@ -69,10 +76,12 @@ CREATE TABLE IF NOT EXISTS public.onboarding_skips (
 
 ALTER TABLE public.onboarding_skips ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own skips" ON public.onboarding_skips;
 CREATE POLICY "Users can manage own skips"
   ON public.onboarding_skips FOR ALL
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own skips" ON public.onboarding_skips;
 CREATE POLICY "Users can insert own skips"
   ON public.onboarding_skips FOR INSERT
   WITH CHECK (auth.uid() = user_id);

@@ -17,6 +17,7 @@ $$;
 -- Update gallery_images: replace broad policy with one that excludes password-protected galleries
 DROP POLICY IF EXISTS "Public can view gallery images via client link" ON public.gallery_images;
 
+DROP POLICY IF EXISTS "Public can view non-protected gallery images" ON public.gallery_images;
 CREATE POLICY "Public can view non-protected gallery images"
 ON public.gallery_images FOR SELECT
 USING (gallery_is_public(gallery_id));
@@ -24,6 +25,7 @@ USING (gallery_is_public(gallery_id));
 -- Update image_edits: same fix
 DROP POLICY IF EXISTS "Public can view image edits via client link" ON public.image_edits;
 
+DROP POLICY IF EXISTS "Public can view image edits for non-protected galleries" ON public.image_edits;
 CREATE POLICY "Public can view image edits for non-protected galleries"
 ON public.image_edits FOR SELECT
 USING (gallery_is_public(gallery_id));

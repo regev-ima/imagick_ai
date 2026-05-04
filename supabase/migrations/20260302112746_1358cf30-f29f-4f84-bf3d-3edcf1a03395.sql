@@ -9,10 +9,12 @@ CREATE TABLE IF NOT EXISTS public.paypal_plan_mapping (
 
 ALTER TABLE public.paypal_plan_mapping ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can view plan mappings" ON public.paypal_plan_mapping;
 CREATE POLICY "Anyone can view plan mappings"
   ON public.paypal_plan_mapping FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Admins can manage plan mappings" ON public.paypal_plan_mapping;
 CREATE POLICY "Admins can manage plan mappings"
   ON public.paypal_plan_mapping FOR ALL
   USING (public.is_admin(auth.uid()));

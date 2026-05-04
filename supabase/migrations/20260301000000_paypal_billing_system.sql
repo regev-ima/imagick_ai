@@ -34,18 +34,22 @@ DROP POLICY IF EXISTS "Deny updates to credit logs" ON public.edit_usage_logs;
 DROP POLICY IF EXISTS "Deny deletes from credit logs" ON public.edit_usage_logs;
 
 -- Recreate with new names
+DROP POLICY IF EXISTS "Users can view their own edit logs" ON public.edit_usage_logs;
 CREATE POLICY "Users can view their own edit logs"
 ON public.edit_usage_logs FOR SELECT
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Deny direct inserts to edit logs" ON public.edit_usage_logs;
 CREATE POLICY "Deny direct inserts to edit logs"
 ON public.edit_usage_logs FOR INSERT
 TO authenticated WITH CHECK (false);
 
+DROP POLICY IF EXISTS "Deny updates to edit logs" ON public.edit_usage_logs;
 CREATE POLICY "Deny updates to edit logs"
 ON public.edit_usage_logs FOR UPDATE
 TO authenticated USING (false);
 
+DROP POLICY IF EXISTS "Deny deletes from edit logs" ON public.edit_usage_logs;
 CREATE POLICY "Deny deletes from edit logs"
 ON public.edit_usage_logs FOR DELETE
 TO authenticated USING (false);
@@ -196,10 +200,12 @@ CREATE TABLE IF NOT EXISTS public.invoices (
 
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own invoices" ON public.invoices;
 CREATE POLICY "Users can view their own invoices"
 ON public.invoices FOR SELECT
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can manage all invoices" ON public.invoices;
 CREATE POLICY "Admins can manage all invoices"
 ON public.invoices FOR ALL
 USING (public.is_admin(auth.uid()));
@@ -229,6 +235,7 @@ CREATE TABLE IF NOT EXISTS public.paypal_webhook_events (
 
 ALTER TABLE public.paypal_webhook_events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can view webhook events" ON public.paypal_webhook_events;
 CREATE POLICY "Admins can view webhook events"
 ON public.paypal_webhook_events FOR ALL
 USING (public.is_admin(auth.uid()));
@@ -252,9 +259,11 @@ CREATE TABLE IF NOT EXISTS public.paypal_plan_mapping (
 
 ALTER TABLE public.paypal_plan_mapping ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can read PayPal plan mappings" ON public.paypal_plan_mapping;
 CREATE POLICY "Anyone can read PayPal plan mappings"
 ON public.paypal_plan_mapping FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Admins can manage PayPal plan mappings" ON public.paypal_plan_mapping;
 CREATE POLICY "Admins can manage PayPal plan mappings"
 ON public.paypal_plan_mapping FOR ALL
 USING (public.is_admin(auth.uid()));
@@ -276,10 +285,12 @@ CREATE TABLE IF NOT EXISTS public.user_addons (
 
 ALTER TABLE public.user_addons ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own addons" ON public.user_addons;
 CREATE POLICY "Users can view their own addons"
 ON public.user_addons FOR SELECT
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can manage all addons" ON public.user_addons;
 CREATE POLICY "Admins can manage all addons"
 ON public.user_addons FOR ALL
 USING (public.is_admin(auth.uid()));

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.gallery_sessions (
 ALTER TABLE public.gallery_sessions ENABLE ROW LEVEL SECURITY;
 
 -- No public access to sessions table - only service role can manage
+DROP POLICY IF EXISTS "No public access to gallery sessions" ON public.gallery_sessions;
 CREATE POLICY "No public access to gallery sessions"
 ON public.gallery_sessions FOR ALL
 USING (false);
@@ -36,6 +37,7 @@ AS $$
 $$;
 
 -- Add policy for password-protected galleries with valid sessions
+DROP POLICY IF EXISTS "Public can view password-protected gallery images with session" ON public.gallery_images;
 CREATE POLICY "Public can view password-protected gallery images with session"
 ON public.gallery_images FOR SELECT
 USING (
@@ -44,6 +46,7 @@ USING (
 );
 
 -- Same for image_edits
+DROP POLICY IF EXISTS "Public can view password-protected image edits with session" ON public.image_edits;
 CREATE POLICY "Public can view password-protected image edits with session"
 ON public.image_edits FOR SELECT
 USING (

@@ -19,12 +19,14 @@ CREATE INDEX idx_image_edits_gallery_id ON public.image_edits(gallery_id);
 ALTER TABLE public.image_edits ENABLE ROW LEVEL SECURITY;
 
 -- SELECT: owner can view their own edits
+DROP POLICY IF EXISTS "Users can view their own image edits" ON public.image_edits;
 CREATE POLICY "Users can view their own image edits"
 ON public.image_edits
 FOR SELECT
 USING (auth.uid() = user_id);
 
 -- SELECT: public can view via client link (same pattern as gallery_images)
+DROP POLICY IF EXISTS "Public can view image edits via client link" ON public.image_edits;
 CREATE POLICY "Public can view image edits via client link"
 ON public.image_edits
 FOR SELECT
@@ -35,6 +37,7 @@ USING (EXISTS (
 ));
 
 -- SELECT: admins can view all
+DROP POLICY IF EXISTS "Admins can view all image edits" ON public.image_edits;
 CREATE POLICY "Admins can view all image edits"
 ON public.image_edits
 FOR SELECT

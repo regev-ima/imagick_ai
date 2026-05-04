@@ -49,6 +49,7 @@ ALTER TABLE public.styles
 -- עדכון פוליסת SELECT לכלול allowed_user_ids
 DROP POLICY IF EXISTS "Users can view their own styles" ON public.styles;
 
+DROP POLICY IF EXISTS "Users can view accessible styles" ON public.styles;
 CREATE POLICY "Users can view accessible styles"
 ON public.styles FOR SELECT TO authenticated
 USING (

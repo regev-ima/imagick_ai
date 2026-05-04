@@ -11,7 +11,8 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies WHERE policyname = 'Users can update own face_detections'
   ) THEN
-    CREATE POLICY "Users can update own face_detections"
+    DROP POLICY IF EXISTS "Users can update own face_detections" ON face_detections;
+CREATE POLICY "Users can update own face_detections"
       ON face_detections FOR UPDATE TO authenticated
       USING (gallery_id IN (SELECT id FROM galleries WHERE user_id = auth.uid()));
   END IF;
@@ -19,7 +20,8 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies WHERE policyname = 'Users can update own face_clusters'
   ) THEN
-    CREATE POLICY "Users can update own face_clusters"
+    DROP POLICY IF EXISTS "Users can update own face_clusters" ON face_clusters;
+CREATE POLICY "Users can update own face_clusters"
       ON face_clusters FOR UPDATE TO authenticated
       USING (gallery_id IN (SELECT id FROM galleries WHERE user_id = auth.uid()));
   END IF;

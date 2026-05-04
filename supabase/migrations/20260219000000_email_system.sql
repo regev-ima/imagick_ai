@@ -26,10 +26,12 @@ CREATE INDEX IF NOT EXISTS email_logs_status_idx     ON public.email_logs (statu
 
 ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own email logs" ON public.email_logs;
 CREATE POLICY "Users can view own email logs"
   ON public.email_logs FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can view all email logs" ON public.email_logs;
 CREATE POLICY "Admins can view all email logs"
   ON public.email_logs FOR SELECT
   USING (public.is_admin(auth.uid()));
@@ -56,6 +58,7 @@ CREATE TABLE IF NOT EXISTS public.user_email_preferences (
 
 ALTER TABLE public.user_email_preferences ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own email preferences" ON public.user_email_preferences;
 CREATE POLICY "Users can manage own email preferences"
   ON public.user_email_preferences FOR ALL
   USING (auth.uid() = user_id)

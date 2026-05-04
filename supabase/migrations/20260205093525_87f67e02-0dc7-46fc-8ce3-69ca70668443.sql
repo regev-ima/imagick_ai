@@ -85,75 +85,92 @@ ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
 
 -- 9. RLS Policies for user_roles
+DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
 CREATE POLICY "Users can view their own roles"
   ON public.user_roles FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can view all roles" ON public.user_roles;
 CREATE POLICY "Admins can view all roles"
   ON public.user_roles FOR SELECT
   USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can manage all roles" ON public.user_roles;
 CREATE POLICY "Admins can manage all roles"
   ON public.user_roles FOR ALL
   USING (public.is_admin(auth.uid()));
 
 -- 10. RLS Policies for subscription_plans
+DROP POLICY IF EXISTS "Anyone can view active plans" ON public.subscription_plans;
 CREATE POLICY "Anyone can view active plans"
   ON public.subscription_plans FOR SELECT
   USING (is_active = true);
 
+DROP POLICY IF EXISTS "Admins can manage plans" ON public.subscription_plans;
 CREATE POLICY "Admins can manage plans"
   ON public.subscription_plans FOR ALL
   USING (public.is_admin(auth.uid()));
 
 -- 11. RLS Policies for user_subscriptions
+DROP POLICY IF EXISTS "Users can view own subscription" ON public.user_subscriptions;
 CREATE POLICY "Users can view own subscription"
   ON public.user_subscriptions FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can view all subscriptions" ON public.user_subscriptions;
 CREATE POLICY "Admins can view all subscriptions"
   ON public.user_subscriptions FOR SELECT
   USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can manage all subscriptions" ON public.user_subscriptions;
 CREATE POLICY "Admins can manage all subscriptions"
   ON public.user_subscriptions FOR ALL
   USING (public.is_admin(auth.uid()));
 
 -- 12. Admin policies for galleries
+DROP POLICY IF EXISTS "Admins can view all galleries" ON public.galleries;
 CREATE POLICY "Admins can view all galleries"
   ON public.galleries FOR SELECT
   USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can update all galleries" ON public.galleries;
 CREATE POLICY "Admins can update all galleries"
   ON public.galleries FOR UPDATE
   USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can delete all galleries" ON public.galleries;
 CREATE POLICY "Admins can delete all galleries"
   ON public.galleries FOR DELETE
   USING (public.is_admin(auth.uid()));
 
 -- 13. Admin policies for styles
+DROP POLICY IF EXISTS "Admins can view all styles" ON public.styles;
 CREATE POLICY "Admins can view all styles"
   ON public.styles FOR SELECT
   USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can update all styles" ON public.styles;
 CREATE POLICY "Admins can update all styles"
   ON public.styles FOR UPDATE
   USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can delete all styles" ON public.styles;
 CREATE POLICY "Admins can delete all styles"
   ON public.styles FOR DELETE
   USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can insert styles" ON public.styles;
 CREATE POLICY "Admins can insert styles"
   ON public.styles FOR INSERT
   WITH CHECK (public.is_admin(auth.uid()));
 
 -- 14. Admin policies for gallery_images
+DROP POLICY IF EXISTS "Admins can view all gallery images" ON public.gallery_images;
 CREATE POLICY "Admins can view all gallery images"
   ON public.gallery_images FOR SELECT
   USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can manage all gallery images" ON public.gallery_images;
 CREATE POLICY "Admins can manage all gallery images"
   ON public.gallery_images FOR ALL
   USING (public.is_admin(auth.uid()));
