@@ -27,10 +27,12 @@ CREATE TABLE IF NOT EXISTS public.user_lifecycle_profiles (
 
 ALTER TABLE public.user_lifecycle_profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage all lifecycle profiles" ON public.user_lifecycle_profiles;
 CREATE POLICY "Admins can manage all lifecycle profiles"
 ON public.user_lifecycle_profiles FOR ALL
 USING (is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Users can view their own lifecycle profile" ON public.user_lifecycle_profiles;
 CREATE POLICY "Users can view their own lifecycle profile"
 ON public.user_lifecycle_profiles FOR SELECT
 USING (auth.uid() = user_id);
@@ -49,10 +51,12 @@ CREATE TABLE IF NOT EXISTS public.email_sequences (
 
 ALTER TABLE public.email_sequences ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage all sequences" ON public.email_sequences;
 CREATE POLICY "Admins can manage all sequences"
 ON public.email_sequences FOR ALL
 USING (is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can view all sequences" ON public.email_sequences;
 CREATE POLICY "Admins can view all sequences"
 ON public.email_sequences FOR SELECT
 USING (is_admin(auth.uid()));
@@ -73,10 +77,12 @@ CREATE TABLE IF NOT EXISTS public.email_sequence_steps (
 
 ALTER TABLE public.email_sequence_steps ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage all sequence steps" ON public.email_sequence_steps;
 CREATE POLICY "Admins can manage all sequence steps"
 ON public.email_sequence_steps FOR ALL
 USING (is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can view all sequence steps" ON public.email_sequence_steps;
 CREATE POLICY "Admins can view all sequence steps"
 ON public.email_sequence_steps FOR SELECT
 USING (is_admin(auth.uid()));
@@ -99,10 +105,12 @@ CREATE TABLE IF NOT EXISTS public.user_sequence_enrollments (
 
 ALTER TABLE public.user_sequence_enrollments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage all enrollments" ON public.user_sequence_enrollments;
 CREATE POLICY "Admins can manage all enrollments"
 ON public.user_sequence_enrollments FOR ALL
 USING (is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Users can view their own enrollments" ON public.user_sequence_enrollments;
 CREATE POLICY "Users can view their own enrollments"
 ON public.user_sequence_enrollments FOR SELECT
 USING (auth.uid() = user_id);

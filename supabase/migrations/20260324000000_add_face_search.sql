@@ -39,17 +39,21 @@ ALTER TABLE face_clusters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE face_detections ENABLE ROW LEVEL SECURITY;
 
 -- Owner can read their own clusters/detections
+DROP POLICY IF EXISTS "Users can view own face_clusters" ON face_clusters;
 CREATE POLICY "Users can view own face_clusters"
   ON face_clusters FOR SELECT
   USING (gallery_id IN (SELECT id FROM galleries WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can view own face_detections" ON face_detections;
 CREATE POLICY "Users can view own face_detections"
   ON face_detections FOR SELECT
   USING (gallery_id IN (SELECT id FROM galleries WHERE user_id = auth.uid()));
 
 -- Public read for client gallery (guests browsing face clusters)
+DROP POLICY IF EXISTS "Public can view face_clusters" ON face_clusters;
 CREATE POLICY "Public can view face_clusters"
   ON face_clusters FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Public can view face_detections" ON face_detections;
 CREATE POLICY "Public can view face_detections"
   ON face_detections FOR SELECT USING (true);

@@ -16,12 +16,14 @@ CREATE TABLE IF NOT EXISTS public.email_logs (
 ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
 
 -- Admins can view all logs
+DROP POLICY IF EXISTS "Admins can view all email logs" ON public.email_logs;
 CREATE POLICY "Admins can view all email logs"
   ON public.email_logs FOR SELECT
   USING (is_admin(auth.uid()));
 
 -- Service role inserts (via edge functions with service role key) bypass RLS automatically.
 -- We still allow authenticated users to read their own logs for settings pages.
+DROP POLICY IF EXISTS "Users can view their own email logs" ON public.email_logs;
 CREATE POLICY "Users can view their own email logs"
   ON public.email_logs FOR SELECT
   USING (auth.uid() = user_id);
@@ -43,14 +45,17 @@ CREATE TABLE IF NOT EXISTS public.user_email_preferences (
 
 ALTER TABLE public.user_email_preferences ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own email preferences" ON public.user_email_preferences;
 CREATE POLICY "Users can view their own email preferences"
   ON public.user_email_preferences FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own email preferences" ON public.user_email_preferences;
 CREATE POLICY "Users can update their own email preferences"
   ON public.user_email_preferences FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own email preferences" ON public.user_email_preferences;
 CREATE POLICY "Users can insert their own email preferences"
   ON public.user_email_preferences FOR INSERT
   WITH CHECK (auth.uid() = user_id);

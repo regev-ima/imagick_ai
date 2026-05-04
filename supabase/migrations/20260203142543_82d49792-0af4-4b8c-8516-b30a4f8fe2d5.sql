@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.gallery_invites (
 ALTER TABLE public.gallery_invites ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for gallery_invites
+DROP POLICY IF EXISTS "Users can manage their gallery invites" ON public.gallery_invites;
 CREATE POLICY "Users can manage their gallery invites"
 ON public.gallery_invites
 FOR ALL
@@ -31,6 +32,7 @@ USING (EXISTS (
   AND g.user_id = auth.uid()
 ));
 
+DROP POLICY IF EXISTS "Users can view their gallery invites" ON public.gallery_invites;
 CREATE POLICY "Users can view their gallery invites"
 ON public.gallery_invites
 FOR SELECT

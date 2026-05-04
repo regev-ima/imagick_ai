@@ -12,12 +12,14 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
 ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
 
 -- Anyone authenticated can read settings
+DROP POLICY IF EXISTS "Authenticated users can view platform settings" ON public.platform_settings;
 CREATE POLICY "Authenticated users can view platform settings"
 ON public.platform_settings FOR SELECT
 TO authenticated
 USING (true);
 
 -- Only admins can manage settings
+DROP POLICY IF EXISTS "Admins can manage platform settings" ON public.platform_settings;
 CREATE POLICY "Admins can manage platform settings"
 ON public.platform_settings FOR ALL
 USING (is_admin(auth.uid()));

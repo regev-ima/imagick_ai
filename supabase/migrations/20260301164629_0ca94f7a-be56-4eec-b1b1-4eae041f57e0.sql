@@ -19,10 +19,12 @@ CREATE TABLE IF NOT EXISTS public.credit_grants (
 ALTER TABLE public.credit_grants ENABLE ROW LEVEL SECURITY;
 
 -- 2. RLS policies
+DROP POLICY IF EXISTS "Users can view own credit grants" ON public.credit_grants;
 CREATE POLICY "Users can view own credit grants"
   ON public.credit_grants FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins full access on credit grants" ON public.credit_grants;
 CREATE POLICY "Admins full access on credit grants"
   ON public.credit_grants FOR ALL
   USING (public.is_admin(auth.uid()));

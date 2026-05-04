@@ -26,6 +26,7 @@ FROM public.galleries
 WHERE client_link IS NOT NULL;
 
 -- Re-create the public policy - it still allows SELECT but the view will be used for public access
+DROP POLICY IF EXISTS "Public can view galleries by client link" ON public.galleries;
 CREATE POLICY "Public can view galleries by client link"
 ON public.galleries FOR SELECT
 USING (client_link IS NOT NULL);

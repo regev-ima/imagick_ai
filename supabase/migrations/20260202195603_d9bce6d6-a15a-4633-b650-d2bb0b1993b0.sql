@@ -2,6 +2,7 @@
 DROP POLICY "Anyone can create client interactions" ON public.client_interactions;
 
 -- Create a more restrictive policy that only allows inserts for galleries with client links
+DROP POLICY IF EXISTS "Public can create interactions for shared galleries" ON public.client_interactions;
 CREATE POLICY "Public can create interactions for shared galleries"
   ON public.client_interactions FOR INSERT
   WITH CHECK (EXISTS (

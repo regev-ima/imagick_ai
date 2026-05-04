@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS public.credit_usage_logs (
 
 ALTER TABLE public.credit_usage_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own credit logs" ON public.credit_usage_logs;
 CREATE POLICY "Users can view their own credit logs"
 ON public.credit_usage_logs
 FOR SELECT

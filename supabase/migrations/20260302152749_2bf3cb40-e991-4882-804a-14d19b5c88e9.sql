@@ -33,18 +33,21 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.paypal_webhook_events ENABLE ROW LEVEL SECURITY;
 
 -- RLS: Users can view own invoices
+DROP POLICY IF EXISTS "Users can view own invoices" ON public.invoices;
 CREATE POLICY "Users can view own invoices"
   ON public.invoices FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
 -- RLS: Admins can manage all invoices
+DROP POLICY IF EXISTS "Admins can manage all invoices" ON public.invoices;
 CREATE POLICY "Admins can manage all invoices"
   ON public.invoices FOR ALL
   TO authenticated
   USING (public.is_admin(auth.uid()));
 
 -- RLS: No public access to webhook events
+DROP POLICY IF EXISTS "No public access to webhook events" ON public.paypal_webhook_events;
 CREATE POLICY "No public access to webhook events"
   ON public.paypal_webhook_events FOR ALL
   TO authenticated

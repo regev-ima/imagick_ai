@@ -16,16 +16,19 @@ CREATE TABLE IF NOT EXISTS public.user_sessions (
 ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Admins can read all sessions
+DROP POLICY IF EXISTS "Admins can view all sessions" ON public.user_sessions;
 CREATE POLICY "Admins can view all sessions"
 ON public.user_sessions FOR SELECT
 USING (is_admin(auth.uid()));
 
 -- Authenticated users can insert their own sessions
+DROP POLICY IF EXISTS "Users can insert own sessions" ON public.user_sessions;
 CREATE POLICY "Users can insert own sessions"
 ON public.user_sessions FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
 -- Users can view their own sessions
+DROP POLICY IF EXISTS "Users can view own sessions" ON public.user_sessions;
 CREATE POLICY "Users can view own sessions"
 ON public.user_sessions FOR SELECT
 USING (auth.uid() = user_id);

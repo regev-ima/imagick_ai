@@ -19,11 +19,13 @@ DROP POLICY IF EXISTS "Public can view image edits via client link" ON public.im
 DROP POLICY IF EXISTS "Public can view gallery images via client link" ON public.gallery_images;
 
 -- Recreate with security definer function
+DROP POLICY IF EXISTS "Public can view image edits via client link" ON public.image_edits;
 CREATE POLICY "Public can view image edits via client link"
   ON public.image_edits
   FOR SELECT
   USING (public.gallery_has_client_link(gallery_id));
 
+DROP POLICY IF EXISTS "Public can view gallery images via client link" ON public.gallery_images;
 CREATE POLICY "Public can view gallery images via client link"
   ON public.gallery_images
   FOR SELECT
