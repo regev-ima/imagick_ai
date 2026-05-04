@@ -40,6 +40,7 @@ CREATE POLICY "Admins full access lifecycle profiles"
   USING (public.is_admin(auth.uid()));
 
 -- Trigger: auto-create lifecycle profile for every new user
+DROP FUNCTION IF EXISTS public.create_default_lifecycle_profile();
 CREATE OR REPLACE FUNCTION public.create_default_lifecycle_profile()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -56,6 +57,7 @@ CREATE TRIGGER on_auth_user_created_lifecycle
   FOR EACH ROW EXECUTE FUNCTION public.create_default_lifecycle_profile();
 
 -- RPC: atomic login_count increment (used by track-session edge function)
+DROP FUNCTION IF EXISTS public.increment_lifecycle_login(UUID);
 CREATE OR REPLACE FUNCTION public.increment_lifecycle_login(p_user_id UUID)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN

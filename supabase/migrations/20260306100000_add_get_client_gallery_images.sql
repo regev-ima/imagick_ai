@@ -1,6 +1,7 @@
 -- SECURITY DEFINER RPC to fetch gallery images for client view
 -- Bypasses RLS. Access control: gallery must have a client_link (shared).
 -- Password protection is enforced at the frontend level (password screen).
+DROP FUNCTION IF EXISTS public.get_client_gallery_images(uuid, text);
 CREATE OR REPLACE FUNCTION public.get_client_gallery_images(
   p_gallery_id uuid,
   p_session_token text DEFAULT NULL

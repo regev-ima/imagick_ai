@@ -1,5 +1,6 @@
 -- Create a security definer function to safely get public gallery data
 -- This bypasses RLS to allow public access to galleries with client_link
+DROP FUNCTION IF EXISTS public.get_public_gallery(TEXT);
 CREATE OR REPLACE FUNCTION public.get_public_gallery(p_client_link TEXT)
 RETURNS TABLE (
   id UUID,

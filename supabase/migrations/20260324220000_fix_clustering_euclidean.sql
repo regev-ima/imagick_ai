@@ -1,6 +1,7 @@
 -- Fix: Use Euclidean distance (L2) instead of cosine similarity for face-api.js descriptors
 -- face-api.js recommends: Euclidean distance < 0.6 = same person
 
+DROP FUNCTION IF EXISTS cluster_gallery_faces(uuid, float);
 CREATE OR REPLACE FUNCTION cluster_gallery_faces(
   p_gallery_id uuid,
   p_distance_threshold float DEFAULT 0.55

@@ -42,6 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_credit_grants_user_active
   WHERE status = 'active';
 
 -- 4. admin_grant_credits RPC (corrected column names)
+DROP FUNCTION IF EXISTS public.admin_grant_credits(UUID, INTEGER, TIMESTAMPTZ, TEXT);
 CREATE OR REPLACE FUNCTION public.admin_grant_credits(
   p_user_id    UUID,
   p_amount     INTEGER,
@@ -90,6 +91,7 @@ END;
 $$;
 
 -- 5. Updated update_credits_on_usage trigger function (corrected columns, grant depletion)
+DROP FUNCTION IF EXISTS public.update_credits_on_usage();
 CREATE OR REPLACE FUNCTION public.update_credits_on_usage()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -143,6 +145,7 @@ END;
 $$;
 
 -- 6. expire_credit_grants RPC (corrected column names)
+DROP FUNCTION IF EXISTS public.expire_credit_grants();
 CREATE OR REPLACE FUNCTION public.expire_credit_grants()
 RETURNS INTEGER
 LANGUAGE plpgsql

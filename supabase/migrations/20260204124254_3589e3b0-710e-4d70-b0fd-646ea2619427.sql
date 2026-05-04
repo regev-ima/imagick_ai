@@ -1,5 +1,6 @@
 -- Create a security definer function to resolve short links to client links
 -- This bypasses RLS to allow public access to short link resolution
+DROP FUNCTION IF EXISTS public.resolve_short_link(TEXT);
 CREATE OR REPLACE FUNCTION public.resolve_short_link(p_short_id TEXT)
 RETURNS TEXT
 LANGUAGE sql

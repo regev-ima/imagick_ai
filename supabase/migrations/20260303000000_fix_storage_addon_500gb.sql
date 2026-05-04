@@ -1,4 +1,5 @@
 -- Fix: storage add-on should grant 500GB per purchase (was 100GB)
+DROP FUNCTION IF EXISTS public.get_effective_storage_limit(UUID);
 CREATE OR REPLACE FUNCTION public.get_effective_storage_limit(p_user_id UUID)
 RETURNS INTEGER
 LANGUAGE plpgsql

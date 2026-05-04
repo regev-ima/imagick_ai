@@ -1,6 +1,7 @@
 
 -- Create a security definer function to check if a gallery has a client_link
 -- This bypasses RLS on galleries so the check works for non-owner users
+DROP FUNCTION IF EXISTS public.gallery_has_client_link(uuid);
 CREATE OR REPLACE FUNCTION public.gallery_has_client_link(p_gallery_id uuid)
 RETURNS boolean
 LANGUAGE sql

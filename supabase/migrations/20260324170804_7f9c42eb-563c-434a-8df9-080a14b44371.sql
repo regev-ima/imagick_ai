@@ -12,6 +12,7 @@ CREATE INDEX IF NOT EXISTS idx_face_detections_vector
   WITH (lists = 20);
 
 -- Function: cluster faces by cosine similarity within a gallery
+DROP FUNCTION IF EXISTS cluster_gallery_faces(uuid, float);
 CREATE OR REPLACE FUNCTION cluster_gallery_faces(
   p_gallery_id uuid,
   p_similarity_threshold float DEFAULT 0.6

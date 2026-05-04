@@ -44,6 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_credit_grants_user_active
   WHERE status = 'active';
 
 -- 2. RPC: admin_grant_credits — atomic grant + increment edits_remaining
+DROP FUNCTION IF EXISTS public.admin_grant_credits(UUID, INTEGER, TIMESTAMPTZ, TEXT);
 CREATE OR REPLACE FUNCTION public.admin_grant_credits(
   p_user_id    UUID,
   p_amount     INTEGER,
@@ -92,6 +93,7 @@ END;
 $$;
 
 -- 3. Update edit-usage trigger to also deplete grants (soonest-expiring first)
+DROP FUNCTION IF EXISTS public.update_edits_on_usage();
 CREATE OR REPLACE FUNCTION public.update_edits_on_usage()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -146,6 +148,7 @@ END;
 $$;
 
 -- 4. RPC: expire_credit_grants — called by billing-cron
+DROP FUNCTION IF EXISTS public.expire_credit_grants();
 CREATE OR REPLACE FUNCTION public.expire_credit_grants()
 RETURNS INTEGER
 LANGUAGE plpgsql

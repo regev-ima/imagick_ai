@@ -1,4 +1,5 @@
 
+DROP FUNCTION IF EXISTS public.get_images_missing_edits(uuid, uuid[], integer);
 CREATE OR REPLACE FUNCTION public.get_images_missing_edits(
   p_gallery_id uuid,
   p_style_ids uuid[],
@@ -22,6 +23,7 @@ AS $$
   LIMIT p_limit;
 $$;
 
+DROP FUNCTION IF EXISTS public.count_images_missing_edits(uuid, uuid[]);
 CREATE OR REPLACE FUNCTION public.count_images_missing_edits(
   p_gallery_id uuid,
   p_style_ids uuid[]

@@ -226,6 +226,7 @@ AS $$
 $$;
 
 -- 12) Function: claim_pending_lead_emails (duplicate-safe atomic claim)
+DROP FUNCTION IF EXISTS public.claim_pending_lead_emails(integer);
 CREATE OR REPLACE FUNCTION public.claim_pending_lead_emails(p_limit integer DEFAULT 20)
 RETURNS TABLE(
   id uuid,
@@ -271,6 +272,7 @@ AS $$
 $$;
 
 -- 13) Function: cancel pending lead emails when user signs up
+DROP FUNCTION IF EXISTS public.cancel_lead_on_signup();
 CREATE OR REPLACE FUNCTION public.cancel_lead_on_signup()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER

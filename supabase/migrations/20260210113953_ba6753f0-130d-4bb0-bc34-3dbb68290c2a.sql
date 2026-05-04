@@ -1,3 +1,4 @@
+DROP FUNCTION IF EXISTS public.increment_style_transfer_completed(uuid);
 CREATE OR REPLACE FUNCTION public.increment_style_transfer_completed(p_style_id uuid)
 RETURNS void
 LANGUAGE sql

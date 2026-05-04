@@ -118,6 +118,7 @@ DROP TRIGGER IF EXISTS on_credit_usage_logged ON public.edit_usage_logs;
 DROP FUNCTION IF EXISTS public.update_credits_on_usage();
 
 -- New edit deduction trigger (skips unlimited plans where edits_remaining = -1)
+DROP FUNCTION IF EXISTS public.update_edits_on_usage();
 CREATE OR REPLACE FUNCTION public.update_edits_on_usage()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -146,6 +147,7 @@ CREATE TRIGGER on_edit_usage_logged
 -- Update signup trigger to give 3000 edits
 DROP TRIGGER IF EXISTS on_auth_user_created_subscription ON auth.users;
 
+DROP FUNCTION IF EXISTS public.create_default_subscription();
 CREATE OR REPLACE FUNCTION public.create_default_subscription()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -303,6 +305,7 @@ CREATE INDEX IF NOT EXISTS idx_user_addons_user_id ON public.user_addons(user_id
 -- 11. HELPER FUNCTIONS for effective limits (plan + add-ons)
 -- =====================================================================
 
+DROP FUNCTION IF EXISTS public.get_effective_model_limit(UUID);
 CREATE OR REPLACE FUNCTION public.get_effective_model_limit(p_user_id UUID)
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -326,6 +329,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.get_effective_storage_limit(UUID);
 CREATE OR REPLACE FUNCTION public.get_effective_storage_limit(p_user_id UUID)
 RETURNS INTEGER
 LANGUAGE plpgsql

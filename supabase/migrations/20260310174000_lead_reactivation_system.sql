@@ -5,6 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS pg_cron SCHEMA pg_catalog;
 CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
 
+DROP FUNCTION IF EXISTS public.normalize_email(TEXT);
 CREATE OR REPLACE FUNCTION public.normalize_email(p_email TEXT)
 RETURNS TEXT
 LANGUAGE sql
@@ -16,6 +17,7 @@ AS $$
   END;
 $$;
 
+DROP FUNCTION IF EXISTS public.lookup_registered_emails(TEXT[]);
 CREATE OR REPLACE FUNCTION public.lookup_registered_emails(p_emails TEXT[])
 RETURNS TABLE(email_normalized TEXT, user_id UUID)
 LANGUAGE sql
@@ -204,6 +206,7 @@ CREATE INDEX IF NOT EXISTS idx_lead_scheduled_pending
 CREATE INDEX IF NOT EXISTS idx_lead_scheduled_lead
   ON public.lead_scheduled_emails (lead_id, created_at DESC);
 
+DROP FUNCTION IF EXISTS public.claim_pending_lead_emails(INT);
 CREATE OR REPLACE FUNCTION public.claim_pending_lead_emails(p_limit INT DEFAULT 20)
 RETURNS SETOF public.lead_scheduled_emails
 LANGUAGE plpgsql
@@ -250,6 +253,7 @@ CREATE INDEX IF NOT EXISTS idx_lead_email_opens_scheduled
 -- ============================================================
 -- Lead Conversion Trigger (auth.users -> lead converted)
 -- ============================================================
+DROP FUNCTION IF EXISTS public.handle_lead_conversion_on_signup();
 CREATE OR REPLACE FUNCTION public.handle_lead_conversion_on_signup()
 RETURNS TRIGGER
 LANGUAGE plpgsql

@@ -23,6 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_gallery_sessions_expires ON public.gallery_sessio
 
 -- Add RLS policy: allow viewing password-protected gallery images if valid session exists
 -- We need a security definer function for this
+DROP FUNCTION IF EXISTS public.gallery_has_valid_session(uuid);
 CREATE OR REPLACE FUNCTION public.gallery_has_valid_session(p_gallery_id uuid)
   RETURNS boolean
   LANGUAGE sql

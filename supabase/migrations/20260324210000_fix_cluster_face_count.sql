@@ -1,6 +1,7 @@
 -- Fix: cluster_gallery_faces should count unique images, not total detections
 -- Also raise default similarity threshold from 0.6 to 0.75
 
+DROP FUNCTION IF EXISTS cluster_gallery_faces(uuid, float);
 CREATE OR REPLACE FUNCTION cluster_gallery_faces(
   p_gallery_id uuid,
   p_similarity_threshold float DEFAULT 0.75
