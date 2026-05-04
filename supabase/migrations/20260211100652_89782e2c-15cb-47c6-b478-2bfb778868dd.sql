@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS public.image_edits (
 );
 
 -- Index for fast lookups by image
-CREATE INDEX idx_image_edits_image_id ON public.image_edits(image_id);
-CREATE INDEX idx_image_edits_gallery_id ON public.image_edits(gallery_id);
+CREATE INDEX IF NOT EXISTS idx_image_edits_image_id ON public.image_edits(image_id);
+CREATE INDEX IF NOT EXISTS idx_image_edits_gallery_id ON public.image_edits(gallery_id);
 
 -- Enable RLS
 ALTER TABLE public.image_edits ENABLE ROW LEVEL SECURITY;

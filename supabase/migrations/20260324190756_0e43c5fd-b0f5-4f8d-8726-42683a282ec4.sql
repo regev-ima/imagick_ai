@@ -1,6 +1,6 @@
 -- 1. Fix vector index: switch from cosine_ops to l2_ops
 DROP INDEX IF EXISTS idx_face_detections_vector;
-CREATE INDEX idx_face_detections_vector
+CREATE INDEX IF NOT EXISTS idx_face_detections_vector
   ON face_detections
   USING ivfflat (face_vector vector_l2_ops)
   WITH (lists = 20);

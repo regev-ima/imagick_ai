@@ -1,5 +1,7 @@
 -- 1. יצירת Enum לתפקידים
-CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
+DO $$ BEGIN
+  CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 2. טבלת תפקידים
 CREATE TABLE IF NOT EXISTS public.user_roles (
@@ -185,6 +187,7 @@ VALUES
   ('Studio', 'studio', 149, 1430, 20000, -1, 500, true, true, true, true, 3, '["20,000 credits per month", "Unlimited styles", "500GB storage", "AI Culling", "Team access", "API access", "Priority support"]'::jsonb);
 
 -- 16. Trigger to update updated_at
+DROP TRIGGER IF EXISTS update_user_subscriptions_updated_at ON public.user_subscriptions;
 CREATE TRIGGER update_user_subscriptions_updated_at
   BEFORE UPDATE ON public.user_subscriptions
   FOR EACH ROW

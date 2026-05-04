@@ -32,14 +32,14 @@ CREATE POLICY "Service role full access on credit grants"
   USING (true)
   WITH CHECK (true);
 
-CREATE INDEX idx_credit_grants_user_id
+CREATE INDEX IF NOT EXISTS idx_credit_grants_user_id
   ON public.credit_grants(user_id);
 
-CREATE INDEX idx_credit_grants_active_expires
+CREATE INDEX IF NOT EXISTS idx_credit_grants_active_expires
   ON public.credit_grants(expires_at)
   WHERE status = 'active';
 
-CREATE INDEX idx_credit_grants_user_active
+CREATE INDEX IF NOT EXISTS idx_credit_grants_user_active
   ON public.credit_grants(user_id, expires_at)
   WHERE status = 'active';
 

@@ -17,5 +17,5 @@ ON public.credit_usage_logs
 FOR SELECT
 USING (auth.uid() = user_id);
 
-CREATE INDEX idx_credit_usage_logs_user_id ON public.credit_usage_logs(user_id);
-CREATE INDEX idx_credit_usage_logs_created_at ON public.credit_usage_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_credit_usage_logs_user_id ON public.credit_usage_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_credit_usage_logs_created_at ON public.credit_usage_logs(created_at);

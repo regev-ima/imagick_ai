@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS public.lead_releases (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_lead_releases_campaign ON public.lead_releases(campaign_id);
-CREATE INDEX idx_lead_releases_created ON public.lead_releases(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lead_releases_campaign ON public.lead_releases(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_lead_releases_created ON public.lead_releases(created_at DESC);
 
 ALTER TABLE public.lead_releases ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins manage lead_releases" ON public.lead_releases FOR ALL USING (is_admin(auth.uid()));

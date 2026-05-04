@@ -30,14 +30,14 @@ CREATE POLICY "Admins full access on credit grants"
   USING (public.is_admin(auth.uid()));
 
 -- 3. Indexes
-CREATE INDEX idx_credit_grants_user_id
+CREATE INDEX IF NOT EXISTS idx_credit_grants_user_id
   ON public.credit_grants(user_id);
 
-CREATE INDEX idx_credit_grants_active_expires
+CREATE INDEX IF NOT EXISTS idx_credit_grants_active_expires
   ON public.credit_grants(expires_at)
   WHERE status = 'active';
 
-CREATE INDEX idx_credit_grants_user_active
+CREATE INDEX IF NOT EXISTS idx_credit_grants_user_active
   ON public.credit_grants(user_id, expires_at)
   WHERE status = 'active';
 

@@ -87,6 +87,7 @@ CREATE POLICY "Users can insert own skips"
   WITH CHECK (auth.uid() = user_id);
 
 -- Trigger for updated_at on questions
+DROP TRIGGER IF EXISTS update_onboarding_questions_updated_at ON public.onboarding_questions;
 CREATE TRIGGER update_onboarding_questions_updated_at
   BEFORE UPDATE ON public.onboarding_questions
   FOR EACH ROW

@@ -54,6 +54,6 @@ CREATE POLICY "No public access to webhook events"
   USING (public.is_admin(auth.uid()));
 
 -- Create indexes
-CREATE INDEX idx_invoices_user_id ON public.invoices(user_id);
-CREATE INDEX idx_invoices_created_at ON public.invoices(created_at DESC);
-CREATE INDEX idx_webhook_events_event_id ON public.paypal_webhook_events(event_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON public.invoices(user_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_created_at ON public.invoices(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_event_id ON public.paypal_webhook_events(event_id);

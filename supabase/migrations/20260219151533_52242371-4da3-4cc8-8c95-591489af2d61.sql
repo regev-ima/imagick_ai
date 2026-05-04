@@ -61,13 +61,14 @@ CREATE POLICY "Users can insert their own email preferences"
   WITH CHECK (auth.uid() = user_id);
 
 -- Trigger to keep updated_at fresh
+DROP TRIGGER IF EXISTS update_user_email_preferences_updated_at ON public.user_email_preferences;
 CREATE TRIGGER update_user_email_preferences_updated_at
   BEFORE UPDATE ON public.user_email_preferences
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Index for fast lookup by user_id
-CREATE INDEX idx_email_logs_user_id    ON public.email_logs (user_id);
-CREATE INDEX idx_email_logs_created_at ON public.email_logs (created_at DESC);
-CREATE INDEX idx_email_logs_status     ON public.email_logs (status);
-CREATE INDEX idx_email_logs_email_type ON public.email_logs (email_type);
+CREATE INDEX IF NOT EXISTS idx_email_logs_user_id    ON public.email_logs (user_id);
+CREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON public.email_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_logs_status     ON public.email_logs (status);
+CREATE INDEX IF NOT EXISTS idx_email_logs_email_type ON public.email_logs (email_type);
