@@ -9,7 +9,7 @@
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 
-const LOGO_URL        = "https://nzfnqgmphepxgrjkkgkq.supabase.co/storage/v1/object/public/gallery-images/brand%2Fimagick-logo-dark.png";
+const LOGO_URL        = "https://zfcltfqgrhytpvgqkkfo.supabase.co/storage/v1/object/public/gallery-images/brand%2Fimagick-logo-dark.png";
 const BRAND_PRIMARY   = "#e85c9b"; // Pink-Magenta  hsl(330,85%,60%)
 const BRAND_SECONDARY = "#9b5ad4"; // Electric Violet hsl(270,75%,60%)
 const BRAND_GRADIENT  = `linear-gradient(135deg, ${BRAND_PRIMARY} 0%, ${BRAND_SECONDARY} 100%)`;

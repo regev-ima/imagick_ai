@@ -465,7 +465,7 @@ BEGIN
       '* * * * *',
       $job$
         SELECT net.http_post(
-          url := 'https://nzfnqgmphepxgrjkkgkq.supabase.co/functions/v1/process-lead-email-queue',
+          url := 'https://zfcltfqgrhytpvgqkkfo.supabase.co/functions/v1/process-lead-email-queue',
           headers := jsonb_build_object(
             'Content-Type', 'application/json',
             'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)

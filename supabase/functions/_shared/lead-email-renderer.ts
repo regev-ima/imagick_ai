@@ -1,5 +1,5 @@
 const DEFAULT_DARK_LOGO_URL =
-  "https://nzfnqgmphepxgrjkkgkq.supabase.co/storage/v1/object/public/gallery-images/brand%2Fimagick-logo.png";
+  "https://zfcltfqgrhytpvgqkkfo.supabase.co/storage/v1/object/public/gallery-images/brand%2Fimagick-logo.png";
 
 const RAW_TOKEN_REGEX = /{{\s*([a-zA-Z0-9_]+)\s*}}/g;
 
