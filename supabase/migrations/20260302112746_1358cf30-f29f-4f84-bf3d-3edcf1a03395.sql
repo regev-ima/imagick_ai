@@ -1,4 +1,4 @@
-CREATE TABLE public.paypal_plan_mapping (
+CREATE TABLE IF NOT EXISTS public.paypal_plan_mapping (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   plan_id uuid NOT NULL REFERENCES public.subscription_plans(id) ON DELETE CASCADE,
   billing_cycle text NOT NULL CHECK (billing_cycle IN ('monthly', 'yearly')),

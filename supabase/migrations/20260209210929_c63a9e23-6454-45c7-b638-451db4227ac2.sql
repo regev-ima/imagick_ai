@@ -1,5 +1,5 @@
 
-CREATE TABLE public.credit_usage_logs (
+CREATE TABLE IF NOT EXISTS public.credit_usage_logs (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL,
   gallery_id UUID REFERENCES public.galleries(id) ON DELETE SET NULL,

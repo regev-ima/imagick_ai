@@ -175,7 +175,7 @@ WHERE us.plan_id = sp.id AND sp.slug = 'free';
 -- 7. CREATE INVOICES TABLE
 -- =====================================================================
 
-CREATE TABLE public.invoices (
+CREATE TABLE IF NOT EXISTS public.invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
   invoice_number TEXT NOT NULL UNIQUE,
@@ -214,7 +214,7 @@ CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START WITH 1001;
 -- 8. CREATE PAYPAL WEBHOOK EVENTS TABLE (idempotency + audit)
 -- =====================================================================
 
-CREATE TABLE public.paypal_webhook_events (
+CREATE TABLE IF NOT EXISTS public.paypal_webhook_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id TEXT NOT NULL UNIQUE,
   event_type TEXT NOT NULL,
@@ -240,7 +240,7 @@ CREATE INDEX idx_paypal_webhook_event_type ON public.paypal_webhook_events(event
 -- 9. CREATE PAYPAL PLAN MAPPING TABLE
 -- =====================================================================
 
-CREATE TABLE public.paypal_plan_mapping (
+CREATE TABLE IF NOT EXISTS public.paypal_plan_mapping (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   plan_id UUID NOT NULL REFERENCES public.subscription_plans(id),
   billing_cycle TEXT NOT NULL CHECK (billing_cycle IN ('monthly', 'yearly')),
@@ -263,7 +263,7 @@ USING (public.is_admin(auth.uid()));
 -- 10. CREATE USER ADD-ONS TABLE
 -- =====================================================================
 
-CREATE TABLE public.user_addons (
+CREATE TABLE IF NOT EXISTS public.user_addons (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
   addon_type TEXT NOT NULL CHECK (addon_type IN ('extra_model', 'extra_storage')),

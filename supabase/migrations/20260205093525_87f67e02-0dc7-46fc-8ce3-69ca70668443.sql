@@ -2,7 +2,7 @@
 CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
 
 -- 2. טבלת תפקידים
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   role app_role NOT NULL DEFAULT 'user',
@@ -43,7 +43,7 @@ AS $$
 $$;
 
 -- 6. טבלת תוכניות מנוי
-CREATE TABLE public.subscription_plans (
+CREATE TABLE IF NOT EXISTS public.subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
@@ -63,7 +63,7 @@ CREATE TABLE public.subscription_plans (
 );
 
 -- 7. טבלת מנויי משתמשים
-CREATE TABLE public.user_subscriptions (
+CREATE TABLE IF NOT EXISTS public.user_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
   plan_id UUID REFERENCES public.subscription_plans(id) NOT NULL,

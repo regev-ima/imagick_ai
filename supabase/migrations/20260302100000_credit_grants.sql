@@ -3,7 +3,7 @@
 -- =====================================================================
 
 -- 1. Create credit_grants table
-CREATE TABLE public.credit_grants (
+CREATE TABLE IF NOT EXISTS public.credit_grants (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   grant_type       TEXT NOT NULL DEFAULT 'gift'

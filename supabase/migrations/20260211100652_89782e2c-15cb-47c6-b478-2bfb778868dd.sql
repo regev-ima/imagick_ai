@@ -1,6 +1,6 @@
 
 -- Create image_edits table for multiple style edits per image
-CREATE TABLE public.image_edits (
+CREATE TABLE IF NOT EXISTS public.image_edits (
   id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   image_id uuid NOT NULL REFERENCES public.gallery_images(id) ON DELETE CASCADE,
   gallery_id uuid NOT NULL,

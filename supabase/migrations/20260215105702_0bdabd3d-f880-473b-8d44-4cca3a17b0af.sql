@@ -1,6 +1,6 @@
 
 -- Create platform_settings table for admin-managed settings like logos
-CREATE TABLE public.platform_settings (
+CREATE TABLE IF NOT EXISTS public.platform_settings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   key text UNIQUE NOT NULL,
   value text,

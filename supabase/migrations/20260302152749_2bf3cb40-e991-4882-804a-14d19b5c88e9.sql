@@ -1,5 +1,5 @@
 -- Create invoices table
-CREATE TABLE public.invoices (
+CREATE TABLE IF NOT EXISTS public.invoices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   invoice_number text NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE public.invoices (
 );
 
 -- Create paypal_webhook_events table for idempotency
-CREATE TABLE public.paypal_webhook_events (
+CREATE TABLE IF NOT EXISTS public.paypal_webhook_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id text NOT NULL UNIQUE,
   event_type text NOT NULL,

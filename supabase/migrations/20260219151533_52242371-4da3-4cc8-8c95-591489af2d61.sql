@@ -1,6 +1,6 @@
 
 -- ── email_logs ────────────────────────────────────────────────────────────
-CREATE TABLE public.email_logs (
+CREATE TABLE IF NOT EXISTS public.email_logs (
   id                UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id           UUID        NULL,
   recipient_email   TEXT        NOT NULL,
@@ -27,7 +27,7 @@ CREATE POLICY "Users can view their own email logs"
   USING (auth.uid() = user_id);
 
 -- ── user_email_preferences ────────────────────────────────────────────────
-CREATE TABLE public.user_email_preferences (
+CREATE TABLE IF NOT EXISTS public.user_email_preferences (
   user_id                 UUID    NOT NULL UNIQUE,
   welcome_email           BOOLEAN NOT NULL DEFAULT true,
   gallery_upload_complete BOOLEAN NOT NULL DEFAULT true,

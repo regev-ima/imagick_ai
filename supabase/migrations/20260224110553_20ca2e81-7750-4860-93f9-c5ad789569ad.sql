@@ -1,6 +1,6 @@
 
 -- 1. onboarding_questions
-CREATE TABLE public.onboarding_questions (
+CREATE TABLE IF NOT EXISTS public.onboarding_questions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   question_key TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
@@ -33,7 +33,7 @@ CREATE POLICY "Admins can manage questions"
   USING (is_admin(auth.uid()));
 
 -- 2. onboarding_answers
-CREATE TABLE public.onboarding_answers (
+CREATE TABLE IF NOT EXISTS public.onboarding_answers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   question_id UUID NOT NULL REFERENCES public.onboarding_questions(id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
@@ -62,7 +62,7 @@ CREATE POLICY "Admins can read all answers"
   USING (is_admin(auth.uid()));
 
 -- 3. onboarding_skips
-CREATE TABLE public.onboarding_skips (
+CREATE TABLE IF NOT EXISTS public.onboarding_skips (
   user_id UUID PRIMARY KEY,
   skipped_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
