@@ -21,8 +21,8 @@ CREATE POLICY "Admins select lead_releases" ON public.lead_releases
 
 -- Add release_id to lead_enrollments
 ALTER TABLE public.lead_enrollments
-  ADD COLUMN release_id uuid REFERENCES public.lead_releases(id);
+  ADD COLUMN IF NOT EXISTS release_id uuid REFERENCES public.lead_releases(id);
 
 -- Add release_id to lead_scheduled_emails
 ALTER TABLE public.lead_scheduled_emails
-  ADD COLUMN release_id uuid REFERENCES public.lead_releases(id);
+  ADD COLUMN IF NOT EXISTS release_id uuid REFERENCES public.lead_releases(id);

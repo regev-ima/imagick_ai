@@ -1,7 +1,7 @@
 
 ALTER TABLE galleries 
-  ADD COLUMN import_folders_total integer NOT NULL DEFAULT 0,
-  ADD COLUMN import_folders_completed integer NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS import_folders_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS import_folders_completed integer NOT NULL DEFAULT 0;
 
 DROP FUNCTION IF EXISTS increment_gallery_folder_completed(uuid);
 CREATE OR REPLACE FUNCTION increment_gallery_folder_completed(p_gallery_id uuid)
