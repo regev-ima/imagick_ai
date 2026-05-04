@@ -11,6 +11,7 @@ ALTER TABLE public.galleries
   ADD COLUMN IF NOT EXISTS edits_reserved INTEGER NOT NULL DEFAULT 0;
 
 -- 2. Update the edit-usage trigger to also release reservations
+DROP FUNCTION IF EXISTS public.update_edits_on_usage();
 CREATE OR REPLACE FUNCTION public.update_edits_on_usage()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -32,6 +33,7 @@ END;
 $$;
 
 -- 3. Atomic reserve RPC — reserves edits if sufficient available, returns true/false
+DROP FUNCTION IF EXISTS public.reserve_edits_atomic(UUID, UUID, INTEGER);
 CREATE OR REPLACE FUNCTION public.reserve_edits_atomic(p_user_id UUID, p_gallery_id UUID, p_needed INTEGER)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -62,6 +64,7 @@ END;
 $$;
 
 -- 4. RPC to release leftover gallery reservation (errors/skipped images)
+DROP FUNCTION IF EXISTS public.release_gallery_reservation(UUID, UUID);
 CREATE OR REPLACE FUNCTION public.release_gallery_reservation(p_gallery_id UUID, p_user_id UUID)
 RETURNS void
 LANGUAGE plpgsql

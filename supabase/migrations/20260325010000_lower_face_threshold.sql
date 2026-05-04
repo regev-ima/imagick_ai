@@ -3,6 +3,7 @@
 -- face-api.js L2: same person ~0.3-0.5, different person ~0.7+
 -- 0.6 is the sweet spot
 
+DROP FUNCTION IF EXISTS cluster_gallery_faces(uuid, float);
 CREATE OR REPLACE FUNCTION cluster_gallery_faces(
   p_gallery_id uuid,
   p_distance_threshold float DEFAULT 0.6

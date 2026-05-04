@@ -8,6 +8,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object OR duplicate_table OR unique_violation THEN NULL; END $$;
 
 -- 2) Update cancel_lead_on_signup() to also cancel 'held' emails when a lead converts
+DROP FUNCTION IF EXISTS public.cancel_lead_on_signup();
 CREATE OR REPLACE FUNCTION public.cancel_lead_on_signup()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER

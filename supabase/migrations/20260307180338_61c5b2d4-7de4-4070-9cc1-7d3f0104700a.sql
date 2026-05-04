@@ -1,3 +1,4 @@
+DROP FUNCTION IF EXISTS public.get_client_gallery_images(uuid, text);
 CREATE OR REPLACE FUNCTION public.get_client_gallery_images(
   p_gallery_id uuid,
   p_session_token text DEFAULT NULL

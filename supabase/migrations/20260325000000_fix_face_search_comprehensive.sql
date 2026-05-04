@@ -34,6 +34,7 @@ CREATE POLICY "Users can update own face_clusters"
 END $$;
 
 -- 3. Recreate clustering function with correct threshold and SECURITY DEFINER
+DROP FUNCTION IF EXISTS cluster_gallery_faces(uuid, float);
 CREATE OR REPLACE FUNCTION cluster_gallery_faces(
   p_gallery_id uuid,
   p_distance_threshold float DEFAULT 0.8
@@ -134,6 +135,7 @@ $$;
 
 -- 4. Debug function: see actual L2 distances between faces in a gallery
 --    Call with: SELECT * FROM get_face_distances('gallery-uuid') ORDER BY distance LIMIT 50;
+DROP FUNCTION IF EXISTS get_face_distances(uuid);
 CREATE OR REPLACE FUNCTION get_face_distances(p_gallery_id uuid)
 RETURNS TABLE(face_a uuid, face_b uuid, image_a uuid, image_b uuid, distance float)
 LANGUAGE sql

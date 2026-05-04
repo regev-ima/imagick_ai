@@ -116,6 +116,7 @@ ON public.user_sequence_enrollments FOR SELECT
 USING (auth.uid() = user_id);
 
 -- 6. Create trigger for auto-creating lifecycle profile on signup
+DROP FUNCTION IF EXISTS public.create_default_lifecycle_profile();
 CREATE OR REPLACE FUNCTION public.create_default_lifecycle_profile()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -131,6 +132,7 @@ END;
 $$;
 
 -- Attach trigger to auth.users via subscription-based approach (trigger on user_subscriptions which is created on signup)
+DROP FUNCTION IF EXISTS public.create_lifecycle_on_subscription();
 CREATE OR REPLACE FUNCTION public.create_lifecycle_on_subscription()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -152,6 +154,7 @@ FOR EACH ROW
 EXECUTE FUNCTION public.create_lifecycle_on_subscription();
 
 -- 7. Login count incrementer
+DROP FUNCTION IF EXISTS public.increment_lifecycle_login(uuid);
 CREATE OR REPLACE FUNCTION public.increment_lifecycle_login(p_user_id uuid)
 RETURNS void
 LANGUAGE plpgsql

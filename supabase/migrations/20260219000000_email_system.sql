@@ -65,6 +65,7 @@ CREATE POLICY "Users can manage own email preferences"
   WITH CHECK (auth.uid() = user_id);
 
 -- Auto-create a preferences row for each new user
+DROP FUNCTION IF EXISTS public.create_default_email_preferences();
 CREATE OR REPLACE FUNCTION public.create_default_email_preferences()
 RETURNS TRIGGER
 LANGUAGE plpgsql

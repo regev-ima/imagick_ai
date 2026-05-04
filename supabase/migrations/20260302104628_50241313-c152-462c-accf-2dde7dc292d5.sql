@@ -1,5 +1,6 @@
 
 -- Add auth check to increment_lifecycle_login to prevent unauthorized manipulation
+DROP FUNCTION IF EXISTS public.increment_lifecycle_login(uuid);
 CREATE OR REPLACE FUNCTION public.increment_lifecycle_login(p_user_id uuid)
  RETURNS void
  LANGUAGE plpgsql

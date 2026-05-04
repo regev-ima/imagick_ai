@@ -1,5 +1,6 @@
 
 -- Create a security definer function that checks gallery has client_link AND is NOT password-protected
+DROP FUNCTION IF EXISTS public.gallery_is_public(uuid);
 CREATE OR REPLACE FUNCTION public.gallery_is_public(p_gallery_id uuid)
   RETURNS boolean
   LANGUAGE sql

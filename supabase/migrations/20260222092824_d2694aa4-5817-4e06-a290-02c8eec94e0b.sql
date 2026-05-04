@@ -1,3 +1,4 @@
+DROP FUNCTION IF EXISTS get_edits_per_user();
 CREATE OR REPLACE FUNCTION get_edits_per_user()
 RETURNS TABLE(user_id uuid, edits_count bigint)
 LANGUAGE sql SECURITY DEFINER SET search_path TO 'public'

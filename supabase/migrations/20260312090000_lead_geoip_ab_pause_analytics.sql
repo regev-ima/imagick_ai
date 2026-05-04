@@ -72,6 +72,7 @@ END;
 $$;
 
 -- 7) Update lead conversion trigger to stamp converted_at
+DROP FUNCTION IF EXISTS public.cancel_lead_on_signup();
 CREATE OR REPLACE FUNCTION public.cancel_lead_on_signup()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER

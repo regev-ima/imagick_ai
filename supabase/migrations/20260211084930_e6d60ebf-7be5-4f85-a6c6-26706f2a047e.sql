@@ -1,5 +1,6 @@
 
 -- 1. Auto-create subscription for new users
+DROP FUNCTION IF EXISTS public.create_default_subscription();
 CREATE OR REPLACE FUNCTION public.create_default_subscription()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -23,6 +24,7 @@ CREATE TRIGGER on_auth_user_created_subscription
   EXECUTE FUNCTION public.create_default_subscription();
 
 -- 2. Credit deduction trigger
+DROP FUNCTION IF EXISTS public.update_credits_on_usage();
 CREATE OR REPLACE FUNCTION public.update_credits_on_usage()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -46,6 +48,7 @@ CREATE TRIGGER on_credit_usage_logged
   EXECUTE FUNCTION public.update_credits_on_usage();
 
 -- 3. Storage recalculation function
+DROP FUNCTION IF EXISTS public.recalculate_user_storage(uuid);
 CREATE OR REPLACE FUNCTION public.recalculate_user_storage(p_user_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -67,6 +70,7 @@ END;
 $$;
 
 -- 4. Auto-update storage on image insert/delete
+DROP FUNCTION IF EXISTS public.update_storage_on_image_change();
 CREATE OR REPLACE FUNCTION public.update_storage_on_image_change()
 RETURNS trigger
 LANGUAGE plpgsql

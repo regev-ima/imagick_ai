@@ -4,6 +4,7 @@
 -- face-api.js L2 distances: same person ~0.3-0.4, different person ~0.6+
 -- 0.45 is strict enough to avoid false matches while still grouping same person.
 
+DROP FUNCTION IF EXISTS cluster_gallery_faces(uuid, float);
 CREATE OR REPLACE FUNCTION cluster_gallery_faces(
   p_gallery_id uuid,
   p_distance_threshold float DEFAULT 0.45

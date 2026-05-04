@@ -1,5 +1,6 @@
 -- Fix clustering: raise threshold to 0.65, fix face_count always showing 0
 
+DROP FUNCTION IF EXISTS cluster_gallery_faces(uuid, float);
 CREATE OR REPLACE FUNCTION cluster_gallery_faces(
   p_gallery_id uuid,
   p_distance_threshold float DEFAULT 0.65
