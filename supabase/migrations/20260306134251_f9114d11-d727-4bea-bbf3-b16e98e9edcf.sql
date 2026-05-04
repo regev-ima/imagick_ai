@@ -9,4 +9,4 @@ DO $$ BEGIN
   ALTER TABLE public.paypal_plan_mapping 
   ADD CONSTRAINT paypal_plan_mapping_plan_id_billing_cycle_is_sandbox_key 
   UNIQUE (plan_id, billing_cycle, is_sandbox);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table OR unique_violation THEN NULL; END $$;

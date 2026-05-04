@@ -4,4 +4,4 @@ ALTER TABLE public.galleries DROP CONSTRAINT galleries_status_check;
 DO $$ BEGIN
   ALTER TABLE public.galleries ADD CONSTRAINT galleries_status_check 
   CHECK (status = ANY (ARRAY['uploading'::text, 'transferring'::text, 'processing'::text, 'culling'::text, 'ready'::text, 'error'::text]));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table OR unique_violation THEN NULL; END $$;

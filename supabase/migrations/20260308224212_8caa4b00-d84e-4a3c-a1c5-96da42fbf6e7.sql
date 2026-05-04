@@ -7,4 +7,4 @@ DO $$ BEGIN
     'newborn','family','event','commercial','real_estate','fashion',
     'food','sports'
   ]));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table OR unique_violation THEN NULL; END $$;

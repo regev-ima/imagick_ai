@@ -1,7 +1,7 @@
 -- 1. יצירת Enum לתפקידים
 DO $$ BEGIN
   CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table OR unique_violation THEN NULL; END $$;
 
 -- 2. טבלת תפקידים
 CREATE TABLE IF NOT EXISTS public.user_roles (
