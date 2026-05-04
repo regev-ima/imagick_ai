@@ -18,8 +18,8 @@ ON public.gallery_sessions FOR ALL
 USING (false);
 
 -- Index for fast lookups
-CREATE INDEX idx_gallery_sessions_token ON public.gallery_sessions(session_token);
-CREATE INDEX idx_gallery_sessions_expires ON public.gallery_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_gallery_sessions_token ON public.gallery_sessions(session_token);
+CREATE INDEX IF NOT EXISTS idx_gallery_sessions_expires ON public.gallery_sessions(expires_at);
 
 -- Add RLS policy: allow viewing password-protected gallery images if valid session exists
 -- We need a security definer function for this

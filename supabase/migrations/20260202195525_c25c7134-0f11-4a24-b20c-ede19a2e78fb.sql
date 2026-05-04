@@ -197,16 +197,19 @@ END;
 $$ LANGUAGE plpgsql SET search_path = public;
 
 -- Create triggers for timestamp updates
+DROP TRIGGER IF EXISTS update_galleries_updated_at ON public.galleries;
 CREATE TRIGGER update_galleries_updated_at
   BEFORE UPDATE ON public.galleries
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_gallery_images_updated_at ON public.gallery_images;
 CREATE TRIGGER update_gallery_images_updated_at
   BEFORE UPDATE ON public.gallery_images
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_styles_updated_at ON public.styles;
 CREATE TRIGGER update_styles_updated_at
   BEFORE UPDATE ON public.styles
   FOR EACH ROW
@@ -249,6 +252,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SET search_path = public;
 
+DROP TRIGGER IF EXISTS generate_gallery_client_link ON public.galleries;
 CREATE TRIGGER generate_gallery_client_link
   BEFORE INSERT ON public.galleries
   FOR EACH ROW

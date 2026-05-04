@@ -145,6 +145,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS create_lifecycle_on_subscription_insert ON public.user_subscriptions;
 CREATE TRIGGER create_lifecycle_on_subscription_insert
 AFTER INSERT ON public.user_subscriptions
 FOR EACH ROW

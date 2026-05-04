@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS face_clusters (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_face_clusters_gallery ON face_clusters(gallery_id);
+CREATE INDEX IF NOT EXISTS idx_face_clusters_gallery ON face_clusters(gallery_id);
 
 -- face_detections: one row per detected face per image
 CREATE TABLE IF NOT EXISTS face_detections (
@@ -23,9 +23,9 @@ CREATE TABLE IF NOT EXISTS face_detections (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_face_detections_gallery ON face_detections(gallery_id);
-CREATE INDEX idx_face_detections_image ON face_detections(image_id);
-CREATE INDEX idx_face_detections_cluster ON face_detections(cluster_id);
+CREATE INDEX IF NOT EXISTS idx_face_detections_gallery ON face_detections(gallery_id);
+CREATE INDEX IF NOT EXISTS idx_face_detections_image ON face_detections(image_id);
+CREATE INDEX IF NOT EXISTS idx_face_detections_cluster ON face_detections(cluster_id);
 
 -- Gallery status columns for face search (mirrors culling_status pattern)
 ALTER TABLE galleries

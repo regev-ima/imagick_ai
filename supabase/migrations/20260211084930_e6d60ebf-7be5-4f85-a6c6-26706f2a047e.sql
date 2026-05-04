@@ -16,6 +16,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS on_auth_user_created_subscription ON auth.users;
 CREATE TRIGGER on_auth_user_created_subscription
   AFTER INSERT ON auth.users
   FOR EACH ROW
@@ -38,6 +39,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS on_credit_usage_logged ON public.credit_usage_logs;
 CREATE TRIGGER on_credit_usage_logged
   AFTER INSERT ON public.credit_usage_logs
   FOR EACH ROW
@@ -82,6 +84,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS on_gallery_image_storage_change ON public.gallery_images;
 CREATE TRIGGER on_gallery_image_storage_change
   AFTER INSERT OR DELETE ON public.gallery_images
   FOR EACH ROW

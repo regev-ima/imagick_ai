@@ -137,6 +137,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS on_edit_usage_logged ON public.edit_usage_logs;
 CREATE TRIGGER on_edit_usage_logged
   AFTER INSERT ON public.edit_usage_logs
   FOR EACH ROW
@@ -161,6 +162,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS on_auth_user_created_subscription ON auth.users;
 CREATE TRIGGER on_auth_user_created_subscription
   AFTER INSERT ON auth.users
   FOR EACH ROW
@@ -210,8 +212,8 @@ CREATE POLICY "Admins can manage all invoices"
 ON public.invoices FOR ALL
 USING (public.is_admin(auth.uid()));
 
-CREATE INDEX idx_invoices_user_id ON public.invoices(user_id);
-CREATE INDEX idx_invoices_created_at ON public.invoices(created_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON public.invoices(user_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_created_at ON public.invoices(created_at);
 
 -- Invoice number sequence
 CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START WITH 1001;
@@ -240,8 +242,8 @@ CREATE POLICY "Admins can view webhook events"
 ON public.paypal_webhook_events FOR ALL
 USING (public.is_admin(auth.uid()));
 
-CREATE INDEX idx_paypal_webhook_event_id ON public.paypal_webhook_events(event_id);
-CREATE INDEX idx_paypal_webhook_event_type ON public.paypal_webhook_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_paypal_webhook_event_id ON public.paypal_webhook_events(event_id);
+CREATE INDEX IF NOT EXISTS idx_paypal_webhook_event_type ON public.paypal_webhook_events(event_type);
 
 -- =====================================================================
 -- 9. CREATE PAYPAL PLAN MAPPING TABLE
@@ -295,7 +297,7 @@ CREATE POLICY "Admins can manage all addons"
 ON public.user_addons FOR ALL
 USING (public.is_admin(auth.uid()));
 
-CREATE INDEX idx_user_addons_user_id ON public.user_addons(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_addons_user_id ON public.user_addons(user_id);
 
 -- =====================================================================
 -- 11. HELPER FUNCTIONS for effective limits (plan + add-ons)

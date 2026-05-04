@@ -58,8 +58,8 @@ CREATE TABLE IF NOT EXISTS public.lead_contacts (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_lead_contacts_email_normalized ON public.lead_contacts(email_normalized);
-CREATE INDEX idx_lead_contacts_status ON public.lead_contacts(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lead_contacts_email_normalized ON public.lead_contacts(email_normalized);
+CREATE INDEX IF NOT EXISTS idx_lead_contacts_status ON public.lead_contacts(status);
 
 ALTER TABLE public.lead_contacts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins manage lead_contacts" ON public.lead_contacts FOR ALL USING (is_admin(auth.uid()));
@@ -107,8 +107,8 @@ CREATE TABLE IF NOT EXISTS public.lead_import_job_rows (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_lead_import_job_rows_job ON public.lead_import_job_rows(import_job_id);
-CREATE INDEX idx_lead_import_job_rows_email ON public.lead_import_job_rows(email_normalized);
+CREATE INDEX IF NOT EXISTS idx_lead_import_job_rows_job ON public.lead_import_job_rows(import_job_id);
+CREATE INDEX IF NOT EXISTS idx_lead_import_job_rows_email ON public.lead_import_job_rows(email_normalized);
 
 ALTER TABLE public.lead_import_job_rows ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins manage lead_import_job_rows" ON public.lead_import_job_rows FOR ALL USING (is_admin(auth.uid()));
@@ -128,8 +128,8 @@ CREATE TABLE IF NOT EXISTS public.lead_enrollments (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_lead_enrollments_lead ON public.lead_enrollments(lead_id);
-CREATE INDEX idx_lead_enrollments_status ON public.lead_enrollments(status);
+CREATE INDEX IF NOT EXISTS idx_lead_enrollments_lead ON public.lead_enrollments(lead_id);
+CREATE INDEX IF NOT EXISTS idx_lead_enrollments_status ON public.lead_enrollments(status);
 
 ALTER TABLE public.lead_enrollments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins manage lead_enrollments" ON public.lead_enrollments FOR ALL USING (is_admin(auth.uid()));
@@ -160,10 +160,10 @@ CREATE TABLE IF NOT EXISTS public.lead_scheduled_emails (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_lead_scheduled_status_at ON public.lead_scheduled_emails(status, scheduled_at);
-CREATE INDEX idx_lead_scheduled_lead ON public.lead_scheduled_emails(lead_id);
-CREATE INDEX idx_lead_scheduled_enrollment ON public.lead_scheduled_emails(enrollment_id);
-CREATE INDEX idx_lead_scheduled_open_token ON public.lead_scheduled_emails(open_token);
+CREATE INDEX IF NOT EXISTS idx_lead_scheduled_status_at ON public.lead_scheduled_emails(status, scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_lead_scheduled_lead ON public.lead_scheduled_emails(lead_id);
+CREATE INDEX IF NOT EXISTS idx_lead_scheduled_enrollment ON public.lead_scheduled_emails(enrollment_id);
+CREATE INDEX IF NOT EXISTS idx_lead_scheduled_open_token ON public.lead_scheduled_emails(open_token);
 
 ALTER TABLE public.lead_scheduled_emails ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins manage lead_scheduled_emails" ON public.lead_scheduled_emails FOR ALL USING (is_admin(auth.uid()));
@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS public.lead_email_opens (
   device_type text
 );
 
-CREATE INDEX idx_lead_email_opens_scheduled ON public.lead_email_opens(scheduled_email_id);
+CREATE INDEX IF NOT EXISTS idx_lead_email_opens_scheduled ON public.lead_email_opens(scheduled_email_id);
 
 ALTER TABLE public.lead_email_opens ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins manage lead_email_opens" ON public.lead_email_opens FOR ALL USING (is_admin(auth.uid()));
