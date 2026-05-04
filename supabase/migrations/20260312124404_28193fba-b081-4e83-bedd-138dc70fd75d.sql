@@ -20,5 +20,7 @@ CREATE TABLE IF NOT EXISTS public.lead_geoip_cache (
 ALTER TABLE public.lead_geoip_cache ENABLE ROW LEVEL SECURITY;
 
 -- Admin-only policies
+DROP POLICY IF EXISTS "Admins manage lead_geoip_cache" ON public.lead_geoip_cache;
 CREATE POLICY "Admins manage lead_geoip_cache" ON public.lead_geoip_cache FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_geoip_cache" ON public.lead_geoip_cache;
 CREATE POLICY "Admins select lead_geoip_cache" ON public.lead_geoip_cache FOR SELECT TO authenticated USING (is_admin(auth.uid()));

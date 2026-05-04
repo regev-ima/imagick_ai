@@ -14,9 +14,11 @@ CREATE TABLE IF NOT EXISTS public.user_addons (
 
 ALTER TABLE public.user_addons ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own addons" ON public.user_addons;
 CREATE POLICY "Users can view own addons" ON public.user_addons
   FOR SELECT TO authenticated USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can manage all addons" ON public.user_addons;
 CREATE POLICY "Admins can manage all addons" ON public.user_addons
   FOR ALL USING (is_admin(auth.uid()));
 

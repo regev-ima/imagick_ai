@@ -14,9 +14,11 @@ CREATE TABLE IF NOT EXISTS public.lead_campaigns (
 
 ALTER TABLE public.lead_campaigns ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage lead campaigns" ON public.lead_campaigns;
 CREATE POLICY "Admins can manage lead campaigns" ON public.lead_campaigns
   FOR ALL USING (is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can view lead campaigns" ON public.lead_campaigns;
 CREATE POLICY "Admins can view lead campaigns" ON public.lead_campaigns
   FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
@@ -34,8 +36,10 @@ CREATE TABLE IF NOT EXISTS public.lead_campaign_steps (
 
 ALTER TABLE public.lead_campaign_steps ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage lead campaign steps" ON public.lead_campaign_steps;
 CREATE POLICY "Admins can manage lead campaign steps" ON public.lead_campaign_steps
   FOR ALL USING (is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can view lead campaign steps" ON public.lead_campaign_steps;
 CREATE POLICY "Admins can view lead campaign steps" ON public.lead_campaign_steps
   FOR SELECT TO authenticated USING (is_admin(auth.uid()));

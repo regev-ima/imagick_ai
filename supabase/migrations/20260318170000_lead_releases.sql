@@ -13,6 +13,7 @@ CREATE INDEX IF NOT EXISTS idx_lead_releases_campaign ON public.lead_releases(ca
 CREATE INDEX IF NOT EXISTS idx_lead_releases_created ON public.lead_releases(created_at DESC);
 
 ALTER TABLE public.lead_releases ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_releases" ON public.lead_releases;
 CREATE POLICY "Admins manage lead_releases" ON public.lead_releases FOR ALL USING (is_admin(auth.uid()));
 
 -- Link enrollments and scheduled emails to their release batch
