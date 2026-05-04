@@ -11,9 +11,11 @@ CREATE TABLE IF NOT EXISTS public.lead_releases (
 
 ALTER TABLE public.lead_releases ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins manage lead_releases" ON public.lead_releases;
 CREATE POLICY "Admins manage lead_releases" ON public.lead_releases
   FOR ALL TO public USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins select lead_releases" ON public.lead_releases;
 CREATE POLICY "Admins select lead_releases" ON public.lead_releases
   FOR SELECT TO authenticated USING (public.is_admin(auth.uid()));
 

@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS public.lead_campaigns (
 );
 
 ALTER TABLE public.lead_campaigns ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_campaigns" ON public.lead_campaigns;
 CREATE POLICY "Admins manage lead_campaigns" ON public.lead_campaigns FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_campaigns" ON public.lead_campaigns;
 CREATE POLICY "Admins select lead_campaigns" ON public.lead_campaigns FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 3) Recreate lead_campaign_steps WITH body_html
@@ -40,7 +42,9 @@ CREATE TABLE IF NOT EXISTS public.lead_campaign_steps (
 );
 
 ALTER TABLE public.lead_campaign_steps ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_campaign_steps" ON public.lead_campaign_steps;
 CREATE POLICY "Admins manage lead_campaign_steps" ON public.lead_campaign_steps FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_campaign_steps" ON public.lead_campaign_steps;
 CREATE POLICY "Admins select lead_campaign_steps" ON public.lead_campaign_steps FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 4) lead_contacts
@@ -62,7 +66,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_lead_contacts_email_normalized ON public.l
 CREATE INDEX IF NOT EXISTS idx_lead_contacts_status ON public.lead_contacts(status);
 
 ALTER TABLE public.lead_contacts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_contacts" ON public.lead_contacts;
 CREATE POLICY "Admins manage lead_contacts" ON public.lead_contacts FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_contacts" ON public.lead_contacts;
 CREATE POLICY "Admins select lead_contacts" ON public.lead_contacts FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 5) lead_import_jobs
@@ -89,7 +95,9 @@ CREATE TABLE IF NOT EXISTS public.lead_import_jobs (
 );
 
 ALTER TABLE public.lead_import_jobs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_import_jobs" ON public.lead_import_jobs;
 CREATE POLICY "Admins manage lead_import_jobs" ON public.lead_import_jobs FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_import_jobs" ON public.lead_import_jobs;
 CREATE POLICY "Admins select lead_import_jobs" ON public.lead_import_jobs FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 6) lead_import_job_rows
@@ -111,7 +119,9 @@ CREATE INDEX IF NOT EXISTS idx_lead_import_job_rows_job ON public.lead_import_jo
 CREATE INDEX IF NOT EXISTS idx_lead_import_job_rows_email ON public.lead_import_job_rows(email_normalized);
 
 ALTER TABLE public.lead_import_job_rows ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_import_job_rows" ON public.lead_import_job_rows;
 CREATE POLICY "Admins manage lead_import_job_rows" ON public.lead_import_job_rows FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_import_job_rows" ON public.lead_import_job_rows;
 CREATE POLICY "Admins select lead_import_job_rows" ON public.lead_import_job_rows FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 7) lead_enrollments
@@ -132,7 +142,9 @@ CREATE INDEX IF NOT EXISTS idx_lead_enrollments_lead ON public.lead_enrollments(
 CREATE INDEX IF NOT EXISTS idx_lead_enrollments_status ON public.lead_enrollments(status);
 
 ALTER TABLE public.lead_enrollments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_enrollments" ON public.lead_enrollments;
 CREATE POLICY "Admins manage lead_enrollments" ON public.lead_enrollments FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_enrollments" ON public.lead_enrollments;
 CREATE POLICY "Admins select lead_enrollments" ON public.lead_enrollments FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 8) lead_scheduled_emails
@@ -166,7 +178,9 @@ CREATE INDEX IF NOT EXISTS idx_lead_scheduled_enrollment ON public.lead_schedule
 CREATE INDEX IF NOT EXISTS idx_lead_scheduled_open_token ON public.lead_scheduled_emails(open_token);
 
 ALTER TABLE public.lead_scheduled_emails ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_scheduled_emails" ON public.lead_scheduled_emails;
 CREATE POLICY "Admins manage lead_scheduled_emails" ON public.lead_scheduled_emails FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_scheduled_emails" ON public.lead_scheduled_emails;
 CREATE POLICY "Admins select lead_scheduled_emails" ON public.lead_scheduled_emails FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 9) lead_email_opens
@@ -183,7 +197,9 @@ CREATE TABLE IF NOT EXISTS public.lead_email_opens (
 CREATE INDEX IF NOT EXISTS idx_lead_email_opens_scheduled ON public.lead_email_opens(scheduled_email_id);
 
 ALTER TABLE public.lead_email_opens ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage lead_email_opens" ON public.lead_email_opens;
 CREATE POLICY "Admins manage lead_email_opens" ON public.lead_email_opens FOR ALL USING (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Admins select lead_email_opens" ON public.lead_email_opens;
 CREATE POLICY "Admins select lead_email_opens" ON public.lead_email_opens FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- 10) Function: normalize_email
