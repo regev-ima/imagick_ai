@@ -27,7 +27,7 @@ export function useCreditsUsage() {
       if (!effectiveUserId) return null;
 
       let query = (supabase as any)
-        .from("credit_usage_logs")
+        .from("edit_usage_logs")
         .select("*")
         .eq("user_id", effectiveUserId)
         .eq("action_type", "ai_edit")
@@ -51,7 +51,7 @@ export function useCreditsUsage() {
         return { editsByGallery: [], dailyUsage: [], totalUsed: 0, hasMockData: false };
       }
 
-      const totalUsed = logs.reduce((s: number, l: any) => s + (l.credits_spent || 0), 0);
+      const totalUsed = logs.reduce((s: number, l: any) => s + (l.edits_spent || 0), 0);
 
       // Aggregate by gallery
       const galleryMap: Record<string, { gallery_id: string; edits: number }> = {};
@@ -60,7 +60,7 @@ export function useCreditsUsage() {
         if (!galleryMap[gid]) {
           galleryMap[gid] = { gallery_id: gid, edits: 0 };
         }
-        galleryMap[gid].edits += (log as any).credits_spent || 0;
+        galleryMap[gid].edits += (log as any).edits_spent || 0;
       }
 
       // Fetch gallery names
@@ -87,7 +87,7 @@ export function useCreditsUsage() {
       const dailyMap: Record<string, number> = {};
       logs.forEach((log) => {
         const day = (log as any).created_at.substring(0, 10);
-        dailyMap[day] = (dailyMap[day] || 0) + ((log as any).credits_spent || 0);
+        dailyMap[day] = (dailyMap[day] || 0) + ((log as any).edits_spent || 0);
       });
       const dailyUsage: DailyUsage[] = Object.entries(dailyMap)
         .map(([date, edits]) => ({ date, edits }))

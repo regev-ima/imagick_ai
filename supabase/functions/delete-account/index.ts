@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     await adminClient.from("credit_grants").delete().eq("user_id", userId);
 
     // 15. credit_usage_logs
-    await adminClient.from("credit_usage_logs").delete().eq("user_id", userId);
+    await adminClient.from("edit_usage_logs").delete().eq("user_id", userId);
 
     // 16. onboarding_answers
     await adminClient.from("onboarding_answers").delete().eq("user_id", userId);

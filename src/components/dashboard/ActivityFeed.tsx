@@ -50,8 +50,8 @@ export default function ActivityFeed() {
 
       // Fetch recent edit usage logs
       const { data: logs } = await (supabase as any)
-        .from("credit_usage_logs")
-        .select("id, action_type, description, gallery_id, credits_spent, created_at")
+        .from("edit_usage_logs")
+        .select("id, action_type, description, gallery_id, edits_spent, created_at")
         .eq("user_id", effectiveUserId)
         .order("created_at", { ascending: false })
         .limit(5);
@@ -76,7 +76,7 @@ export default function ActivityFeed() {
         type: log.action_type as ActivityItem["type"],
         description: cleanDescription(log.description),
         galleryName: log.gallery_id ? galleryNames[log.gallery_id] : undefined,
-        credits: log.credits_spent,
+        credits: log.edits_spent,
         timestamp: log.created_at,
       }));
     },
