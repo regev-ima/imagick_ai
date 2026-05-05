@@ -269,7 +269,7 @@ export default function UserDetailPage() {
                               </div>
                               <div className="border rounded-lg p-2.5 text-center">
                                 <Layers className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-                                <p className="text-lg font-bold leading-tight">{g.credits_spent || 0}</p>
+                                <p className="text-lg font-bold leading-tight">{g.edits_spent || 0}</p>
                                 <p className="text-[10px] text-muted-foreground">Credits</p>
                               </div>
                               <div className="border rounded-lg p-2.5 text-center">

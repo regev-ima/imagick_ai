@@ -161,7 +161,7 @@ serve(async (req: Request) => {
 
       // Check if credit already logged for this image+style to prevent duplicate charges
       const { data: existingLog } = await supabase
-        .from("credit_usage_logs")
+        .from("edit_usage_logs")
         .select("id")
         .eq("user_id", userId)
         .eq("description", logDescription)
@@ -169,11 +169,11 @@ serve(async (req: Request) => {
 
       if (!existingLog) {
         const { error: creditLogError } = await supabase
-          .from("credit_usage_logs")
+          .from("edit_usage_logs")
           .insert({
             user_id: userId,
             action_type: "ai_edit",
-            credits_spent: 1,
+            edits_spent: 1,
             gallery_id: galleryId,
             description: logDescription,
           });
