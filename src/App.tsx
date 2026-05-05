@@ -10,7 +10,17 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminRoute } from "./components/AdminRoute";
 import { ImpersonationProvider } from "./hooks/useImpersonation";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: "always",
+      retry: 1,
+    },
+  },
+});
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const DashboardLayout = lazy(() => import("./components/layout/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));

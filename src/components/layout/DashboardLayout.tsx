@@ -63,6 +63,10 @@ export default function DashboardLayout() {
       if (error) throw error;
       return Object.fromEntries((data || []).map(r => [r.key, r.value]));
     },
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const isDark = theme === "dark";

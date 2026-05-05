@@ -9,10 +9,22 @@
 
     <link rel="icon" type="image/png" href="/favicon.png" />
 
-    <!-- Serif fonts for client gallery templates -->
+    <!-- Preconnect to Supabase (API + storage) to shave TLS/DNS off the first request -->
+    <link rel="preconnect" href="https://zfcltfqgrhytpvgqkkfo.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://zfcltfqgrhytpvgqkkfo.supabase.co" />
+
+    <!-- Serif fonts for client gallery templates (load non-blocking) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
+    </noscript>
 
     <meta property="og:title" content="Imagick.ai - AI Photo Gallery Platform" />
     <meta property="og:description" content="Professional AI-powered photo gallery platform for photographers" />
