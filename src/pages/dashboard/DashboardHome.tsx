@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +21,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import CreditsUsageChart from "@/components/dashboard/CreditsUsageChart";
+const CreditsUsageChart = lazy(() => import("@/components/dashboard/CreditsUsageChart"));
 import OnboardingQuestionnaire from "@/components/onboarding/OnboardingQuestionnaire";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -510,7 +510,9 @@ export default function DashboardHome() {
               transition={{ delay: 0.35 }}
               className="space-y-4"
             >
-              <CreditsUsageChart />
+              <Suspense fallback={<div className="glass-card rounded-2xl border border-border/30 p-4 h-64" />}>
+                <CreditsUsageChart />
+              </Suspense>
 
               {/* Storage gauge card */}
               <div className="glass-card rounded-2xl border border-border/30 p-4">
