@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
  import { supabase } from "@/integrations/supabase/client";
  import { toast } from "sonner";
+ import { Sentry } from "@/lib/sentry";
  
  interface UploadProgress {
    uploaded: number;
@@ -355,7 +356,10 @@ const B2_PROXY_URL = "https://cloudflare-b2-proxy.rx8rq49b5c.workers.dev";
                 imageCount:  imageIds.length,
                 styleNames:  emailData.styleNames,
               },
-            }).catch(() => {});
+            }).catch((err) => {
+              console.error("re_edit_submitted email failed:", err);
+              Sentry.captureException(err, { tags: { context: "re_edit_submitted_email" } });
+            });
           }
         }
 
