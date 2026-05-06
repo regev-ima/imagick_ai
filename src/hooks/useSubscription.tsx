@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { deriveEditCounters } from "@/lib/subscriptionMath";
 import { useUserRole } from "./useUserRole";
 import { useEffectiveUser } from "./useImpersonation";
 
@@ -222,24 +223,19 @@ export function useSubscription() {
     };
   }
 
-  // DB columns were renamed (credits_used → edits_used, credits_remaining →
-  // edits_remaining, credits_per_month → edits_included); read new names with
-  // legacy fallbacks so the UI reflects real usage instead of the plan max.
-  const editsUsed = subscription?.edits_used ?? subscription?.credits_used ?? 0;
-  const editsRemaining =
-    subscription?.edits_remaining ??
-    subscription?.credits_remaining ??
-    currentPlan?.edits_included ??
-    currentPlan?.credits_per_month ??
-    3000;
-  const editsTotal = currentPlan?.edits_included ?? currentPlan?.credits_per_month ?? 3000;
-  const editsReserved = subscription?.edits_reserved || 0;
-  const isUnlimited = editsRemaining === -1;
-  const availableEdits = isUnlimited ? -1 : Math.max(0, editsRemaining - editsReserved);
-  const giftCreditsTotal = creditGrants
-    .filter((g: any) => g.status === "active" && (g.credits_remaining || 0) > 0)
-    .reduce((sum: number, g: any) => sum + (g.credits_remaining || 0), 0);
-  const planCreditsRemaining = isUnlimited ? -1 : Math.max(0, editsRemaining - giftCreditsTotal);
+  // Derive every edit counter from the raw rows. The helper accepts both
+  // pre and post-rename column names so a stale Supabase types regen
+  // (or a legacy DB) won't make the UI fall back to plan max again.
+  const {
+    editsUsed,
+    editsRemaining,
+    editsTotal,
+    editsReserved,
+    isUnlimited,
+    availableEdits,
+    giftCreditsTotal,
+    planCreditsRemaining,
+  } = deriveEditCounters(subscription as any, currentPlan as any, creditGrants as any);
   const isFreePlan = currentPlan?.slug === "free";
   const isPaidPlan = !isFreePlan;
   const isCancelling = subscription?.cancel_at_period_end === true;

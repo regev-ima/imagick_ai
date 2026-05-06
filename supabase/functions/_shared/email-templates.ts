@@ -273,6 +273,27 @@ export function reEditCompleteTemplate(galleryName: string, imageCount: number, 
   return { subject, html };
 }
 
+export function accountDeletedTemplate(displayName: string, deletedAt: string): { subject: string; html: string } {
+  const subject = "Your imagick.ai account has been deleted";
+  const html = wrapTemplate(subject, `
+    <div class="badge">Account Deleted</div>
+    <h1 class="title">Goodbye${displayName ? `, <span class="title-grad">${escHtml(displayName)}</span>` : ""}</h1>
+    <p class="text">We're confirming that your imagick.ai account has been permanently deleted on <strong>${escHtml(deletedAt)}</strong>.</p>
+    <div class="info-box">
+      <div class="info-row">
+        <span class="info-label">What's gone</span>
+        <span class="info-value">All galleries, images, custom styles, billing records and subscriptions tied to your account.</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Active subscriptions</span>
+        <span class="info-value">Cancelled with PayPal automatically.</span>
+      </div>
+    </div>
+    <p class="text">Keep this email as proof of deletion. If this wasn't you, please contact us immediately at <a href="mailto:contact@imagick.ai">contact@imagick.ai</a>.</p>
+  `);
+  return { subject, html };
+}
+
 export function gallerySharedConfirmTemplate(galleryName: string, clientEmail: string, galleryUrl: string): { subject: string; html: string } {
   const subject = `Gallery sent to ${clientEmail}`;
   const html = wrapTemplate(subject, `
