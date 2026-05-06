@@ -34,24 +34,40 @@ window.addEventListener("load", () => {
   setTimeout(() => sessionStorage.removeItem(RELOAD_FLAG), 5000);
 });
 
+function isStaleChunkError(error: unknown): boolean {
+  const msg = String((error as { message?: string } | null | undefined)?.message ?? error ?? "");
+  return /Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg);
+}
+
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary
-    fallback={({ resetError }) => (
-      <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <div className="max-w-md text-center space-y-4">
-          <h1 className="text-2xl font-bold">Something went wrong</h1>
-          <p className="text-muted-foreground">
-            We've been notified and are looking into it. You can try again.
-          </p>
-          <button
-            onClick={resetError}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium"
-          >
-            Try again
-          </button>
+    fallback={({ error, resetError }) => {
+      // Belt-and-suspenders: if the lazy() chunk failure slipped past the
+      // global vite:preloadError listener, the ErrorBoundary still catches
+      // it here. Trigger a single hard reload so the user lands on the
+      // new bundle without ever seeing the fallback.
+      if (isStaleChunkError(error) && sessionStorage.getItem(RELOAD_FLAG) !== "1") {
+        sessionStorage.setItem(RELOAD_FLAG, "1");
+        window.location.reload();
+        return null;
+      }
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background p-6">
+          <div className="max-w-md text-center space-y-4">
+            <h1 className="text-2xl font-bold">Something went wrong</h1>
+            <p className="text-muted-foreground">
+              We've been notified and are looking into it. You can try again.
+            </p>
+            <button
+              onClick={resetError}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium"
+            >
+              Try again
+            </button>
+          </div>
         </div>
-      </div>
-    )}
+      );
+    }}
   >
     <App />
   </Sentry.ErrorBoundary>,
