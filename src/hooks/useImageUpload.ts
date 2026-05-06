@@ -41,8 +41,11 @@ const MIN_TIMEOUT_MS = 30 * 1000; // Minimum 30 seconds
 // Stall detection - if no progress for this duration, consider upload stuck
 const STALL_TIMEOUT_MS = 20 * 1000; // 20 seconds with no progress
 const STALL_CHECK_INTERVAL_MS = 5 * 1000; // Check every 5 seconds
-// Number of concurrent uploads to run in parallel
-const CONCURRENT_UPLOADS = 6;
+// Concurrent uploads — Cloudflare Worker chokes well above this when
+// hit with 100+ photos because each upload holds an open connection
+// against per-Worker CPU/memory limits. 4 is a stable balance between
+// throughput and tail latency.
+const CONCURRENT_UPLOADS = 4;
 
 export function useImageUpload() {
   const [isUploading, setIsUploading] = useState(false);
@@ -176,23 +179,19 @@ export function useImageUpload() {
         resolve(false);
       });
 
-      // Open and send request
+      // Open and send request. We pass the File blob directly — XHR
+      // streams it from disk, so 100×30 MB photos cost ~30 MB of RAM
+      // (the active chunk), not 3 GB. Reading each file into an
+      // ArrayBuffer first was the root cause of browser OOM crashes
+      // when uploading large galleries.
+      //
+      // We do NOT set the Connection header: browsers forbid it per
+      // the fetch/XHR spec ("Refused to set unsafe header") and the
+      // server already keeps connections alive by default.
       xhr.open("PUT", B2_PROXY_URL, true);
       xhr.setRequestHeader("signedurl", signedUrl);
       xhr.setRequestHeader("Content-Type", file.type || "image/jpeg");
-      xhr.setRequestHeader("Connection", "keep-alive"); // Help maintain connection through proxy
-      
-      // Read file and send
-      const reader = new FileReader();
-      reader.onload = () => {
-        xhr.send(reader.result as ArrayBuffer);
-      };
-      reader.onerror = () => {
-        cleanup();
-        console.error("Error reading file:", file.name);
-        resolve(false);
-      };
-      reader.readAsArrayBuffer(file);
+      xhr.send(file);
     });
   };
 
