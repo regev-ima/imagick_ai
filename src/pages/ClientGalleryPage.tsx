@@ -452,12 +452,15 @@ export default function ClientGalleryPage() {
         "min-h-screen flex items-center justify-center p-4",
         darkMode ? "bg-[#0a0a0f] text-white" : "bg-[#faf9f7] text-gray-900"
       )}>
-        <div className="text-center">
-          <h1 className="text-2xl font-light mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
+        <div className="text-center max-w-md">
+          <h1 className="text-3xl font-light mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
             {gallery.name}
           </h1>
-          <p className={darkMode ? "text-white/50" : "text-gray-400"}>
-            This gallery is empty.
+          <p className={cn("text-base mb-2", darkMode ? "text-white/80" : "text-gray-700")}>
+            ✨ Your photos are still being prepared.
+          </p>
+          <p className={cn("text-sm", darkMode ? "text-white/50" : "text-gray-500")}>
+            Please check back soon — your photographer will let you know when they're ready.
           </p>
         </div>
       </div>

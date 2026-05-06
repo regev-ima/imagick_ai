@@ -60,6 +60,7 @@ export default function AuthPage() {
 
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -135,11 +136,12 @@ export default function AuthPage() {
       if (error) throw error;
       if (data?.reason === "google_only") {
         toast.info("This account uses Google Sign-In. We sent you an email with instructions.");
-        setIsForgotPassword(false);
+        setPasswordResetSent(true);
         return;
       }
-      toast.success("If an account exists with this email, a reset link has been sent.");
-      setIsForgotPassword(false);
+      // Stay on the page with a clear in-place confirmation instead of a
+      // transient toast that the user might miss.
+      setPasswordResetSent(true);
     } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -467,6 +469,30 @@ export default function AuthPage() {
               </>
             )}
 
+            {isForgotPassword && passwordResetSent && (
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center space-y-3">
+                <MailCheck className="w-12 h-12 mx-auto text-primary" />
+                <h3 className="text-lg font-semibold">Check your email</h3>
+                <p className="text-sm text-muted-foreground">
+                  If an account exists for <strong className="text-foreground">{formData.email}</strong>,
+                  we've sent a reset link. It can take a minute to arrive — also check spam.
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-primary hover:text-primary"
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setPasswordResetSent(false);
+                  }}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to sign in
+                </Button>
+              </div>
+            )}
+
+            {!(isForgotPassword && passwordResetSent) && (
             <form onSubmit={isForgotPassword ? handleForgotPassword : handleSubmit} className="space-y-4">
               {isForgotPassword ? (
                 <div>
@@ -585,6 +611,7 @@ export default function AuthPage() {
                 )}
               </Button>
             </form>
+            )}
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
