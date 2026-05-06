@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 
 const baseHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,6 +76,26 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Rate limit on token lookups so an attacker can't brute-force the
+    // token space. 30 attempts per IP per hour is generous for a real
+    // user (who clicks the link a couple of times, max) and ruinous for
+    // a scanner. The check is per IP — token enumeration from one
+    // source is the realistic attack model.
+    const ipLimit = await checkRateLimit(adminClient, {
+      key: `leadunsub:ip:${getClientIp(req)}`,
+      maxRequests: 30,
+      windowSeconds: 3600,
+    });
+    if (!ipLimit.allowed) {
+      return new Response(
+        JSON.stringify({ success: false, code: "rate_limited", message: "Too many requests" }),
+        {
+          status: 429,
+          headers: { ...baseHeaders, "Content-Type": "application/json", "Retry-After": String(ipLimit.retryAfter) },
+        },
+      );
+    }
 
     const matched = await lookupLeadByToken(adminClient, token);
     if (!matched) {

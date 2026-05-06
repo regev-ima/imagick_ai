@@ -5,28 +5,16 @@
  * Security:
  *  - Always returns { success: true } — never reveals if email exists
  *  - Checks user existence BEFORE generating a reset link (efficient + safe)
- *  - Rate-limited: max 3 requests per email per hour
+ *  - Rate-limited via check_rate_limit RPC: per-email cap (3/hour) AND
+ *    per-IP cap (10/hour) so an attacker can't flood the same address by
+ *    cycling IPs nor flood many addresses from one IP.
  *  - No JWT required (user forgot their password)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email-sender.ts";
 import { passwordResetTemplate, googleAccountTemplate } from "../_shared/email-templates.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-
-// Simple in-memory rate limit: max 3 reset requests per email per hour
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(email: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(email);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(email, { count: 1, resetAt: now + 3_600_000 });
-    return true;
-  }
-  if (entry.count >= 3) return false;
-  entry.count++;
-  return true;
-}
+import { checkRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -41,16 +29,34 @@ Deno.serve(async (req) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-
-    if (!checkRateLimit(normalizedEmail)) {
-      return json({ error: "Too many requests. Please try again later." }, 429);
-    }
+    const ip = getClientIp(req);
 
     const supabaseUrl    = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const studioUrl      = (Deno.env.get("STUDIO_URL") || "https://studio.imagick.ai").replace(/\/+$/, "");
+    const studioUrl      = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    // Per-email cap: 3/hour. Cycling IPs to flood a single mailbox doesn't help.
+    const emailLimit = await checkRateLimit(supabaseAdmin, {
+      key: `pwreset:email:${normalizedEmail}`,
+      maxRequests: 3,
+      windowSeconds: 3600,
+    });
+    // Per-IP cap: 10/hour across all addresses. Stops a single attacker from
+    // enumerating users or flooding many addresses from one source.
+    const ipLimit = await checkRateLimit(supabaseAdmin, {
+      key: `pwreset:ip:${ip}`,
+      maxRequests: 10,
+      windowSeconds: 3600,
+    });
+    if (!emailLimit.allowed || !ipLimit.allowed) {
+      const retryAfter = Math.max(emailLimit.retryAfter, ipLimit.retryAfter);
+      return new Response(JSON.stringify({ error: "Too many requests. Please try again later." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(retryAfter) },
+      });
+    }
 
     // ── 1. Check if user exists FIRST (timing-safe: always do the lookup) ────
     // We always perform this lookup so timing is consistent regardless of outcome.

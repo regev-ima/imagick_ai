@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,28 +11,6 @@ const corsHeaders = {
 interface VerifyRequest {
   galleryId: string;
   password: string;
-}
-
-// In-memory rate limiting (resets on function cold start)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_MAX = 5; // Max attempts
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-
-function checkRateLimit(identifier: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(identifier);
-  
-  if (!entry || now > entry.resetTime) {
-    rateLimitMap.set(identifier, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return false;
-  }
-  
-  entry.count++;
-  return true;
 }
 
 // Verify password using Web Crypto API (PBKDF2)
@@ -93,8 +72,8 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     // Get client IP for rate limiting
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-    
+    const clientIp = getClientIp(req);
+
     const { galleryId, password }: VerifyRequest = await req.json();
 
     // Validate required fields
@@ -105,20 +84,39 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Rate limit by IP + galleryId combination
-    const rateLimitKey = `${clientIp}:${galleryId}`;
-    if (!checkRateLimit(rateLimitKey)) {
-      return new Response(
-        JSON.stringify({ error: "Too many attempts. Please try again later." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Create Supabase client with service role key to access password column
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Rate limit attempts: 5 wrong tries per IP+gallery per hour (brute-force
+    // password guessing) AND 30 across any galleries from one IP per hour
+    // (stops a scanner sweeping many galleries).
+    const ipGalleryLimit = await checkRateLimit(supabase, {
+      key: `gpw:${clientIp}:${galleryId}`,
+      maxRequests: 5,
+      windowSeconds: 3600,
+    });
+    const ipLimit = await checkRateLimit(supabase, {
+      key: `gpw:ip:${clientIp}`,
+      maxRequests: 30,
+      windowSeconds: 3600,
+    });
+    if (!ipGalleryLimit.allowed || !ipLimit.allowed) {
+      const retryAfter = Math.max(ipGalleryLimit.retryAfter, ipLimit.retryAfter);
+      return new Response(
+        JSON.stringify({ error: "Too many attempts. Please try again later." }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": String(retryAfter),
+          },
+        },
+      );
+    }
 
     // Fetch the gallery's password using service role (bypasses RLS)
     const { data: gallery, error } = await supabase
