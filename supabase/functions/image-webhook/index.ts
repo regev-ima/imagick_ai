@@ -5,6 +5,7 @@ import { sendEmail } from "../_shared/email-sender.ts";
 import { galleryImagesReadyTemplate, reEditCompleteTemplate } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { captureException } from "../_shared/sentry.ts";
+import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +38,14 @@ serve(async (req: Request) => {
   }
 
   try {
+    if (!(await verifyWebhookSecret(req))) {
+      console.warn("Rejecting image-webhook: bad or missing token");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -365,7 +374,8 @@ serve(async (req: Request) => {
           const apiUsername = Deno.env.get("IMAGICK_API_USERNAME")!;
           const apiPassword = Deno.env.get("IMAGICK_API_PASSWORD")!;
           const apiEndpoint = "https://imagick-api-endpoint.rx8rq49b5c.workers.dev/make-grouping/";
-          const webhookUrl = `${supabaseUrl}/functions/v1/grouping-webhook`;
+          const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
+          const webhookUrl = appendWebhookSecret(`${supabaseUrl}/functions/v1/grouping-webhook`);
 
           const groupingRequest = {
             collectionId: galleryId,

@@ -3,6 +3,7 @@ import { sendEmail } from "../_shared/email-sender.ts";
 import { styleReadyTemplate } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { captureException } from "../_shared/sentry.ts";
+import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,14 @@ Deno.serve(async (req) => {
   }
 
   try {
+    if (!(await verifyWebhookSecret(req))) {
+      console.warn("Rejecting train-webhook: bad or missing token");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const body = await req.json();
     console.log("Train webhook received:", JSON.stringify(body));
 

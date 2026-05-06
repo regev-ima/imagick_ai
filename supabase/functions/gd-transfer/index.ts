@@ -270,8 +270,11 @@ Deno.serve(async (req) => {
         use_uuid4: true,
       };
 
+      const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
       if (isStyleTransfer && styleId) {
-        gcpRequestBody.callback_url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/train-webhook`;
+        gcpRequestBody.callback_url = appendWebhookSecret(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/train-webhook`
+        );
         gcpRequestBody.callback_args = {
           styleId,
           userId,
@@ -281,7 +284,9 @@ Deno.serve(async (req) => {
           modelType: body.modelType || "event",
         };
       } else {
-        gcpRequestBody.callback_url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/gd-transfer-webhook`;
+        gcpRequestBody.callback_url = appendWebhookSecret(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/gd-transfer-webhook`
+        );
         gcpRequestBody.callback_args = {
           galleryId,
           userId,

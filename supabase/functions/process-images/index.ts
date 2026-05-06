@@ -221,7 +221,8 @@ serve(async (req: Request) => {
       );
     }
 
-    const webhookUrl = `${supabaseUrl}/functions/v1/image-webhook`;
+    const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
+    const webhookUrl = appendWebhookSecret(`${supabaseUrl}/functions/v1/image-webhook`);
 
     // Check existing edits to skip duplicates
     const fetchedImageIds = images.map((img) => img.id);

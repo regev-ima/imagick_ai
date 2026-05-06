@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email-sender.ts";
 import { cullingReadyTemplate } from "../_shared/email-templates.ts";
 import { captureException } from "../_shared/sentry.ts";
+import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +38,14 @@ serve(async (req: Request) => {
   }
 
   try {
+    if (!(await verifyWebhookSecret(req))) {
+      console.warn("Rejecting grouping-webhook: bad or missing token");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
