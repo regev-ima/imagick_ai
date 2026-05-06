@@ -477,7 +477,7 @@ export function AddImagesModal({
                     <ScrollArea className="h-[400px] pr-2">
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         {styles.map(style => {
-                          const coverUrl = showcaseCovers[style.id];
+                          const coverUrl = showcaseCovers[style.id] || style.thumbnail_url || undefined;
                           const isSelected = selectedStyles.includes(style.id);
                           return (
                             <motion.div

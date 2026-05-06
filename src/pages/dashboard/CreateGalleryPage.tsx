@@ -868,7 +868,7 @@ export default function CreateGalleryPage() {
                         {selectedStyles.map(id => {
                           const style = styles.find(s => s.id === id);
                           if (!style) return null;
-                          const chipCover = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined);
+                          const chipCover = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined) || style.thumbnail_url || undefined;
                           return (
                             <motion.div
                               key={id}
@@ -930,7 +930,7 @@ export default function CreateGalleryPage() {
                   <ScrollArea className="h-[350px] pr-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {filteredStyles.map(style => {
-                        const coverUrl = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined);
+                        const coverUrl = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined) || style.thumbnail_url || undefined;
                         const isSelected = selectedStyles.includes(style.id);
                         return (
                           <motion.div
