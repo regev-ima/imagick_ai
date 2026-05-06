@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email-sender.ts";
 import { styleReadyTemplate } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -227,6 +228,7 @@ Deno.serve(async (req) => {
     });
   } catch (error: unknown) {
     console.error("Error in train-webhook:", error);
+    await captureException(error, { tags: { fn: "train-webhook" } });
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

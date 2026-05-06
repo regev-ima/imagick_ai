@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { Sentry } from "@/lib/sentry";
 
 export function useAuth() {
   const queryClient = useQueryClient();
@@ -16,6 +17,11 @@ export function useAuth() {
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
+        if (session?.user) {
+          Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined });
+        } else {
+          Sentry.setUser(null);
+        }
       }
     );
 
@@ -24,6 +30,9 @@ export function useAuth() {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+      if (session?.user) {
+        Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined });
+      }
     });
 
     return () => {
@@ -34,6 +43,7 @@ export function useAuth() {
   const signOut = async () => {
     // Clear all cached data to prevent data leakage between users
     queryClient.clear();
+    Sentry.setUser(null);
     await supabase.auth.signOut();
   };
 

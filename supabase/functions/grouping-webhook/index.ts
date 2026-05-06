@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email-sender.ts";
 import { cullingReadyTemplate } from "../_shared/email-templates.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -187,6 +188,7 @@ serve(async (req: Request) => {
 
   } catch (error: unknown) {
     console.error("Error in grouping-webhook:", error);
+    await captureException(error, { tags: { fn: "grouping-webhook" } });
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
