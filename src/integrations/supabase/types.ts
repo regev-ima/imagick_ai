@@ -2248,6 +2248,21 @@ export type Database = {
           thumbnail_url: string
         }[]
       }
+      get_admin_kpi_overview: {
+        Args: never
+        Returns: {
+          active_subscribers: number
+          mrr_usd: number
+          cancellations_30d: number
+          churn_pct_30d: number
+          edits_today: number
+          edits_7d: number
+          edits_30d: number
+          signups_7d: number
+          signups_30d: number
+          computed_at: string
+        }
+      }
       get_edits_per_user: {
         Args: never
         Returns: {
