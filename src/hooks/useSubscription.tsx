@@ -54,11 +54,14 @@ export function useSubscription() {
     queryFn: async () => {
       if (!effectiveUserId) return null;
 
+      // Disambiguate the foreign key — user_subscriptions has TWO FKs to
+      // subscription_plans (plan_id and scheduled_plan_id) so PostgREST
+      // refuses the implicit embed with PGRST201.
       const { data, error } = await supabase
         .from("user_subscriptions")
         .select(`
           *,
-          plan:subscription_plans(*)
+          plan:subscription_plans!plan_id(*)
         `)
         .eq("user_id", effectiveUserId)
         .maybeSingle();
