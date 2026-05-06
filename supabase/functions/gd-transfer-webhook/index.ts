@@ -320,7 +320,7 @@ Deno.serve(async (req) => {
           .single();
         const galleryName = gallery?.name || "Untitled Gallery";
         const userName = authUser.user_metadata?.full_name || authUser.email.split("@")[0];
-        const studioUrl = (Deno.env.get("STUDIO_URL") || "https://studio.imagick.ai").replace(/\/+$/, "");
+        const studioUrl = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
         const galleryUrl = `${studioUrl}/dashboard/galleries/${galleryId}`;
         const { subject, html } = gdImportCompleteTemplate(galleryName, totalCount, galleryUrl);
         await sendEmail({

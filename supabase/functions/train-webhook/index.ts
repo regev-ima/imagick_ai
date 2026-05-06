@@ -328,7 +328,7 @@ async function sendStyleReadyEmail(supabase: any, styleId: string, userId: strin
   const { data: userRecord } = await adminClient.auth.admin.getUserById(userId);
   if (!userRecord?.user?.email) return;
 
-  const appUrl   = (Deno.env.get("STUDIO_URL") || "https://studio.imagick.ai").replace(/\/+$/, "");
+  const appUrl   = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
   const styleUrl = `${appUrl}/dashboard/styles/${styleId}`;
   const template = styleReadyTemplate(style.name, styleUrl);
 

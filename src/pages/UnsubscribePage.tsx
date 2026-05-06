@@ -7,7 +7,9 @@ type ViewState = "loading" | "retain" | "success" | "error";
 type UnsubscribeKind = "lead" | "journey";
 
 const TRACE_VERSION = "unsubscribe-retention-v2-2026-03-11";
-const AUTH_URL = "https://studio.imagick.ai/auth";
+// Use the same origin as the page, so this stays correct across staging
+// previews and any future domain change without a code edit.
+const AUTH_URL = `${typeof window !== "undefined" ? window.location.origin : ""}/auth`;
 const REQUEST_TIMEOUT_MS = 9000;
 const LOGO_DARK_URL =
   "https://zfcltfqgrhytpvgqkkfo.supabase.co/storage/v1/object/public/gallery-images/brand%2Fimagick-logo-dark.png";

@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl    = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const studioUrl      = (Deno.env.get("STUDIO_URL") || "https://studio.imagick.ai").replace(/\/+$/, "");
+    const studioUrl      = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 

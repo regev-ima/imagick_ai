@@ -9,6 +9,17 @@
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 
+// Single source of truth for the studio URL. Reads from env (STUDIO_URL) so
+// changing the domain is one secret update instead of a code change in every
+// template.
+const APP_URL = (() => {
+  try {
+    return ((globalThis as { Deno?: { env: { get: (k: string) => string | undefined } } }).Deno?.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
+  } catch {
+    return "https://app.imagick.ai";
+  }
+})();
+
 const LOGO_URL        = "https://zfcltfqgrhytpvgqkkfo.supabase.co/storage/v1/object/public/brand/imagick-logo.png";
 const BRAND_PRIMARY   = "#e85c9b"; // Pink-Magenta  hsl(330,85%,60%)
 const BRAND_SECONDARY = "#9b5ad4"; // Electric Violet hsl(270,75%,60%)
@@ -118,7 +129,7 @@ function wrapTemplate(subject: string, bodyHtml: string): string {
           © ${new Date().getFullYear()} Imagick.ai &nbsp;·&nbsp;
           <a href="https://imagick.ai" class="footer-link">imagick.ai</a>
           &nbsp;·&nbsp;
-          <a href="https://studio.imagick.ai/dashboard/settings" class="footer-link">Email preferences</a>
+          <a href="${APP_URL}/dashboard/settings" class="footer-link">Email preferences</a>
         </p>
         <p class="footer-text" style="margin-top:5px;">
           You're receiving this because you have an account at Imagick.ai.
@@ -159,7 +170,7 @@ export function welcomeEmailTemplate(name: string): { subject: string; html: str
       </div>
     </div>
     <div class="cta-wrap">
-      <a href="https://studio.imagick.ai/dashboard" class="cta-btn">Start editing now →</a>
+      <a href="${APP_URL}/dashboard" class="cta-btn">Start editing now →</a>
     </div>
     <hr class="divider" />
     <p class="text" style="font-size:13px;">Questions? Ideas? Just hit reply — we read every message and we'd love to hear from you.</p>
@@ -323,7 +334,7 @@ export function subscriptionChangeTemplate(planName: string, changeType: "upgrad
         : `Your subscription has been ${changeType === "upgrade" ? "upgraded" : "changed"} to the <strong>${escHtml(planName)}</strong> plan.`}
     </p>
     <div class="cta-wrap">
-      <a href="${escHtml(billingUrl || "https://studio.imagick.ai/dashboard/billing")}" class="cta-btn">View billing details →</a>
+      <a href="${escHtml(billingUrl || `${APP_URL}/dashboard/billing`)}" class="cta-btn">View billing details →</a>
     </div>
     <p class="text">If you have any questions about your subscription, reply to this email and we'll help you out.</p>
   `);

@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
       return json({ success: true });
     }
 
-    const appUrl = (Deno.env.get("STUDIO_URL") || "https://studio.imagick.ai").replace(/\/+$/, "");
+    const appUrl = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
 
     // ── Internal types (called from edge functions with service role key) ──
     // These receive userId in the body and look up user info via admin API.
