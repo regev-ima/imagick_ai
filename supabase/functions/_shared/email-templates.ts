@@ -554,16 +554,23 @@ export function journeyUpgradeTemplate(studioUrl: string): { subject: string; ht
   );
 }
 
-export function journeyReEngagementTemplate(studioUrl: string): { subject: string; html: string } {
+export function journeyReEngagementTemplate(
+  studioUrl: string,
+  firstName = "there",
+  unsubscribeUrl?: string,
+): { subject: string; html: string } {
   return journeyEmailTemplate(
     'We miss you! Your AI editing studio is waiting 💜',
     `<div class="badge">We Miss You</div>
 <h1 class="title">Your studio is <span class="title-grad">waiting for you</span> 💜</h1>
-<p class="text">Hi Test User,</p>
-<p class="text">It's been a while! Your account is still active and your free edits are waiting.</p>
+<p class="text">Hi ${escHtml(firstName)},</p>
+<p class="text">It's been a while since you've edited on Imagick.ai. Your account is still active and your edits are waiting for you.</p>
+<p class="text">Since you've been away we've shipped faster AI processing, better colour accuracy, and new tools like AI Culling and Smart Grouping.</p>
 <div class="cta-wrap">
   <a href="${escHtml(studioUrl)}/dashboard" class="cta-btn">Come back to Imagick →</a>
-</div>`
+</div>
+<p class="text" style="font-size:13px;">If Imagick.ai isn't the right fit any more, no hard feelings — you can opt out below.</p>`,
+    unsubscribeUrl,
   );
 }
 

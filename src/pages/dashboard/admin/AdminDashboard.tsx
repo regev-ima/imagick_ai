@@ -21,6 +21,8 @@ import {
   type LucideIcon,
   Megaphone,
   Settings2,
+  TrendingDown,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -99,19 +101,42 @@ export default function AdminDashboard() {
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
-      const [galleriesResult, stylesResult, subscriptionsResult] = await Promise.all([
+      const [galleriesResult, stylesResult, kpiResult] = await Promise.all([
         supabase.from("galleries").select("id", { count: "exact", head: true }),
         supabase.from("styles").select("id", { count: "exact", head: true }),
-        supabase.from("user_subscriptions").select("id", { count: "exact", head: true }),
+        supabase.rpc("get_admin_kpi_overview"),
       ]);
+
+      const kpi = (kpiResult.data ?? null) as {
+        active_subscribers: number;
+        mrr_usd: number | string;
+        cancellations_30d: number;
+        churn_pct_30d: number | string;
+        edits_today: number;
+        edits_7d: number;
+        edits_30d: number;
+        signups_7d: number;
+        signups_30d: number;
+      } | null;
 
       return {
         totalGalleries: galleriesResult.count || 0,
         totalStyles: stylesResult.count || 0,
-        activeSubscriptions: subscriptionsResult.count || 0,
+        activeSubscriptions: kpi?.active_subscribers ?? 0,
+        mrrUsd: Number(kpi?.mrr_usd ?? 0),
+        churnPct30d: Number(kpi?.churn_pct_30d ?? 0),
+        cancellations30d: kpi?.cancellations_30d ?? 0,
+        editsToday: kpi?.edits_today ?? 0,
+        edits7d: kpi?.edits_7d ?? 0,
+        edits30d: kpi?.edits_30d ?? 0,
+        signups7d: kpi?.signups_7d ?? 0,
+        signups30d: kpi?.signups_30d ?? 0,
       };
     },
   });
+
+  const formatUsd = (n: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -124,31 +149,20 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* Stats Overview */}
+      {/* KPI row 1 — revenue & subscriber health */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Galleries</p>
-                <p className="text-2xl font-bold">{stats?.totalGalleries || 0}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-primary/10">
-                <Images className="w-6 h-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Styles</p>
-                <p className="text-2xl font-bold">{stats?.totalStyles || 0}</p>
+                <p className="text-sm text-muted-foreground">MRR</p>
+                <p className="text-2xl font-bold">{formatUsd(stats?.mrrUsd ?? 0)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Annual subs normalised to monthly
+                </p>
               </div>
               <div className="p-3 rounded-xl bg-secondary/10">
-                <Sparkles className="w-6 h-6 text-secondary" />
+                <DollarSign className="w-6 h-6 text-secondary" />
               </div>
             </div>
           </CardContent>
@@ -158,8 +172,11 @@ export default function AdminDashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active Subscriptions</p>
-                <p className="text-2xl font-bold">{stats?.activeSubscriptions || 0}</p>
+                <p className="text-sm text-muted-foreground">Active subscribers</p>
+                <p className="text-2xl font-bold">{stats?.activeSubscriptions ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Paying, status=active
+                </p>
               </div>
               <div className="p-3 rounded-xl bg-primary/10">
                 <Activity className="w-6 h-6 text-primary" />
@@ -172,11 +189,98 @@ export default function AdminDashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Monthly Revenue</p>
-                <p className="text-2xl font-bold">$0</p>
+                <p className="text-sm text-muted-foreground">Churn (30d)</p>
+                <p className="text-2xl font-bold">
+                  {Number(stats?.churnPct30d ?? 0).toFixed(1)}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats?.cancellations30d ?? 0} cancellations
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-destructive/10">
+                <TrendingDown className="w-6 h-6 text-destructive" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">New signups (7d)</p>
+                <p className="text-2xl font-bold">{stats?.signups7d ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats?.signups30d ?? 0} in last 30 days
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-primary/10">
+                <UserPlus2 className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* KPI row 2 — usage volume */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Edits today</p>
+                <p className="text-2xl font-bold">{stats?.editsToday ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">UTC day so far</p>
               </div>
               <div className="p-3 rounded-xl bg-secondary/10">
-                <DollarSign className="w-6 h-6 text-secondary" />
+                <Zap className="w-6 h-6 text-secondary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Edits / day (7d avg)</p>
+                <p className="text-2xl font-bold">
+                  {Math.round((stats?.edits7d ?? 0) / 7)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats?.edits7d ?? 0} total in last 7 days
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-primary/10">
+                <TrendingUp className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total galleries</p>
+                <p className="text-2xl font-bold">{stats?.totalGalleries ?? 0}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-primary/10">
+                <Images className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total styles</p>
+                <p className="text-2xl font-bold">{stats?.totalStyles ?? 0}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-secondary/10">
+                <Sparkles className="w-6 h-6 text-secondary" />
               </div>
             </div>
           </CardContent>

@@ -28,6 +28,7 @@ const PREF_COLUMN: Record<string, string> = {
   gd_import_started:       "gd_import_started",
   gd_import_complete:      "gd_import_complete",
   journey_email:           "journey_emails",
+  journey_reengagement:    "journey_emails",
   // password_reset always sends — no opt-out
 };
 

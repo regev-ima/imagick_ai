@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
       journey_social_proof: () => journeySocialProofTemplate(studioUrl),
       journey_upload_more: () => journeyUploadMoreTemplate(studioUrl),
       journey_upgrade: () => journeyUpgradeTemplate(studioUrl),
-      journey_reengagement: () => journeyReEngagementTemplate(studioUrl),
+      journey_reengagement: () => journeyReEngagementTemplate(studioUrl, "Test User"),
     };
 
     let subject = "";
