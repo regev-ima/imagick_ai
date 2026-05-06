@@ -11,13 +11,13 @@ test.describe("auth form interactions", () => {
   test("defaults to sign-in mode (no Full Name field)", async ({ page }) => {
     await expect(page.getByRole("button", { name: /^sign in$/i }).first()).toBeVisible();
     // Full Name field should NOT be visible in sign-in mode
-    await expect(page.getByLabel(/full name/i)).toHaveCount(0);
+    await expect(page.getByPlaceholder("John Doe")).toHaveCount(0);
   });
 
   test("toggles to sign-up mode and reveals the Full Name field", async ({ page }) => {
     await page.getByRole("button", { name: /^sign up$/i }).click();
     await expect(page.getByRole("button", { name: /start for free/i })).toBeVisible();
-    await expect(page.getByLabel(/full name/i)).toBeVisible();
+    await expect(page.getByPlaceholder("John Doe")).toBeVisible();
   });
 
   test("shows password strength indicator when typing in sign-up mode", async ({ page }) => {

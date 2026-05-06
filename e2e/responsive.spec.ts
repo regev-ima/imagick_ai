@@ -1,10 +1,16 @@
-import { test, expect, devices } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 // Smoke checks on a phone viewport so we don't ship pages that overflow
-// or hide their primary CTA on mobile. Uses Playwright's built-in
-// iPhone 12 emulation profile.
-
-test.use({ ...devices["iPhone 12"] });
+// or hide their primary CTA on mobile. We don't use Playwright's built-in
+// `devices["iPhone 12"]` profile because it sets defaultBrowserType to
+// webkit, which would force CI to install another browser. The viewport
+// + isMobile flags are what we actually care about.
+test.use({
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+});
 
 test.describe("mobile viewport", () => {
   test("auth page primary CTA is visible without horizontal scroll", async ({ page }) => {
