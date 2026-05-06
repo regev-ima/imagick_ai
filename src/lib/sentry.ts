@@ -17,7 +17,14 @@ if (dsn) {
     ],
     beforeSend(event) {
       const msg = event.message || event.exception?.values?.[0]?.value || "";
+      // Browser noise that's never actionable.
       if (/ResizeObserver loop|Non-Error promise rejection captured/i.test(msg)) {
+        return null;
+      }
+      // Stale chunk after deploy — main.tsx already recovers with a reload,
+      // and the user never sees the error. Suppress so we don't drown the
+      // dashboard in one row per deploy × user-with-old-tab.
+      if (/Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg)) {
         return null;
       }
       return event;
