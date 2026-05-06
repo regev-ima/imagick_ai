@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createOrder } from "../_shared/paypal.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 const ADDON_PRICES: Record<string, { price: number; label: string }> = {
   extra_model: { price: 15, label: "Extra Custom AI Model" },
@@ -13,6 +14,12 @@ const ADDON_PRICES: Record<string, { price: number; label: string }> = {
 const MODEL_PRICE_BY_PLAN: Record<string, number> = {
   studio: 10,
 };
+
+// Bound the quantity a client may request. Without this, a malicious or
+// buggy client could send a negative or unbounded value and influence the
+// PayPal order amount.
+const MIN_ADDON_QUANTITY = 1;
+const MAX_ADDON_QUANTITY = 50;
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -41,9 +48,26 @@ serve(async (req: Request) => {
       });
     }
 
-    const { addonType, quantity = 1, inline } = await req.json();
+    let body: { addonType?: string; quantity?: unknown; inline?: boolean };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const addon = ADDON_PRICES[addonType];
+    const { addonType, inline } = body;
+    const rawQty = body.quantity ?? 1;
+    const quantity = typeof rawQty === "number" ? rawQty : Number(rawQty);
+    if (!Number.isInteger(quantity) || quantity < MIN_ADDON_QUANTITY || quantity > MAX_ADDON_QUANTITY) {
+      return new Response(
+        JSON.stringify({ error: `Quantity must be an integer between ${MIN_ADDON_QUANTITY} and ${MAX_ADDON_QUANTITY}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const addon = addonType ? ADDON_PRICES[addonType] : undefined;
     if (!addon) {
       return new Response(JSON.stringify({ error: "Invalid addon type" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -93,6 +117,10 @@ serve(async (req: Request) => {
     );
   } catch (error: unknown) {
     console.error("Error creating addon order:", error);
+    await captureException(error, {
+      tags: { fn: "paypal-create-addon-order" },
+      level: "error",
+    });
     const msg = error instanceof Error ? error.message : "Internal server error";
     return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },

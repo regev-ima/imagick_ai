@@ -142,6 +142,7 @@ export default function EmailTemplatesPage() {
 
       <Card className="glass-card border-border/50">
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -200,6 +201,7 @@ export default function EmailTemplatesPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

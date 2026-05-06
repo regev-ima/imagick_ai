@@ -60,25 +60,48 @@ serve(async (req: Request) => {
         processed: false,
       });
 
+    let alreadyProcessed = false;
     if (insertErr) {
-      // 23505 = unique_violation — another concurrent webhook beat us to it
-      if ((insertErr as { code?: string }).code === "23505") {
-        console.log(`Duplicate webhook event ${eventId}, skipping`);
+      // 23505 = unique_violation — another concurrent webhook (or a PayPal
+      // retry of an event we already returned 5xx for) beat us to inserting.
+      if ((insertErr as { code?: string }).code !== "23505") {
+        throw insertErr;
+      }
+
+      // Check the prior row: if it finished processing, this is a true
+      // duplicate and we ack with 200. If not, fall through and re-attempt
+      // processing — this is the PayPal retry path after a previous 5xx.
+      const { data: existing } = await supabase
+        .from("paypal_webhook_events")
+        .select("processed")
+        .eq("event_id", eventId)
+        .maybeSingle();
+
+      if (existing?.processed) {
+        console.log(`Duplicate webhook event ${eventId} (already processed), acking`);
         return new Response(JSON.stringify({ status: "duplicate" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw insertErr;
+
+      console.log(`Webhook event ${eventId} previously failed; retrying processing`);
+      alreadyProcessed = true; // skip mark-as-processed on success path? no — still mark it
     }
 
-    // 3. Process event (only the webhook that won the insert race gets here)
+    // 3. Process event. On failure we re-raise so the outer catch returns
+    //    5xx, and PayPal retries the same event_id. The retry path above
+    //    will re-attempt processing because processed=false.
     try {
       await processEvent(supabase, event, studioUrl);
 
       await supabase
         .from("paypal_webhook_events")
-        .update({ processed: true, processed_at: new Date().toISOString() })
+        .update({
+          processed: true,
+          processed_at: new Date().toISOString(),
+          processing_error: null,
+        })
         .eq("event_id", eventId);
     } catch (processErr: any) {
       console.error("Error processing webhook event:", processErr);
@@ -88,9 +111,11 @@ serve(async (req: Request) => {
         .eq("event_id", eventId);
       await captureException(processErr, {
         tags: { fn: "paypal-webhook", phase: "processEvent", eventType: event.event_type },
-        extra: { eventId },
+        extra: { eventId, retry: alreadyProcessed },
         level: "error",
       });
+      // Re-raise so the outer catch returns 5xx and PayPal retries.
+      throw processErr;
     }
 
     return new Response(JSON.stringify({ status: "ok" }), {
@@ -100,9 +125,11 @@ serve(async (req: Request) => {
   } catch (error: unknown) {
     console.error("PayPal webhook error:", error);
     await captureException(error, { tags: { fn: "paypal-webhook" }, level: "fatal" });
-    // Return 200 to prevent PayPal from retrying
-    return new Response(JSON.stringify({ status: "error" }), {
-      status: 200,
+    // Return 5xx so PayPal retries with the same event_id. The idempotency
+    // layer above will dedupe successful processing on the retry.
+    const message = error instanceof Error ? error.message : "Internal server error";
+    return new Response(JSON.stringify({ status: "error", message }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -354,6 +381,37 @@ async function processEvent(supabase: any, event: any, studioUrl: string) {
       }
 
       console.log(`Subscription suspended for PayPal sub ${paypalSubId}`);
+      break;
+    }
+
+    case "BILLING.SUBSCRIPTION.RENEWED": {
+      // PayPal can emit RENEWED separately from PAYMENT.SALE.COMPLETED.
+      // The payment-side handler below records the invoice + sends mail;
+      // here we just refresh the period window so usage gates stay aligned.
+      const paypalSubId = resource.id;
+      let nextBillingTime: string | undefined;
+      try {
+        const subDetails = await getSubscriptionDetails(paypalSubId);
+        nextBillingTime = subDetails.billing_info?.next_billing_time;
+      } catch (err) {
+        console.error("Failed to fetch subscription details on RENEWED:", err);
+      }
+
+      const updates: Record<string, unknown> = {
+        status: "active",
+        last_payment_at: new Date().toISOString(),
+        suspension_count: 0,
+      };
+      if (nextBillingTime) {
+        updates.current_period_end = new Date(nextBillingTime).toISOString().split("T")[0];
+      }
+
+      await supabase
+        .from("user_subscriptions")
+        .update(updates)
+        .eq("paypal_subscription_id", paypalSubId);
+
+      console.log(`Subscription renewed for PayPal sub ${paypalSubId}`);
       break;
     }
 

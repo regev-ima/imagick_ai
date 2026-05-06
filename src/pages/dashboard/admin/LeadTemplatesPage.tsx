@@ -240,6 +240,7 @@ export default function LeadTemplatesPage() {
 
       <Card className="glass-card border-border/50">
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -340,6 +341,7 @@ export default function LeadTemplatesPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

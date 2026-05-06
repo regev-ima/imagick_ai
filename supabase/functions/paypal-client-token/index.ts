@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getPayPalMode } from "../_shared/paypal.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -96,6 +97,10 @@ serve(async (req: Request) => {
     );
   } catch (error: unknown) {
     console.error("Error in paypal-client-token:", error);
+    await captureException(error, {
+      tags: { fn: "paypal-client-token" },
+      level: "error",
+    });
     const msg = error instanceof Error ? error.message : "Internal server error";
     return new Response(
       JSON.stringify({ error: msg }),

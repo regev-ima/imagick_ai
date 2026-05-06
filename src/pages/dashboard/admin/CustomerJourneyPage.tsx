@@ -261,6 +261,7 @@ export default function CustomerJourneyPage() {
               {isLoading ? (
                 <div className="flex items-center justify-center py-12"><RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" /></div>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -303,6 +304,7 @@ export default function CustomerJourneyPage() {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

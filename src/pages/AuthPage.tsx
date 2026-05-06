@@ -650,7 +650,25 @@ export default function AuthPage() {
           )}
 
           <p className="text-[10px] text-center text-muted-foreground/50 mt-4">
-            By continuing, you agree to our Terms of Service and Privacy Policy.
+            By continuing, you agree to our{" "}
+            <a
+              href="https://imagick.ai/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-muted-foreground transition-colors"
+            >
+              Terms of Service
+            </a>
+            {" "}and{" "}
+            <a
+              href="https://imagick.ai/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-muted-foreground transition-colors"
+            >
+              Privacy Policy
+            </a>
+            .
           </p>
         </motion.div>
       </div>
