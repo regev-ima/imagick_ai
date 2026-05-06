@@ -36,8 +36,12 @@ export interface UserSubscription {
   current_period_end: string;
   paypal_subscription_id: string | null;
   paypal_plan_id: string | null;
-  credits_used: number;
-  credits_remaining: number;
+  edits_used: number;
+  edits_remaining: number;
+  /** @deprecated pre-rename alias for edits_used */
+  credits_used?: number;
+  /** @deprecated pre-rename alias for edits_remaining */
+  credits_remaining?: number;
   edits_reserved: number;
   storage_used_mb: number;
   cancel_at_period_end: boolean;
@@ -72,7 +76,11 @@ export function useSubscription() {
       }
       const sub = data as unknown as UserSubscription | null;
       if (sub?.plan) {
-        (sub.plan as any).edits_included = (sub.plan as any).credits_per_month;
+        const p = sub.plan as any;
+        // DB column was renamed credits_per_month → edits_included.
+        // Expose both names so legacy readers keep working.
+        if (p.edits_included === undefined) p.edits_included = p.credits_per_month;
+        if (p.credits_per_month === undefined) p.credits_per_month = p.edits_included;
       }
       return sub;
     },
@@ -119,7 +127,8 @@ export function useSubscription() {
 
       return (data as unknown as any[]).map((p: any) => ({
         ...p,
-        edits_included: p.credits_per_month,
+        edits_included: p.edits_included ?? p.credits_per_month,
+        credits_per_month: p.credits_per_month ?? p.edits_included,
       })) as SubscriptionPlan[];
     },
   });
@@ -211,9 +220,17 @@ export function useSubscription() {
     };
   }
 
-  const editsUsed = subscription?.credits_used || 0;
-  const editsRemaining = subscription?.credits_remaining ?? currentPlan?.credits_per_month ?? 3000;
-  const editsTotal = currentPlan?.credits_per_month ?? 3000;
+  // DB columns were renamed (credits_used → edits_used, credits_remaining →
+  // edits_remaining, credits_per_month → edits_included); read new names with
+  // legacy fallbacks so the UI reflects real usage instead of the plan max.
+  const editsUsed = subscription?.edits_used ?? subscription?.credits_used ?? 0;
+  const editsRemaining =
+    subscription?.edits_remaining ??
+    subscription?.credits_remaining ??
+    currentPlan?.edits_included ??
+    currentPlan?.credits_per_month ??
+    3000;
+  const editsTotal = currentPlan?.edits_included ?? currentPlan?.credits_per_month ?? 3000;
   const editsReserved = subscription?.edits_reserved || 0;
   const isUnlimited = editsRemaining === -1;
   const availableEdits = isUnlimited ? -1 : Math.max(0, editsRemaining - editsReserved);
