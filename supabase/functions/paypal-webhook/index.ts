@@ -44,33 +44,35 @@ serve(async (req: Request) => {
       });
     }
 
-    // 2. Idempotency check
+    // 2. Atomic idempotency: insert first, rely on the UNIQUE(event_id)
+    //    constraint so two simultaneous PayPal retries can't both pass the
+    //    check and double-charge the customer. Whichever webhook commits
+    //    the row first owns processing; the other(s) bail out as duplicates.
     const eventId = event.id;
-    const { data: existing } = await supabase
+    const { error: insertErr } = await supabase
       .from("paypal_webhook_events")
-      .select("id")
-      .eq("event_id", eventId)
-      .maybeSingle();
-
-    if (existing) {
-      console.log(`Duplicate webhook event ${eventId}, skipping`);
-      return new Response(JSON.stringify({ status: "duplicate" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      .insert({
+        event_id: eventId,
+        event_type: event.event_type,
+        resource_type: event.resource_type,
+        resource_id: event.resource?.id,
+        payload: event,
+        processed: false,
       });
+
+    if (insertErr) {
+      // 23505 = unique_violation — another concurrent webhook beat us to it
+      if ((insertErr as { code?: string }).code === "23505") {
+        console.log(`Duplicate webhook event ${eventId}, skipping`);
+        return new Response(JSON.stringify({ status: "duplicate" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw insertErr;
     }
 
-    // 3. Insert event record
-    await supabase.from("paypal_webhook_events").insert({
-      event_id: eventId,
-      event_type: event.event_type,
-      resource_type: event.resource_type,
-      resource_id: event.resource?.id,
-      payload: event,
-      processed: false,
-    });
-
-    // 4. Process event
+    // 3. Process event (only the webhook that won the insert race gets here)
     try {
       await processEvent(supabase, event, studioUrl);
 
@@ -84,6 +86,11 @@ serve(async (req: Request) => {
         .from("paypal_webhook_events")
         .update({ processing_error: processErr.message || String(processErr) })
         .eq("event_id", eventId);
+      await captureException(processErr, {
+        tags: { fn: "paypal-webhook", phase: "processEvent", eventType: event.event_type },
+        extra: { eventId },
+        level: "error",
+      });
     }
 
     return new Response(JSON.stringify({ status: "ok" }), {
