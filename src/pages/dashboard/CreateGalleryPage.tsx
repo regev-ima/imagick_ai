@@ -54,7 +54,8 @@ import { UploadSourceSelector, type UploadSource } from "@/components/gallery/Up
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 import { useSubscription } from "@/hooks/useSubscription";
 import { getThumbnailUrl } from "@/lib/imageUrls";
-import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
+import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
 import {
   Select,
@@ -143,6 +144,7 @@ export default function CreateGalleryPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const { processImages } = useImageProcessing();
   const { uploadImages, uploadProgress, isUploading: hookIsUploading, cancelUploads } = useImageUpload();
   const { editsRemaining, availableEdits, editsReserved, isUnlimited, canEdit, isSuspended, isExpired, isFreePlan } = useSubscription();
@@ -240,24 +242,7 @@ export default function CreateGalleryPage() {
     }
   });
 
-  // Fetch showcase cover images for styles
-  const { data: showcaseCovers = {} } = useQuery({
-    queryKey: ["showcase-covers"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("image_edits")
-        .select("style_id, edited_url")
-        .eq("gallery_id", SHOWCASE_GALLERY_ID);
-      if (error) throw error;
-      const map: Record<string, string> = {};
-      for (const row of data || []) {
-        if (row.style_id && !map[row.style_id]) {
-          map[row.style_id] = row.edited_url;
-        }
-      }
-      return map;
-    },
-  });
+  const { data: showcaseCovers = {} } = useShowcaseCovers();
 
   const steps = [
     { number: 1, title: "Details", subtitle: "Name & gallery type", icon: FolderOpen },
@@ -619,44 +604,46 @@ export default function CreateGalleryPage() {
   return (
     <div className="relative p-6 lg:p-8 overflow-hidden">
       {/* === AI Ambient Animations (Background) === */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {/* Floating particles */}
-        {PARTICLES.map((p) => (
-          <motion.div
-            key={p.id}
-            className={cn("absolute rounded-full opacity-40", p.size, p.color)}
-            style={{ top: p.top, left: p.left }}
-            animate={{
-              y: [-p.yOffset, p.yOffset, -p.yOffset],
-              x: [-p.xOffset, p.xOffset, -p.xOffset],
-            }}
-            transition={{
-              duration: p.duration,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: p.delay,
-            }}
-          />
-        ))}
-        {/* Gradient orbs */}
-        {ORBS.map((orb, i) => (
-          <motion.div
-            key={i}
-            className={cn("absolute rounded-full blur-[100px] opacity-[0.06]", orb.size, orb.color)}
-            style={{ top: orb.top, left: orb.left }}
-            animate={{
-              x: [0, 60, -40, 0],
-              y: [0, -50, 30, 0],
-            }}
-            transition={{
-              duration: orb.duration,
-              repeat: Infinity,
-              repeatType: "mirror",
-              ease: "easeInOut",
-            }}
-          />
-        ))}
-      </div>
+      {!prefersReducedMotion && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+          {/* Floating particles */}
+          {PARTICLES.map((p) => (
+            <motion.div
+              key={p.id}
+              className={cn("absolute rounded-full opacity-40", p.size, p.color)}
+              style={{ top: p.top, left: p.left }}
+              animate={{
+                y: [-p.yOffset, p.yOffset, -p.yOffset],
+                x: [-p.xOffset, p.xOffset, -p.xOffset],
+              }}
+              transition={{
+                duration: p.duration,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: p.delay,
+              }}
+            />
+          ))}
+          {/* Gradient orbs */}
+          {ORBS.map((orb, i) => (
+            <motion.div
+              key={i}
+              className={cn("absolute rounded-full blur-[100px] opacity-[0.06]", orb.size, orb.color)}
+              style={{ top: orb.top, left: orb.left }}
+              animate={{
+                x: [0, 60, -40, 0],
+                y: [0, -50, 30, 0],
+              }}
+              transition={{
+                duration: orb.duration,
+                repeat: Infinity,
+                repeatType: "mirror",
+                ease: "easeInOut",
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Header */}
       <div className="relative flex items-center gap-4 mb-8">
@@ -935,11 +922,22 @@ export default function CreateGalleryPage() {
                         return (
                           <motion.div
                             key={style.id}
+                            role="checkbox"
+                            aria-checked={isSelected}
+                            aria-label={style.name}
+                            tabIndex={0}
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
                             onClick={() => toggleStyle(style.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                toggleStyle(style.id);
+                              }
+                            }}
                             className={cn(
                               "flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all border group",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                               isSelected
                                 ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md shadow-primary/10 border-primary/50"
                                 : "border-border/50 hover:border-primary/40 hover:bg-muted/30"

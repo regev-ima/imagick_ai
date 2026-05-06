@@ -105,7 +105,12 @@
              >
                <Card className={`glass-card relative ${!plan.is_active ? "opacity-60" : ""}`}>
                  {!plan.is_active && (
-                   <Badge className="absolute top-2 right-2 bg-muted">Inactive</Badge>
+                   <Badge
+                     className="absolute top-2 right-2 bg-muted"
+                     title="New subscriptions are disabled. Existing subscribers are unaffected."
+                   >
+                     Inactive (no new signups)
+                   </Badge>
                  )}
                  <CardHeader>
                    <CardTitle className="flex items-center justify-between">
@@ -136,8 +141,8 @@
  
                    <div className="space-y-2 text-sm">
                      <div className="flex items-center justify-between">
-                        <span>Credits included</span>
-                        <span className="font-medium">{plan.credits_per_month === -1 ? "Unlimited" : plan.credits_per_month.toLocaleString()}</span>
+                        <span>AI Edits / month</span>
+                        <span className="font-medium">{plan.edits_included === -1 ? "Unlimited" : (plan.edits_included ?? 0).toLocaleString()}</span>
                      </div>
                      <div className="flex items-center justify-between">
                        <span>Custom AI Models</span>
@@ -241,20 +246,20 @@
  
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                     <Label>Credits Included (-1 = unlimited)</Label>
+                     <Label>AI Edits Included (-1 = unlimited)</Label>
                      <Input
                        type="number"
-                       value={editingPlan.credits_per_month}
-                       onChange={(e) => setEditingPlan({ ...editingPlan, credits_per_month: parseInt(e.target.value) })}
+                       value={editingPlan.edits_included ?? 0}
+                       onChange={(e) => setEditingPlan({ ...editingPlan, edits_included: parseInt(e.target.value) })}
                      />
                    </div>
                    <div className="space-y-2">
-                     <Label>Price per Extra Credit ($)</Label>
+                     <Label>Price per Extra Edit ($)</Label>
                      <Input
                        type="number"
                        step="0.001"
-                       value={editingPlan.price_per_extra_credit}
-                       onChange={(e) => setEditingPlan({ ...editingPlan, price_per_extra_credit: parseFloat(e.target.value) })}
+                       value={editingPlan.price_per_extra_edit ?? 0}
+                       onChange={(e) => setEditingPlan({ ...editingPlan, price_per_extra_edit: parseFloat(e.target.value) })}
                     />
                   </div>
                 </div>

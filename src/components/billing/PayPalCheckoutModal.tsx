@@ -38,9 +38,11 @@ export function PayPalCheckoutModal({
   const [error, setError] = useState<string | null>(null);
   const scriptLoadedRef = useRef(false);
   const buttonsRenderedRef = useRef(false);
+  const abortedRef = useRef(false);
 
   const loadAndRender = useCallback(async () => {
     if (!isOpen) return;
+    abortedRef.current = false;
     setLoading(true);
     setError(null);
     buttonsRenderedRef.current = false;
@@ -63,6 +65,7 @@ export function PayPalCheckoutModal({
         }
       );
       const tokenData = await res.json();
+      if (abortedRef.current) return;
       if (!res.ok) throw new Error(tokenData.error || "Failed to get PayPal config");
 
       const { clientId, paypalPlanId } = tokenData;
@@ -95,18 +98,19 @@ export function PayPalCheckoutModal({
 
         // Wait for Buttons to become available (SDK initializes async)
         let retries = 0;
-        while (!window.paypal?.Buttons && retries < 20) {
+        while (!window.paypal?.Buttons && retries < 20 && !abortedRef.current) {
           await new Promise(r => setTimeout(r, 300));
           retries++;
         }
       }
 
+      if (abortedRef.current) return;
       if (!window.paypal?.Buttons) {
         throw new Error("PayPal SDK loaded but Buttons component is not available. Please try again or check your network connection.");
       }
 
       // 4. Render buttons
-      if (!containerRef.current || buttonsRenderedRef.current) return;
+      if (!containerRef.current || buttonsRenderedRef.current || abortedRef.current) return;
       containerRef.current.innerHTML = "";
 
       window.paypal.Buttons({
@@ -165,10 +169,11 @@ export function PayPalCheckoutModal({
 
       buttonsRenderedRef.current = true;
     } catch (err: any) {
+      if (abortedRef.current) return;
       console.error("PayPal checkout error:", err);
       setError(err.message || "Failed to initialize PayPal checkout");
     } finally {
-      setLoading(false);
+      if (!abortedRef.current) setLoading(false);
     }
   }, [isOpen, planSlug, billingCycle, onSuccess, onClose]);
 
@@ -176,7 +181,10 @@ export function PayPalCheckoutModal({
     if (isOpen) {
       // Small delay to ensure the DOM container is mounted
       const timer = setTimeout(loadAndRender, 100);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        abortedRef.current = true;
+      };
     }
   }, [isOpen, loadAndRender]);
 
@@ -190,8 +198,8 @@ export function PayPalCheckoutModal({
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 flex items-center justify-center ring-1 ring-amber-500/20">
                 <Crown className="w-5 h-5 text-amber-500" />
               </div>
-              <div>
-                <DialogTitle className="text-lg">Subscribe to {planName}</DialogTitle>
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-base sm:text-lg truncate">Subscribe to {planName}</DialogTitle>
                 <DialogDescription className="text-xs mt-0.5">
                   {billingCycle === "yearly" ? "Annual" : "Monthly"} billing
                 </DialogDescription>

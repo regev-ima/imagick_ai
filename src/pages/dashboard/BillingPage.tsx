@@ -41,6 +41,7 @@ import { useSubscription, type SubscriptionPlan } from "@/hooks/useSubscription"
 import { useEffectiveUser } from "@/hooks/useImpersonation";
 import { useInvoices } from "@/hooks/useInvoices";
 import { downloadInvoicePdf } from "@/lib/download-invoice-pdf";
+import { EDIT_LOW_THRESHOLD } from "@/lib/constants";
 import { toast } from "sonner";
 
 type CreditGrant = {
@@ -255,7 +256,7 @@ export default function BillingPage() {
         </div>
       )}
 
-      {isFreePlan && !isUnlimited && editsRemaining <= 500 && editsRemaining > 0 && (
+      {isFreePlan && !isUnlimited && editsRemaining <= EDIT_LOW_THRESHOLD && editsRemaining > 0 && (
         <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
           <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
           <div>
@@ -689,7 +690,7 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {plansList.map((plan) => {
             const features = (plan.features as string[]) || [];
             const isCurrentPlan = plan.slug === planSlug;
@@ -710,7 +711,7 @@ export default function BillingPage() {
                 )}
               >
                 {isPopular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-primary to-accent text-primary-foreground text-xs font-medium rounded-full flex items-center gap-1">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1 bg-gradient-to-r from-primary to-accent text-primary-foreground text-xs font-medium rounded-full flex items-center gap-1 whitespace-nowrap shadow-md">
                     <Sparkles className="w-3 h-3" />
                     Most Popular
                   </div>

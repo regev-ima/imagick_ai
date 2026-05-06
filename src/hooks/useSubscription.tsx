@@ -10,7 +10,8 @@ export interface SubscriptionPlan {
   slug: string;
   price_monthly: number;
   price_yearly: number;
-  credits_per_month: number;
+  edits_included: number;
+  price_per_extra_edit: number;
   max_styles: number;
   max_storage_gb: number;
   has_ai_culling: boolean;
@@ -18,9 +19,10 @@ export interface SubscriptionPlan {
   has_api_access: boolean;
   has_priority_support: boolean;
   has_full_style_library: boolean;
-  price_per_extra_credit: number;
-  /** @deprecated alias for credits_per_month */
-  edits_included: number;
+  /** @deprecated pre-rename alias for edits_included */
+  credits_per_month?: number;
+  /** @deprecated pre-rename alias for price_per_extra_edit */
+  price_per_extra_credit?: number;
   features: string[];
   sort_order: number;
   is_active: boolean;
@@ -235,7 +237,7 @@ export function useSubscription() {
   const isUnlimited = editsRemaining === -1;
   const availableEdits = isUnlimited ? -1 : Math.max(0, editsRemaining - editsReserved);
   const giftCreditsTotal = creditGrants
-    .filter((g: any) => g.status === "active")
+    .filter((g: any) => g.status === "active" && (g.credits_remaining || 0) > 0)
     .reduce((sum: number, g: any) => sum + (g.credits_remaining || 0), 0);
   const planCreditsRemaining = isUnlimited ? -1 : Math.max(0, editsRemaining - giftCreditsTotal);
   const isFreePlan = currentPlan?.slug === "free";
