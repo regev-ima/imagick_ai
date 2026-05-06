@@ -1,6 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { cancelSubscription } from "../_shared/paypal.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { sendEmail } from "../_shared/email-sender.ts";
+import { accountDeletedTemplate } from "../_shared/email-templates.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -34,6 +37,10 @@ Deno.serve(async (req) => {
     }
 
     const userId = userData.user.id as string;
+    const userEmail = userData.user.email ?? null;
+    const userDisplayName =
+      (userData.user.user_metadata?.full_name as string | undefined) ??
+      (userEmail ? userEmail.split("@")[0] : "");
     const adminClient = createClient(supabaseUrl, serviceKey);
 
     // Delete all user data in order (respecting foreign keys)
@@ -149,11 +156,41 @@ Deno.serve(async (req) => {
       );
     }
 
+    // 23. Send GDPR audit-trail email confirming the deletion. We do this
+    //     *after* successful auth deletion so the user only gets the
+    //     receipt if data really is gone. Failures here must not throw
+    //     (the user is deleted; we can't roll back) — log to Sentry.
+    if (userEmail) {
+      try {
+        const deletedAt = new Date().toLocaleString("en-US", {
+          year: "numeric", month: "long", day: "numeric",
+          hour: "numeric", minute: "2-digit", timeZoneName: "short",
+        });
+        const tpl = accountDeletedTemplate(userDisplayName, deletedAt);
+        await sendEmail({
+          to: userEmail,
+          subject: tpl.subject,
+          html: tpl.html,
+          emailType: "account_deleted",
+          // No userId — the user row is gone; logging without it skips
+          // the email_logs FK constraint and the opt-out preference check.
+          supabaseAdmin: adminClient,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send account deletion email:", emailErr);
+        await captureException(emailErr, {
+          tags: { fn: "delete-account", phase: "confirmation_email" },
+          extra: { userId },
+        });
+      }
+    }
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("delete-account error:", err);
+    await captureException(err, { tags: { fn: "delete-account" }, level: "error" });
     return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

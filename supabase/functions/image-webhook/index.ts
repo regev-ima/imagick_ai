@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email-sender.ts";
-import { galleryImagesReadyTemplate } from "../_shared/email-templates.ts";
+import { galleryImagesReadyTemplate, reEditCompleteTemplate } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { captureException } from "../_shared/sentry.ts";
 
@@ -276,10 +276,13 @@ serve(async (req: Request) => {
 
       // Update gallery status based on images
       if (allReady || (someError && processingCount === 0)) {
-        // Read current state for reservation release info
+        // Read current state for reservation release info. We also need
+        // processing_completed_at to detect whether this transition is the
+        // first ever (initial upload) or a subsequent one (re-edit) so we
+        // can pick the right notification template.
         const { data: galleryBefore } = await supabase
           .from("galleries")
-          .select("status, edits_reserved")
+          .select("status, edits_reserved, processing_completed_at")
           .eq("id", galleryId)
           .single();
 
@@ -308,9 +311,13 @@ serve(async (req: Request) => {
             console.log(`Released remaining reservation (${galleryBefore.edits_reserved}) for gallery ${galleryId}`);
           }
 
-          // Send "gallery ready" email + WhatsApp exactly once
+          // Send "gallery ready" email + WhatsApp exactly once. If the
+          // gallery was previously completed (processing_completed_at set
+          // before this transition), this is a re-edit, not an initial
+          // upload, so we send the re-edit-specific template.
+          const isReEdit = !!galleryBefore?.processing_completed_at;
           if (userId) {
-            sendGalleryReadyEmail(supabase, galleryId, userId, readyCount, supabaseUrl).catch(err =>
+            sendGalleryReadyEmail(supabase, galleryId, userId, readyCount, supabaseUrl, isReEdit).catch(err =>
               console.error("sendGalleryReadyEmail error:", err)
             );
           }
@@ -511,8 +518,18 @@ async function autoApplyShowcaseToStyle(supabase: any, galleryId: string, styleI
 /**
  * Send a "gallery is ready" email to the gallery owner.
  * Skips showcase galleries and handles missing user data gracefully.
+ *
+ * @param isReEdit  When true, sends the re_edit_complete template instead
+ *                  of the initial gallery_images_ready template.
  */
-async function sendGalleryReadyEmail(supabase: any, galleryId: string, userId: string, readyCount: number, supabaseUrl: string) {
+async function sendGalleryReadyEmail(
+  supabase: any,
+  galleryId: string,
+  userId: string,
+  readyCount: number,
+  supabaseUrl: string,
+  isReEdit = false,
+) {
   // Fetch gallery name + check it's not the showcase gallery
   const { data: gallery } = await supabase
     .from("galleries")
@@ -532,15 +549,18 @@ async function sendGalleryReadyEmail(supabase: any, galleryId: string, userId: s
 
   const appUrl    = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
   const galleryUrl = `${appUrl}/dashboard/galleries/${galleryId}`;
-  const template   = galleryImagesReadyTemplate(gallery.name, readyCount, galleryUrl);
+  const template   = isReEdit
+    ? reEditCompleteTemplate(gallery.name, readyCount, galleryUrl)
+    : galleryImagesReadyTemplate(gallery.name, readyCount, galleryUrl);
+  const emailType  = isReEdit ? "re_edit_complete" : "gallery_images_ready";
 
   await sendEmail({
     to:           userRecord.user.email,
     subject:      template.subject,
     html:         template.html,
-    emailType:    "gallery_images_ready",
+    emailType,
     userId,
-    metadata:     { galleryId, readyCount },
+    metadata:     { galleryId, readyCount, isReEdit },
     supabaseAdmin: adminClient,
   });
 

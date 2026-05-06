@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { lazy, Suspense, useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,13 +30,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { BillingHistoryModal } from "@/components/billing/BillingHistoryModal";
-import { StorageBreakdownModal } from "@/components/billing/StorageBreakdownModal";
-import { CreditsUsageModal } from "@/components/billing/CreditsUsageModal";
-import { CancelSubscriptionModal } from "@/components/billing/CancelSubscriptionModal";
-import { DowngradeConfirmModal } from "@/components/billing/DowngradeConfirmModal";
-import { AddOnModal } from "@/components/billing/AddOnModal";
-import { PayPalCheckoutModal } from "@/components/billing/PayPalCheckoutModal";
+// Modals are only rendered after a user interaction, so lazy-load them so
+// recharts (CreditsUsageModal) and the PayPal SDK loader stay out of the
+// initial billing-page bundle.
+const BillingHistoryModal = lazy(() =>
+  import("@/components/billing/BillingHistoryModal").then(m => ({ default: m.BillingHistoryModal }))
+);
+const StorageBreakdownModal = lazy(() =>
+  import("@/components/billing/StorageBreakdownModal").then(m => ({ default: m.StorageBreakdownModal }))
+);
+const CreditsUsageModal = lazy(() =>
+  import("@/components/billing/CreditsUsageModal").then(m => ({ default: m.CreditsUsageModal }))
+);
+const CancelSubscriptionModal = lazy(() =>
+  import("@/components/billing/CancelSubscriptionModal").then(m => ({ default: m.CancelSubscriptionModal }))
+);
+const DowngradeConfirmModal = lazy(() =>
+  import("@/components/billing/DowngradeConfirmModal").then(m => ({ default: m.DowngradeConfirmModal }))
+);
+const AddOnModal = lazy(() =>
+  import("@/components/billing/AddOnModal").then(m => ({ default: m.AddOnModal }))
+);
+const PayPalCheckoutModal = lazy(() =>
+  import("@/components/billing/PayPalCheckoutModal").then(m => ({ default: m.PayPalCheckoutModal }))
+);
 import { useSubscription, type SubscriptionPlan } from "@/hooks/useSubscription";
 import { useEffectiveUser } from "@/hooks/useImpersonation";
 import { useInvoices } from "@/hooks/useInvoices";
@@ -787,8 +804,9 @@ export default function BillingPage() {
       </motion.div>
 
 
-      {/* Modals */}
+      {/* Modals (lazy-loaded; rendered only after user interaction) */}
       <AnimatePresence>
+        <Suspense fallback={null}>
         {showBillingHistory && (
           <BillingHistoryModal
             isOpen={showBillingHistory}
@@ -859,6 +877,7 @@ export default function BillingPage() {
             }}
           />
         )}
+        </Suspense>
       </AnimatePresence>
     </div>
   );

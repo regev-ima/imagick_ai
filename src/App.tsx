@@ -37,6 +37,8 @@ const ShortLinkRedirect = lazy(() => import("./pages/ShortLinkRedirect"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
+const PrivacyPage = lazy(() => import("./pages/legal/PrivacyPage"));
+const TermsPage = lazy(() => import("./pages/legal/TermsPage"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/admin/AdminDashboard"));
 const UsersManagement = lazy(() => import("./pages/dashboard/admin/UsersManagement"));
 const PlansManagement = lazy(() => import("./pages/dashboard/admin/PlansManagement"));
@@ -99,6 +101,8 @@ const App = () => (
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/unsubscribe" element={<UnsubscribePage />} />
+                <Route path="/legal/privacy" element={<PrivacyPage />} />
+                <Route path="/legal/terms" element={<TermsPage />} />
                 <Route path="/g/:shortId" element={<ShortLinkRedirect />} />
                 <Route path="/gallery/:galleryId" element={<ClientGalleryPage />} />
                 <Route

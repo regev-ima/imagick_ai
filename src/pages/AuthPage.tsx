@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Loader2, Camera, Sparkles, Zap, MailCheck, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -651,23 +651,19 @@ export default function AuthPage() {
 
           <p className="text-[10px] text-center text-muted-foreground/50 mt-4">
             By continuing, you agree to our{" "}
-            <a
-              href="https://imagick.ai/terms"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/legal/terms"
               className="underline hover:text-muted-foreground transition-colors"
             >
               Terms of Service
-            </a>
+            </Link>
             {" "}and{" "}
-            <a
-              href="https://imagick.ai/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/legal/privacy"
               className="underline hover:text-muted-foreground transition-colors"
             >
               Privacy Policy
-            </a>
+            </Link>
             .
           </p>
         </motion.div>
