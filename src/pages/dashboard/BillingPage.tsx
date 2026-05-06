@@ -471,7 +471,18 @@ export default function BillingPage() {
                     : `${maxStorageGb} GB`}
                 </p>
               </div>
-              <Progress value={storagePercentage} className="h-2" />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {storageUsedMb < 1024
+                      ? `${Math.round(storageUsedMb)} MB`
+                      : `${storageUsedGb.toFixed(2)} GB`}{" "}
+                    used
+                  </span>
+                  <span>{maxStorageGb} GB total</span>
+                </div>
+                <Progress value={storagePercentage} className="h-2" />
+              </div>
               {extraStorageGb > 0 && (
                 <p className="text-xs text-muted-foreground">
                   Includes {extraStorageGb} GB from add-ons
