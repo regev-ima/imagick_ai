@@ -10,6 +10,7 @@ import {
   invoiceEmailTemplate,
 } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,6 +92,7 @@ serve(async (req: Request) => {
     });
   } catch (error: unknown) {
     console.error("PayPal webhook error:", error);
+    await captureException(error, { tags: { fn: "paypal-webhook" }, level: "fatal" });
     // Return 200 to prevent PayPal from retrying
     return new Response(JSON.stringify({ status: "error" }), {
       status: 200,

@@ -7,6 +7,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { captureException } from "./sentry.ts";
 
 export const FROM_ADDRESS = "noreply@imagick.ai";
 export const FROM_DISPLAY  = `Imagick.ai <${FROM_ADDRESS}>`;
@@ -137,6 +138,11 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   } catch (err) {
     sendError = err instanceof Error ? err.message : String(err);
     console.error("Resend fetch error:", sendError);
+    await captureException(err, {
+      tags: { fn: "email-sender", emailType },
+      extra: { to, subject },
+      user: userId ? { id: userId } : undefined,
+    });
   }
 
   // ── 3. Log to email_logs ─────────────────────────────────────────────────
