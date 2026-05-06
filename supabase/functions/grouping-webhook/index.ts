@@ -229,7 +229,7 @@ async function sendCullingReadyEmail(
   const { data: userRecord } = await adminClient.auth.admin.getUserById(userId);
   if (!userRecord?.user?.email) return;
 
-  const appUrl     = (Deno.env.get("STUDIO_URL") || "https://studio.imagick.ai").replace(/\/+$/, "");
+  const appUrl     = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
   const galleryUrl = `${appUrl}/dashboard/galleries/${galleryId}`;
   const template   = cullingReadyTemplate(gallery.name, totalImages, topPicksCount ?? 0, galleryUrl);
 

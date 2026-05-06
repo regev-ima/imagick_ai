@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const studioUrl = (Deno.env.get("STUDIO_URL") || "https://studio.imagick.ai").replace(/\/+$/, "");
+    const studioUrl = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
     const leadLogoUrl = await resolveLeadBrandLogoUrl(supabaseAdmin);
     const leadSignatureLogoUrl = await resolveLeadSignatureLogoUrl(supabaseAdmin);
     const sampleUrl = `${studioUrl}/dashboard`;

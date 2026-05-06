@@ -54,7 +54,7 @@ function sanitizeLastName(value?: string | null): string {
 }
 
 function sanitizeStudioUrl(value?: string | null): string {
-  return (value?.trim() || "https://studio.imagick.ai").replace(/\/+$/, "");
+  return (value?.trim() || "https://app.imagick.ai").replace(/\/+$/, "");
 }
 
 export function normalizeLeadTokens(vars: LeadTokenVars): Record<string, string> {
@@ -316,7 +316,7 @@ function wrapSapirEmail(
 export function renderLeadCampaignEmail(input: LeadEmailRenderInput) {
   const logoUrl = input.logoUrl || DEFAULT_DARK_LOGO_URL;
   const signatureLogoUrl = input.signatureLogoUrl || DEFAULT_DARK_LOGO_URL;
-  const studioUrl = input.studioUrl || "https://studio.imagick.ai";
+  const studioUrl = input.studioUrl || "https://app.imagick.ai";
   if (input.senderProfile === "sapir") {
     return wrapSapirEmail(
       input.subject,
