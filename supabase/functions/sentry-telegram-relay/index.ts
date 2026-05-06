@@ -38,32 +38,83 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function pick<T = string>(...candidates: unknown[]): T | undefined {
+  for (const c of candidates) {
+    if (c !== undefined && c !== null && c !== "") return c as T;
+  }
+  return undefined;
+}
+
 function formatMessage(payload: Record<string, unknown>): string {
-  const project = (payload.project_name as string) || (payload.project as string) || "imagick-ai";
-  const level = ((payload.level as string) || "error").toUpperCase();
-  const culprit = (payload.culprit as string) || "";
-  const url = (payload.url as string) || "";
+  // Sentry sends at least three different payload shapes depending on which
+  // integration is calling us:
+  //   1. Legacy "Webhook" issue alert  →  flat top-level fields
+  //   2. Internal Integration alert rule action  →  { data: { event: {...} } }
+  //   3. Internal Integration "issue" subscription  →  { data: { issue: {...} } }
+  // We treat all three uniformly by checking every place a given field might
+  // live and taking the first non-empty value.
+  const data = (payload.data as Record<string, unknown> | undefined) || {};
+  const event = (pick<Record<string, unknown>>(data.event, payload.event) as Record<string, unknown> | undefined) || {};
+  const issue = (pick<Record<string, unknown>>(data.issue, payload.issue) as Record<string, unknown> | undefined) || {};
+  const exception = (event.exception as Record<string, unknown> | undefined) || {};
+  const exceptionValue = Array.isArray(exception.values) && exception.values.length
+    ? (exception.values[0] as Record<string, unknown>)
+    : {};
 
-  // Sentry sends either { message } at the top level (legacy) or nests it
-  // under { event: { title | message } } (newer integrations).
-  const event = (payload.event as Record<string, unknown> | undefined) || {};
-  const title =
-    (payload.message as string) ||
-    (event.title as string) ||
-    (event.message as string) ||
-    "Unknown error";
+  const project = pick<string>(
+    payload.project_name,
+    payload.project_slug,
+    payload.project,
+    data.project_slug,
+    data.project_name,
+    event.project,
+  ) || "imagick-ai";
 
-  const env = (event.environment as string) || "production";
-  const userEmail =
-    ((event.user as Record<string, unknown> | undefined)?.email as string) || "";
+  const level = (pick<string>(event.level, issue.level, payload.level) || "error").toUpperCase();
+
+  const env = pick<string>(event.environment, payload.environment, issue.environment) || "production";
+
+  // Title — try a wide set of fields, falling back to exception type+value.
+  let title = pick<string>(
+    event.title,
+    issue.title,
+    payload.message,
+    event.message,
+    issue.message,
+    payload.culprit,
+  );
+  if (!title && exceptionValue.type) {
+    const exType = exceptionValue.type as string;
+    const exVal = exceptionValue.value as string | undefined;
+    title = exVal ? `${exType}: ${exVal}` : exType;
+  }
+  if (!title) {
+    title = "Unknown error (payload missing title)";
+  }
+
+  const culprit = pick<string>(event.culprit, issue.culprit, payload.culprit) || "";
+  const url = pick<string>(
+    event.web_url,
+    event.url,
+    issue.permalink,
+    issue.web_url,
+    payload.url,
+    payload.web_url,
+  ) || "";
+
+  const userObj = (pick<Record<string, unknown>>(event.user, issue.user) as Record<string, unknown> | undefined) || {};
+  const userEmail = pick<string>(userObj.email, userObj.username) || "";
+
+  const triggeredRule = pick<string>(data.triggered_rule, payload.triggered_rule);
 
   const lines = [
     `🚨 <b>${escapeHtml(level)}</b> — <code>${escapeHtml(project)}</code> (${escapeHtml(env)})`,
     "",
-    `<b>${escapeHtml(title)}</b>`,
+    `<b>${escapeHtml(title.slice(0, 400))}</b>`,
   ];
-  if (culprit) lines.push(`📍 <code>${escapeHtml(culprit)}</code>`);
+  if (culprit) lines.push(`📍 <code>${escapeHtml(culprit.slice(0, 200))}</code>`);
   if (userEmail) lines.push(`👤 ${escapeHtml(userEmail)}`);
+  if (triggeredRule) lines.push(`⚙️ ${escapeHtml(triggeredRule)}`);
   if (url) lines.push("", `🔗 <a href="${escapeHtml(url)}">Open in Sentry</a>`);
   return lines.join("\n");
 }
@@ -116,6 +167,18 @@ Deno.serve(async (req) => {
   }
 
   const text = formatMessage(payload);
+  // If we couldn't find a real title, log the payload shape so we can see
+  // exactly which fields the integration is sending and patch formatMessage.
+  if (text.includes("Unknown error (payload missing title)")) {
+    console.warn(
+      "Sentry payload had no recognisable title. Top-level keys:",
+      Object.keys(payload).join(", "),
+      "data keys:",
+      Object.keys((payload.data as Record<string, unknown>) || {}).join(", "),
+      "raw (truncated):",
+      rawBody.slice(0, 1500),
+    );
+  }
 
   try {
     const tgRes = await fetch(`${TELEGRAM_API}/bot${botToken}/sendMessage`, {
