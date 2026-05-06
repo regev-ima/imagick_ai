@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getAccessToken, getPayPalMode } from "../_shared/paypal.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 async function getApiBaseForSetup(): Promise<string> {
   const mode = await getPayPalMode();
@@ -186,6 +187,10 @@ serve(async (req: Request) => {
     );
   } catch (error: unknown) {
     console.error("Error setting up PayPal plans:", error);
+    await captureException(error, {
+      tags: { fn: "paypal-setup-plans" },
+      level: "error",
+    });
     const msg = error instanceof Error ? error.message : "Internal server error";
     return new Response(
       JSON.stringify({ error: msg }),

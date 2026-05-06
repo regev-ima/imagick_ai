@@ -5,6 +5,7 @@ import { sendEmail } from "../_shared/email-sender.ts";
 import { subscriptionCancelledTemplate } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -89,6 +90,10 @@ serve(async (req: Request) => {
     });
   } catch (error: unknown) {
     console.error("Error cancelling subscription:", error);
+    await captureException(error, {
+      tags: { fn: "paypal-cancel-subscription" },
+      level: "error",
+    });
     const msg = error instanceof Error ? error.message : "Internal server error";
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
