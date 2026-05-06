@@ -19,8 +19,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { UploadSourceSelector, type UploadSource } from "./UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "./GoogleDriveInput";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 import { getThumbnailUrl } from "@/lib/imageUrls";
-import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 
 interface UploadedFile {
   id: string;
@@ -94,25 +94,7 @@ export function AddImagesModal({
     enabled: isOpen,
   });
 
-  // Fetch showcase covers
-  const { data: showcaseCovers = {} } = useQuery({
-    queryKey: ["showcase-covers"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("image_edits")
-        .select("style_id, edited_url")
-        .eq("gallery_id", SHOWCASE_GALLERY_ID);
-      if (error) throw error;
-      const map: Record<string, string> = {};
-      for (const row of data || []) {
-        if (row.style_id && !map[row.style_id]) {
-          map[row.style_id] = row.edited_url;
-        }
-      }
-      return map;
-    },
-    enabled: isOpen,
-  });
+  const { data: showcaseCovers = {} } = useShowcaseCovers({ enabled: isOpen });
 
   // Reset when modal opens
   useEffect(() => {
@@ -482,11 +464,22 @@ export function AddImagesModal({
                           return (
                             <motion.div
                               key={style.id}
+                              role="checkbox"
+                              aria-checked={isSelected}
+                              aria-label={style.name}
+                              tabIndex={0}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                               onClick={() => toggleStyle(style.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  toggleStyle(style.id);
+                                }
+                              }}
                               className={cn(
                                 "relative rounded-xl overflow-hidden cursor-pointer transition-all h-36 flex flex-col justify-end group",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                 isSelected
                                   ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20"
                                   : "ring-1 ring-border/50 hover:ring-primary/40"

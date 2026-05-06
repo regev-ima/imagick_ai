@@ -33,9 +33,9 @@ export function CreditsUsageModal({ isOpen, onClose, onBuyCredits }: CreditsUsag
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-primary" />
-            Edit Usage
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg truncate">
+            <Zap className="w-5 h-5 text-primary shrink-0" />
+            <span className="truncate">AI Edits Usage</span>
           </DialogTitle>
         </DialogHeader>
 

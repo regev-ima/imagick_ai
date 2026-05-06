@@ -18,7 +18,12 @@ function markGrantsSeen(ids: string[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
 }
 
-function fireConfetti() {
+function fireConfetti(): () => void {
+  // Respect users who prefer no motion — skip the visual entirely.
+  if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    return () => {};
+  }
+
   const colors = ["#22c55e", "#4ade80", "#86efac", "#10b981", "#34d399", "#fbbf24", "#f59e0b"];
   const container = document.createElement("div");
   container.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden";
@@ -32,7 +37,6 @@ function fireConfetti() {
     const duration = 1.5 + Math.random() * 1.5;
     const size = 6 + Math.random() * 6;
     const rotation = Math.random() * 360;
-    const drift = (Math.random() - 0.5) * 200;
 
     particle.style.cssText = `
       position:absolute;
@@ -62,7 +66,17 @@ function fireConfetti() {
     document.head.appendChild(style);
   }
 
-  setTimeout(() => container.remove(), 4000);
+  let removed = false;
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    container.remove();
+  };
+  const timeoutId = window.setTimeout(remove, 4000);
+  return () => {
+    clearTimeout(timeoutId);
+    remove();
+  };
 }
 
 interface CreditGrant {
@@ -89,7 +103,7 @@ export function useGiftCreditsCelebration(creditGrants: CreditGrant[]) {
 
     hasFired.current = true;
 
-    fireConfetti();
+    const cleanup = fireConfetti();
 
     const totalNew = unseenGrants.reduce((s, g) => s + g.credits_remaining, 0);
     toast.success(`You received ${totalNew.toLocaleString()} bonus credits!`, {
@@ -98,5 +112,7 @@ export function useGiftCreditsCelebration(creditGrants: CreditGrant[]) {
     });
 
     markGrantsSeen(unseenGrants.map((g) => g.id));
+
+    return cleanup;
   }, [creditGrants]);
 }

@@ -22,7 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import heroImage1 from "@/assets/hero-gallery-1.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import { getPreviewUrl } from "@/lib/imageUrls";
-import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
+import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 
 type StyleStatus = "importing" | "training" | "ready" | "error" | "deleted";
 type StyleVisibility = "private" | "public";
@@ -78,24 +78,7 @@ export default function StylesPage() {
     enabled: !!user?.id
   });
 
-  // Fetch one showcase edit per style for cover images
-  const { data: showcaseCovers = {} } = useQuery({
-    queryKey: ["showcase-covers"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("image_edits")
-        .select("style_id, edited_url")
-        .eq("gallery_id", SHOWCASE_GALLERY_ID);
-      if (error) throw error;
-      const map: Record<string, string> = {};
-      for (const row of data || []) {
-        if (row.style_id && !map[row.style_id]) {
-          map[row.style_id] = row.edited_url;
-        }
-      }
-      return map;
-    },
-  });
+  const { data: showcaseCovers = {} } = useShowcaseCovers();
 
   const handleViewStyle = (styleId: string) => {
     navigate(`/dashboard/styles/${styleId}`);

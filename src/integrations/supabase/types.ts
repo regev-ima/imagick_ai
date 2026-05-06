@@ -1745,10 +1745,11 @@ export type Database = {
       subscription_plans: {
         Row: {
           created_at: string
-          credits_per_month: number
+          edits_included: number
           features: Json | null
           has_ai_culling: boolean
           has_api_access: boolean
+          has_full_style_library: boolean
           has_priority_support: boolean
           has_team_access: boolean
           id: string
@@ -1757,17 +1758,18 @@ export type Database = {
           max_styles: number
           name: string
           price_monthly: number
-          price_per_extra_credit: number
+          price_per_extra_edit: number
           price_yearly: number
           slug: string
           sort_order: number
         }
         Insert: {
           created_at?: string
-          credits_per_month?: number
+          edits_included?: number
           features?: Json | null
           has_ai_culling?: boolean
           has_api_access?: boolean
+          has_full_style_library?: boolean
           has_priority_support?: boolean
           has_team_access?: boolean
           id?: string
@@ -1776,17 +1778,18 @@ export type Database = {
           max_styles?: number
           name: string
           price_monthly?: number
-          price_per_extra_credit?: number
+          price_per_extra_edit?: number
           price_yearly?: number
           slug: string
           sort_order?: number
         }
         Update: {
           created_at?: string
-          credits_per_month?: number
+          edits_included?: number
           features?: Json | null
           has_ai_culling?: boolean
           has_api_access?: boolean
+          has_full_style_library?: boolean
           has_priority_support?: boolean
           has_team_access?: boolean
           id?: string
@@ -1795,7 +1798,7 @@ export type Database = {
           max_styles?: number
           name?: string
           price_monthly?: number
-          price_per_extra_credit?: number
+          price_per_extra_edit?: number
           price_yearly?: number
           slug?: string
           sort_order?: number
@@ -2061,8 +2064,8 @@ export type Database = {
           billing_cycle: string
           cancel_at_period_end: boolean
           created_at: string
-          credits_remaining: number
-          credits_used: number
+          edits_remaining: number
+          edits_used: number
           current_period_end: string
           current_period_start: string
           edits_reserved: number
@@ -2086,8 +2089,8 @@ export type Database = {
           billing_cycle?: string
           cancel_at_period_end?: boolean
           created_at?: string
-          credits_remaining?: number
-          credits_used?: number
+          edits_remaining?: number
+          edits_used?: number
           current_period_end?: string
           current_period_start?: string
           edits_reserved?: number
@@ -2111,8 +2114,8 @@ export type Database = {
           billing_cycle?: string
           cancel_at_period_end?: boolean
           created_at?: string
-          credits_remaining?: number
-          credits_used?: number
+          edits_remaining?: number
+          edits_used?: number
           current_period_end?: string
           current_period_start?: string
           edits_reserved?: number

@@ -6,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import heroImage1 from "@/assets/hero-gallery-1.jpg";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 
 interface Style {
   id: string;
@@ -48,25 +46,7 @@ export function ReEditModal({
   const editsNeeded = selectedImageCount * selectedStyles.length;
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
 
-  // Fetch showcase cover images
-  const { data: showcaseCovers = {} } = useQuery({
-    queryKey: ["showcase-covers-reedit"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("image_edits")
-        .select("style_id, edited_url")
-        .eq("gallery_id", SHOWCASE_GALLERY_ID);
-      if (error) throw error;
-      const map: Record<string, string> = {};
-      for (const row of data || []) {
-        if (row.style_id && row.edited_url && !map[row.style_id]) {
-          map[row.style_id] = row.edited_url;
-        }
-      }
-      return map;
-    },
-    enabled: isOpen,
-  });
+  const { data: showcaseCovers = {} } = useShowcaseCovers({ enabled: isOpen });
 
   useEffect(() => {
     if (isOpen) setSelectedStyles([]);
@@ -186,11 +166,22 @@ export function ReEditModal({
                   return (
                     <motion.div
                       key={style.id}
+                      role="checkbox"
+                      aria-checked={isSelected}
+                      aria-label={style.name}
+                      tabIndex={0}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => toggleStyle(style.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleStyle(style.id);
+                        }
+                      }}
                       className={cn(
                         "relative rounded-xl overflow-hidden cursor-pointer transition-all h-36 flex flex-col justify-end group",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         isSelected
                           ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20"
                           : "ring-1 ring-border/50 hover:ring-primary/40"
