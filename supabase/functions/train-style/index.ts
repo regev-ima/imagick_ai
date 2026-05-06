@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const webhookUrl = `${supabaseUrl}/functions/v1/train-webhook`;
+    const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
+    const webhookUrl = appendWebhookSecret(`${supabaseUrl}/functions/v1/train-webhook`);
 
     // Call the external training API
     const apiUsername = Deno.env.get("IMAGICK_API_USERNAME")!;

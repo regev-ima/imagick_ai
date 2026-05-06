@@ -3,6 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createSubscription, getPayPalMode } from "../_shared/paypal.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { captureException } from "../_shared/sentry.ts";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
+
+const PLAN_SLUG_RE = /^[a-z0-9_-]{1,32}$/;
+const VALID_BILLING_CYCLES = new Set(["monthly", "yearly"]);
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -34,13 +38,46 @@ serve(async (req: Request) => {
       });
     }
 
-    const { planSlug, billingCycle } = await req.json();
+    // Rate limit: 10 subscription creations per minute per user.
+    // PayPal subscription creation is a real money path; even legitimate
+    // usage shouldn't fire it more than once per checkout attempt.
+    const limit = await checkRateLimit(supabase, {
+      key: `paypal-create-sub:${user.id}`,
+      maxRequests: 10,
+      windowSeconds: 60,
+    });
+    if (!limit.allowed) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests" }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": String(limit.retryAfter),
+          },
+        }
+      );
+    }
 
-    if (!planSlug || !billingCycle) {
-      return new Response(JSON.stringify({ error: "planSlug and billingCycle are required" }), {
+    let parsedBody: { planSlug?: unknown; billingCycle?: unknown };
+    try {
+      parsedBody = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const planSlug = typeof parsedBody.planSlug === "string" ? parsedBody.planSlug : "";
+    const billingCycle = typeof parsedBody.billingCycle === "string" ? parsedBody.billingCycle : "";
+
+    if (!PLAN_SLUG_RE.test(planSlug) || !VALID_BILLING_CYCLES.has(billingCycle)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid planSlug or billingCycle" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Look up plan
@@ -99,9 +136,9 @@ serve(async (req: Request) => {
       tags: { fn: "paypal-create-subscription" },
       level: "error",
     });
-    const msg = error instanceof Error ? error.message : "Internal server error";
+    // Don't leak internal error details to the client — they're in Sentry.
     return new Response(
-      JSON.stringify({ error: msg }),
+      JSON.stringify({ error: "Could not create PayPal subscription. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

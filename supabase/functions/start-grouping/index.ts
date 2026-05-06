@@ -98,8 +98,9 @@ serve(async (req: Request) => {
     const apiPassword = Deno.env.get("IMAGICK_API_PASSWORD")!;
     const apiEndpoint = "https://imagick-api-endpoint.rx8rq49b5c.workers.dev/make-grouping/";
 
-    // Build webhook URL for callback
-    const webhookUrl = `${supabaseUrl}/functions/v1/grouping-webhook`;
+    // Build webhook URL for callback (signed with shared secret)
+    const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
+    const webhookUrl = appendWebhookSecret(`${supabaseUrl}/functions/v1/grouping-webhook`);
 
     // Prepare request body for external API
     const requestBody = {

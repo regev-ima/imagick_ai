@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createOrder } from "../_shared/paypal.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { captureException } from "../_shared/sentry.ts";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
 
 const ADDON_PRICES: Record<string, { price: number; label: string }> = {
   extra_model: { price: 15, label: "Extra Custom AI Model" },
@@ -46,6 +47,28 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Rate limit: 20 addon orders per minute per user. Same money-path
+    // concern as paypal-create-subscription, slightly looser because
+    // addon flows can legitimately retry inline/server modes.
+    const limit = await checkRateLimit(supabase, {
+      key: `paypal-addon-order:${user.id}`,
+      maxRequests: 20,
+      windowSeconds: 60,
+    });
+    if (!limit.allowed) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests" }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": String(limit.retryAfter),
+          },
+        }
+      );
     }
 
     let body: { addonType?: string; quantity?: unknown; inline?: boolean };
@@ -121,9 +144,9 @@ serve(async (req: Request) => {
       tags: { fn: "paypal-create-addon-order" },
       level: "error",
     });
-    const msg = error instanceof Error ? error.message : "Internal server error";
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Could not create addon order. Please try again." }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
