@@ -11,9 +11,11 @@ interface UppyUploadAreaProps {
   maxFiles?: number;
   /** Disable the area while uploads are in flight. */
   disabled?: boolean;
-  /** Optional CSS height. Defaults to a reasonable size. */
-  height?: number | string;
 }
+
+// Dashboard height is responsive: small on phones, larger on desktop.
+// Uppy renders the file grid inside a scroll container of this size.
+const DASHBOARD_HEIGHT_PX = "min(60vh, 480px)";
 
 /**
  * Mount Uppy's Dashboard plugin into a div via the standalone
@@ -35,7 +37,6 @@ export function UppyUploadArea({
   uppy,
   maxFiles,
   disabled = false,
-  height = 360,
 }: UppyUploadAreaProps) {
   const targetRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +48,11 @@ export function UppyUploadArea({
       id: "Dashboard",
       target,
       inline: true,
-      height,
+      // The Dashboard plugin accepts numeric or string heights. We use
+      // a CSS string so it tracks the parent's responsive width via
+      // its own internal layout.
+      height: DASHBOARD_HEIGHT_PX,
+      width: "100%",
       // Force dark theme — our app is always dark and the OS-aware
       // "auto" was rendering a white box that clashed with the rest
       // of the dashboard.
@@ -56,7 +61,7 @@ export function UppyUploadArea({
       hideUploadButton: true,
       showProgressDetails: true,
       showRemoveButtonAfterComplete: false,
-      thumbnailWidth: 200,
+      thumbnailWidth: 160,
       note: "JPG, PNG, RAW (CR2, ARW, NEF, DNG…)",
     });
 
@@ -64,7 +69,7 @@ export function UppyUploadArea({
       const plugin = uppy.getPlugin("Dashboard");
       if (plugin) uppy.removePlugin(plugin);
     };
-  }, [uppy, height]);
+  }, [uppy]);
 
   // Update plan-based file limit when it changes (e.g. user picks more
   // styles, which lowers maxImages on a free plan).
@@ -87,11 +92,12 @@ export function UppyUploadArea({
       // CSS overrides to align Dashboard's dark theme with our pink
       // brand accent (--primary in tailwind config). These cascade into
       // the Dashboard's shadow DOM via Uppy's CSS variables.
-      className="imagick-uppy-dashboard"
+      className="imagick-uppy-dashboard w-full"
       style={
         {
           "--uppy-c-primary": "#e85c9b",
           "--uppy-c-primary-light": "#ff7bbd",
+          width: "100%",
           ...(disabled ? { pointerEvents: "none", opacity: 0.6 } : {}),
         } as React.CSSProperties
       }
