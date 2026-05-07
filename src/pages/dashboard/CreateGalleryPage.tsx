@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { isAcceptedImageFile, IMAGE_ACCEPT, isRawFile, getFileExtension } from "@/lib/fileTypes";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useUppyState } from "@uppy/react";
+import { UppyUploadArea } from "@/components/upload/UppyUploadArea";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -129,24 +130,15 @@ function SparkleBurst({ active }: { active: boolean }) {
   );
 }
 
-interface UploadedFile {
-  id: string;
-  file: File;
-  preview: string;
-  isRaw: boolean;
-  progress: number;
-  status: "pending" | "uploading" | "complete" | "error" | "retrying";
-  bytesUploaded?: number;
-  totalBytes?: number;
-}
-
 export default function CreateGalleryPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const prefersReducedMotion = usePrefersReducedMotion();
   const { processImages } = useImageProcessing();
-  const { uploadImages, uploadProgress, isUploading: hookIsUploading, cancelUploads } = useImageUpload();
+  const { uppy, uploadImages, uploadProgress, isUploading: hookIsUploading, cancelUploads } = useImageUpload();
+  // Subscribe to Uppy's file count — replaces the old uploadedFiles array.
+  const uppyFileCount = useUppyState(uppy, (state) => Object.keys(state.files).length);
   const { editsRemaining, availableEdits, editsReserved, isUnlimited, canEdit, isSuspended, isExpired, isFreePlan } = useSubscription();
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
@@ -159,12 +151,8 @@ export default function CreateGalleryPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [customLabels, setCustomLabels] = useState<string[]>([]);
   const [aiCulling, setAiCulling] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
-  const imageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Upload source state
   const [uploadSource, setUploadSource] = useState<UploadSource>("local");
@@ -178,7 +166,7 @@ export default function CreateGalleryPage() {
   const [styleTab, setStyleTab] = useState<"public" | "yours">("public");
 
   // Edit calculations
-  const imageCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : uploadedFiles.length;
+  const imageCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : uppyFileCount;
   const stylesCount = selectedStyles.length;
   const editsNeeded = imageCount * stylesCount;
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
@@ -291,71 +279,6 @@ export default function CreateGalleryPage() {
     }
   };
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files).filter(isAcceptedImageFile);
-    addFiles(files);
-  }, []);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      addFiles(files);
-    }
-  };
-
-  const addFiles = (files: File[]) => {
-    const newFiles: UploadedFile[] = files.map(file => {
-      const raw = isRawFile(file);
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        file,
-        preview: raw ? "" : URL.createObjectURL(file),
-        isRaw: raw,
-        progress: 0,
-        status: "pending"
-      };
-    });
-    
-    setUploadedFiles(prev => {
-      const combined = [...prev, ...newFiles];
-      if (!isUnlimited && stylesCount > 0 && combined.length > maxImages) {
-        const allowed = maxImages - prev.length;
-        if (allowed <= 0) {
-          newFiles.forEach(f => URL.revokeObjectURL(f.preview));
-          toast.error(`Edit limit reached. You can upload up to ${maxImages} images with ${stylesCount} style(s).`);
-          return prev;
-        }
-        const kept = newFiles.slice(0, allowed);
-        newFiles.slice(allowed).forEach(f => URL.revokeObjectURL(f.preview));
-        toast.warning(`Only ${allowed} of ${files.length} images added due to edit limit.`);
-        return [...prev, ...kept];
-      }
-      return combined;
-    });
-  };
-
-  const removeFile = (id: string) => {
-    setUploadedFiles(prev => {
-      const file = prev.find(f => f.id === id);
-      if (file) {
-        URL.revokeObjectURL(file.preview);
-      }
-      return prev.filter(f => f.id !== id);
-    });
-  };
-
   const createGalleryAndUpload = async () => {
     if (!user) {
       toast.error("Please sign in to create a gallery");
@@ -447,7 +370,7 @@ export default function CreateGalleryPage() {
           description: description || null,
           categories: selectedCategories,
           ai_culling_enabled: aiCulling,
-          total_images: uploadedFiles.length,
+          total_images: uppyFileCount,
           status: "uploading"
         })
         .select()
@@ -463,53 +386,10 @@ export default function CreateGalleryPage() {
           .eq("id", gallery.id);
       }
 
-      // 3. Upload images directly to B2 using the hook with callbacks
-      const files = uploadedFiles.map(f => f.file);
-
-      const imageIds = await uploadImages(gallery.id, user.id, files, {
-        onFileStart: (index) => {
-          setUploadedFiles(prev => prev.map((f, i) => 
-            i === index ? { ...f, status: "uploading" as const, progress: 0 } : f
-          ));
-          // Auto-scroll to the currently uploading image
-          const fileId = uploadedFiles[index]?.id;
-          if (fileId) {
-            setTimeout(() => {
-              const element = imageRefs.current.get(fileId);
-              if (element) {
-                element.scrollIntoView({ behavior: "smooth", block: "center" });
-              }
-            }, 100);
-          }
-        },
-        onFileProgress: (index, filename, fileProgress) => {
-          setUploadedFiles(prev => prev.map((f, i) => 
-            i === index ? { 
-              ...f, 
-              progress: fileProgress.percentage,
-              bytesUploaded: fileProgress.bytesUploaded,
-              totalBytes: fileProgress.totalBytes,
-              status: fileProgress.status as "uploading" | "retrying"
-            } : f
-          ));
-        },
-        onFileComplete: (index) => {
-          setUploadedFiles(prev => prev.map((f, i) => 
-            i === index ? { ...f, status: "complete" as const, progress: 100 } : f
-          ));
-        },
-        onFileError: (index) => {
-          setUploadedFiles(prev => prev.map((f, i) => 
-            i === index ? { ...f, status: "error" as const } : f
-          ));
-        },
-        onFileRetry: (index, filename, retryCount) => {
-          setUploadedFiles(prev => prev.map((f, i) => 
-            i === index ? { ...f, status: "retrying" as const, progress: 0 } : f
-          ));
-          toast.info(`Retrying ${filename}... (attempt ${retryCount + 1}/4)`);
-        }
-      });
+      // 3. Upload images via Uppy. Files are already in Uppy state — we
+      // don't pass them again. Uppy Dashboard renders progress per file
+      // on its own, so no per-file callbacks needed.
+      const imageIds = await uploadImages(gallery.id, user.id);
 
       // 4. Get the first image URL for hero
       let heroImageUrl: string | null = null;
@@ -595,7 +475,7 @@ export default function CreateGalleryPage() {
         if (uploadSource === "drive") {
           return driveFolderInfo !== null;
         }
-        return uploadedFiles.length > 0;
+        return uppyFileCount > 0;
       default:
         return false;
     }
@@ -1184,8 +1064,7 @@ export default function CreateGalleryPage() {
                     setDriveFolderInfo(null);
                     setDriveLinks([]);
                   } else {
-                    uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
-                    setUploadedFiles([]);
+                    uppy.cancelAll();
                   }
                 }}
                 disabled={isUploading || isTransferring}
@@ -1203,188 +1082,22 @@ export default function CreateGalleryPage() {
                 />
               )}
 
-              {/* Local Upload Drop Zone - merged with preview */}
+              {/* Local Upload — Uppy Dashboard (lazy-loaded thumbnails,
+                   handles drag-drop, picker, and per-file progress UI). */}
               {uploadSource === "local" && (
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={cn(
-                    "relative border-2 border-dashed rounded-xl transition-all min-h-[200px]",
-                    isDragging
-                      ? "border-primary bg-primary/10 scale-[1.01]"
-                      : "border-primary/30 hover:border-primary/50"
-                  )}
-                >
-                  {/* Hidden file input triggered programmatically */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept={IMAGE_ACCEPT}
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    tabIndex={-1}
-                  />
-
-                  {uploadedFiles.length === 0 ? (
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex flex-col items-center gap-4 p-10 cursor-pointer"
-                    >
-                      <div className="relative">
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center">
-                          <CloudIcon className="w-10 h-10 text-primary/70" />
-                        </div>
-                        <motion.div
-                          className="absolute inset-0 rounded-full border-2 border-primary/20"
-                          animate={isDragging ? { scale: [1, 1.15, 1], opacity: [0.5, 0, 0.5] } : {}}
-                          transition={{ duration: 1.2, repeat: Infinity }}
-                        />
-                      </div>
-                      <div className="text-center space-y-1.5">
-                        <p className="font-semibold text-base">
-                          {isDragging ? "Drop your photos here" : "Drop photos here or click to upload"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          JPG, PNG, RAW (CR2, ARW, NEF, DNG…) • Up to 50MB per file
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="font-medium text-sm">
-                          {uploadedFiles.length} photos selected
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <label>
-                            <Button variant="outline" size="sm" className="gap-1 text-xs" asChild>
-                              <span>
-                                <Plus className="w-3 h-3" />
-                                Add More
-                              </span>
-                            </Button>
-                            <input
-                              type="file"
-                              multiple
-                              accept={IMAGE_ACCEPT}
-                              onChange={handleFileSelect}
-                              className="hidden"
-                            />
-                          </label>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() => {
-                              uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
-                              setUploadedFiles([]);
-                            }}
-                            disabled={isUploading}
-                          >
-                            Clear All
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2.5 max-h-[280px] overflow-y-auto">
-                        {uploadedFiles.map(file => (
-                          <div
-                            key={file.id}
-                            className="relative aspect-square group rounded-lg overflow-hidden"
-                            ref={(el) => {
-                              if (el) {
-                                imageRefs.current.set(file.id, el);
-                              } else {
-                                imageRefs.current.delete(file.id);
-                              }
-                            }}
-                          >
-                            {file.isRaw ? (
-                              <div className="w-full h-full bg-muted flex flex-col items-center justify-center gap-1">
-                                <FileImage className="w-6 h-6 text-muted-foreground" />
-                                <span className="text-xs font-bold text-foreground">{getFileExtension(file.file.name)}</span>
-                                <span className="text-[10px] text-muted-foreground truncate max-w-[90%] px-1">{file.file.name}</span>
-                              </div>
-                            ) : (
-                              <img
-                                src={file.preview}
-                                alt=""
-                                className="w-full h-full object-cover"
-                              />
-                            )}
-
-                            {/* Hover overlay */}
-                            {file.status === "pending" && !isUploading && (
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                            )}
-                            
-                            {/* Uploading with progress */}
-                            {file.status === "uploading" && (
-                              <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center p-1">
-                                <Loader2 className="w-5 h-5 animate-spin text-primary mb-1" />
-                                <span className="text-xs font-medium text-primary">{file.progress}%</span>
-                                {file.bytesUploaded !== undefined && file.totalBytes !== undefined && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {(file.bytesUploaded / (1024 * 1024)).toFixed(1)}MB
-                                  </span>
-                                )}
-                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">
-                                  <motion.div 
-                                    className="h-full bg-primary"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${file.progress}%` }}
-                                    transition={{ duration: 0.2 }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Retrying */}
-                            {file.status === "retrying" && (
-                              <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center">
-                                <RefreshCw className="w-5 h-5 animate-spin text-accent-foreground mb-1" />
-                                <span className="text-xs font-medium text-accent-foreground">Retrying...</span>
-                              </div>
-                            )}
-
-                            {file.status === "complete" && (
-                              <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                                <Check className="w-3 h-3 text-primary-foreground" />
-                              </div>
-                            )}
-
-                            {file.status === "error" && (
-                              <div className="absolute inset-0 bg-destructive/60 flex flex-col items-center justify-center">
-                                <X className="w-6 h-6 text-destructive-foreground" />
-                                <span className="text-xs text-destructive-foreground mt-1">Failed</span>
-                              </div>
-                            )}
-
-                            {file.status === "pending" && !isUploading && (
-                              <button
-                                onClick={() => removeFile(file.id)}
-                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <UppyUploadArea
+                  uppy={uppy}
+                  maxFiles={!isUnlimited && stylesCount > 0 ? maxImages : undefined}
+                  disabled={isUploading || hookIsUploading}
+                />
               )}
 
               {/* Upload Progress Bar - only for local uploads */}
               {uploadSource === "local" && (
                 <AnimatePresence>
                   {(isUploading || hookIsUploading) && uploadProgress && (() => {
-                    const totalBytes = uploadedFiles.reduce((acc, f) => f.file.size + acc, 0);
-                    const uploadedBytes = Array.from(uploadProgress.fileProgress.values())
-                      .reduce((acc, p) => acc + p.bytesUploaded, 0);
+                    const totalBytes = uploadProgress.totalBytes;
+                    const uploadedBytes = uploadProgress.bytesUploaded;
                     const percentage = totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0;
                     const formatMB = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
                     return (

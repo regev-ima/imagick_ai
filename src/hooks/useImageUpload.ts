@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Uppy, { type UppyFile } from "@uppy/core";
 import AwsS3 from "@uppy/aws-s3";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,24 +7,16 @@ import { toast } from "sonner";
 /**
  * Image upload hook backed by Uppy (transloadit/uppy).
  *
- * The previous hand-rolled XHR uploader was crashing browsers on
- * 1000+ photo galleries. The Uppy core handles the things that were
- * fragile: throttled progress events, parallelism caps, retries with
- * backoff, and stream-from-disk uploads (no FileReader / no in-memory
- * buffering of the whole file).
+ * Two ways to use it:
  *
- * The external API of this hook is unchanged on purpose so existing
- * consumers (CreateGalleryPage, AddImagesModal, useImageProcessing)
- * keep working without any further refactor.
+ *   1. Render `<Dashboard uppy={uppy} />` (recommended for new code).
+ *      The user picks/drops files into Uppy directly. Then call
+ *      `uploadImages(galleryId, userId)` with no files arg — we
+ *      upload whatever is currently in Uppy.
  *
- * Flow per call to uploadImages():
- *   1. Generate UUID-based B2 filenames for each File
- *   2. Batch-fetch signed B2 URLs from our `image-upload` edge fn
- *   3. Add files to Uppy with those URLs cached in metadata
- *   4. Uppy uploads with concurrency cap, streaming, retries, etc.
- *   5. On each upload-success: enqueue a gallery_images insert
- *   6. A timer flushes the insert queue in batches of 100
- *   7. Resolve with the list of inserted gallery_images IDs
+ *   2. Pass `File[]` to `uploadImages(galleryId, userId, files)`
+ *      (legacy path used by useImageProcessing for the Drive flow).
+ *      Files are added to Uppy then uploaded immediately.
  */
 
 interface FileUploadProgress {
@@ -69,7 +61,7 @@ interface FileMeta {
   publicUrl: string;
   /** Pre-signed URL for the PUT. */
   signedUrl: string;
-  /** Index in the files[] array passed to uploadImages. */
+  /** Index in the upload batch (used for sort_order). */
   index: number;
   /** Gallery to insert into. */
   galleryId: string;
@@ -77,26 +69,10 @@ interface FileMeta {
   userId: string;
 }
 
-// PUTs go through a Cloudflare Worker that forwards to B2 with the
-// signed URL provided in a custom header. Same target as the previous
-// implementation.
 const B2_PROXY_URL = "https://cloudflare-b2-proxy.rx8rq49b5c.workers.dev";
-
-// Concurrency for B2 uploads. The Cloudflare Worker proxy chokes well
-// above 4 because each upload pins a connection against per-Worker
-// CPU/memory limits.
 const CONCURRENT_UPLOADS = 4;
-
-// Throttle aggregate React state updates. Uppy fires progress events
-// per file at high frequency; we coalesce to ~10 Hz to stop the main
-// thread from drowning in re-renders.
 const STATE_UPDATE_THROTTLE_MS = 100;
-
-// Throttle per-file callbacks (consumers typically do an O(n) array
-// map inside them; firing 30×/sec × n=3000 files was causing the freeze).
 const PER_FILE_CALLBACK_THROTTLE_MS = 200;
-
-// Batch DB inserts so 1000 photos produce ~10 HTTP writes, not 1000.
 const INSERT_BATCH_SIZE = 100;
 const INSERT_FLUSH_INTERVAL_MS = 50;
 
@@ -104,12 +80,8 @@ export function useImageUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
-  // Single Uppy instance reused across uploadImages() calls. Cleared
-  // before each call (uppy.cancelAll() removes any leftover files).
   const uppyRef = useRef<Uppy<FileMeta, Record<string, never>> | null>(null);
 
-  // Live aggregate refs — mutated continuously, snapshotted into state
-  // by the throttled flusher.
   const fileProgressRef = useRef(new Map<string, FileUploadProgress>());
   const bytesUploadedRef = useRef(0);
   const totalBytesRef = useRef(0);
@@ -120,11 +92,21 @@ export function useImageUpload() {
   const stateFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPerFileCallbackRef = useRef(new Map<string, number>());
 
-  // Lazy init of Uppy.
-  if (!uppyRef.current) {
-    uppyRef.current = new Uppy<FileMeta, Record<string, never>>({
+  // Single Uppy instance per hook lifetime — files added by the user
+  // (via Dashboard or programmatically) accumulate here until
+  // uploadImages() is called. We need a stable reference for the
+  // <Dashboard> component to subscribe to.
+  const uppy = useMemo<Uppy<FileMeta, Record<string, never>>>(() => {
+    if (uppyRef.current) return uppyRef.current;
+    const instance = new Uppy<FileMeta, Record<string, never>>({
       autoProceed: false,
       allowMultipleUploadBatches: true,
+      restrictions: {
+        allowedFileTypes: [
+          "image/*",
+          ".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".rw2", ".orf",
+        ],
+      },
     }).use(AwsS3, {
       shouldUseMultipart: false,
       limit: CONCURRENT_UPLOADS,
@@ -141,7 +123,9 @@ export function useImageUpload() {
         };
       },
     });
-  }
+    uppyRef.current = instance;
+    return instance;
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -223,43 +207,67 @@ export function useImageUpload() {
   const uploadImages = async (
     galleryId: string,
     userId: string,
-    files: File[],
+    files?: File[],
     callbacks?: UploadCallbacks,
   ): Promise<string[]> => {
-    if (files.length === 0) return [];
-    const uppy = uppyRef.current!;
+    // Legacy path: caller passed File[]. Add them to Uppy first.
+    if (files && files.length > 0) {
+      uppy.cancelAll();
+      files.forEach((file, idx) => {
+        try {
+          uppy.addFile({
+            name: file.name,
+            type: file.type || "image/jpeg",
+            data: file,
+            meta: {
+              originalName: file.name,
+              b2Name: "",
+              publicUrl: "",
+              signedUrl: "",
+              index: idx,
+              galleryId,
+              userId,
+            },
+          });
+        } catch (err) {
+          console.error("Failed to add file to Uppy:", file.name, err);
+        }
+      });
+    }
 
-    // Reset live aggregates for this run.
+    const uppyFiles = uppy.getFiles();
+    if (uppyFiles.length === 0) return [];
+
     setIsUploading(true);
     fileProgressRef.current = new Map();
     bytesUploadedRef.current = 0;
     completedCountRef.current = 0;
     currentFileRef.current = "Getting upload URLs...";
-    totalCountRef.current = files.length;
-    totalBytesRef.current = files.reduce((acc, f) => acc + f.size, 0);
+    totalCountRef.current = uppyFiles.length;
+    totalBytesRef.current = uppyFiles.reduce((acc, f) => acc + (f.size ?? 0), 0);
     lastPerFileCallbackRef.current = new Map();
     lastStateUpdateRef.current = 0;
     flushStateNow();
 
-    // Drain anything left over from a previous run.
-    uppy.cancelAll();
-
-    files.forEach((file) => {
-      fileProgressRef.current.set(file.name, {
-        fileName: file.name,
+    uppyFiles.forEach((file) => {
+      fileProgressRef.current.set(file.name ?? file.id, {
+        fileName: file.name ?? file.id,
         bytesUploaded: 0,
-        totalBytes: file.size,
+        totalBytes: file.size ?? 0,
         percentage: 0,
         status: "pending",
         retryCount: 0,
       });
     });
 
-    // Generate UUID-based B2 filenames (one per File) and batch-fetch
-    // signed URLs from the edge function.
-    const fileEntries = files.map((file, index) => {
-      const ext = file.name.split(".").pop() || "jpg";
-      return { file, index, b2Name: `${crypto.randomUUID()}.${ext}` };
+    // Generate UUID-based B2 filenames per file currently in Uppy and
+    // batch-fetch signed URLs.
+    const b2NameByUppyId = new Map<string, string>();
+    uppyFiles.forEach((file, idx) => {
+      const ext = (file.name ?? "jpg").split(".").pop() || "jpg";
+      const b2Name = `${crypto.randomUUID()}.${ext}`;
+      b2NameByUppyId.set(file.id, b2Name);
+      uppy.setFileMeta(file.id, { index: idx, galleryId, userId, b2Name });
     });
 
     await supabase
@@ -270,7 +278,7 @@ export function useImageUpload() {
     const signedUrls = await getSignedUrls(
       "imagick",
       `galleries/${userId}/${galleryId}/`,
-      fileEntries.map((e) => e.b2Name),
+      Array.from(b2NameByUppyId.values()),
     );
     if (!signedUrls) {
       toast.error("Failed to get upload URLs");
@@ -280,6 +288,20 @@ export function useImageUpload() {
 
     const urlByB2Name = new Map<string, SignedUrlInfo>();
     signedUrls.forEach((u) => urlByB2Name.set(u.name, u));
+
+    // Stamp each file with its signed URL meta.
+    uppyFiles.forEach((file) => {
+      const b2Name = b2NameByUppyId.get(file.id);
+      if (!b2Name) return;
+      const urlInfo = urlByB2Name.get(b2Name);
+      if (!urlInfo) return;
+      uppy.setFileMeta(file.id, {
+        originalName: file.name ?? "",
+        b2Name,
+        publicUrl: urlInfo.publicUrl,
+        signedUrl: urlInfo.signedUrl,
+      });
+    });
 
     // ── Batched gallery_images insert pipeline ─────────────────────────
     type PendingInsert = {
@@ -343,9 +365,12 @@ export function useImageUpload() {
       });
 
     // ── Wire Uppy events for THIS run ──────────────────────────────────
-    // We attach scoped listeners and remove them after this run finishes.
-    const indexById = new Map<string, number>(); // uppy file id → index in files[]
-    const filenameById = new Map<string, string>(); // uppy file id → original name
+    const indexById = new Map<string, number>();
+    const filenameById = new Map<string, string>();
+    uppyFiles.forEach((file, idx) => {
+      indexById.set(file.id, idx);
+      filenameById.set(file.id, file.name ?? file.id);
+    });
     const insertPromises: Promise<string | null>[] = [];
 
     const onUploadProgress = (
@@ -469,45 +494,16 @@ export function useImageUpload() {
     uppy.on("upload-success", onUploadSuccess);
     uppy.on("upload-error", onUploadError);
 
-    // Add files to Uppy with cached signed URL metadata.
-    fileEntries.forEach(({ file, index, b2Name }) => {
-      const urlInfo = urlByB2Name.get(b2Name);
-      if (!urlInfo) return;
-      try {
-        const fileId = uppy.addFile<FileMeta, Record<string, never>>({
-          name: file.name,
-          type: file.type || "image/jpeg",
-          data: file,
-          meta: {
-            originalName: file.name,
-            b2Name,
-            publicUrl: urlInfo.publicUrl,
-            signedUrl: urlInfo.signedUrl,
-            index,
-            galleryId,
-            userId,
-          },
-        });
-        indexById.set(fileId, index);
-        filenameById.set(fileId, file.name);
-      } catch (err) {
-        console.error("Failed to add file to Uppy:", file.name, err);
-      }
-    });
-
     currentFileRef.current = "";
     flushStateNow();
 
     try {
       await uppy.upload();
-      // Drain any inserts still buffered.
       await flushInserts();
 
-      // Resolve all queued insert promises so we know the final order.
       const resolved = await Promise.all(insertPromises);
       const imageIds = resolved.filter((id): id is string => !!id);
 
-      // Update gallery total_images count.
       const { data: countData } = await supabase
         .from("gallery_images")
         .select("id", { count: "exact" })
@@ -544,6 +540,8 @@ export function useImageUpload() {
   }, []);
 
   return {
+    /** The shared Uppy instance — pass to <Dashboard uppy={uppy} />. */
+    uppy,
     isUploading,
     uploadProgress,
     uploadImages,
