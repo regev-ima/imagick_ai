@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Uppy, { type UppyFile } from "@uppy/core";
-import AwsS3 from "@uppy/aws-s3";
+import XHRUpload from "@uppy/xhr-upload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -107,19 +107,25 @@ export function useImageUpload() {
           ".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".rw2", ".orf",
         ],
       },
-    }).use(AwsS3, {
-      shouldUseMultipart: false,
+    }).use(XHRUpload, {
+      // We use the generic XHR uploader, NOT @uppy/aws-s3, because the
+      // Cloudflare Worker proxy returns a plain 200 (not an S3 XML
+      // response). The aws-s3 plugin parses the response for AWS-style
+      // metadata and hangs on 200-with-empty-body responses, which
+      // caused the previous "stalls at 51 MB" symptom (4 concurrent
+      // PUTs, ~13 MB each, sent fully but never marked as completed).
+      endpoint: B2_PROXY_URL,
+      method: "PUT",
+      formData: false, // raw body = the file, not multipart/form-data
       limit: CONCURRENT_UPLOADS,
       retryDelays: [1000, 2000, 4000, 8000, 16000],
-      getUploadParameters: async (file) => {
+      // Per-file headers — the actual B2 signed URL goes here so the
+      // Cloudflare Worker can forward to the right object.
+      headers: (file) => {
         const meta = file.meta as FileMeta;
         return {
-          method: "PUT" as const,
-          url: B2_PROXY_URL,
-          headers: {
-            signedurl: meta.signedUrl,
-            "Content-Type": file.type || "image/jpeg",
-          },
+          signedurl: meta.signedUrl,
+          "Content-Type": file.type || "image/jpeg",
         };
       },
     });

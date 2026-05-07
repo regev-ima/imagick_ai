@@ -35,7 +35,7 @@ export function UppyUploadArea({
   uppy,
   maxFiles,
   disabled = false,
-  height = 320,
+  height = 360,
 }: UppyUploadAreaProps) {
   const targetRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +48,10 @@ export function UppyUploadArea({
       target,
       inline: true,
       height,
+      // Force dark theme — our app is always dark and the OS-aware
+      // "auto" was rendering a white box that clashed with the rest
+      // of the dashboard.
+      theme: "dark",
       proudlyDisplayPoweredByUppy: false,
       hideUploadButton: true,
       showProgressDetails: true,
@@ -78,17 +82,20 @@ export function UppyUploadArea({
     }
   }, [uppy, maxFiles]);
 
-  // The Dashboard exposes a `disabled` prop via setOptions, but we
-  // mainly need to block interaction during upload. CSS pointer-events
-  // is the simplest path that doesn't fight the plugin lifecycle.
   return (
     <div
-      ref={targetRef}
+      // CSS overrides to align Dashboard's dark theme with our pink
+      // brand accent (--primary in tailwind config). These cascade into
+      // the Dashboard's shadow DOM via Uppy's CSS variables.
+      className="imagick-uppy-dashboard"
       style={
-        disabled
-          ? { pointerEvents: "none", opacity: 0.6 }
-          : undefined
+        {
+          "--uppy-c-primary": "#e85c9b",
+          "--uppy-c-primary-light": "#ff7bbd",
+          ...(disabled ? { pointerEvents: "none", opacity: 0.6 } : {}),
+        } as React.CSSProperties
       }
+      ref={targetRef}
     />
   );
 }
