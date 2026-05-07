@@ -424,10 +424,35 @@
   outline-color: hsl(330 100% 60%) !important;
 }
 
-/* Status / progress bar accent */
-.imagick-uppy-dashboard .uppy-StatusBar.is-uploading,
+/* Status bar — dark muted background (matches our card bg), with the
+ * progress fill itself in pink. Previously we coloured BOTH the bar
+ * background and the fill, which produced a jarring solid-pink slab. */
+.imagick-uppy-dashboard .uppy-StatusBar {
+  background-color: hsl(0 0% 100% / 0.04) !important;
+  color: hsl(0 0% 100% / 0.85) !important;
+  border-top: 1px solid hsl(0 0% 100% / 0.06) !important;
+}
+.imagick-uppy-dashboard .uppy-StatusBar.is-uploading {
+  background-color: hsl(0 0% 100% / 0.04) !important;
+}
 .imagick-uppy-dashboard .uppy-StatusBar-progress {
   background-color: hsl(330 100% 60%) !important;
+  height: 3px !important;
+  opacity: 1 !important;
+}
+/* The faint "track" line behind the progress fill */
+.imagick-uppy-dashboard .uppy-StatusBar:not(.is-error)
+  .uppy-StatusBar-progress.is-indeterminate {
+  background-image: linear-gradient(
+    45deg,
+    hsl(330 100% 60% / 0.6) 25%,
+    transparent 25%,
+    transparent 50%,
+    hsl(330 100% 60% / 0.6) 50%,
+    hsl(330 100% 60% / 0.6) 75%,
+    transparent 75%,
+    transparent
+  ) !important;
 }
 
 /* Per-file thumbnail tiles — slightly rounded to match our cards */
