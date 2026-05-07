@@ -69,6 +69,7 @@ import { FilterOptions, defaultFilters } from "@/components/gallery/filter-types
 import { ShareGalleryModal } from "@/components/gallery/ShareGalleryModal";
 import { StyleSelector, StyleComparison } from "@/components/gallery/StyleSelector";
 import { ImageCard } from "@/components/gallery/ImageCard";
+import { VirtualizedImageGrid } from "@/components/gallery/VirtualizedImageGrid";
 import { CatalogModeSelector, CatalogMode } from "@/components/gallery/CatalogModeSelector";
 import { CatalogSection } from "@/components/gallery/CatalogSection";
 import { GroupingView } from "@/components/gallery/GroupingView";
@@ -2222,21 +2223,17 @@ export default function GalleryEditorPage() {
             ))}
           </div>
         ) : (
-          // Default grid view with infinite scroll
-          <>
-            <div 
-              ref={gridContainerRef}
-              className={cn(
-              "w-full gap-0.5",
-              viewMode === "masonry" 
-                ? "flex flex-wrap" 
-                  : "grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
-              )}>
-              {visibleImages.map((image, index) => {
-                const computed = justifiedSizes.get(image.id);
-                return (
+          // Default grid / masonry view
+          (() => {
+            // Per-image renderer reused by both the virtualized grid
+            // (handles 3000+ photos without crashing) and the legacy
+            // masonry path (still uses the visibleImages slice + infinite
+            // scroll because variable-height masonry needs more work to
+            // virtualize well).
+            const renderCard = (image: typeof filteredImages[number], index: number) => {
+              const computed = justifiedSizes.get(image.id);
+              return (
                 <ImageCard
-                  key={image.id}
                   image={{
                     id: image.id,
                     filename: image.filename,
@@ -2246,7 +2243,7 @@ export default function GalleryEditorPage() {
                     ai_rating: image.ai_rating,
                     culling_score: (image as any).culling_score,
                     width: image.width,
-                    height: image.height
+                    height: image.height,
                   }}
                   index={index}
                   thumbnailUrl={getImageThumbnail(image)}
@@ -2255,7 +2252,6 @@ export default function GalleryEditorPage() {
                   computedWidth={computed?.width}
                   computedHeight={computed?.height}
                   status={
-                    // Show processing overlay for pending re-edit images
                     selectedViewStyle !== "original" &&
                     pendingReEdit?.styleIds.includes(selectedViewStyle) &&
                     pendingReEdit?.imageIds.includes(image.id) &&
@@ -2267,39 +2263,81 @@ export default function GalleryEditorPage() {
                   onSelectionToggle={handleSelectionToggle}
                   onOpenLightbox={openLightbox}
                   onToggleLike={(id) => toggleLike.mutate(id)}
-                  processingInfo={canViewAnalytics ? {
-                    sentAt: image.last_processing_attempt_at || null,
-                    completedAt: image.processing_completed_at || null,
-                    attempts: image.processing_attempts || 0,
-                    error: image.status === "error" ? image.last_processing_error || null : null,
-                  } : undefined}
+                  processingInfo={
+                    canViewAnalytics
+                      ? {
+                          sentAt: image.last_processing_attempt_at || null,
+                          completedAt: image.processing_completed_at || null,
+                          attempts: image.processing_attempts || 0,
+                          error:
+                            image.status === "error" ? image.last_processing_error || null : null,
+                        }
+                      : undefined
+                  }
                 />
-                );
-              })}
-              {/* Skeleton placeholders for freshly uploaded images */}
-              {pendingUploadCount > 0 && Array.from({ length: pendingUploadCount }).map((_, i) => (
+              );
+            };
+
+            const skeletons =
+              pendingUploadCount > 0
+                ? Array.from({ length: pendingUploadCount }).map((_, i) => (
+                    <div
+                      key={`skeleton-${i}`}
+                      className="relative rounded-sm overflow-hidden animate-pulse bg-muted/60 aspect-square"
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Upload className="w-6 h-6 text-muted-foreground/20" />
+                      </div>
+                    </div>
+                  ))
+                : null;
+
+            if (viewMode === "grid") {
+              return (
+                <VirtualizedImageGrid
+                  items={filteredImages}
+                  scrollContainerRef={scrollContainerRef}
+                  getKey={(image) => image.id}
+                  renderItem={renderCard}
+                  trailing={
+                    skeletons ? (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-0.5 mt-0.5">
+                        {skeletons}
+                      </div>
+                    ) : null
+                  }
+                />
+              );
+            }
+
+            // Masonry — variable-height layout. Keeps the previous
+            // visibleImages-slice + infinite-scroll behaviour because
+            // virtualizing a masonry grid needs row-height measurement
+            // that's a separate refactor. Capping at visibleCount keeps
+            // the DOM count bounded.
+            return (
+              <>
                 <div
-                  key={`skeleton-${i}`}
-                  className={cn(
-                    "relative rounded-sm overflow-hidden animate-pulse bg-muted/60",
-                    viewMode === "grid" ? "aspect-square" : "aspect-square"
-                  )}
+                  ref={gridContainerRef}
+                  className="w-full gap-0.5 flex flex-wrap"
                 >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Upload className="w-6 h-6 text-muted-foreground/20" />
-                  </div>
+                  {visibleImages.map((image, index) => (
+                    <div key={image.id} style={{ display: "contents" }}>
+                      {renderCard(image, index)}
+                    </div>
+                  ))}
+                  {skeletons}
                 </div>
-              ))}
-            </div>
-            {/* Load more indicator */}
-            {visibleCount < filteredImages.length && (
-              <div className="flex justify-center py-8">
-                <p className="text-sm text-muted-foreground">
-                  Showing {visibleCount} of {filteredImages.length} images • Scroll for more
-                </p>
-              </div>
-            )}
-          </>
+                {visibleCount < filteredImages.length && (
+                  <div className="flex justify-center py-8">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {visibleCount} of {filteredImages.length} images • Scroll for more
+                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()
         )}
         </>
         )}
