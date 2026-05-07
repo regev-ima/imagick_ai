@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { isAcceptedImageFile, IMAGE_ACCEPT, isRawFile, getFileExtension } from "@/lib/fileTypes";
+import { useUppyState } from "@uppy/react";
+import { UppyUploadArea } from "@/components/upload/UppyUploadArea";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Sparkles, Check, Upload, Images, ChevronLeft, Loader2,
@@ -21,17 +22,6 @@ import { GoogleDriveInput, type DriveFolderInfo } from "./GoogleDriveInput";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 import { getThumbnailUrl } from "@/lib/imageUrls";
-
-interface UploadedFile {
-  id: string;
-  file: File;
-  preview: string;
-  isRaw: boolean;
-  progress: number;
-  status: "pending" | "uploading" | "complete" | "error" | "retrying";
-  bytesUploaded?: number;
-  totalBytes?: number;
-}
 
 interface AddImagesModalProps {
   isOpen: boolean;
@@ -54,8 +44,6 @@ export function AddImagesModal({
 }: AddImagesModalProps) {
   const [step, setStep] = useState<Step>("styles");
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   const [uploadSource, setUploadSource] = useState<UploadSource>("local");
   const [driveLinks, setDriveLinks] = useState<string[]>([]);
   const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
@@ -63,15 +51,13 @@ export function AddImagesModal({
 
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { uploadImages, uploadProgress, isUploading: hookIsUploading } = useImageUpload();
+  const { uppy, uploadImages, uploadProgress, isUploading: hookIsUploading } = useImageUpload();
+  const uppyFileCount = useUppyState(uppy, (state) => Object.keys(state.files).length);
   const { processImages } = useImageProcessing();
   const { editsRemaining, availableEdits, editsReserved, isUnlimited, isFreePlan, canEdit, isSuspended, isExpired } = useSubscription();
 
-  const imageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   // Edit calculations
-  const imageCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : uploadedFiles.length;
+  const imageCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : uppyFileCount;
   const stylesCount = selectedStyles.length;
   const editsNeeded = imageCount * stylesCount;
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
@@ -101,20 +87,13 @@ export function AddImagesModal({
     if (isOpen) {
       setStep("styles");
       setSelectedStyles([]);
-      setUploadedFiles([]);
+      uppy.cancelAll();
       setUploadSource("local");
       setDriveLinks([]);
       setDriveFolderInfo(null);
       setIsUploadingLocal(false);
     }
-  }, [isOpen]);
-
-  // Cleanup previews
-  useEffect(() => {
-    return () => {
-      uploadedFiles.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
-    };
-  }, []);
+  }, [isOpen, uppy]);
 
   const toggleStyle = (styleId: string) => {
     setSelectedStyles(prev => {
@@ -124,73 +103,6 @@ export function AddImagesModal({
         return prev;
       }
       return [...prev, styleId];
-    });
-  };
-
-  const addFiles = useCallback((files: File[]) => {
-    const newFiles: UploadedFile[] = files.map(file => {
-      const raw = isRawFile(file);
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        file,
-        preview: raw ? "" : URL.createObjectURL(file),
-        isRaw: raw,
-        progress: 0,
-        status: "pending" as const,
-      };
-    });
-
-    setUploadedFiles(prev => {
-      const combined = [...prev, ...newFiles];
-      if (!isUnlimited && stylesCount > 0 && combined.length > maxImages) {
-        const allowed = maxImages - prev.length;
-        if (allowed <= 0) {
-          newFiles.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
-          toast.error(`Edit limit reached. You can upload up to ${maxImages} images with ${stylesCount} style(s).`);
-          return prev;
-        }
-        const kept = newFiles.slice(0, allowed);
-        newFiles.slice(allowed).forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
-        toast.warning(`Only ${allowed} of ${files.length} images added due to edit limit.`);
-        return [...prev, ...kept];
-      }
-      return combined;
-    });
-  }, [isUnlimited, stylesCount, maxImages]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files).filter(isAcceptedImageFile);
-    if (files.length === 0) {
-      toast.error("Please drop image files only");
-      return;
-    }
-    addFiles(files);
-  }, [addFiles]);
-
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files).filter(isAcceptedImageFile);
-      if (files.length > 0) addFiles(files);
-    }
-  }, [addFiles]);
-
-  const removeFile = (id: string) => {
-    setUploadedFiles(prev => {
-      const file = prev.find(f => f.id === id);
-      if (file?.preview) URL.revokeObjectURL(file.preview);
-      return prev.filter(f => f.id !== id);
     });
   };
 
@@ -221,8 +133,8 @@ export function AddImagesModal({
       return;
     }
 
-    // Local file upload
-    if (uploadedFiles.length === 0) {
+    // Local file upload — files already in Uppy state
+    if (uppyFileCount === 0) {
       toast.error("Please add at least one image");
       return;
     }
@@ -234,51 +146,7 @@ export function AddImagesModal({
     setIsUploadingLocal(true);
 
     try {
-      const files = uploadedFiles.map(f => f.file);
-
-      const imageIds = await uploadImages(galleryId, user.id, files, {
-        onFileStart: (index) => {
-          setUploadedFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, status: "uploading" as const, progress: 0 } : f
-          ));
-          const fileId = uploadedFiles[index]?.id;
-          if (fileId) {
-            setTimeout(() => {
-              const element = imageRefs.current.get(fileId);
-              if (element) {
-                element.scrollIntoView({ behavior: "smooth", block: "center" });
-              }
-            }, 100);
-          }
-        },
-        onFileProgress: (index, _filename, fileProgress) => {
-          setUploadedFiles(prev => prev.map((f, i) =>
-            i === index ? {
-              ...f,
-              progress: fileProgress.percentage,
-              bytesUploaded: fileProgress.bytesUploaded,
-              totalBytes: fileProgress.totalBytes,
-              status: fileProgress.status as "uploading" | "retrying",
-            } : f
-          ));
-        },
-        onFileComplete: (index) => {
-          setUploadedFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, status: "complete" as const, progress: 100 } : f
-          ));
-        },
-        onFileError: (index) => {
-          setUploadedFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, status: "error" as const } : f
-          ));
-        },
-        onFileRetry: (index, filename, retryCount) => {
-          setUploadedFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, status: "retrying" as const, progress: 0 } : f
-          ));
-          toast.info(`Retrying ${filename}... (attempt ${retryCount + 1}/6)`);
-        },
-      });
+      const imageIds = await uploadImages(galleryId, user.id);
 
       if (imageIds.length > 0) {
         // Update gallery total_images and status
@@ -316,7 +184,7 @@ export function AddImagesModal({
         }
       }
 
-      onUploadComplete?.(uploadedFiles.filter(f => f.status === "complete").length || uploadedFiles.length);
+      onUploadComplete?.(imageIds.length);
       onClose();
     } catch (error: any) {
       console.error("Error uploading images:", error);
@@ -584,8 +452,7 @@ export function AddImagesModal({
                         setDriveFolderInfo(null);
                         setDriveLinks([]);
                       } else {
-                        uploadedFiles.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
-                        setUploadedFiles([]);
+                        uppy.cancelAll();
                       }
                     }}
                     disabled={isProcessing}
@@ -603,178 +470,24 @@ export function AddImagesModal({
                     />
                   )}
 
-                  {/* Local Upload Zone */}
+                  {/* Local Upload Zone — Uppy Dashboard handles all of
+                       drag-drop, picker, lazy thumbnails, and per-file
+                       progress without rendering 1000 thumbnails into the
+                       DOM at once. */}
                   {uploadSource === "local" && (
-                    <div
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      className={cn(
-                        "relative border-2 border-dashed rounded-xl transition-all min-h-[200px]",
-                        isDragging
-                          ? "border-primary bg-primary/10 scale-[1.01]"
-                          : "border-primary/30 hover:border-primary/50"
-                      )}
-                    >
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        accept={IMAGE_ACCEPT}
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        tabIndex={-1}
-                      />
-
-                      {uploadedFiles.length === 0 ? (
-                        <div
-                          onClick={() => fileInputRef.current?.click()}
-                          className="flex flex-col items-center gap-4 p-10 cursor-pointer"
-                        >
-                          <div className="relative">
-                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center">
-                              <CloudIcon className="w-10 h-10 text-primary/70" />
-                            </div>
-                            <motion.div
-                              className="absolute inset-0 rounded-full border-2 border-primary/20"
-                              animate={isDragging ? { scale: [1, 1.15, 1], opacity: [0.5, 0, 0.5] } : {}}
-                              transition={{ duration: 1.2, repeat: Infinity }}
-                            />
-                          </div>
-                          <div className="text-center space-y-1.5">
-                            <p className="font-semibold text-base">
-                              {isDragging ? "Drop your photos here" : "Drop photos here or click to upload"}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              JPG, PNG, RAW (CR2, ARW, NEF, DNG…) • Up to 50MB per file
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-3">
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="font-medium text-sm">{uploadedFiles.length} photos selected</p>
-                            <div className="flex items-center gap-2">
-                              <label>
-                                <Button variant="outline" size="sm" className="gap-1 text-xs" asChild>
-                                  <span>
-                                    <Plus className="w-3 h-3" />
-                                    Add More
-                                  </span>
-                                </Button>
-                                <input
-                                  type="file"
-                                  multiple
-                                  accept={IMAGE_ACCEPT}
-                                  onChange={handleFileSelect}
-                                  className="hidden"
-                                />
-                              </label>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-xs"
-                                onClick={() => {
-                                  uploadedFiles.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
-                                  setUploadedFiles([]);
-                                }}
-                                disabled={isProcessing}
-                              >
-                                Clear All
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2.5 max-h-[280px] overflow-y-auto">
-                            {uploadedFiles.map(file => (
-                              <div
-                                key={file.id}
-                                className="relative aspect-square group rounded-lg overflow-hidden"
-                                ref={(el) => {
-                                  if (el) imageRefs.current.set(file.id, el);
-                                  else imageRefs.current.delete(file.id);
-                                }}
-                              >
-                                {file.isRaw ? (
-                                  <div className="w-full h-full bg-muted flex flex-col items-center justify-center gap-1">
-                                    <FileImage className="w-6 h-6 text-muted-foreground" />
-                                    <span className="text-xs font-bold text-foreground">{getFileExtension(file.file.name)}</span>
-                                    <span className="text-[10px] text-muted-foreground truncate max-w-[90%] px-1">{file.file.name}</span>
-                                  </div>
-                                ) : (
-                                  <img src={file.preview} alt="" className="w-full h-full object-cover" />
-                                )}
-
-                                {/* Hover overlay */}
-                                {file.status === "pending" && !isProcessing && (
-                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                                )}
-
-                                {/* Uploading with progress */}
-                                {file.status === "uploading" && (
-                                  <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center p-1">
-                                    <Loader2 className="w-5 h-5 animate-spin text-primary mb-1" />
-                                    <span className="text-xs font-medium text-primary">{file.progress}%</span>
-                                    {file.bytesUploaded !== undefined && file.totalBytes !== undefined && (
-                                      <span className="text-[10px] text-muted-foreground">
-                                        {(file.bytesUploaded / (1024 * 1024)).toFixed(1)}MB
-                                      </span>
-                                    )}
-                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">
-                                      <motion.div
-                                        className="h-full bg-primary"
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${file.progress}%` }}
-                                        transition={{ duration: 0.2 }}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Retrying */}
-                                {file.status === "retrying" && (
-                                  <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center">
-                                    <RefreshCw className="w-5 h-5 animate-spin text-accent-foreground mb-1" />
-                                    <span className="text-xs font-medium text-accent-foreground">Retrying...</span>
-                                  </div>
-                                )}
-
-                                {file.status === "complete" && (
-                                  <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                                    <Check className="w-3 h-3 text-primary-foreground" />
-                                  </div>
-                                )}
-
-                                {file.status === "error" && (
-                                  <div className="absolute inset-0 bg-destructive/60 flex flex-col items-center justify-center">
-                                    <X className="w-6 h-6 text-destructive-foreground" />
-                                    <span className="text-xs text-destructive-foreground mt-1">Failed</span>
-                                  </div>
-                                )}
-
-                                {file.status === "pending" && !isProcessing && (
-                                  <button
-                                    onClick={() => removeFile(file.id)}
-                                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <UppyUploadArea
+                      uppy={uppy}
+                      maxFiles={!isUnlimited && stylesCount > 0 ? maxImages : undefined}
+                      disabled={isProcessing}
+                    />
                   )}
 
-                  {/* Upload Progress Bar */}
+                  {/* Aggregate Upload Progress Bar */}
                   {uploadSource === "local" && (
                     <AnimatePresence>
                       {isProcessing && uploadProgress && (() => {
-                        const totalBytes = uploadedFiles.reduce((acc, f) => f.file.size + acc, 0);
-                        const uploadedBytes = Array.from(uploadProgress.fileProgress.values())
-                          .reduce((acc, p) => acc + p.bytesUploaded, 0);
+                        const totalBytes = uploadProgress.totalBytes;
+                        const uploadedBytes = uploadProgress.bytesUploaded;
                         const percentage = totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0;
                         const formatMB = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
                         return (
