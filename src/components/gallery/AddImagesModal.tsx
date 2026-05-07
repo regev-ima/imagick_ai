@@ -9,6 +9,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +64,33 @@ export function AddImagesModal({
   const { processImages } = useImageProcessing();
   const { editsRemaining, availableEdits, editsReserved, isUnlimited, isFreePlan, canEdit, isSuspended, isExpired } = useSubscription();
 
+  // Crash-recovery / dedupe: when this modal opens for an existing
+  // gallery, pull the filenames already uploaded so we can detect
+  // when a user re-selects them after a tab crash / lost connection.
+  const { data: existingFilenames } = useQuery({
+    queryKey: ["gallery-existing-filenames", galleryId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("gallery_images")
+        .select("filename")
+        .eq("gallery_id", galleryId)
+        .neq("status", "deleted");
+      if (error) {
+        console.error("Failed to fetch existing filenames:", error);
+        return new Set<string>();
+      }
+      return new Set((data ?? []).map((r: any) => r.filename as string));
+    },
+    enabled: isOpen && !!galleryId,
+    staleTime: 30_000,
+  });
+
+  const [duplicatePrompt, setDuplicatePrompt] = useState<{
+    duplicateIds: string[];
+    duplicateNames: string[];
+    newCount: number;
+  } | null>(null);
+
   // Edit calculations
   const imageCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : uppyFileCount;
   const stylesCount = selectedStyles.length;
@@ -64,6 +99,55 @@ export function AddImagesModal({
   const maxImages = isUnlimited ? Infinity : (stylesCount > 0 ? Math.floor(availableEdits / stylesCount) : 0);
 
   const isProcessing = isUploadingLocal || hookIsUploading;
+
+  // Detect filenames the user is re-uploading — fired whenever Uppy
+  // ingests a batch from drag-drop / file picker. We collect the
+  // duplicates and surface a dialog: "skip duplicates" or "upload
+  // anyway". This is the crash-recovery story — if a 3000-photo
+  // upload was interrupted halfway, the user can drop the same folder
+  // and we'll only push what's missing.
+  useEffect(() => {
+    if (!uppy || !existingFilenames) return;
+    const handleFilesAdded = (files: any[]) => {
+      const dupes: { id: string; name: string }[] = [];
+      let newCount = 0;
+      files.forEach((f) => {
+        const name = f.name ?? "";
+        if (name && existingFilenames.has(name)) {
+          dupes.push({ id: f.id, name });
+        } else {
+          newCount++;
+        }
+      });
+      if (dupes.length === 0) return;
+      setDuplicatePrompt({
+        duplicateIds: dupes.map((d) => d.id),
+        duplicateNames: dupes.map((d) => d.name),
+        newCount,
+      });
+    };
+    uppy.on("files-added", handleFilesAdded);
+    return () => {
+      uppy.off("files-added", handleFilesAdded);
+    };
+  }, [uppy, existingFilenames]);
+
+  const handleSkipDuplicates = () => {
+    if (!duplicatePrompt) return;
+    duplicatePrompt.duplicateIds.forEach((id) => {
+      try {
+        uppy.removeFile(id);
+      } catch (err) {
+        console.error("Failed to remove duplicate from Uppy:", err);
+      }
+    });
+    toast.info(`Skipped ${duplicatePrompt.duplicateIds.length} files already uploaded.`);
+    setDuplicatePrompt(null);
+  };
+
+  const handleUploadDuplicatesAnyway = () => {
+    setDuplicatePrompt(null);
+  };
 
   // Fetch styles
   const { data: styles = [] } = useQuery({
@@ -146,7 +230,29 @@ export function AddImagesModal({
     setIsUploadingLocal(true);
 
     try {
-      const imageIds = await uploadImages(galleryId, user.id);
+      // Stream uploaded batches into AI processing as they finish so
+      // editing starts within seconds, not after the full upload.
+      const streamedProcessedIds = new Set<string>();
+      const imageIds = await uploadImages(galleryId, user.id, undefined, {
+        onBatchInserted: (newIds) => {
+          if (selectedStyles.length === 0 || newIds.length === 0) return;
+          const fresh = newIds.filter((id) => !streamedProcessedIds.has(id));
+          if (fresh.length === 0) return;
+          fresh.forEach((id) => streamedProcessedIds.add(id));
+          (async () => {
+            try {
+              await supabase
+                .from("gallery_images")
+                .update({ status: "processing" })
+                .in("id", fresh)
+                .eq("status", "uploading");
+              processImages(galleryId, fresh, selectedStyles);
+            } catch (err) {
+              console.error("Streaming processImages batch failed:", err);
+            }
+          })();
+        },
+      });
 
       if (imageIds.length > 0) {
         // Update gallery total_images and status
@@ -165,15 +271,17 @@ export function AddImagesModal({
           })
           .eq("id", galleryId);
 
-        // Mark images as processing and start AI
+        // Process any IDs that weren't streamed (last partial batch).
         if (selectedStyles.length > 0) {
-          await supabase
-            .from("gallery_images")
-            .update({ status: "processing" })
-            .in("id", imageIds)
-            .eq("status", "uploading");
-
-          processImages(galleryId, imageIds, selectedStyles);
+          const remaining = imageIds.filter((id) => !streamedProcessedIds.has(id));
+          if (remaining.length > 0) {
+            await supabase
+              .from("gallery_images")
+              .update({ status: "processing" })
+              .in("id", remaining)
+              .eq("status", "uploading");
+            processImages(galleryId, remaining, selectedStyles);
+          }
           toast.success(`${imageIds.length} images uploaded! AI processing started...`);
         } else {
           await supabase
@@ -617,6 +725,32 @@ export function AddImagesModal({
           </div>
         </Card>
       </motion.div>
+
+      <AlertDialog open={!!duplicatePrompt} onOpenChange={(open) => !open && setDuplicatePrompt(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Already uploaded {duplicatePrompt?.duplicateIds.length ?? 0} of these photos
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {duplicatePrompt && duplicatePrompt.newCount > 0
+                ? `${duplicatePrompt.duplicateIds.length} files match photos already in this gallery, and ${duplicatePrompt.newCount} are new. Skip the duplicates and only upload the new ones, or upload everything anyway (will create duplicate entries)?`
+                : `${duplicatePrompt?.duplicateIds.length ?? 0} files all match photos already in this gallery. Upload them again anyway?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setDuplicatePrompt(null)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleUploadDuplicatesAnyway}>
+              Upload all
+            </Button>
+            <Button onClick={handleSkipDuplicates}>
+              {duplicatePrompt && duplicatePrompt.newCount > 0
+                ? `Skip ${duplicatePrompt.duplicateIds.length}, upload ${duplicatePrompt.newCount} new`
+                : "Skip all duplicates"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

@@ -44,6 +44,14 @@ interface UploadCallbacks {
   onFileComplete?: (index: number, filename: string) => void;
   onFileError?: (index: number, filename: string, error: string) => void;
   onFileRetry?: (index: number, filename: string, retryCount: number) => void;
+  /**
+   * Called every time a batch of gallery_images rows is inserted into
+   * the DB (every ~50 files or so). Lets the consumer kick off AI
+   * processing for those rows immediately, instead of waiting for the
+   * whole batch to finish — important for 2000-photo galleries where
+   * we want editing to start within seconds, not minutes.
+   */
+  onBatchInserted?: (imageIds: string[]) => void;
 }
 
 interface SignedUrlInfo {
@@ -362,10 +370,25 @@ export function useImageUpload() {
             continue;
           }
           const idByFilename = new Map<string, string>();
+          const insertedIds: string[] = [];
           (data || []).forEach((row: any) => {
-            if (row?.filename && row?.id) idByFilename.set(row.filename, row.id);
+            if (row?.filename && row?.id) {
+              idByFilename.set(row.filename, row.id);
+              insertedIds.push(row.id);
+            }
           });
           batch.forEach((b) => b.resolve(idByFilename.get(b.filename) ?? null));
+
+          // Notify the consumer that this batch is now in the DB so it
+          // can immediately start AI processing on these IDs without
+          // waiting for the rest of the upload to finish.
+          if (insertedIds.length > 0) {
+            try {
+              callbacks?.onBatchInserted?.(insertedIds);
+            } catch (err) {
+              console.error("onBatchInserted callback threw:", err);
+            }
+          }
         }
       } finally {
         flushing = false;
