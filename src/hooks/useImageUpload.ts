@@ -141,6 +141,13 @@ export function useImageUpload() {
           "Content-Type": file.type || "image/jpeg",
         };
       },
+      // Our Cloudflare Worker → B2 path returns a plain 200 with an
+      // empty (or text) body, NOT JSON. The default `getResponseData`
+      // tries to JSON.parse the response and logs warnings + can mark
+      // uploads as failed. Override to ignore the response shape — any
+      // 2xx is treated as success and we already know the public URL
+      // from the signed URL we generated.
+      getResponseData: () => ({}),
     });
     uppyRef.current = instance;
     return instance;
