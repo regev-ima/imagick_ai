@@ -434,3 +434,27 @@
 .imagick-uppy-dashboard .uppy-Dashboard-Item {
   border-radius: 10px !important;
 }
+
+/* "browse files" text link inside the empty drop zone — Uppy uses
+ * its own blue here. Force it to our pink. Same for any other link
+ * rendered by Dashboard / StatusBar plugins. */
+.imagick-uppy-dashboard .uppy-Dashboard-browse,
+.imagick-uppy-dashboard .uppy-Dashboard-AddFiles a,
+.imagick-uppy-dashboard a.uppy-c-btn-link,
+.imagick-uppy-dashboard .uppy-StatusBar-actionBtn--retry,
+.imagick-uppy-dashboard .uppy-StatusBar-actionBtn--upload,
+.imagick-uppy-dashboard .uppy-c-btn-link {
+  color: hsl(330 100% 60%) !important;
+}
+.imagick-uppy-dashboard .uppy-Dashboard-browse:hover,
+.imagick-uppy-dashboard .uppy-Dashboard-AddFiles a:hover,
+.imagick-uppy-dashboard .uppy-c-btn-link:hover {
+  color: hsl(330 100% 70%) !important;
+}
+
+/* Override Uppy's --uppy-c-blue (used in many internal accents) so
+ * any element we didn't explicitly target still picks up our pink. */
+.imagick-uppy-dashboard {
+  --uppy-c-blue: hsl(330 100% 60%);
+  --uppy-c-cornflower-blue: hsl(330 100% 60%);
+}
