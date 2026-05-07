@@ -389,7 +389,34 @@ export default function CreateGalleryPage() {
       // 3. Upload images via Uppy. Files are already in Uppy state — we
       // don't pass them again. Uppy Dashboard renders progress per file
       // on its own, so no per-file callbacks needed.
-      const imageIds = await uploadImages(gallery.id, user.id);
+      //
+      // We stream completed batches into AI processing as they finish,
+      // so editing starts within seconds of the first photos uploading
+      // (instead of waiting for the entire 2000-photo upload to drain).
+      const streamedProcessedIds = new Set<string>();
+      const imageIds = await uploadImages(gallery.id, user.id, undefined, {
+        onBatchInserted: (newIds) => {
+          if (selectedStyles.length === 0 || newIds.length === 0) return;
+          const fresh = newIds.filter((id) => !streamedProcessedIds.has(id));
+          if (fresh.length === 0) return;
+          fresh.forEach((id) => streamedProcessedIds.add(id));
+
+          // Mark the batch as processing and kick off the AI editor.
+          // Fire-and-forget — failures are reported by the edge fn.
+          (async () => {
+            try {
+              await supabase
+                .from("gallery_images")
+                .update({ status: "processing" })
+                .in("id", fresh)
+                .eq("status", "uploading");
+              processImages(gallery.id, fresh, selectedStyles);
+            } catch (err) {
+              console.error("Streaming processImages batch failed:", err);
+            }
+          })();
+        },
+      });
 
       // 4. Get the first image URL for hero
       let heroImageUrl: string | null = null;
@@ -434,18 +461,18 @@ export default function CreateGalleryPage() {
         }).catch(err => console.error("Failed to send upload complete email:", err));
       }
 
-      // 7. Start AI processing if styles are selected
+      // 7. Start AI processing for any IDs that weren't already streamed
       if (selectedStyles.length > 0 && imageIds.length > 0) {
-        // Safety net: move uploaded images to "processing" before calling edge function
-        // so they are visible to chain recovery even if processImages() fails
-        await supabase
-          .from("gallery_images")
-          .update({ status: "processing" })
-          .in("id", imageIds)
-          .eq("status", "uploading");
-
+        const remaining = imageIds.filter((id) => !streamedProcessedIds.has(id));
+        if (remaining.length > 0) {
+          await supabase
+            .from("gallery_images")
+            .update({ status: "processing" })
+            .in("id", remaining)
+            .eq("status", "uploading");
+          processImages(gallery.id, remaining, selectedStyles);
+        }
         toast.success("Gallery created! AI processing started...");
-        processImages(gallery.id, imageIds, selectedStyles);
       } else {
         // Update images to ready if no styles selected
         await supabase
