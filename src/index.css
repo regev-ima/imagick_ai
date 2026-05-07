@@ -382,15 +382,55 @@
   animation: neon-pulse 1.5s ease-in-out infinite;
 }
 
-/* ── Uppy Dashboard overrides ─────────────────────────────────────────
- * Uppy's inline Dashboard caps its inner panel width which causes the
- * file grid to leave a gap on wide screens. Force it to fill the
- * container (matches the imagick form layout).
+/* ── Uppy Dashboard — imagick.ai theming ──────────────────────────────
+ * Match the rest of the app's pink-on-dark visual language:
+ *   - rounded-xl (12px) outer corners, like our cards
+ *   - dashed pink border at 30% opacity, like our previous custom
+ *     drop zone
+ *   - pink accents on buttons / progress / focus rings
+ *   - full-width grid (Uppy's default leaves a gap on wide screens)
  */
+.imagick-uppy-dashboard .uppy-Dashboard {
+  width: 100% !important;
+}
 .imagick-uppy-dashboard .uppy-Dashboard-inner {
   max-width: 100% !important;
   width: 100% !important;
+  border-radius: 12px !important;
+  border: 2px dashed hsl(330 100% 60% / 0.30) !important;
+  background: hsl(330 100% 60% / 0.04) !important;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
-.imagick-uppy-dashboard .uppy-Dashboard {
-  width: 100% !important;
+.imagick-uppy-dashboard .uppy-Dashboard-inner:hover,
+.imagick-uppy-dashboard .uppy-Dashboard--isDraggingOver .uppy-Dashboard-inner {
+  border-color: hsl(330 100% 60% / 0.60) !important;
+  background: hsl(330 100% 60% / 0.08) !important;
+}
+
+/* Solid pink primary buttons (browse files, retry-all, etc.) */
+.imagick-uppy-dashboard .uppy-c-btn-primary,
+.imagick-uppy-dashboard .uppy-DashboardContent-addMore {
+  background-color: hsl(330 100% 60%) !important;
+  color: white !important;
+  border-radius: 8px !important;
+}
+.imagick-uppy-dashboard .uppy-c-btn-primary:hover,
+.imagick-uppy-dashboard .uppy-DashboardContent-addMore:hover {
+  background-color: hsl(330 100% 55%) !important;
+}
+
+/* Pink focus rings everywhere */
+.imagick-uppy-dashboard *:focus-visible {
+  outline-color: hsl(330 100% 60%) !important;
+}
+
+/* Status / progress bar accent */
+.imagick-uppy-dashboard .uppy-StatusBar.is-uploading,
+.imagick-uppy-dashboard .uppy-StatusBar-progress {
+  background-color: hsl(330 100% 60%) !important;
+}
+
+/* Per-file thumbnail tiles — slightly rounded to match our cards */
+.imagick-uppy-dashboard .uppy-Dashboard-Item {
+  border-radius: 10px !important;
 }
