@@ -92,16 +92,21 @@ export function UppyUploadArea({
       // CSS overrides to align Dashboard's dark theme with our pink
       // brand accent (--primary in tailwind config). These cascade into
       // the Dashboard's shadow DOM via Uppy's CSS variables.
-      className="imagick-uppy-dashboard w-full"
+      // Note: we deliberately do NOT dim the area while uploading.
+      // Uppy disables its own controls during upload internally;
+      // dimming the wrapper used to put a dark veil over the file
+      // grid that blocked clicks (the user could not retry / remove
+      // a failed file).
+      className="imagick-uppy-dashboard w-full max-w-none"
       style={
         {
           "--uppy-c-primary": "#e85c9b",
           "--uppy-c-primary-light": "#ff7bbd",
           width: "100%",
-          ...(disabled ? { pointerEvents: "none", opacity: 0.6 } : {}),
         } as React.CSSProperties
       }
       ref={targetRef}
+      aria-disabled={disabled || undefined}
     />
   );
 }

@@ -381,3 +381,16 @@
 .animate-neon-pulse {
   animation: neon-pulse 1.5s ease-in-out infinite;
 }
+
+/* ── Uppy Dashboard overrides ─────────────────────────────────────────
+ * Uppy's inline Dashboard caps its inner panel width which causes the
+ * file grid to leave a gap on wide screens. Force it to fill the
+ * container (matches the imagick form layout).
+ */
+.imagick-uppy-dashboard .uppy-Dashboard-inner {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+.imagick-uppy-dashboard .uppy-Dashboard {
+  width: 100% !important;
+}
