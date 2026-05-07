@@ -118,7 +118,20 @@ export function useImageUpload() {
       method: "PUT",
       formData: false, // raw body = the file, not multipart/form-data
       limit: CONCURRENT_UPLOADS,
+      // Default timeout is 30s, which kills any single PUT that takes
+      // longer than that — and a 13 MB JPEG over a slow connection,
+      // forwarded by the Cloudflare Worker to B2, regularly takes
+      // 30-60s. RAW files at 50 MB can take several minutes. Bumped to
+      // 10 minutes so legitimate uploads have enough room.
+      timeout: 10 * 60 * 1000,
       retryDelays: [1000, 2000, 4000, 8000, 16000],
+      // Retry network errors AND 5xx — the default only retries 5xx,
+      // so a transient 408/timeout from the Worker would fail
+      // immediately. Network errors (no response) are passed as null.
+      shouldRetry: (response) => {
+        if (!response) return true;
+        return response.status >= 408 && response.status !== 401 && response.status !== 403;
+      },
       // Per-file headers — the actual B2 signed URL goes here so the
       // Cloudflare Worker can forward to the right object.
       headers: (file) => {
