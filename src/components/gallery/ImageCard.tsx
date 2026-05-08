@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, memo } from "react";
 import { motion } from "framer-motion";
 import { Check, ZoomIn, Star, Heart, Loader2, Upload, AlertTriangle, Clock, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -44,7 +44,7 @@ interface ImageCardProps {
 
 const MAX_RETRY_DELAY = 10000;
 
-export function ImageCard({
+function ImageCardImpl({
   image,
   index,
   thumbnailUrl,
@@ -86,7 +86,9 @@ export function ImageCard({
     };
   }, []);
 
-  // IntersectionObserver: only load image when card enters viewport (+ 200px margin)
+  // IntersectionObserver: only load image when card enters viewport.
+  // Larger rootMargin (1000px) so fast scrolls don't outrun the
+  // image fetches and leave the user staring at empty placeholders.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -97,7 +99,7 @@ export function ImageCard({
           observer.unobserve(el);
         }
       },
-      { rootMargin: "200px" }
+      { rootMargin: "1000px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -214,6 +216,9 @@ export function ImageCard({
             <img
               src={currentSrc}
               alt={image.filename}
+              loading="lazy"
+              decoding="async"
+              fetchPriority="low"
               className={cn(
                 "object-cover transition-transform duration-500 group-hover:scale-[1.03]",
                 viewMode === "grid" ? "w-full aspect-square" : "h-full w-full"
@@ -372,3 +377,39 @@ export function ImageCard({
     </div>
   );
 }
+
+/**
+ * Wrapped in React.memo so a state change in the parent (selection,
+ * filter, hover etc.) doesn't re-render all 3000 cards. The custom
+ * comparator only triggers a re-render when something this card
+ * actually displays changes — image identity, status, selection,
+ * thumbnail URL, computed dimensions, processing info.
+ */
+export const ImageCard = memo(ImageCardImpl, (prev, next) => {
+  if (prev.image !== next.image) {
+    if (
+      prev.image.id !== next.image.id ||
+      prev.image.is_hero !== next.image.is_hero ||
+      prev.image.is_liked !== next.image.is_liked ||
+      prev.image.ai_rating !== next.image.ai_rating ||
+      prev.image.culling_score !== next.image.culling_score
+    ) {
+      return false;
+    }
+  }
+  if (
+    prev.thumbnailUrl !== next.thumbnailUrl ||
+    prev.viewMode !== next.viewMode ||
+    prev.isSelected !== next.isSelected ||
+    prev.computedWidth !== next.computedWidth ||
+    prev.computedHeight !== next.computedHeight ||
+    prev.status !== next.status ||
+    prev.index !== next.index
+  ) {
+    return false;
+  }
+  // Callback identity changes are fine — they're stable from
+  // useCallback in the parent. Skip them in the comparison so we
+  // don't churn on referential equality for callbacks.
+  return true;
+});
