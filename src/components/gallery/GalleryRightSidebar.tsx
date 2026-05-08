@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, PanelRightClose, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Sparkles, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
+import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Sparkles, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
@@ -29,7 +29,9 @@ const STYLE_COLORS = [
   "bg-cyan-500",
 ];
 
-type SidebarSection = "styles" | "filter" | "info" | null;
+type AccordionId = "styles" | "filter" | "info";
+
+const SIDEBAR_OPEN_STATE_KEY = "imagick.gallery-sidebar-open-sections";
 
 interface GalleryRightSidebarProps {
   // Applied Styles
@@ -132,8 +134,17 @@ export function GalleryRightSidebar({
   className,
   isMobileSheet,
 }: GalleryRightSidebarProps) {
-  const [activeSection, setActiveSection] = useState<SidebarSection>(null);
-
+  // Persist accordion open state + collapsed mode across reloads.
+  const [openSections, setOpenSections] = useState<Set<AccordionId>>(() => {
+    if (typeof window === "undefined") return new Set(["styles", "filter"]);
+    try {
+      const raw = window.localStorage.getItem(SIDEBAR_OPEN_STATE_KEY);
+      if (!raw) return new Set(["styles", "filter"]);
+      return new Set(JSON.parse(raw) as AccordionId[]);
+    } catch {
+      return new Set(["styles", "filter"]);
+    }
+  });
   const totalCullingImages = Object.values(cullingCounts).reduce((a, b) => a + b, 0);
 
   const allStyles = [
@@ -141,11 +152,33 @@ export function GalleryRightSidebar({
     ...availableStyles,
   ];
 
-  const toggleSection = (section: SidebarSection) => {
-    setActiveSection(prev => (prev === section ? null : section));
+  const toggleAccordion = (id: AccordionId) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        window.localStorage.setItem(SIDEBAR_OPEN_STATE_KEY, JSON.stringify(Array.from(next)));
+      } catch {
+        /* ignore storage errors */
+      }
+      return next;
+    });
   };
 
-  const isExpanded = activeSection !== null;
+  // Count discrete filters that are non-default. Used for the badge
+  // on the FILTER section header so the user can see at a glance that
+  // some filters are restricting the grid even when the section is
+  // collapsed.
+  const activeFilterCount = filters
+    ? (filters.selectedRatings.length > 0 ? 1 : 0) +
+      (filters.minRating > 0 ? 1 : 0) +
+      (filters.showLikedOnly ? 1 : 0) +
+      (filters.showHeroOnly ? 1 : 0) +
+      (filters.selectedTags.length > 0 ? 1 : 0) +
+      (filters.selectedLabels.length > 0 ? 1 : 0) +
+      (filters.groupingLevel !== "none" ? 1 : 0)
+    : 0;
 
   // In mobile sheet mode, always show expanded content
   if (isMobileSheet) {
@@ -213,40 +246,45 @@ export function GalleryRightSidebar({
     );
   }
 
+  // Always-expanded sidebar with stacked accordion sections. Power-
+  // user collapse-to-icons mode was removed because the user reported
+  // bare icons aren't intuitive — every action button needs a label.
   return (
     <div
       className={cn(
-        "shrink-0 border-l border-border/50 glass-card flex transition-all duration-200 h-full",
-        isExpanded ? "w-[280px]" : "w-12",
-        className
+        "shrink-0 border-l border-border/50 glass-card flex flex-col w-[300px] h-full",
+        className,
       )}
     >
-      {/* Expanded Panel Content */}
-      {isExpanded && (
-        <ScrollArea className="flex-1 min-w-0">
-          <div className="p-3">
-            {/* Close button */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {activeSection === "styles" && "Styles"}
-                {activeSection === "filter" && "Filters"}
-                {activeSection === "info" && "Gallery Info"}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-6 h-6"
-                onClick={() => setActiveSection(null)}
-              >
-                <X className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-            <Separator className="mb-3" />
+      {/* Header */}
+      <div className="flex items-center px-3 py-2 border-b border-border/30 shrink-0">
+        <span className="text-sm font-semibold text-foreground">Gallery</span>
+      </div>
 
-            {activeSection === "styles" && (
-              <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} />
-            )}
-            {activeSection === "filter" && filters && onFiltersChange && (
+      <ScrollArea className="flex-1 min-w-0">
+        <div className="p-3 space-y-3">
+          {/* ── VIEW: Styles ── */}
+          <SidebarSection
+            title="View"
+            id="styles"
+            icon={<Layers className="w-3.5 h-3.5" />}
+            badge={selectedStyle !== "original" ? "1" : undefined}
+            isOpen={openSections.has("styles")}
+            onToggle={() => toggleAccordion("styles")}
+          >
+            <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} />
+          </SidebarSection>
+
+          {/* ── FILTER ── */}
+          {filters && onFiltersChange && (
+            <SidebarSection
+              title="Filter"
+              id="filter"
+              icon={<Filter className="w-3.5 h-3.5" />}
+              badge={activeFilterCount > 0 ? String(activeFilterCount) : undefined}
+              isOpen={openSections.has("filter")}
+              onToggle={() => toggleAccordion("filter")}
+            >
               <UnifiedFilterPanel
                 hasCullingData={hasCullingData}
                 cullingCounts={cullingCounts}
@@ -263,103 +301,160 @@ export function GalleryRightSidebar({
                 onRunCulling={onRunCulling}
                 onToggleLikedFilter={onToggleLikedFilter}
               />
-            )}
-            {activeSection === "info" && galleryTimingData && (
+            </SidebarSection>
+          )}
+
+          {/* ── INFO (admin only) ── */}
+          {canViewAnalytics && galleryTimingData && (
+            <SidebarSection
+              title="Info"
+              id="info"
+              icon={<Info className="w-3.5 h-3.5" />}
+              isOpen={openSections.has("info")}
+              onToggle={() => toggleAccordion("info")}
+            >
               <GalleryInfoPanel data={galleryTimingData} processingStats={processingStats} />
-            )}
-          </div>
-        </ScrollArea>
-      )}
+            </SidebarSection>
+          )}
+        </div>
+      </ScrollArea>
 
-      {/* Icon Toolbar Strip */}
-      <div className="w-12 shrink-0 flex flex-col items-center py-2 gap-1 border-l border-border/30">
-        <TooltipProvider delayDuration={300}>
-          {/* Section toggles */}
-          <ToolbarIconButton
-            icon={<Layers className="w-4 h-4" />}
-            label="Applied Styles"
-            isActive={activeSection === "styles"}
-            onClick={() => toggleSection("styles")}
-          />
-
-          <Separator className="my-1.5 w-6" />
-
-          <ToolbarIconButton
-            icon={<Filter className="w-4 h-4" />}
-            label="Filters"
-            isActive={activeSection === "filter" || hasActiveFilters || isLikedFilterActive}
-            onClick={() => toggleSection("filter")}
-          />
-
-          <Separator className="my-1.5 w-6" />
-
-          {/* Action buttons */}
+      {/* ── ACTIONS: pinned bottom strip ─────────────────────────────
+          Labelled buttons in a 2-column grid so users can read what
+          each one does (the previous icon-only strip was the main
+          'not intuitive' complaint). Grouped by purpose:
+          – content management: Add, AI Cull, Faces
+          – delivery: Share, Download
+          – admin: Settings
+        */}
+      <div className="border-t border-border/30 p-3 space-y-2 shrink-0">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
+          Actions
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
           {onAddImages && (
-            <ToolbarIconButton
-              icon={<Images className="w-4 h-4" />}
-              label="Add Images"
-              onClick={onAddImages}
-            />
+            <ActionButton icon={<Images className="w-3.5 h-3.5" />} label="Add photos" onClick={onAddImages} />
           )}
           {onRunCulling && (
-            <ToolbarIconButton
-              icon={isCullingRunning ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : isCullingStuck ? <Wand2 className="w-4 h-4 text-orange-500" /> : <Wand2 className="w-4 h-4" />}
-              label={isCullingStuck ? "Culling seems stuck — click to retry" : isCullingRunning ? "AI Culling in progress... will complete in a few minutes" : "Run AI Culling"}
+            <ActionButton
+              icon={
+                isCullingRunning ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : isCullingStuck ? (
+                  <Wand2 className="w-3.5 h-3.5 text-orange-500" />
+                ) : (
+                  <Wand2 className="w-3.5 h-3.5" />
+                )
+              }
+              label="AI Culling"
               onClick={onRunCulling}
               disabled={isCullingRunning}
             />
           )}
           {onOpenFaceSearch && (
-            <ToolbarIconButton
-              icon={faceSearchStatus === "processing" ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : faceSearchStatus === "completed" ? <ScanFace className="w-4 h-4 text-green-500" /> : <ScanFace className="w-4 h-4" />}
-              label={faceSearchStatus === "processing" ? "Face detection in progress..." : faceSearchStatus === "completed" ? "View detected faces" : "Face Search"}
+            <ActionButton
+              icon={
+                faceSearchStatus === "processing" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : faceSearchStatus === "completed" ? (
+                  <ScanFace className="w-3.5 h-3.5 text-green-500" />
+                ) : (
+                  <ScanFace className="w-3.5 h-3.5" />
+                )
+              }
+              label="Faces"
               onClick={onOpenFaceSearch}
             />
           )}
           {onShare && (
-            <ToolbarIconButton
-              icon={<Share2 className="w-4 h-4" />}
-              label="Share Gallery"
-              onClick={onShare}
-            />
+            <ActionButton icon={<Share2 className="w-3.5 h-3.5" />} label="Share" onClick={onShare} />
           )}
           {onDownload && (
-            <ToolbarIconButton
-              icon={<Download className="w-4 h-4" />}
-              label="Download Gallery"
-              onClick={onDownload}
-            />
+            <ActionButton icon={<Download className="w-3.5 h-3.5" />} label="Download" onClick={onDownload} />
           )}
           {onOpenSettings && (
-            <ToolbarIconButton
-              icon={<Settings className="w-4 h-4" />}
-              label="Gallery Settings"
-              onClick={onOpenSettings}
-            />
+            <ActionButton icon={<Settings className="w-3.5 h-3.5" />} label="Settings" onClick={onOpenSettings} />
           )}
-          {canViewAnalytics && galleryTimingData && (
-            <ToolbarIconButton
-              icon={<Info className="w-4 h-4" />}
-              label="Gallery Info"
-              isActive={activeSection === "info"}
-              onClick={() => toggleSection("info")}
-            />
-          )}
-
-          {/* Collapse button - only when expanded */}
-          {isExpanded && (
-            <>
-              <Separator className="my-1.5 w-6" />
-              <ToolbarIconButton
-                icon={<PanelRightClose className="w-4 h-4" />}
-                label="Collapse Sidebar"
-                onClick={() => setActiveSection(null)}
-              />
-            </>
-          )}
-        </TooltipProvider>
+        </div>
       </div>
     </div>
+  );
+}
+
+/* ── Accordion-style section with header chevron + badge ─────────── */
+function SidebarSection({
+  title,
+  icon,
+  badge,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  id: AccordionId;
+  icon: React.ReactNode;
+  badge?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border/30 bg-muted/20 overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/40 transition-colors"
+        aria-expanded={isOpen}
+      >
+        <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {icon}
+          {title}
+          {badge && (
+            <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-none">
+              {badge}
+            </span>
+          )}
+        </span>
+        <span
+          className={cn(
+            "text-muted-foreground transition-transform duration-150",
+            isOpen ? "rotate-180" : "rotate-0",
+          )}
+          aria-hidden
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </button>
+      {isOpen && <div className="px-3 pb-3 pt-1">{children}</div>}
+    </div>
+  );
+}
+
+/* ── Action button (icon + label, in 2-col grid at bottom) ───────── */
+function ActionButton({
+  icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-9 justify-start gap-2 text-xs font-medium px-2.5"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+    </Button>
   );
 }
 
