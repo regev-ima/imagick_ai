@@ -1178,13 +1178,37 @@ export default function GalleryEditorPage() {
   // Detect stuck culling — threshold scales with gallery size so a
   // 3000-photo gallery isn't called "stuck" before its realistic
   // completion window has even closed. See lib/cullingEta.ts.
+  //
+  // Also: if hasCullingData is already true, the run actually finished
+  // (we have ratings + labels in the rows) and the only thing wrong
+  // is the gallery.culling_status flag — so we don't show "stuck"
+  // even though the timer is past the threshold.
   const isCullingStuck = useMemo(() => {
     if (gallery?.culling_status !== "processing") return false;
+    if (hasCullingData) return false;
     const startedAt = gallery?.culling_started_at;
     if (!startedAt) return true; // legacy, pre-migration
     const elapsed = Date.now() - new Date(startedAt).getTime();
     return elapsed > stuckThresholdMs(images.length);
-  }, [gallery?.culling_status, gallery?.culling_started_at, images.length]);
+  }, [gallery?.culling_status, gallery?.culling_started_at, images.length, hasCullingData]);
+
+  // Self-healing: when culling data is present but the gallery row
+  // still says culling_status='processing' (the webhook missed an
+  // update), patch it to 'ready' so the banner clears for everyone
+  // who opens the gallery, not just this user. Runs once per render
+  // when the inconsistency is detected.
+  useEffect(() => {
+    if (!gallery?.id) return;
+    if (gallery.culling_status === "processing" && hasCullingData) {
+      supabase
+        .from("galleries")
+        .update({ culling_status: "ready" } as any)
+        .eq("id", gallery.id)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["gallery", id] });
+        });
+    }
+  }, [gallery?.id, gallery?.culling_status, hasCullingData, id, queryClient]);
 
   // AI Culling mutation - calls the start-grouping function
   const runAICulling = useMutation({
@@ -1913,6 +1937,7 @@ export default function GalleryEditorPage() {
             startedAt={gallery?.culling_started_at as string | null | undefined}
             imageCount={images.length}
             isStuck={isCullingStuck}
+            hasCullingData={hasCullingData}
           />
         </div>
         <div className="p-4 lg:p-6">

@@ -12,6 +12,10 @@ interface CullingStatusBannerProps {
   imageCount?: number;
   /** Pre-computed stuck flag from the page (matches the gallery's image count). */
   isStuck?: boolean;
+  /** True when culling DATA already exists on the rows (ratings, labels).
+   *  When set we never show the banner — the run actually finished even
+   *  if gallery.culling_status was never updated by the webhook. */
+  hasCullingData?: boolean;
   className?: string;
 }
 
@@ -34,6 +38,7 @@ export function CullingStatusBanner({
   startedAt,
   imageCount = 0,
   isStuck = false,
+  hasCullingData = false,
   className,
 }: CullingStatusBannerProps) {
   // Tick once a minute so the elapsed-time text stays current.
@@ -45,6 +50,10 @@ export function CullingStatusBanner({
   }, [status]);
 
   if (status !== "processing") return null;
+  // The data has already landed but the webhook didn't flip the
+  // status flag — don't show "in progress" for a run that's actually
+  // finished. The page-level self-healer will repair the row.
+  if (hasCullingData) return null;
 
   const elapsedMs = startedAt ? now - new Date(startedAt).getTime() : 0;
   const elapsedMinutes = Math.max(0, Math.floor(elapsedMs / 60_000));
