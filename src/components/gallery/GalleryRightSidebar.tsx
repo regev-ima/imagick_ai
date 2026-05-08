@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, PanelRightClose, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Sparkles, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
+import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Sparkles, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
@@ -32,7 +32,6 @@ const STYLE_COLORS = [
 type AccordionId = "styles" | "filter" | "info";
 
 const SIDEBAR_OPEN_STATE_KEY = "imagick.gallery-sidebar-open-sections";
-const SIDEBAR_COLLAPSED_KEY = "imagick.gallery-sidebar-collapsed";
 
 interface GalleryRightSidebarProps {
   // Applied Styles
@@ -146,11 +145,6 @@ export function GalleryRightSidebar({
       return new Set(["styles", "filter"]);
     }
   });
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
-  });
-
   const totalCullingImages = Object.values(cullingCounts).reduce((a, b) => a + b, 0);
 
   const allStyles = [
@@ -165,18 +159,6 @@ export function GalleryRightSidebar({
       else next.add(id);
       try {
         window.localStorage.setItem(SIDEBAR_OPEN_STATE_KEY, JSON.stringify(Array.from(next)));
-      } catch {
-        /* ignore storage errors */
-      }
-      return next;
-    });
-  };
-
-  const toggleCollapsed = () => {
-    setIsCollapsed((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
       } catch {
         /* ignore storage errors */
       }
@@ -264,84 +246,19 @@ export function GalleryRightSidebar({
     );
   }
 
-  // ── Collapsed mode: a slim icon strip for power users ─────────────
-  if (isCollapsed) {
-    return (
-      <div
-        className={cn(
-          "shrink-0 border-l border-border/50 glass-card flex flex-col items-center py-2 gap-1 transition-[width] duration-200 w-12 h-full",
-          className,
-        )}
-      >
-        <TooltipProvider delayDuration={300}>
-          <ToolbarIconButton
-            icon={<PanelRightClose className="w-4 h-4 rotate-180" />}
-            label="Expand sidebar"
-            onClick={toggleCollapsed}
-          />
-          <Separator className="my-1.5 w-6" />
-          {onAddImages && (
-            <ToolbarIconButton icon={<Images className="w-4 h-4" />} label="Add photos" onClick={onAddImages} />
-          )}
-          {onRunCulling && (
-            <ToolbarIconButton
-              icon={
-                isCullingRunning ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                ) : isCullingStuck ? (
-                  <Wand2 className="w-4 h-4 text-orange-500" />
-                ) : (
-                  <Wand2 className="w-4 h-4" />
-                )
-              }
-              label="AI Culling"
-              onClick={onRunCulling}
-              disabled={isCullingRunning}
-            />
-          )}
-          {onOpenFaceSearch && (
-            <ToolbarIconButton
-              icon={
-                faceSearchStatus === "processing" ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                ) : (
-                  <ScanFace className="w-4 h-4" />
-                )
-              }
-              label="Face search"
-              onClick={onOpenFaceSearch}
-            />
-          )}
-          {onShare && <ToolbarIconButton icon={<Share2 className="w-4 h-4" />} label="Share" onClick={onShare} />}
-          {onDownload && (
-            <ToolbarIconButton icon={<Download className="w-4 h-4" />} label="Download" onClick={onDownload} />
-          )}
-          {onOpenSettings && (
-            <ToolbarIconButton icon={<Settings className="w-4 h-4" />} label="Settings" onClick={onOpenSettings} />
-          )}
-        </TooltipProvider>
-      </div>
-    );
-  }
-
-  // ── Default mode: always-expanded with stacked accordion sections ──
+  // Always-expanded sidebar with stacked accordion sections. Power-
+  // user collapse-to-icons mode was removed because the user reported
+  // bare icons aren't intuitive — every action button needs a label.
   return (
     <div
       className={cn(
-        "shrink-0 border-l border-border/50 glass-card flex flex-col transition-[width] duration-200 w-[300px] h-full",
+        "shrink-0 border-l border-border/50 glass-card flex flex-col w-[300px] h-full",
         className,
       )}
     >
-      {/* Header: title + collapse button */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border/30 shrink-0">
+      {/* Header */}
+      <div className="flex items-center px-3 py-2 border-b border-border/30 shrink-0">
         <span className="text-sm font-semibold text-foreground">Gallery</span>
-        <TooltipProvider delayDuration={300}>
-          <ToolbarIconButton
-            icon={<PanelRightClose className="w-4 h-4" />}
-            label="Collapse to icons"
-            onClick={toggleCollapsed}
-          />
-        </TooltipProvider>
       </div>
 
       <ScrollArea className="flex-1 min-w-0">
