@@ -87,6 +87,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useEffectiveUser } from "@/hooks/useImpersonation";
 import { useImageProcessing } from "@/hooks/useImageProcessing";
 import { getThumbnailUrl, getPreviewUrl, getEditedThumbnailUrl, getEditedPreviewUrl } from "@/lib/imageUrls";
+import { stuckThresholdMs } from "@/lib/cullingEta";
 import { useJustifiedLayout, computeJustifiedLayout } from "@/hooks/useJustifiedLayout";
 import { useImageDimensions } from "@/hooks/useImageDimensions";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -1174,14 +1175,16 @@ export default function GalleryEditorPage() {
     }
   });
 
-  // Detect stuck culling: processing but started_at is null or >10 min ago
+  // Detect stuck culling — threshold scales with gallery size so a
+  // 3000-photo gallery isn't called "stuck" before its realistic
+  // completion window has even closed. See lib/cullingEta.ts.
   const isCullingStuck = useMemo(() => {
     if (gallery?.culling_status !== "processing") return false;
     const startedAt = gallery?.culling_started_at;
     if (!startedAt) return true; // legacy, pre-migration
     const elapsed = Date.now() - new Date(startedAt).getTime();
-    return elapsed > 20 * 60 * 1000; // 20 minutes
-  }, [gallery?.culling_status, gallery?.culling_started_at]);
+    return elapsed > stuckThresholdMs(images.length);
+  }, [gallery?.culling_status, gallery?.culling_started_at, images.length]);
 
   // AI Culling mutation - calls the start-grouping function
   const runAICulling = useMutation({
@@ -1908,6 +1911,7 @@ export default function GalleryEditorPage() {
           <CullingStatusBanner
             status={gallery?.culling_status}
             startedAt={gallery?.culling_started_at as string | null | undefined}
+            imageCount={images.length}
             isStuck={isCullingStuck}
           />
         </div>
@@ -2969,6 +2973,8 @@ export default function GalleryEditorPage() {
             isCullingStuck={isCullingStuck}
             galleryType={gallery?.gallery_type}
             cullingStartedAt={gallery?.culling_started_at as string | null | undefined}
+            cullingCompletedAt={gallery?.culling_completed_at as string | null | undefined}
+            uploadCompletedAt={gallery?.upload_completed_at as string | null | undefined}
             hasCompletedCulling={hasCullingData}
           />
         )}

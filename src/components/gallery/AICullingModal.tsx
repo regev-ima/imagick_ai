@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
+import { estimateCullingMs, formatDuration } from "@/lib/cullingEta";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -35,6 +36,13 @@ interface AICullingModalProps {
    *  and we don't want a single accidental click to wipe an hour of
    *  the photographer's manual review. */
   hasCompletedCulling?: boolean;
+  /** ISO of when the last culling run finished. */
+  cullingCompletedAt?: string | null;
+  /** ISO of when the last upload batch finished. We compare this to
+   *  cullingCompletedAt to know if the user has added more images
+   *  since the last culling — if not, re-running is almost always a
+   *  no-op and we steer them away from it. */
+  uploadCompletedAt?: string | null;
 }
 
 export function AICullingModal({
@@ -49,6 +57,8 @@ export function AICullingModal({
   galleryType,
   cullingStartedAt = null,
   hasCompletedCulling = false,
+  cullingCompletedAt = null,
+  uploadCompletedAt = null,
 }: AICullingModalProps) {
   const { user } = useAuth();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -83,6 +93,19 @@ export function AICullingModal({
   // currently re-running. While processing the button is disabled
   // anyway. Stuck / fresh galleries don't need the extra confirmation.
   const requireRerunAck = hasCompletedCulling && !isCurrentlyRunning;
+
+  // Detect "nothing changed since last culling": last upload batch
+  // completed before the last culling completion. Re-running in this
+  // state would just produce the same ratings, so we hint to the user
+  // they probably don't need to do this.
+  const noNewImagesSinceCulling =
+    !!cullingCompletedAt &&
+    (!uploadCompletedAt || new Date(uploadCompletedAt).getTime() <= new Date(cullingCompletedAt).getTime());
+
+  // Estimated wall-clock for this run, shown next to the button so
+  // users know what to expect ("up to ~3 min for 2,000 photos").
+  const etaMs = useMemo(() => estimateCullingMs(imageCount), [imageCount]);
+  const etaText = formatDuration(etaMs);
 
   // Fetch user's preferred language
   useEffect(() => {
@@ -358,8 +381,30 @@ export function AICullingModal({
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {elapsedText && <>Elapsed: <span className="text-foreground font-medium">{elapsedText}</span>. </>}
-                  Typically 5-10 minutes for ~1000 photos. You can close this dialog —
+                  Estimated total <span className="text-foreground font-medium">{etaText}</span> for{" "}
+                  {imageCount.toLocaleString()} photos. You can close this dialog —
                   we'll update the gallery automatically when it completes.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* "Nothing changed since last culling" hint — appears when
+              the user re-opens the modal on a gallery whose last
+              culling already covered every image currently in it. We
+              don't block them (RAW workflows sometimes want a re-run
+              with different topics), but we steer them away from a
+              wasted run. */}
+          {!isCurrentlyRunning && noNewImagesSinceCulling && (
+            <div className="flex items-start gap-3 p-4 mb-4 rounded-lg border border-border/50 bg-muted/30">
+              <Check className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  No new photos since last culling
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This gallery was already culled and no images have been added since.
+                  Re-running will only refresh the AI ratings — usually you don't need to.
                 </p>
               </div>
             </div>
@@ -386,6 +431,12 @@ export function AICullingModal({
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3">
+            {!isCurrentlyRunning && (
+              <span className="text-xs text-muted-foreground mr-auto">
+                Estimated time: <span className="text-foreground font-medium">~{etaText}</span> for{" "}
+                {imageCount.toLocaleString()} photos
+              </span>
+            )}
             <Button variant="outline" onClick={handleClose}>
               {isCurrentlyRunning ? "Close" : "Cancel"}
             </Button>

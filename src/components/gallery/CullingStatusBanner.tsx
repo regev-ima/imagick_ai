@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { estimateCullingMs, formatDuration } from "@/lib/cullingEta";
 
 interface CullingStatusBannerProps {
   /** Database-backed status — "processing" / "ready" / "idle" / null. */
   status: string | null | undefined;
   /** When the current culling run started, ISO string from DB. */
   startedAt: string | null | undefined;
-  /** True after >20 minutes with no completion — shows a 'looks stuck' hint. */
+  /** Image count so we can compute ETA + the "looks stuck" threshold. */
+  imageCount?: number;
+  /** Pre-computed stuck flag from the page (matches the gallery's image count). */
   isStuck?: boolean;
   className?: string;
 }
@@ -29,6 +32,7 @@ interface CullingStatusBannerProps {
 export function CullingStatusBanner({
   status,
   startedAt,
+  imageCount = 0,
   isStuck = false,
   className,
 }: CullingStatusBannerProps) {
@@ -36,7 +40,7 @@ export function CullingStatusBanner({
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (status !== "processing") return;
-    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    const interval = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(interval);
   }, [status]);
 
@@ -50,6 +54,11 @@ export function CullingStatusBanner({
     elapsedMinutes > 0
       ? `${elapsedMinutes} min ${elapsedSeconds}s elapsed`
       : `${elapsedSeconds}s elapsed`;
+
+  const etaMs = estimateCullingMs(imageCount);
+  const etaText = formatDuration(etaMs);
+  const remainingMs = Math.max(0, etaMs - elapsedMs);
+  const remainingText = remainingMs > 0 ? `~${formatDuration(remainingMs)} remaining` : "wrapping up…";
 
   return (
     <div
@@ -78,14 +87,14 @@ export function CullingStatusBanner({
         <p className="text-sm font-medium">
           {isStuck
             ? "AI Culling looks stuck — you can retry from the sidebar."
-            : "AI Culling in progress…"}
+            : `AI Culling in progress · ${remainingText}`}
         </p>
         <p className="text-xs text-muted-foreground">
           {isStuck ? (
             <>It's been {elapsedText} with no result. Sometimes the API throttles us — restarting usually works.</>
           ) : (
             <>
-              {elapsedText}. Typically completes in 5-10 minutes for ~1000 photos.
+              {elapsedText} · estimated total {etaText} for {imageCount.toLocaleString()} photos.
               You can keep working on other things — we'll update the gallery automatically.
             </>
           )}
