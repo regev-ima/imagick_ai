@@ -256,15 +256,22 @@ export default function GalleryEditorPage() {
       let from = 0;
 
       // Trim the SELECT to columns the editor actually renders. The
-      // gallery_images table has ~30 cols (face_clusters_*, similarity_*,
-      // processing_attempts, etc.) — most aren't needed for the grid.
-      // Cutting the row size by ~3x roughly cuts time-to-first-paint
-      // by ~3x for 3000-photo galleries.
+      // gallery_images table has 30+ cols (full EXIF, sharpness scores,
+      // ai_tags etc.) — most aren't needed for the grid. Cutting the
+      // row size by ~3x roughly cuts time-to-first-paint by ~3x for
+      // 3000-photo galleries.
+      //
+      // IMPORTANT: every name in this list must EXIST on the table.
+      // PR #60 included `processing_completed_at` here by mistake
+      // (that column lives on `galleries`, not `gallery_images`),
+      // which caused the entire SELECT to fail and the gallery to
+      // render as "No images yet" even with 1700+ rows present.
       const GALLERY_COLS = [
         "id",
         "filename",
         "original_url",
         "edited_url",
+        "thumbnail_url",
         "status",
         "is_hero",
         "is_liked",
@@ -276,7 +283,6 @@ export default function GalleryEditorPage() {
         "sort_order",
         "file_size_bytes",
         "last_processing_attempt_at",
-        "processing_completed_at",
         "processing_attempts",
         "last_processing_error",
         "deleted_at",
