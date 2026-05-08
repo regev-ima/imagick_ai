@@ -27,24 +27,62 @@ interface AICullingModalProps {
   cullingStatus?: string;
   isCullingStuck?: boolean;
   galleryType?: string | null;
+  /** ISO timestamp of the in-flight culling run, used for elapsed time display. */
+  cullingStartedAt?: string | null;
+  /** True if this gallery already had a successful culling run.
+   *  When set, we require an explicit confirm-checkbox before
+   *  triggering another one — re-running overwrites ratings & labels
+   *  and we don't want a single accidental click to wipe an hour of
+   *  the photographer's manual review. */
+  hasCompletedCulling?: boolean;
 }
 
-export function AICullingModal({ 
-  isOpen, 
-  onClose, 
+export function AICullingModal({
+  isOpen,
+  onClose,
   onConfirm,
   isProcessing,
   imageCount,
   showCullingRequiredNote,
   cullingStatus = "idle",
   isCullingStuck = false,
-  galleryType
+  galleryType,
+  cullingStartedAt = null,
+  hasCompletedCulling = false,
 }: AICullingModalProps) {
   const { user } = useAuth();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
   const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
   const [languageLoaded, setLanguageLoaded] = useState(false);
+  /** Required check before triggering a re-run that would overwrite
+   *  existing ratings/labels. Reset on every modal open. */
+  const [acknowledgeRerun, setAcknowledgeRerun] = useState(false);
+  /** Tick every minute so elapsed-time text stays current while the
+   *  modal is open during a run. */
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    if (cullingStatus !== "processing") return;
+    const id = setInterval(() => setNowTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [cullingStatus]);
+  // Reset the re-run acknowledgement whenever the modal re-opens.
+  useEffect(() => {
+    if (!isOpen) setAcknowledgeRerun(false);
+  }, [isOpen]);
+
+  const isCurrentlyRunning = cullingStatus === "processing" && !isCullingStuck;
+  const elapsedText = useMemo(() => {
+    if (!cullingStartedAt) return "";
+    const elapsedMs = Date.now() - new Date(cullingStartedAt).getTime();
+    const minutes = Math.max(0, Math.floor(elapsedMs / 60_000));
+    const seconds = Math.max(0, Math.floor((elapsedMs / 1000) % 60));
+    return minutes > 0 ? `${minutes} min ${seconds}s` : `${seconds}s`;
+  }, [cullingStartedAt, cullingStatus]);
+  // The re-run guard only applies AFTER a successful run AND when not
+  // currently re-running. While processing the button is disabled
+  // anyway. Stuck / fresh galleries don't need the extra confirmation.
+  const requireRerunAck = hasCompletedCulling && !isCurrentlyRunning;
 
   // Fetch user's preferred language
   useEffect(() => {
@@ -304,39 +342,78 @@ export function AICullingModal({
             </div>
           </div>
 
+          {/* In-progress panel — shown ONLY when culling is currently
+              running (status=processing && not stuck). Replaces the
+              action buttons with status info so users can't click
+              'Start' a second time and trigger a duplicate API call. */}
+          {isCurrentlyRunning && (
+            <div className="flex items-start gap-3 p-4 mb-4 rounded-lg border border-primary/30 bg-primary/5">
+              <div className="relative shrink-0 mt-0.5">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                <span className="absolute inset-0 rounded-full bg-primary/30 blur-md -z-10" aria-hidden />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  AI Culling already in progress
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {elapsedText && <>Elapsed: <span className="text-foreground font-medium">{elapsedText}</span>. </>}
+                  Typically 5-10 minutes for ~1000 photos. You can close this dialog —
+                  we'll update the gallery automatically when it completes.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Re-run guard — shown when this gallery has already been
+              culled successfully and we're NOT currently running.
+              Requires an explicit checkbox so a stray double-click
+              never overwrites manual ratings/labels. */}
+          {requireRerunAck && (
+            <label className="flex items-start gap-2.5 p-3 mb-4 rounded-lg border border-orange-500/30 bg-orange-500/5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acknowledgeRerun}
+                onChange={(e) => setAcknowledgeRerun(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded accent-primary"
+              />
+              <span className="text-xs text-foreground/90 leading-relaxed">
+                <span className="font-semibold">Re-running will overwrite the existing AI ratings, categories, and duplicate detection</span>{" "}
+                on this gallery. Manual edits will be reset. Tick to confirm.
+              </span>
+            </label>
+          )}
+
           {/* Actions */}
           <div className="flex items-center justify-end gap-3">
             <Button variant="outline" onClick={handleClose}>
-              Cancel
+              {isCurrentlyRunning ? "Close" : "Cancel"}
             </Button>
-            <Button
-              variant="glow"
-              onClick={handleConfirm}
-              disabled={isProcessing || (cullingStatus === "processing" && !isCullingStuck)}
-              className="gap-2"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Processing...
-                </>
-              ) : cullingStatus === "processing" ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Culling in Progress...
-                </>
-              ) : cullingStatus === "ready" ? (
-                <>
-                  <Wand2 className="w-4 h-4" />
-                  Re-run AI Culling
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-4 h-4" />
-                  Start AI Culling
-                </>
-              )}
-            </Button>
+            {!isCurrentlyRunning && (
+              <Button
+                variant="glow"
+                onClick={handleConfirm}
+                disabled={isProcessing || (requireRerunAck && !acknowledgeRerun)}
+                className="gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : hasCompletedCulling ? (
+                  <>
+                    <Wand2 className="w-4 h-4" />
+                    Re-run AI Culling
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4" />
+                    Start AI Culling
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </Card>
       </motion.div>

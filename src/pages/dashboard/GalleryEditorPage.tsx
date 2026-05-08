@@ -70,6 +70,7 @@ import { ShareGalleryModal } from "@/components/gallery/ShareGalleryModal";
 import { StyleSelector, StyleComparison } from "@/components/gallery/StyleSelector";
 import { ImageCard } from "@/components/gallery/ImageCard";
 import { VirtualizedImageGrid } from "@/components/gallery/VirtualizedImageGrid";
+import { CullingStatusBanner } from "@/components/gallery/CullingStatusBanner";
 import { CatalogModeSelector, CatalogMode } from "@/components/gallery/CatalogModeSelector";
 import { CatalogSection } from "@/components/gallery/CatalogSection";
 import { GroupingView } from "@/components/gallery/GroupingView";
@@ -1899,7 +1900,18 @@ export default function GalleryEditorPage() {
       {/* Main Content Area with Sidebar */}
       <div className="flex-1 flex overflow-hidden">
       {/* Image Grid */}
-      <div ref={scrollContainerRef} className="flex-1 p-4 lg:p-6 min-w-0 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 min-w-0 overflow-y-auto">
+        {/* Persistent culling-status banner — shown only while
+            gallery.culling_status === 'processing'. Sticky so it stays
+            in view when the user scrolls down through 3000 thumbnails. */}
+        <div className="sticky top-0 z-20">
+          <CullingStatusBanner
+            status={gallery?.culling_status}
+            startedAt={gallery?.culling_started_at as string | null | undefined}
+            isStuck={isCullingStuck}
+          />
+        </div>
+        <div className="p-4 lg:p-6">
         {/* Recycle Bin View */}
         {showTrash ? (
           <div className="space-y-4">
@@ -2383,6 +2395,7 @@ export default function GalleryEditorPage() {
         )}
         </>
         )}
+        </div>
       </div>
 
       {/* Right Sidebar - Desktop */}
@@ -2955,6 +2968,8 @@ export default function GalleryEditorPage() {
             cullingStatus={gallery?.culling_status || "idle"}
             isCullingStuck={isCullingStuck}
             galleryType={gallery?.gallery_type}
+            cullingStartedAt={gallery?.culling_started_at as string | null | undefined}
+            hasCompletedCulling={hasCullingData}
           />
         )}
       </AnimatePresence>
