@@ -60,7 +60,11 @@ function ImageCardImpl({
   processingInfo
 }: ImageCardProps) {
   const [isLoaded, setIsLoaded] = useState(false);
+  /** True when the card is within ~1000px of the viewport (prefetch zone). */
   const [isInView, setIsInView] = useState(false);
+  /** True when the card is actually inside the viewport — used to bump
+   *  fetch priority so the browser delivers visible thumbnails first. */
+  const [isActiveViewport, setIsActiveViewport] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [currentSrc, setCurrentSrc] = useState(thumbnailUrl);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -86,23 +90,44 @@ function ImageCardImpl({
     };
   }, []);
 
-  // IntersectionObserver: only load image when card enters viewport.
-  // Larger rootMargin (1000px) so fast scrolls don't outrun the
-  // image fetches and leave the user staring at empty placeholders.
+  // Two IntersectionObservers tier the loading priority:
+  //
+  //   1. Buffer (1000px margin) → render the <img> at low priority.
+  //      Lets the browser prefetch what's coming up while the user
+  //      hasn't actually reached it yet.
+  //
+  //   2. Active viewport (0px margin) → flip the SAME <img> to high
+  //      priority. The browser's HTTP/2 / priority-hints stack will
+  //      reorder its request queue so the user's currently-visible
+  //      thumbnails get served before the speculative prefetches.
+  //
+  // Net effect: when you stop scrolling at row 200, the browser
+  // immediately upgrades row 200's thumbnails over the in-flight
+  // prefetches for rows 201-220.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
+    const buffer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsInView(true);
-          observer.unobserve(el);
+          buffer.unobserve(el);
         }
       },
       { rootMargin: "1000px" }
     );
-    observer.observe(el);
-    return () => observer.disconnect();
+    const active = new IntersectionObserver(
+      ([entry]) => {
+        setIsActiveViewport(entry.isIntersecting);
+      },
+      { rootMargin: "0px", threshold: 0 }
+    );
+    buffer.observe(el);
+    active.observe(el);
+    return () => {
+      buffer.disconnect();
+      active.disconnect();
+    };
   }, []);
 
   const handleImageLoad = useCallback(() => {
@@ -216,9 +241,14 @@ function ImageCardImpl({
             <img
               src={currentSrc}
               alt={image.filename}
-              loading="lazy"
+              loading={isActiveViewport ? "eager" : "lazy"}
               decoding="async"
-              fetchPriority="low"
+              // High priority for currently-visible thumbnails so the
+              // browser serves them ahead of the prefetched ones in
+              // the buffer zone. Browsers (Chrome, Edge, Safari TP)
+              // honour fetchpriority changes on already-in-flight
+              // requests via HTTP/2 priority hints.
+              fetchPriority={isActiveViewport ? "high" : "low"}
               className={cn(
                 "object-cover transition-transform duration-500 group-hover:scale-[1.03]",
                 viewMode === "grid" ? "w-full aspect-square" : "h-full w-full"
@@ -383,7 +413,9 @@ function ImageCardImpl({
  * filter, hover etc.) doesn't re-render all 3000 cards. The custom
  * comparator only triggers a re-render when something this card
  * actually displays changes — image identity, status, selection,
- * thumbnail URL, computed dimensions, processing info.
+ * thumbnail URL, computed dimensions, processing info. Internal
+ * isActiveViewport / isInView state changes drive their own renders
+ * via React's normal hooks flow and aren't compared here.
  */
 export const ImageCard = memo(ImageCardImpl, (prev, next) => {
   if (prev.image !== next.image) {
