@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { cullingScoreToStars } from "@/lib/cullingScore";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { isImageLoaded, markImageLoaded } from "@/lib/loadedImageCache";
 
 const ROW_HEIGHT = 160;
 
@@ -59,9 +60,13 @@ function ImageCardImpl({
   onToggleLike,
   processingInfo
 }: ImageCardProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  // If we've already loaded this exact URL during this session, the
+  // browser has it in its HTTP/decode cache. Skip the fade-in and
+  // mount it as already-loaded so scrolling back feels instant.
+  const wasAlreadyLoaded = isImageLoaded(thumbnailUrl);
+  const [isLoaded, setIsLoaded] = useState(wasAlreadyLoaded);
   /** True when the card is within ~1000px of the viewport (prefetch zone). */
-  const [isInView, setIsInView] = useState(false);
+  const [isInView, setIsInView] = useState(wasAlreadyLoaded);
   /** True when the card is actually inside the viewport — used to bump
    *  fetch priority so the browser delivers visible thumbnails first. */
   const [isActiveViewport, setIsActiveViewport] = useState(false);
@@ -75,7 +80,10 @@ function ImageCardImpl({
   useEffect(() => {
     setRetryCount(0);
     setCurrentSrc(thumbnailUrl);
-    setIsLoaded(false);
+    // If this URL is already in the in-memory cache (we've shown it
+    // before this session) keep isLoaded=true so the user doesn't
+    // see a flash of skeleton when scrolling back.
+    setIsLoaded(isImageLoaded(thumbnailUrl));
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
@@ -90,20 +98,24 @@ function ImageCardImpl({
     };
   }, []);
 
-  // Two IntersectionObservers tier the loading priority:
+  // Two IntersectionObservers tier the loading behaviour:
   //
-  //   1. Buffer (1000px margin) → render the <img> at low priority.
-  //      Lets the browser prefetch what's coming up while the user
-  //      hasn't actually reached it yet.
+  //   1. Buffer (1500px margin) → render the <img> at low priority.
+  //      When the card scrolls OUT of the buffer we tear the <img>
+  //      down which cancels any in-flight network request for it
+  //      (browsers cancel pending image fetches on element removal).
+  //      Without this, fast scrolling across 100s of cards leaves
+  //      hundreds of stale fetches stuck behind the connection cap,
+  //      starving the cards the user actually wants to see.
   //
   //   2. Active viewport (0px margin) → flip the SAME <img> to high
   //      priority. The browser's HTTP/2 / priority-hints stack will
   //      reorder its request queue so the user's currently-visible
   //      thumbnails get served before the speculative prefetches.
   //
-  // Net effect: when you stop scrolling at row 200, the browser
-  // immediately upgrades row 200's thumbnails over the in-flight
-  // prefetches for rows 201-220.
+  // Cards that loaded once stay isInView=true permanently (they're
+  // in the loadedImageCache and re-rendering them is essentially
+  // free) — only the fresh ones get torn down.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -111,10 +123,13 @@ function ImageCardImpl({
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsInView(true);
-          buffer.unobserve(el);
+        } else {
+          // Only un-render if we haven't loaded yet — otherwise we'd
+          // throw away decoded pixels we just paid for.
+          setIsInView((prev) => (isImageLoaded(thumbnailUrl) ? prev : false));
         }
       },
-      { rootMargin: "1000px" }
+      { rootMargin: "1500px" }
     );
     const active = new IntersectionObserver(
       ([entry]) => {
@@ -128,11 +143,12 @@ function ImageCardImpl({
       buffer.disconnect();
       active.disconnect();
     };
-  }, []);
+  }, [thumbnailUrl]);
 
   const handleImageLoad = useCallback(() => {
     setIsLoaded(true);
-  }, []);
+    markImageLoaded(currentSrc);
+  }, [currentSrc]);
 
   const handleImageError = useCallback(() => {
     if (!isReady) return;
@@ -189,12 +205,14 @@ function ImageCardImpl({
       )}
       style={viewMode === "masonry" ? { width: itemWidth, height: itemHeight } : undefined}
     >
-      {/* Placeholder shown when not in view or not loaded */}
+      {/* Placeholder shown when not in view or not loaded.
+          Animated shimmer so the user sees motion ("loading") rather
+          than a wall of identical gray boxes when scrolling fast. */}
       {(!isInView || (!isLoaded && isReady)) && (
         <div className={cn(
-          "rounded-md overflow-hidden border-2",
+          "rounded-md overflow-hidden border-2 relative",
           isSelected ? "border-primary ring-1 ring-primary/30" : "border-transparent",
-          !isReady ? "" : "bg-muted/40",
+          !isReady ? "" : "bg-muted/30 thumbnail-shimmer",
           viewMode === "grid" ? "aspect-square" : "w-full h-full"
         )}
           onClick={() => onImageClick(image.id, index)}
