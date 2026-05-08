@@ -231,6 +231,8 @@ export function GalleryRightSidebar({
                 onDuplicateLimitChange={onDuplicateLimitChange}
                 groupCounts={groupCounts}
                 onRunCulling={onRunCulling}
+                isCullingRunning={isCullingRunning}
+                isCullingStuck={isCullingStuck}
                 onToggleLikedFilter={onToggleLikedFilter}
               />
             )}
@@ -299,6 +301,8 @@ export function GalleryRightSidebar({
                 onDuplicateLimitChange={onDuplicateLimitChange}
                 groupCounts={groupCounts}
                 onRunCulling={onRunCulling}
+                isCullingRunning={isCullingRunning}
+                isCullingStuck={isCullingStuck}
                 onToggleLikedFilter={onToggleLikedFilter}
               />
             </SidebarSection>
@@ -584,6 +588,8 @@ function UnifiedFilterPanel({
   onDuplicateLimitChange,
   groupCounts,
   onRunCulling,
+  isCullingRunning,
+  isCullingStuck,
   onToggleLikedFilter,
 }: {
   hasCullingData: boolean;
@@ -599,6 +605,8 @@ function UnifiedFilterPanel({
   onDuplicateLimitChange: (limit: number) => void;
   groupCounts: { loose: number; medium: number; strict: number };
   onRunCulling?: () => void;
+  isCullingRunning?: boolean;
+  isCullingStuck?: boolean;
   onToggleLikedFilter?: () => void;
 }) {
   const toggleRating = (star: number) => {
@@ -733,11 +741,34 @@ function UnifiedFilterPanel({
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full gap-1.5 text-xs h-8 bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
+                className={cn(
+                  "w-full gap-1.5 text-xs h-8 transition-colors",
+                  isCullingRunning
+                    ? "bg-primary/15 border-primary/40 text-primary cursor-not-allowed"
+                    : isCullingStuck
+                      ? "bg-orange-500/10 border-orange-500/30 text-orange-300 hover:bg-orange-500/20"
+                      : "bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary",
+                )}
                 onClick={onRunCulling}
+                disabled={isCullingRunning}
+                aria-busy={isCullingRunning || undefined}
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                Run AI Culling
+                {isCullingRunning ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Running… please wait
+                  </>
+                ) : isCullingStuck ? (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Retry AI Culling
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Run AI Culling
+                  </>
+                )}
               </Button>
             )}
             <div className="grid grid-cols-3 gap-1.5 pt-1">
