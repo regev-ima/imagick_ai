@@ -483,3 +483,24 @@
   --uppy-c-blue: hsl(330 100% 60%);
   --uppy-c-cornflower-blue: hsl(330 100% 60%);
 }
+
+/* ── Gallery thumbnail shimmer ────────────────────────────────────────
+ * Subtle animated gradient on placeholder tiles so the user sees
+ * "loading" motion while scrolling fast, instead of a dead grid of
+ * gray squares. Cheap — one keyframe, runs on the GPU compositor.
+ */
+.thumbnail-shimmer {
+  background-image: linear-gradient(
+    105deg,
+    hsl(0 0% 100% / 0.02) 0%,
+    hsl(0 0% 100% / 0.06) 50%,
+    hsl(0 0% 100% / 0.02) 100%
+  );
+  background-size: 200% 100%;
+  animation: thumbnail-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes thumbnail-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

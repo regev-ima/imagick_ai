@@ -53,11 +53,19 @@ export function VirtualizedImageGrid<T>({
   getKey,
   renderItem,
   trailing,
-  overscanRows = 8,
+  overscanRows = 6,
   gap = 2,
 }: VirtualizedImageGridProps<T>) {
   const innerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  /**
+   * Adaptive overscan based on scroll velocity. When the user is
+   * stationary we keep a modest buffer (overscanRows). When they
+   * flick-scroll we widen it dynamically — by the time they stop,
+   * the rows they're about to see are already mounted with
+   * thumbnail fetches in flight.
+   */
+  const [dynamicOverscan, setDynamicOverscan] = useState(overscanRows);
 
   useEffect(() => {
     const el = innerRef.current;
@@ -70,6 +78,44 @@ export function VirtualizedImageGrid<T>({
     setContainerWidth(el.getBoundingClientRect().width);
     return () => observer.disconnect();
   }, []);
+
+  // Track scroll velocity on the parent scroll container.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    let lastTop = el.scrollTop;
+    let lastTime = performance.now();
+    let raf: number | null = null;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = null;
+        const now = performance.now();
+        const dy = Math.abs(el.scrollTop - lastTop);
+        const dt = now - lastTime || 1;
+        lastTop = el.scrollTop;
+        lastTime = now;
+        const velocity = dy / dt; // px / ms
+
+        // Map velocity → overscan. 0 px/ms = base (6),
+        // 5 px/ms (≈300px/frame) = max (24).
+        const next = Math.min(24, Math.max(overscanRows, Math.round(overscanRows + velocity * 4)));
+        setDynamicOverscan(next);
+
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => setDynamicOverscan(overscanRows), 150);
+      });
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      if (idleTimer) clearTimeout(idleTimer);
+    };
+  }, [scrollContainerRef, overscanRows]);
 
   const columns = pickColumnCount(containerWidth || 1024);
 
@@ -85,7 +131,7 @@ export function VirtualizedImageGrid<T>({
     count: rowCount,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => rowHeight,
-    overscan: overscanRows,
+    overscan: dynamicOverscan,
   });
 
   // Force the virtualizer to remeasure when the column count changes
