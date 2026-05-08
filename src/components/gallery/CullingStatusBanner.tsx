@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { estimateCullingMs, formatDuration } from "@/lib/cullingEta";
 
 interface CullingStatusBannerProps {
   /** Database-backed status — "processing" / "ready" / "idle" / null. */
   status: string | null | undefined;
   /** When the current culling run started, ISO string from DB. */
   startedAt: string | null | undefined;
-  /** True after >20 minutes with no completion — shows a 'looks stuck' hint. */
+  /** Image count so we can compute ETA + the "looks stuck" threshold. */
+  imageCount?: number;
+  /** Pre-computed stuck flag from the page (matches the gallery's image count). */
   isStuck?: boolean;
+  /** True when culling DATA already exists on the rows (ratings, labels).
+   *  When set we never show the banner — the run actually finished even
+   *  if gallery.culling_status was never updated by the webhook. */
+  hasCullingData?: boolean;
   className?: string;
 }
 
@@ -29,18 +36,24 @@ interface CullingStatusBannerProps {
 export function CullingStatusBanner({
   status,
   startedAt,
+  imageCount = 0,
   isStuck = false,
+  hasCullingData = false,
   className,
 }: CullingStatusBannerProps) {
   // Tick once a minute so the elapsed-time text stays current.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (status !== "processing") return;
-    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    const interval = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(interval);
   }, [status]);
 
   if (status !== "processing") return null;
+  // The data has already landed but the webhook didn't flip the
+  // status flag — don't show "in progress" for a run that's actually
+  // finished. The page-level self-healer will repair the row.
+  if (hasCullingData) return null;
 
   const elapsedMs = startedAt ? now - new Date(startedAt).getTime() : 0;
   const elapsedMinutes = Math.max(0, Math.floor(elapsedMs / 60_000));
@@ -50,6 +63,11 @@ export function CullingStatusBanner({
     elapsedMinutes > 0
       ? `${elapsedMinutes} min ${elapsedSeconds}s elapsed`
       : `${elapsedSeconds}s elapsed`;
+
+  const etaMs = estimateCullingMs(imageCount);
+  const etaText = formatDuration(etaMs);
+  const remainingMs = Math.max(0, etaMs - elapsedMs);
+  const remainingText = remainingMs > 0 ? `~${formatDuration(remainingMs)} remaining` : "wrapping up…";
 
   return (
     <div
@@ -78,14 +96,14 @@ export function CullingStatusBanner({
         <p className="text-sm font-medium">
           {isStuck
             ? "AI Culling looks stuck — you can retry from the sidebar."
-            : "AI Culling in progress…"}
+            : `AI Culling in progress · ${remainingText}`}
         </p>
         <p className="text-xs text-muted-foreground">
           {isStuck ? (
             <>It's been {elapsedText} with no result. Sometimes the API throttles us — restarting usually works.</>
           ) : (
             <>
-              {elapsedText}. Typically completes in 5-10 minutes for ~1000 photos.
+              {elapsedText} · estimated total {etaText} for {imageCount.toLocaleString()} photos.
               You can keep working on other things — we'll update the gallery automatically.
             </>
           )}

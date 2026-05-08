@@ -682,7 +682,14 @@ function UnifiedFilterPanel({
         <div className="space-y-2">
           <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Star Rating</Label>
           <div className="space-y-0.5">
-            {CULLING_TIERS.map(tier => {
+            {CULLING_TIERS.filter(tier => {
+              // Hide rating tiers with zero photos UNLESS the user has
+              // already toggled them on (so we don't suddenly hide a
+              // selected filter). The 0-count rows were the main
+              // 'looks messy' complaint after culling completes.
+              const c = cullingCounts[tier.stars] || 0;
+              return c > 0 || filters.selectedRatings.includes(tier.stars);
+            }).map(tier => {
               const count = cullingCounts[tier.stars] || 0;
               const isSelected = filters.selectedRatings.includes(tier.stars);
               const pct = totalCullingImages > 0 ? Math.round((count / totalCullingImages) * 100) : 0;
@@ -814,40 +821,11 @@ function UnifiedFilterPanel({
                 {availableLabels.every(({ label }) => filters.selectedLabels?.includes(label)) ? "Clear" : "Select All"}
               </button>
             </div>
-            <div className="space-y-0.5 max-h-48 overflow-y-auto">
-              {(() => {
-                const maxCount = Math.max(...availableLabels.map(l => l.count), 1);
-                return availableLabels.map(({ label, count }) => {
-                  const isSelected = filters.selectedLabels?.includes(label);
-                  const pct = Math.round((count / maxCount) * 100);
-                  return (
-                    <button
-                      key={label}
-                      onClick={() => toggleLabel(label)}
-                      className={cn(
-                        "w-full relative flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-all overflow-hidden",
-                        isSelected
-                          ? "text-foreground"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "absolute inset-y-0 left-0 rounded-lg transition-all",
-                          isSelected ? "bg-primary/15" : "bg-muted/30"
-                        )}
-                        style={{ width: `${pct}%` }}
-                      />
-                      <div className="relative flex items-center gap-1.5">
-                        {isSelected && <Check className="w-3 h-3 text-primary" />}
-                        <span className="font-medium">{label}</span>
-                      </div>
-                      <span className="relative text-[10px] tabular-nums opacity-70">{count}</span>
-                    </button>
-                  );
-                });
-              })()}
-            </div>
+            <CategoryList
+              availableLabels={availableLabels}
+              selectedLabels={filters.selectedLabels || []}
+              onToggle={toggleLabel}
+            />
           </div>
         </>
       )}
@@ -1193,6 +1171,82 @@ function GalleryInfoPanel({
           </span>
           <span className="text-xs font-semibold text-primary tabular-nums">{totalDuration}</span>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Category list with collapsible long lists ─────────────────────
+ * Galleries with 30+ AI-generated categories were rendering all of
+ * them in a 192px scroll area. Looked busy and hid the actions row.
+ * Now: top 6 by count by default, with a "Show all (N)" toggle.
+ */
+function CategoryList({
+  availableLabels,
+  selectedLabels,
+  onToggle,
+}: {
+  availableLabels: Array<{ label: string; count: number }>;
+  selectedLabels: string[];
+  onToggle: (label: string) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const sorted = [...availableLabels].sort((a, b) => b.count - a.count);
+  const PREVIEW_COUNT = 6;
+  // Always show selected items even if they're not in the top N, so a
+  // user can see + unselect them without expanding.
+  const visible = showAll
+    ? sorted
+    : sorted.filter((l, i) => i < PREVIEW_COUNT || selectedLabels.includes(l.label));
+  const hiddenCount = sorted.length - visible.length;
+  const maxCount = Math.max(...sorted.map((l) => l.count), 1);
+
+  return (
+    <div className="space-y-0.5">
+      {visible.map(({ label, count }) => {
+        const isSelected = selectedLabels.includes(label);
+        const pct = Math.round((count / maxCount) * 100);
+        return (
+          <button
+            key={label}
+            onClick={() => onToggle(label)}
+            className={cn(
+              "w-full relative flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-all overflow-hidden",
+              isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <div
+              className={cn(
+                "absolute inset-y-0 left-0 rounded-lg transition-all",
+                isSelected ? "bg-primary/15" : "bg-muted/30",
+              )}
+              style={{ width: `${pct}%` }}
+            />
+            <div className="relative flex items-center gap-1.5">
+              {isSelected && <Check className="w-3 h-3 text-primary" />}
+              <span className="font-medium">{label}</span>
+            </div>
+            <span className="relative text-[10px] tabular-nums opacity-70">{count}</span>
+          </button>
+        );
+      })}
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="w-full text-center text-[11px] text-primary hover:text-primary/80 font-medium py-1.5 transition-colors"
+        >
+          Show all {sorted.length} categories
+        </button>
+      )}
+      {showAll && sorted.length > PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className="w-full text-center text-[11px] text-muted-foreground hover:text-foreground font-medium py-1.5 transition-colors"
+        >
+          Show fewer
+        </button>
       )}
     </div>
   );
