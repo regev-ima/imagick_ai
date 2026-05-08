@@ -1224,6 +1224,38 @@ export default function GalleryEditorPage() {
           .eq("id", id!);
       }
 
+      // Reset existing culling output before kicking off a new run.
+      // The user explicitly opted-in via the re-run-acknowledge
+      // checkbox, so wiping ratings/labels is intended. Clearing
+      // these makes hasCullingData=false, which:
+      //   - hides the post-culling Star Rating + Categories panels
+      //   - lets the in-progress banner show normally
+      //   - prevents the user from filtering against stale numbers
+      // Fields below match exactly what grouping-webhook writes back.
+      if (hasCullingData) {
+        await supabase
+          .from("gallery_images")
+          .update({
+            culling_score: null,
+            culling_label: null,
+            similarity_group_1: null,
+            similarity_group_2: null,
+            similarity_group_3: null,
+            background_sharpness: null,
+            subject_sharpness: null,
+            thirds_rule: null,
+            intended_facial_expression: null,
+          })
+          .eq("gallery_id", id!);
+        // Reset filter selections that referenced the now-cleared data.
+        setFilters((prev) => ({
+          ...prev,
+          selectedRatings: [],
+          minRating: 0,
+          selectedLabels: [],
+        }));
+      }
+
       const { data, error } = await supabase.functions.invoke('start-grouping', {
         body: { 
           galleryId: id,
@@ -2449,6 +2481,8 @@ export default function GalleryEditorPage() {
           onRunCulling={() => { if (gallery?.culling_status === "processing" && !isCullingStuck) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); }}
           isCullingRunning={runAICulling.isPending || (gallery?.culling_status === "processing" && !isCullingStuck)}
           isCullingStuck={isCullingStuck}
+          cullingStartedAt={gallery?.culling_started_at as string | null | undefined}
+          cullingImageCount={images.length}
           hasActiveFilters={hasActiveFilters}
           onOpenFaceSearch={() => setCatalogMode("faces")}
           faceSearchStatus={isFaceDetectionRunning ? "processing" : faceSearchStatus}

@@ -43,3 +43,19 @@ export function formatDuration(ms: number): string {
   const minutes = Math.round(ms / 60_000);
   return `${minutes} min`;
 }
+
+/**
+ * Format ms as a digital countdown like "2:34" — used on the
+ * 'Running... X:XX' culling button so the user has a continuously
+ * updating sense of how much longer it'll be.
+ *
+ * Negative inputs (run is already past its estimate) are clamped to
+ * 0:00 because we don't want to display nonsense numbers — the
+ * server might just be slow today.
+ */
+export function formatCountdown(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
-import { estimateCullingMs, formatDuration } from "@/lib/cullingEta";
+import { estimateCullingMs, formatCountdown, formatDuration } from "@/lib/cullingEta";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -68,12 +68,13 @@ export function AICullingModal({
   /** Required check before triggering a re-run that would overwrite
    *  existing ratings/labels. Reset on every modal open. */
   const [acknowledgeRerun, setAcknowledgeRerun] = useState(false);
-  /** Tick every minute so elapsed-time text stays current while the
-   *  modal is open during a run. */
+  /** Tick every second so the countdown on the running button ticks
+   *  smoothly. Cheap — runs only while the modal is open AND culling
+   *  is in progress. */
   const [, setNowTick] = useState(0);
   useEffect(() => {
     if (cullingStatus !== "processing") return;
-    const id = setInterval(() => setNowTick((t) => t + 1), 30_000);
+    const id = setInterval(() => setNowTick((t) => t + 1), 1_000);
     return () => clearInterval(id);
   }, [cullingStatus]);
   // Reset the re-run acknowledgement whenever the modal re-opens.
@@ -106,6 +107,11 @@ export function AICullingModal({
   // users know what to expect ("up to ~3 min for 2,000 photos").
   const etaMs = useMemo(() => estimateCullingMs(imageCount), [imageCount]);
   const etaText = formatDuration(etaMs);
+  // Live "X:XX" countdown shown ON the running button.
+  const remainingMs = isCurrentlyRunning && cullingStartedAt
+    ? Math.max(0, etaMs - (Date.now() - new Date(cullingStartedAt).getTime()))
+    : etaMs;
+  const countdownText = formatCountdown(remainingMs);
 
   // Fetch user's preferred language
   useEffect(() => {
@@ -440,31 +446,35 @@ export function AICullingModal({
             <Button variant="outline" onClick={handleClose}>
               {isCurrentlyRunning ? "Close" : "Cancel"}
             </Button>
-            {!isCurrentlyRunning && (
-              <Button
-                variant="glow"
-                onClick={handleConfirm}
-                disabled={isProcessing || (requireRerunAck && !acknowledgeRerun)}
-                className="gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : hasCompletedCulling ? (
-                  <>
-                    <Wand2 className="w-4 h-4" />
-                    Re-run AI Culling
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="w-4 h-4" />
-                    Start AI Culling
-                  </>
-                )}
-              </Button>
-            )}
+            <Button
+              variant="glow"
+              onClick={handleConfirm}
+              disabled={isProcessing || isCurrentlyRunning || (requireRerunAck && !acknowledgeRerun)}
+              aria-busy={isCurrentlyRunning || undefined}
+              className="gap-2 min-w-[180px]"
+            >
+              {isCurrentlyRunning ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Running… <span className="tabular-nums font-mono">{countdownText}</span>
+                </>
+              ) : isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </>
+              ) : hasCompletedCulling ? (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  Re-run AI Culling
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  Start AI Culling
+                </>
+              )}
+            </Button>
           </div>
         </Card>
       </motion.div>

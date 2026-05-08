@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Sparkles, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
+import { estimateCullingMs, formatCountdown } from "@/lib/cullingEta";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
@@ -55,6 +56,12 @@ interface GalleryRightSidebarProps {
   onRunCulling?: () => void;
   isCullingRunning?: boolean;
   isCullingStuck?: boolean;
+  /** ISO timestamp of when the in-flight culling run started.
+   *  Used to render the live X:XX countdown on the running button. */
+  cullingStartedAt?: string | null;
+  /** Photo count for the gallery — needed to compute the ETA the
+   *  countdown counts down from. */
+  cullingImageCount?: number;
   hasActiveFilters?: boolean;
 
   // Face search
@@ -116,6 +123,8 @@ export function GalleryRightSidebar({
   onRunCulling,
   isCullingRunning,
   isCullingStuck,
+  cullingStartedAt,
+  cullingImageCount = 0,
   hasActiveFilters,
   onOpenFaceSearch,
   faceSearchStatus,
@@ -134,6 +143,21 @@ export function GalleryRightSidebar({
   className,
   isMobileSheet,
 }: GalleryRightSidebarProps) {
+  // 1-second tick while culling is running so the X:XX countdown on
+  // the AI Features button keeps moving. No-op when idle.
+  const [, setCullingTick] = useState(0);
+  useEffect(() => {
+    if (!isCullingRunning) return;
+    const t = setInterval(() => setCullingTick((v) => v + 1), 1_000);
+    return () => clearInterval(t);
+  }, [isCullingRunning]);
+
+  const cullingEtaMs = useMemo(() => estimateCullingMs(cullingImageCount), [cullingImageCount]);
+  const cullingRemainingMs = isCullingRunning && cullingStartedAt
+    ? Math.max(0, cullingEtaMs - (Date.now() - new Date(cullingStartedAt).getTime()))
+    : 0;
+  const cullingCountdown = formatCountdown(cullingRemainingMs);
+
   // Persist accordion open state + collapsed mode across reloads.
   const [openSections, setOpenSections] = useState<Set<AccordionId>>(() => {
     if (typeof window === "undefined") return new Set(["styles", "filter"]);
@@ -233,6 +257,7 @@ export function GalleryRightSidebar({
                 onRunCulling={onRunCulling}
                 isCullingRunning={isCullingRunning}
                 isCullingStuck={isCullingStuck}
+                cullingCountdown={cullingCountdown}
                 onToggleLikedFilter={onToggleLikedFilter}
               />
             )}
@@ -303,6 +328,7 @@ export function GalleryRightSidebar({
                 onRunCulling={onRunCulling}
                 isCullingRunning={isCullingRunning}
                 isCullingStuck={isCullingStuck}
+                cullingCountdown={cullingCountdown}
                 onToggleLikedFilter={onToggleLikedFilter}
               />
             </SidebarSection>
@@ -590,6 +616,7 @@ function UnifiedFilterPanel({
   onRunCulling,
   isCullingRunning,
   isCullingStuck,
+  cullingCountdown,
   onToggleLikedFilter,
 }: {
   hasCullingData: boolean;
@@ -607,6 +634,7 @@ function UnifiedFilterPanel({
   onRunCulling?: () => void;
   isCullingRunning?: boolean;
   isCullingStuck?: boolean;
+  cullingCountdown?: string;
   onToggleLikedFilter?: () => void;
 }) {
   const toggleRating = (star: number) => {
@@ -763,7 +791,7 @@ function UnifiedFilterPanel({
                 {isCullingRunning ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Running… please wait
+                    Running… <span className="tabular-nums font-mono">{cullingCountdown ?? ""}</span>
                   </>
                 ) : isCullingStuck ? (
                   <>
