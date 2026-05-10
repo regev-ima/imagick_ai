@@ -4,6 +4,8 @@ import { useAuth } from "./useAuth";
 
 type AppRole = "admin" | "moderator" | "user";
 
+const FOUNDER_EMAIL = "contact@imagick.ai";
+
 interface UserRoleState {
   role: AppRole | null;
   isAdmin: boolean;
@@ -37,10 +39,37 @@ export function useUserRole(): UserRoleState {
         // and the hook would silently set role=null — making the founder
         // look like a regular user and hiding the Admin sidebar item.
         // Fetch all rows and pick the highest-priority one client-side.
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from("user_roles")
           .select("role, can_view_analytics")
           .eq("user_id", user.id);
+
+        // Self-heal: the founder's admin row went missing once and
+        // there was no in-app path to restore it (you need to BE admin
+        // to use the user-management page). Call the dedicated edge
+        // function — it server-side-checks the JWT email against the
+        // founder constant before writing — and re-fetch.
+        const callerEmail = (user.email ?? "").toLowerCase().trim();
+        const hasAdmin = (data ?? []).some((r: any) => r.role === "admin");
+        if (!error && callerEmail === FOUNDER_EMAIL && !hasAdmin) {
+          try {
+            const { error: bootstrapErr } = await supabase.functions.invoke(
+              "bootstrap-founder-admin",
+              { body: {} },
+            );
+            if (!bootstrapErr) {
+              const refetch = await supabase
+                .from("user_roles")
+                .select("role, can_view_analytics")
+                .eq("user_id", user.id);
+              if (!refetch.error) data = refetch.data;
+            } else {
+              console.warn("bootstrap-founder-admin failed:", bootstrapErr);
+            }
+          } catch (bootErr) {
+            console.warn("bootstrap-founder-admin threw:", bootErr);
+          }
+        }
 
         if (error) {
           console.error("Error fetching user role:", error);
