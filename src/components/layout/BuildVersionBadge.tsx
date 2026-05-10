@@ -1,4 +1,9 @@
-import { BUILD_SHA, BUILD_TIME_ISO, formatBuildTime } from "@/lib/buildInfo";
+import {
+  BUILD_SHA,
+  BUILD_TIME_ISO,
+  formatBuildTime,
+  formatBuildTimeShort,
+} from "@/lib/buildInfo";
 import {
   Tooltip,
   TooltipContent,
@@ -33,7 +38,7 @@ export function BuildVersionBadge({ compact = false, className }: BuildVersionBa
                 className,
               )}
             >
-              {BUILD_SHA}
+              {formatBuildTimeShort()}
             </span>
           </TooltipTrigger>
           <TooltipContent side="right">
