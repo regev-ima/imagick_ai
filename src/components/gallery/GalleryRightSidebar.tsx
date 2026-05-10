@@ -357,23 +357,23 @@ export function GalleryRightSidebar({
           – delivery: Share, Download
           – admin: Settings
         */}
-      <div className="border-t border-border/30 p-3 space-y-2 shrink-0">
+      <div className="border-t border-border/30 px-3 py-2 space-y-1.5 shrink-0">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
           Actions
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1">
           {onAddImages && (
-            <ActionButton icon={<Images className="w-3.5 h-3.5" />} label="Add photos" onClick={onAddImages} />
+            <ActionButton icon={<Images className="w-3 h-3" />} label="Add photos" onClick={onAddImages} />
           )}
           {onRunCulling && (
             <ActionButton
               icon={
                 isCullingRunning ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-3 h-3 animate-spin" />
                 ) : isCullingStuck ? (
-                  <Wand2 className="w-3.5 h-3.5 text-orange-500" />
+                  <Wand2 className="w-3 h-3 text-orange-500" />
                 ) : (
-                  <Wand2 className="w-3.5 h-3.5" />
+                  <Wand2 className="w-3 h-3" />
                 )
               }
               label="AI Culling"
@@ -385,11 +385,11 @@ export function GalleryRightSidebar({
             <ActionButton
               icon={
                 faceSearchStatus === "processing" ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-3 h-3 animate-spin" />
                 ) : faceSearchStatus === "completed" ? (
-                  <ScanFace className="w-3.5 h-3.5 text-green-500" />
+                  <ScanFace className="w-3 h-3 text-green-500" />
                 ) : (
-                  <ScanFace className="w-3.5 h-3.5" />
+                  <ScanFace className="w-3 h-3" />
                 )
               }
               label="Faces"
@@ -397,13 +397,13 @@ export function GalleryRightSidebar({
             />
           )}
           {onShare && (
-            <ActionButton icon={<Share2 className="w-3.5 h-3.5" />} label="Share" onClick={onShare} />
+            <ActionButton icon={<Share2 className="w-3 h-3" />} label="Share" onClick={onShare} />
           )}
           {onDownload && (
-            <ActionButton icon={<Download className="w-3.5 h-3.5" />} label="Download" onClick={onDownload} />
+            <ActionButton icon={<Download className="w-3 h-3" />} label="Download" onClick={onDownload} />
           )}
           {onOpenSettings && (
-            <ActionButton icon={<Settings className="w-3.5 h-3.5" />} label="Settings" onClick={onOpenSettings} />
+            <ActionButton icon={<Settings className="w-3 h-3" />} label="Settings" onClick={onOpenSettings} />
           )}
         </div>
       </div>
@@ -478,7 +478,7 @@ function ActionButton({
     <Button
       variant="outline"
       size="sm"
-      className="h-9 justify-start gap-2 text-xs font-medium px-2.5"
+      className="h-7 justify-start gap-1.5 text-[11px] font-medium px-2"
       onClick={onClick}
       disabled={disabled}
     >
