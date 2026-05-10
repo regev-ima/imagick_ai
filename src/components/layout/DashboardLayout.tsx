@@ -27,6 +27,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
+import { BuildVersionBadge } from "@/components/layout/BuildVersionBadge";
 import imagickLogoDark from "@/assets/imagick-logo.png";
 import imagickIconDark from "@/assets/imagick-icon.png";
 import imagickLogoLight from "@/assets/imagick-logo-light.png";
@@ -314,6 +315,11 @@ export default function DashboardLayout() {
             )}
           </TooltipProvider>
         </div>
+
+        {/* Build fingerprint — confirms which deploy is live. */}
+        <div className="px-2 pb-2">
+          <BuildVersionBadge compact={!sidebarOpen} />
+        </div>
       </motion.aside>
 
       {/* Mobile Menu Overlay */}
@@ -423,6 +429,11 @@ export default function DashboardLayout() {
                 <LogOut className="w-5 h-5" />
                 <span className="font-medium">Sign out</span>
               </button>
+            </div>
+
+            {/* Build fingerprint */}
+            <div className="px-4 pb-4">
+              <BuildVersionBadge />
             </div>
           </motion.aside>
         )}
