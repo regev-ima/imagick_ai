@@ -209,8 +209,19 @@ export function useImageUpload() {
         body: { bucket, prefix, names: fileNames },
       });
 
+      // supabase.functions.invoke returns `error` for non-2xx responses
+      // but ALSO populates `data` with the JSON body, so we still try to
+      // surface the server's actual message instead of a useless
+      // generic "Failed to get upload URLs".
       if (error) {
-        console.error("Error getting signed URLs:", error);
+        console.error("Error getting signed URLs:", error, "body:", data);
+        const serverMsg =
+          (typeof data === "object" && data !== null
+            ? (data as any).message || (data as any).error
+            : null) ||
+          (error as any)?.message ||
+          "Unknown error";
+        toast.error(`Upload failed: ${serverMsg}`);
         return null;
       }
 
@@ -222,9 +233,19 @@ export function useImageUpload() {
         return null;
       }
 
+      // Some errors come back as 200 with an `error` field (legacy paths).
+      if (data?.error) {
+        console.error("Edge function returned error body:", data);
+        toast.error(`Upload failed: ${data.message || data.error}`);
+        return null;
+      }
+
       const urls = data.urls?.signedUrls || data.urls;
       if (!Array.isArray(urls)) {
         console.error("Invalid signed URLs format:", data);
+        toast.error(
+          "Upload failed: server returned an unexpected response. Please refresh and try again.",
+        );
         return null;
       }
 
@@ -232,8 +253,9 @@ export function useImageUpload() {
         const publicUrl = signedUrl.split("?")[0];
         return { name: fileNames[index], signedUrl, publicUrl };
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error getting signed URLs:", error);
+      toast.error(`Upload failed: ${error?.message || "network error"}`);
       return null;
     }
   };
@@ -315,7 +337,8 @@ export function useImageUpload() {
       Array.from(b2NameByUppyId.values()),
     );
     if (!signedUrls) {
-      toast.error("Failed to get upload URLs");
+      // getSignedUrls already showed a specific toast with the
+      // server-side reason — don't double-toast a generic message.
       setIsUploading(false);
       return [];
     }
