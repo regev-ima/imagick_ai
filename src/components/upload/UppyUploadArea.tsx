@@ -15,7 +15,11 @@ interface UppyUploadAreaProps {
 
 // Dashboard height is responsive: small on phones, larger on desktop.
 // Uppy renders the file grid inside a scroll container of this size.
-const DASHBOARD_HEIGHT_PX = "min(60vh, 480px)";
+// Kept compact so that when the area is embedded in a modal (Add Images
+// flow) the surrounding chrome — selected-styles summary, source
+// selector, edit-cost row, footer — still fits within an 85vh modal
+// without forcing the user to scroll to reach the Upload button.
+const DASHBOARD_HEIGHT_PX = "min(38vh, 320px)";
 
 /**
  * Mount Uppy's Dashboard plugin into a div via the standalone
