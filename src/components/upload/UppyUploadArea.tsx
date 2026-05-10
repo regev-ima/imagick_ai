@@ -44,30 +44,58 @@ export function UppyUploadArea({
     const target = targetRef.current;
     if (!target) return;
 
-    uppy.use(Dashboard, {
-      id: "Dashboard",
-      target,
-      inline: true,
-      // The Dashboard plugin accepts numeric or string heights. We use
-      // a CSS string so it tracks the parent's responsive width via
-      // its own internal layout.
-      height: DASHBOARD_HEIGHT_PX,
-      width: "100%",
-      // Force dark theme — our app is always dark and the OS-aware
-      // "auto" was rendering a white box that clashed with the rest
-      // of the dashboard.
-      theme: "dark",
-      proudlyDisplayPoweredByUppy: false,
-      hideUploadButton: true,
-      showProgressDetails: true,
-      showRemoveButtonAfterComplete: false,
-      thumbnailWidth: 160,
-      note: "JPG, PNG, RAW (CR2, ARW, NEF, DNG…)",
-    });
+    // Defensive: if a previous mount didn't tear the plugin down (the
+    // user re-opened the modal in the same Uppy instance, React
+    // StrictMode double-mounted us, etc.) `uppy.use()` would throw
+    // "Already used a plugin named Dashboard" and the modal would
+    // crash to the ErrorBoundary's "Something went wrong" screen.
+    // Removing first makes the re-mount idempotent.
+    const existing = uppy.getPlugin("Dashboard");
+    if (existing) {
+      try {
+        uppy.removePlugin(existing);
+      } catch {
+        /* ignore — best effort cleanup */
+      }
+    }
+
+    try {
+      uppy.use(Dashboard, {
+        id: "Dashboard",
+        target,
+        inline: true,
+        // The Dashboard plugin accepts numeric or string heights. We use
+        // a CSS string so it tracks the parent's responsive width via
+        // its own internal layout.
+        height: DASHBOARD_HEIGHT_PX,
+        width: "100%",
+        // Force dark theme — our app is always dark and the OS-aware
+        // "auto" was rendering a white box that clashed with the rest
+        // of the dashboard.
+        theme: "dark",
+        proudlyDisplayPoweredByUppy: false,
+        hideUploadButton: true,
+        showProgressDetails: true,
+        showRemoveButtonAfterComplete: false,
+        thumbnailWidth: 160,
+        note: "JPG, PNG, RAW (CR2, ARW, NEF, DNG…)",
+      });
+    } catch (err) {
+      // Surface the failure but DON'T let it bubble to React's
+      // ErrorBoundary — the surrounding modal is more useful broken
+      // than gone.
+      console.error("Uppy Dashboard mount failed:", err);
+    }
 
     return () => {
       const plugin = uppy.getPlugin("Dashboard");
-      if (plugin) uppy.removePlugin(plugin);
+      if (plugin) {
+        try {
+          uppy.removePlugin(plugin);
+        } catch {
+          /* ignore — plugin may already be torn down */
+        }
+      }
     };
   }, [uppy]);
 
