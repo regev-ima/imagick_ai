@@ -209,13 +209,50 @@ export function useImageUpload() {
         body: { bucket, prefix, names: fileNames },
       });
 
-      // supabase.functions.invoke returns `error` for non-2xx responses
-      // but ALSO populates `data` with the JSON body, so we still try to
-      // surface the server's actual message instead of a useless
-      // generic "Failed to get upload URLs".
+      // supabase-js v2 wraps non-2xx responses in a FunctionsHttpError. The
+      // response body is NOT placed in `data` — it's hidden behind
+      // `error.context` (a Response object). Parse it so we can show the
+      // user the actual server-side reason ("storage_limit_exceeded",
+      // "Server configuration error", etc.) instead of the useless
+      // generic "Edge Function returned a non-2xx status code".
       if (error) {
-        console.error("Error getting signed URLs:", error, "body:", data);
+        let serverBody: any = null;
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            serverBody = await ctx.clone().json();
+          } catch {
+            try {
+              serverBody = { error: await ctx.clone().text() };
+            } catch {
+              /* ignore — couldn't read body */
+            }
+          }
+        }
+        console.error(
+          "Error getting signed URLs:",
+          error,
+          "status:",
+          ctx?.status,
+          "body:",
+          serverBody,
+        );
+
+        // Storage limit exceeded comes through this path because the edge
+        // function returns 403 with a JSON body — handle it specifically
+        // so the user sees the friendly upgrade prompt rather than a raw
+        // error string.
+        if (serverBody?.error === "storage_limit_exceeded") {
+          toast.error(
+            serverBody.message ||
+              "Storage limit exceeded. Please upgrade your plan or purchase additional storage.",
+          );
+          return null;
+        }
+
         const serverMsg =
+          serverBody?.message ||
+          serverBody?.error ||
           (typeof data === "object" && data !== null
             ? (data as any).message || (data as any).error
             : null) ||
