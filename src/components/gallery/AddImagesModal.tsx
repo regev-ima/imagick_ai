@@ -698,7 +698,7 @@ export function AddImagesModal({
                     isProcessing ||
                     !canEdit ||
                     hasInsufficientEdits ||
-                    (uploadSource === "local" && uploadedFiles.length === 0) ||
+                    (uploadSource === "local" && uppyFileCount === 0) ||
                     (uploadSource === "drive" && !driveFolderInfo)
                   }
                   onClick={handleConfirm}
