@@ -276,19 +276,26 @@ export function GalleryRightSidebar({
   // Always-expanded sidebar with stacked accordion sections. Power-
   // user collapse-to-icons mode was removed because the user reported
   // bare icons aren't intuitive — every action button needs a label.
+  //
+  // Layout note: we use CSS grid `[auto, minmax(0,1fr), auto]` rather
+  // than flex-col + flex-1 + min-h-0. The flex pattern was leaving the
+  // pinned-bottom Actions strip clipped on shorter viewports because
+  // some path was letting the middle ScrollArea's intrinsic height
+  // win. Grid with explicit `minmax(0,1fr)` GUARANTEES the middle row
+  // takes exactly the remaining space and never expands the parent.
   return (
     <div
       className={cn(
-        "shrink-0 border-l border-border/50 glass-card flex flex-col w-[300px] h-full",
+        "shrink-0 border-l border-border/50 glass-card grid grid-rows-[auto_minmax(0,1fr)_auto] w-[300px] h-full",
         className,
       )}
     >
       {/* Header */}
-      <div className="flex items-center px-3 py-2 border-b border-border/30 shrink-0">
+      <div className="flex items-center px-3 py-2 border-b border-border/30">
         <span className="text-sm font-semibold text-foreground">Gallery</span>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0 min-w-0">
+      <div className="overflow-y-auto min-h-0">
         <div className="p-3 space-y-3">
           {/* ── VIEW: Styles ── */}
           <SidebarSection
@@ -347,7 +354,7 @@ export function GalleryRightSidebar({
             </SidebarSection>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* ── ACTIONS: pinned bottom strip ─────────────────────────────
           Labelled buttons in a 2-column grid so users can read what
@@ -357,7 +364,7 @@ export function GalleryRightSidebar({
           – delivery: Share, Download
           – admin: Settings
         */}
-      <div className="border-t border-border/30 px-3 py-2 space-y-1.5 shrink-0">
+      <div className="border-t border-border/30 px-3 py-2 space-y-1.5">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
           Actions
         </div>
