@@ -207,8 +207,8 @@ export function GalleryRightSidebar({
   // In mobile sheet mode, always show expanded content
   if (isMobileSheet) {
     return (
-      <div className={cn("flex flex-col h-full", className)}>
-        <ScrollArea className="flex-1">
+      <div className={cn("flex flex-col h-full min-h-0", className)}>
+        <ScrollArea className="flex-1 min-h-0">
           <div className="p-3 space-y-4">
             {/* Action buttons */}
             <div className="flex gap-2 flex-wrap">
@@ -288,7 +288,7 @@ export function GalleryRightSidebar({
         <span className="text-sm font-semibold text-foreground">Gallery</span>
       </div>
 
-      <ScrollArea className="flex-1 min-w-0">
+      <ScrollArea className="flex-1 min-h-0 min-w-0">
         <div className="p-3 space-y-3">
           {/* ── VIEW: Styles ── */}
           <SidebarSection
