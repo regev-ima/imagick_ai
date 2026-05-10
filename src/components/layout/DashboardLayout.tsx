@@ -97,7 +97,7 @@ export default function DashboardLayout() {
     .toUpperCase() || effectiveEmail?.charAt(0).toUpperCase() || "U";
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen overflow-hidden bg-background flex">
       {/* Desktop Sidebar */}
       <motion.aside
         className={cn(
