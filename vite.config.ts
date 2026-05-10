@@ -1,6 +1,29 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { execSync } from "child_process";
+
+// Resolve a short identifier for the build, in priority order:
+//   1. Vercel/CI commit SHA env vars (Vercel sets VERCEL_GIT_COMMIT_SHA)
+//   2. Local `git rev-parse` (dev / non-CI builds)
+//   3. "dev" fallback if neither is available
+function resolveCommitSha(): string {
+  const ciSha =
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.GITHUB_SHA ||
+    process.env.COMMIT_SHA;
+  if (ciSha) return ciSha.slice(0, 7);
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return "dev";
+  }
+}
+
+const BUILD_COMMIT_SHA = resolveCommitSha();
+const BUILD_TIME_ISO = new Date().toISOString();
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
@@ -12,6 +35,10 @@ export default defineConfig(() => ({
     },
   },
   plugins: [react()],
+  define: {
+    __APP_BUILD_SHA__: JSON.stringify(BUILD_COMMIT_SHA),
+    __APP_BUILD_TIME__: JSON.stringify(BUILD_TIME_ISO),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
