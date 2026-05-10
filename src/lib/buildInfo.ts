@@ -34,3 +34,18 @@ export function formatBuildTime(iso: string = BUILD_TIME_ISO): string {
   });
   return `${datePart}, ${timePart}`;
 }
+
+/**
+ * Compact form for the collapsed sidebar — just the time of day
+ * ("09:12"). The full date is still revealed on hover via the badge's
+ * tooltip, so the visible label can stay tiny.
+ */
+export function formatBuildTimeShort(iso: string = BUILD_TIME_ISO): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
