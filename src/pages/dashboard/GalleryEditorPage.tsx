@@ -1582,7 +1582,7 @@ export default function GalleryEditorPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Compact Single-Row Header */}
       <div 
         className="border-b border-border/50 glass-card sticky top-0 z-20 cursor-pointer md:cursor-default"

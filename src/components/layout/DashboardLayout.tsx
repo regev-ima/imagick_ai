@@ -488,10 +488,18 @@ export default function DashboardLayout() {
           </div>
         )}
 
-        {/* Page Content */}
+        {/* Page Content
+            - Gallery editor uses overflow-hidden so its own h-full
+              children can size correctly (the editor manages internal
+              scroll for the image grid + right sidebar). Without this,
+              the editor's h-screen used to add a phantom 64px below
+              the viewport, clipping the right sidebar's Actions strip.
+            - Other pages stay overflow-auto so long forms / dashboards
+              scroll inside <main>.
+        */}
         <main className={cn(
-          "flex-1 overflow-auto",
-          !isGalleryEditor && "mx-auto w-full max-w-[1400px]"
+          "flex-1",
+          isGalleryEditor ? "overflow-hidden" : "overflow-auto mx-auto w-full max-w-[1400px]"
         )}>
           <Suspense fallback={
             <div className="flex items-center justify-center h-full min-h-[60vh]">
