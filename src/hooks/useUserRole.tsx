@@ -30,19 +30,33 @@ export function useUserRole(): UserRoleState {
 
     const fetchRole = async () => {
       try {
+        // Note: a single user can have multiple rows in user_roles
+        // (the table's UNIQUE constraint is on (user_id, role), not just
+        // user_id). Using `.maybeSingle()` here would crash with PGRST116
+        // when a user happens to have e.g. both 'admin' and 'user' rows,
+        // and the hook would silently set role=null — making the founder
+        // look like a regular user and hiding the Admin sidebar item.
+        // Fetch all rows and pick the highest-priority one client-side.
         const { data, error } = await supabase
           .from("user_roles")
           .select("role, can_view_analytics")
-          .eq("user_id", user.id)
-          .maybeSingle();
+          .eq("user_id", user.id);
 
         if (error) {
           console.error("Error fetching user role:", error);
           setRole(null);
           setCanViewAnalytics(false);
         } else {
-          setRole((data?.role as AppRole) || null);
-          setCanViewAnalytics(data?.can_view_analytics ?? false);
+          const rows = (data ?? []) as { role: AppRole; can_view_analytics: boolean | null }[];
+          const priority: Record<AppRole, number> = { admin: 3, moderator: 2, user: 1 };
+          const top = rows.sort(
+            (a, b) => (priority[b.role] ?? 0) - (priority[a.role] ?? 0),
+          )[0];
+          setRole(top?.role ?? null);
+          // can_view_analytics may be set on any of the user's rows —
+          // OR them together so the permission isn't lost just because
+          // the highest-priority row didn't carry the flag.
+          setCanViewAnalytics(rows.some((r) => r.can_view_analytics === true));
         }
       } catch (err) {
         console.error("Error fetching user role:", err);
