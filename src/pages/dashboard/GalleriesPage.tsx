@@ -13,7 +13,9 @@ import {
   ExternalLink,
   Trash2,
   Edit3,
-  Loader2
+  Loader2,
+  BarChart3,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -363,6 +365,18 @@ function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryCardP
                     <Edit3 className="w-4 h-4 mr-2" />
                     Edit
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to={`/dashboard/galleries/${gallery.id}/insights`} onClick={(e) => e.stopPropagation()}>
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      Insights
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to={`/dashboard/galleries/${gallery.id}/selections`} onClick={(e) => e.stopPropagation()}>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Selections
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => { e.preventDefault(); onShare(); }}>
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Share Link
@@ -532,6 +546,18 @@ function GalleryListItem({ gallery, index, onDelete, onEdit, onShare }: GalleryC
                     <DropdownMenuItem onClick={(e) => { e.preventDefault(); onEdit(); }}>
                       <Edit3 className="w-4 h-4 mr-2" />
                       Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to={`/dashboard/galleries/${gallery.id}/insights`} onClick={(e) => e.stopPropagation()}>
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Insights
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to={`/dashboard/galleries/${gallery.id}/selections`} onClick={(e) => e.stopPropagation()}>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Selections
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={(e) => { e.preventDefault(); onShare(); }}>
                       <ExternalLink className="w-4 h-4 mr-2" />

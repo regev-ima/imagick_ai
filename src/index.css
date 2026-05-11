@@ -484,6 +484,20 @@
   --uppy-c-cornflower-blue: hsl(330 100% 60%);
 }
 
+/* ── Brand-themed client gallery root ─────────────────────────────────
+ * BrandThemeProvider mounts a wrapper that scopes the photographer's
+ * brand CSS variables. Templates can opt-in via `var(--brand-primary)`
+ * or inline `style={{ fontFamily: 'var(--brand-font-display)' }}`.
+ * Defaults mirror the editorial-silence direction in SKILL.md so
+ * un-themed galleries still feel intentional rather than generic.
+ */
+.brand-themed-root {
+  --brand-primary: #f5f3ee;
+  --brand-accent: #b8a98a;
+  --brand-font-display: 'Playfair Display', Georgia, serif;
+  --brand-font-body: 'Inter', system-ui, sans-serif;
+}
+
 /* ── Gallery thumbnail shimmer ────────────────────────────────────────
  * Subtle animated gradient on placeholder tiles so the user sees
  * "loading" motion while scrolling fast, instead of a dead grid of

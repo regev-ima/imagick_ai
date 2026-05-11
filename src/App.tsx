@@ -34,6 +34,9 @@ const BillingPage = lazy(() => import("./pages/dashboard/BillingPage"));
 const SettingsPage = lazy(() => import("./pages/dashboard/SettingsPage"));
 const ClientGalleryPage = lazy(() => import("./pages/ClientGalleryPage"));
 const ShortLinkRedirect = lazy(() => import("./pages/ShortLinkRedirect"));
+const PublicPhotoPage = lazy(() => import("./pages/PublicPhotoPage"));
+const GalleryInsightsPage = lazy(() => import("./pages/dashboard/GalleryInsightsPage"));
+const GallerySelectionsPage = lazy(() => import("./pages/dashboard/GallerySelectionsPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
@@ -105,6 +108,7 @@ const App = () => (
                 <Route path="/legal/terms" element={<TermsPage />} />
                 <Route path="/g/:shortId" element={<ShortLinkRedirect />} />
                 <Route path="/gallery/:galleryId" element={<ClientGalleryPage />} />
+                <Route path="/gallery/:galleryId/photo/:imageId" element={<PublicPhotoPage />} />
                 <Route
                   path="/dashboard"
                   element={(
@@ -117,6 +121,8 @@ const App = () => (
                   <Route path="galleries" element={<GalleriesPage />} />
                   <Route path="galleries/new" element={<CreateGalleryPage />} />
                   <Route path="galleries/:id" element={<GalleryEditorPage />} />
+                  <Route path="galleries/:id/insights" element={<GalleryInsightsPage />} />
+                  <Route path="galleries/:id/selections" element={<GallerySelectionsPage />} />
                   <Route path="styles" element={<StylesPage />} />
                   <Route path="styles/new" element={<CreateStylePage />} />
                   <Route path="styles/:styleId" element={<StyleDetailsPage />} />

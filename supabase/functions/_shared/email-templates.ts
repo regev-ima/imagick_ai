@@ -294,6 +294,40 @@ export function accountDeletedTemplate(displayName: string, deletedAt: string): 
   return { subject, html };
 }
 
+export function selectionSubmittedTemplate(
+  galleryName: string,
+  clientName: string,
+  count: number,
+  dashboardUrl: string,
+): { subject: string; html: string } {
+  const subject = `${clientName || "Your client"} finished selecting — "${galleryName}"`;
+  const displayName = clientName ? escHtml(clientName) : "Your client";
+  const html = wrapTemplate(subject, `
+    <div class="badge">Selection Submitted</div>
+    <h1 class="title">${displayName} <span class="title-grad">finished selecting</span> ✅</h1>
+    <p class="text">${displayName} just submitted their final selection for <strong>"${escHtml(galleryName)}"</strong>.</p>
+    <div class="info-box">
+      <div class="info-row">
+        <span class="info-label">Gallery</span>
+        <span class="info-value">${escHtml(galleryName)}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Client</span>
+        <span class="info-value">${displayName}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Selected</span>
+        <span class="info-value">${count} photo${count === 1 ? "" : "s"}</span>
+      </div>
+    </div>
+    <p class="text">You can now review their picks and start building the album.</p>
+    <div class="cta-wrap">
+      <a href="${escHtml(dashboardUrl)}" class="cta-btn">Review selection →</a>
+    </div>
+  `);
+  return { subject, html };
+}
+
 export function gallerySharedConfirmTemplate(galleryName: string, clientEmail: string, galleryUrl: string): { subject: string; html: string } {
   const subject = `Gallery sent to ${clientEmail}`;
   const html = wrapTemplate(subject, `
