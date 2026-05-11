@@ -153,7 +153,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const ready = (images ?? []) as ImageRow[];
     if (ready.length === 0) {
-      return json({ success: true, data: { count: 0, imageIds: [] } });
+      return json({ success: true, count: 0, imageIds: [] });
     }
 
     const chosenIds = rankAndSelect(ready, targetCount);
@@ -219,7 +219,7 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("[gallery-suggest-selection] audit insert failed:", auditError);
     }
 
-    return json({ success: true, data: { count: chosenIds.length, imageIds: chosenIds } });
+    return json({ success: true, count: chosenIds.length, imageIds: chosenIds });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[gallery-suggest-selection] error:", message);

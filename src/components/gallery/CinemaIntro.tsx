@@ -287,11 +287,7 @@ export default function CinemaIntro({
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              transition={{
-                duration: 1.0,
-                ease: [0.22, 1, 0.36, 1],
-                exit: { duration: 0.6 },
-              }}
+              transition={{ duration: 1.0, ease: [0.22, 1, 0.36, 1] }}
               className="text-center"
             >
               <div

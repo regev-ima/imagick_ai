@@ -131,7 +131,7 @@ const handler = async (req: Request): Promise<Response> => {
       // Non-fatal — share event already recorded.
     }
 
-    return json({ success: true, data: { ok: true } });
+    return json({ success: true, ok: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[gallery-record-share] error:", message);

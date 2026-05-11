@@ -176,7 +176,7 @@ const handler = async (req: Request): Promise<Response> => {
     // TODO: also push a WhatsApp notification via notify-whatsapp once the
     // per-photographer phone number is wired up (Phase 1b).
 
-    return json({ success: true, data: { ok: true, count: selectedCount } });
+    return json({ success: true, ok: true, count: selectedCount });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[gallery-finalize-selection] error:", message);
