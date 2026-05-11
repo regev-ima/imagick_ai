@@ -61,8 +61,8 @@ export function useSavedBrandAssets(userId: string | undefined) {
     queryKey: ["brand-assets", userId],
     enabled: !!userId,
     queryFn: async (): Promise<SavedBrandAsset[]> => {
-      const { data, error } = await (supabase
-        .from("gallery_brand_assets") as any)
+      const { data, error } = await (supabase as any)
+        .from("gallery_brand_assets")
         .select("*")
         .eq("user_id", userId)
         .order("is_default", { ascending: false })
@@ -85,8 +85,8 @@ export function useSaveBrandPreset(userId: string | undefined) {
       font_pair: string | null;
     }) => {
       if (!userId) throw new Error("Not signed in");
-      const { error } = await (supabase
-        .from("gallery_brand_assets") as any)
+      const { error } = await (supabase as any)
+        .from("gallery_brand_assets")
         .insert({
           user_id: userId,
           name: preset.name || "Default brand",

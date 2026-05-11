@@ -14,12 +14,10 @@ import {
   MessageSquare,
   StickyNote,
   ChevronDown,
-  ChevronRight,
   Users,
   Mail,
   Clock,
   ArrowLeftRight,
-  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

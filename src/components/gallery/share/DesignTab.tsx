@@ -216,7 +216,7 @@ export function DesignTab(props: DesignTabProps) {
                   <span
                     className={cn(
                       "text-2xl truncate",
-                      fp.isUppercase && "tracking-[0.15em]",
+                      "isUppercase" in fp && fp.isUppercase && "tracking-[0.15em]",
                     )}
                     style={{ fontFamily: fp.fontFamily }}
                   >
