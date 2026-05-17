@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, memo } from "react";
 import { motion } from "framer-motion";
-import { Check, ZoomIn, Star, Heart, Loader2, Upload, AlertTriangle, Clock, Info } from "lucide-react";
+import { Check, ZoomIn, Star, Heart, Upload, AlertTriangle, Clock, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cullingScoreToStars } from "@/lib/cullingScore";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
@@ -173,16 +173,25 @@ function ImageCardImpl({
   const renderStatusOverlay = () => {
     if (isReady) return null;
 
+    // "Thinking" dots — three pink dots that pulse in succession.
+    // Lighter than a spinner (no continuous rotation) and reads as
+    // "working on it" rather than "loading". The staggered delays come
+    // from utility classes in index.css (.thinking-dot-{1,2,3}).
+    const thinkingDots = (
+      <div className="flex items-center gap-1" aria-label="Processing">
+        <span className="thinking-dot thinking-dot-1" />
+        <span className="thinking-dot thinking-dot-2" />
+        <span className="thinking-dot thinking-dot-3" />
+      </div>
+    );
+
     return (
       <div className={cn(
         "absolute inset-0 flex flex-col items-center justify-center rounded-md z-10",
         status === "error"
           ? "bg-destructive/20 backdrop-blur-sm"
-          : "bg-muted/80 backdrop-blur-sm"
+          : "bg-muted/60 backdrop-blur-sm"
       )}>
-        {status === "processing" && (
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        )}
         {status === "uploading" && (
           <Upload className="w-6 h-6 text-primary animate-pulse" />
         )}
@@ -192,6 +201,10 @@ function ImageCardImpl({
         {status === "error" && (
           <AlertTriangle className="w-6 h-6 text-destructive" />
         )}
+        {/* Default + "processing" state — also covers anything we
+            haven't explicitly mapped (e.g. a freshly-uploaded image
+            with no thumbnail yet that's queued for AI scoring). */}
+        {status !== "uploading" && status !== "pending" && status !== "error" && thinkingDots}
       </div>
     );
   };
@@ -205,14 +218,17 @@ function ImageCardImpl({
       )}
       style={viewMode === "masonry" ? { width: itemWidth, height: itemHeight } : undefined}
     >
-      {/* Placeholder shown when not in view or not loaded.
-          Animated shimmer so the user sees motion ("loading") rather
-          than a wall of identical gray boxes when scrolling fast. */}
-      {(!isInView || (!isLoaded && isReady)) && (
+      {/* Placeholder shown when not in view, not loaded, or not yet
+          processed. The !isReady branch was previously gated on
+          !isInView, leaving freshly-uploaded images as invisible
+          empty tiles in the grid (the actual <img> below only renders
+          for ready images). Always render the skeleton when not
+          ready so the user sees the slot the image will live in.   */}
+      {(!isInView || !isReady || (!isLoaded && isReady)) && (
         <div className={cn(
           "rounded-md overflow-hidden border-2 relative",
           isSelected ? "border-primary ring-1 ring-primary/30" : "border-transparent",
-          !isReady ? "" : "bg-muted/30 thumbnail-shimmer",
+          "bg-muted/30 thumbnail-shimmer",
           viewMode === "grid" ? "aspect-square" : "w-full h-full"
         )}
           onClick={() => onImageClick(image.id, index)}
