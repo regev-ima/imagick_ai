@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type Uppy from "@uppy/core";
 import Dashboard from "@uppy/dashboard";
 
 import "@uppy/core/css/style.css";
 import "@uppy/dashboard/css/style.css";
+
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 interface UppyUploadAreaProps {
   uppy: Uppy<any, any>;
@@ -43,6 +45,20 @@ export function UppyUploadArea({
   disabled = false,
 }: UppyUploadAreaProps) {
   const targetRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
+
+  // Resolve "system" to a concrete light/dark for Uppy. The Dashboard
+  // plugin accepts "light" | "dark" | "auto" — "auto" reads
+  // prefers-color-scheme, which is wrong when the user manually picked
+  // a non-system theme in our ThemeProvider.
+  const resolvedTheme = useMemo<"light" | "dark">(() => {
+    if (theme === "light") return "light";
+    if (theme === "dark") return "dark";
+    return typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }, [theme]);
 
   useEffect(() => {
     const target = targetRef.current;
@@ -73,10 +89,11 @@ export function UppyUploadArea({
         // its own internal layout.
         height: DASHBOARD_HEIGHT_PX,
         width: "100%",
-        // Force dark theme — our app is always dark and the OS-aware
-        // "auto" was rendering a white box that clashed with the rest
-        // of the dashboard.
-        theme: "dark",
+        // Track the app's current theme so Dashboard text contrasts
+        // correctly. Light mode renders Uppy's near-white text on a
+        // light panel otherwise (file names and "Drop files here"
+        // become unreadable).
+        theme: resolvedTheme,
         proudlyDisplayPoweredByUppy: false,
         hideUploadButton: true,
         showProgressDetails: true,
@@ -101,7 +118,7 @@ export function UppyUploadArea({
         }
       }
     };
-  }, [uppy]);
+  }, [uppy, resolvedTheme]);
 
   // Update plan-based file limit when it changes (e.g. user picks more
   // styles, which lowers maxImages on a free plan).

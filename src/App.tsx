@@ -84,10 +84,15 @@ const App = () => (
           toastOptions={{
             classNames: {
               toast: "group border-border bg-background text-foreground",
-              success: "!bg-green-500/10 !border-green-500/50 !text-green-500",
-              error: "!bg-destructive/10 !border-destructive/50 !text-destructive",
-              warning: "!bg-yellow-500/10 !border-yellow-500/50 !text-yellow-500",
-              info: "!bg-primary/10 !border-primary/50 !text-primary",
+              description: "!opacity-100 group-[.toast]:!text-current",
+              success:
+                "!bg-green-50 !border-green-500/60 !text-green-800 dark:!bg-green-500/10 dark:!border-green-500/50 dark:!text-green-300",
+              error:
+                "!bg-red-50 !border-destructive/60 !text-red-800 dark:!bg-destructive/10 dark:!border-destructive/50 dark:!text-destructive",
+              warning:
+                "!bg-yellow-50 !border-yellow-500/60 !text-yellow-800 dark:!bg-yellow-500/10 dark:!border-yellow-500/50 dark:!text-yellow-300",
+              info:
+                "!bg-primary/5 !border-primary/60 !text-primary dark:!bg-primary/10 dark:!border-primary/50",
             }
           }}
         />

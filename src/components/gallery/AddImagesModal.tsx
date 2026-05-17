@@ -305,6 +305,7 @@ export function AddImagesModal({
   if (!isOpen) return null;
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -725,7 +726,14 @@ export function AddImagesModal({
           </div>
         </Card>
       </motion.div>
+    </motion.div>
 
+      {/* AlertDialog must NOT be inside the backdrop motion.div above:
+          Radix portals the dialog into document.body for layout, but
+          React events still bubble through the component tree, so a
+          click on any AlertDialog button bubbles up to the backdrop's
+          onClick={onClose} and closes the whole modal. Sibling
+          placement under the Fragment breaks that bubbling path. */}
       <AlertDialog open={!!duplicatePrompt} onOpenChange={(open) => !open && setDuplicatePrompt(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -751,6 +759,6 @@ export function AddImagesModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </motion.div>
+    </>
   );
 }
