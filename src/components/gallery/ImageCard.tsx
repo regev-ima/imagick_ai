@@ -44,6 +44,12 @@ interface ImageCardProps {
 }
 
 const MAX_RETRY_DELAY = 10000;
+// Stop retrying broken thumbnails after this many attempts (~31s with the
+// exponential backoff capped at MAX_RETRY_DELAY). Without a cap the tile
+// would loop forever and the user just sees an empty white square — see
+// the "stuck tile" cluster reported when an upload finished but a thumb
+// 404'd on the CDN.
+const MAX_THUMBNAIL_RETRIES = 5;
 
 function ImageCardImpl({
   image,
@@ -71,6 +77,9 @@ function ImageCardImpl({
    *  fetch priority so the browser delivers visible thumbnails first. */
   const [isActiveViewport, setIsActiveViewport] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  // Surfaces a visible "stuck" state once the retry budget is spent so
+  // the user can click to retry instead of staring at an empty tile.
+  const [hasFailed, setHasFailed] = useState(false);
   const [currentSrc, setCurrentSrc] = useState(thumbnailUrl);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -79,6 +88,7 @@ function ImageCardImpl({
 
   useEffect(() => {
     setRetryCount(0);
+    setHasFailed(false);
     setCurrentSrc(thumbnailUrl);
     // If this URL is already in the in-memory cache (we've shown it
     // before this session) keep isLoaded=true so the user doesn't
@@ -152,12 +162,27 @@ function ImageCardImpl({
 
   const handleImageError = useCallback(() => {
     if (!isReady) return;
+    if (retryCount >= MAX_THUMBNAIL_RETRIES) {
+      setHasFailed(true);
+      return;
+    }
     const delay = Math.min(Math.pow(2, retryCount + 1) * 1000, MAX_RETRY_DELAY);
     retryTimeoutRef.current = setTimeout(() => {
       setCurrentSrc(`${thumbnailUrl}?retry=${Date.now()}`);
       setRetryCount(prev => prev + 1);
     }, delay);
   }, [retryCount, thumbnailUrl, isReady]);
+
+  // Manual retry from the failed-tile UI: reset state and refetch with
+  // a cache-busting query string so we don't hit the same poisoned CDN
+  // entry.
+  const handleManualRetry = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setHasFailed(false);
+    setRetryCount(0);
+    setIsLoaded(false);
+    setCurrentSrc(`${thumbnailUrl}?retry=${Date.now()}`);
+  }, [thumbnailUrl]);
 
   const { mode: cullingScoreMode } = useCullingScoreMode();
   const starRating = cullingScoreToStars(image.culling_score, cullingScoreMode);
@@ -168,6 +193,23 @@ function ImageCardImpl({
   const aspectRatio = (image.width && image.height) ? image.width / image.height : 1.5;
   const itemWidth = viewMode === "masonry" ? (computedWidth ?? ROW_HEIGHT * aspectRatio) : undefined;
   const itemHeight = viewMode === "masonry" ? (computedHeight ?? ROW_HEIGHT) : undefined;
+
+  // Render the failed-thumbnail tile — shown when retry budget is
+  // exhausted. Clickable to retry; otherwise the user is stuck staring
+  // at an empty white square forever.
+  const renderFailedTile = () => (
+    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md z-10 bg-muted/60 backdrop-blur-sm gap-2">
+      <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+      <button
+        type="button"
+        onClick={handleManualRetry}
+        className="text-[11px] text-primary hover:underline focus:outline-none focus:underline"
+        aria-label="Retry loading thumbnail"
+      >
+        Retry
+      </button>
+    </div>
+  );
 
   // Render status overlay for non-ready images
   const renderStatusOverlay = () => {
@@ -224,7 +266,7 @@ function ImageCardImpl({
           empty tiles in the grid (the actual <img> below only renders
           for ready images). Always render the skeleton when not
           ready so the user sees the slot the image will live in.   */}
-      {(!isInView || !isReady || (!isLoaded && isReady)) && (
+      {(!isInView || !isReady || (!isLoaded && isReady) || hasFailed) && (
         <div className={cn(
           "rounded-md overflow-hidden border-2 relative",
           isSelected ? "border-primary ring-1 ring-primary/30" : "border-transparent",
@@ -233,7 +275,7 @@ function ImageCardImpl({
         )}
           onClick={() => onImageClick(image.id, index)}
         >
-          {!isReady && renderStatusOverlay()}
+          {hasFailed ? renderFailedTile() : (!isReady && renderStatusOverlay())}
           {/* Selection checkbox on placeholder */}
           <button
             type="button"
@@ -256,7 +298,7 @@ function ImageCardImpl({
       )}
 
       {/* Actual card - only render when in view AND ready */}
-      {isInView && isReady && (
+      {isInView && isReady && !hasFailed && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={isLoaded ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
