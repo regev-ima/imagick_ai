@@ -515,6 +515,11 @@
  * gray squares. Cheap — one keyframe, runs on the GPU compositor.
  */
 .thumbnail-shimmer {
+  /* In dark mode the underlying card is near-black, so a faint white
+   * highlight reads as a shimmer. In light mode the underlying card
+   * is near-white, so the *same* white highlight is invisible — and
+   * stuck/empty tiles looked like blank squares. Re-targeted via
+   * html.light below. */
   background-image: linear-gradient(
     105deg,
     hsl(0 0% 100% / 0.02) 0%,
@@ -523,6 +528,14 @@
   );
   background-size: 200% 100%;
   animation: thumbnail-shimmer 1.4s ease-in-out infinite;
+}
+.light .thumbnail-shimmer {
+  background-image: linear-gradient(
+    105deg,
+    hsl(0 0% 0% / 0.04) 0%,
+    hsl(0 0% 0% / 0.10) 50%,
+    hsl(0 0% 0% / 0.04) 100%
+  );
 }
 
 @keyframes thumbnail-shimmer {
