@@ -484,6 +484,31 @@
   --uppy-c-cornflower-blue: hsl(330 100% 60%);
 }
 
+/* ── Light-mode contrast fixes ─────────────────────────────────────
+ * The rules above were written when the app was dark-only. They
+ * paint white-on-translucent for the status bar and let Uppy's own
+ * "shy" / secondary text (the "Drop files here or" line, the file
+ * count, the upload-speed readout) inherit Uppy's grey defaults.
+ * On a white app background those become unreadable. Re-target the
+ * same elements with dark ink when html.light is active. */
+.light .imagick-uppy-dashboard .uppy-StatusBar {
+  background-color: hsl(0 0% 0% / 0.04) !important;
+  color: hsl(240 10% 15%) !important;
+  border-top-color: hsl(0 0% 0% / 0.08) !important;
+}
+.light .imagick-uppy-dashboard .uppy-StatusBar.is-uploading {
+  background-color: hsl(0 0% 0% / 0.04) !important;
+}
+.light .imagick-uppy-dashboard .uppy-Dashboard-AddFiles-title,
+.light .imagick-uppy-dashboard .uppy-Dashboard-Item-name,
+.light .imagick-uppy-dashboard .uppy-Dashboard-Item-status,
+.light .imagick-uppy-dashboard .uppy-StatusBar-content,
+.light .imagick-uppy-dashboard .uppy-StatusBar-statusPrimary,
+.light .imagick-uppy-dashboard .uppy-StatusBar-statusSecondary,
+.light .imagick-uppy-dashboard .uppy-Dashboard-note {
+  color: hsl(240 10% 15%) !important;
+}
+
 /* ── Gallery thumbnail shimmer ────────────────────────────────────────
  * Subtle animated gradient on placeholder tiles so the user sees
  * "loading" motion while scrolling fast, instead of a dead grid of
