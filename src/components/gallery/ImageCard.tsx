@@ -6,6 +6,7 @@ import { cullingScoreToStars } from "@/lib/cullingScore";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { isImageLoaded, markImageLoaded } from "@/lib/loadedImageCache";
+import { useFailedImages } from "@/components/gallery/FailedImagesContext";
 
 const ROW_HEIGHT = 160;
 
@@ -50,6 +51,12 @@ const MAX_RETRY_DELAY = 10000;
 // the "stuck tile" cluster reported when an upload finished but a thumb
 // 404'd on the CDN.
 const MAX_THUMBNAIL_RETRIES = 5;
+// User-initiated retries on top of the auto-retry budget. After this many
+// click-to-retry attempts we stop offering the button — the file almost
+// certainly isn't coming back and we don't want to keep hammering the CDN
+// or letting the user spam it. The tile transitions to a "Re-upload"
+// final state with the filename shown so the user knows what to do next.
+const MAX_MANUAL_RETRIES = 2;
 
 function ImageCardImpl({
   image,
@@ -77,11 +84,18 @@ function ImageCardImpl({
    *  fetch priority so the browser delivers visible thumbnails first. */
   const [isActiveViewport, setIsActiveViewport] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [manualRetryCount, setManualRetryCount] = useState(0);
   // Surfaces a visible "stuck" state once the retry budget is spent so
   // the user can click to retry instead of staring at an empty tile.
   const [hasFailed, setHasFailed] = useState(false);
+  // True between a manual-retry click and the next load/error event —
+  // drives the "thinking" dots so the user gets feedback that the click
+  // did something. Distinct from the auto-retry path (which is fast
+  // enough that the empty placeholder reads as "still loading").
+  const [isRetrying, setIsRetrying] = useState(false);
   const [currentSrc, setCurrentSrc] = useState(thumbnailUrl);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { reportFailed, reportRecovered } = useFailedImages();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const isReady = status === "ready";
@@ -157,11 +171,13 @@ function ImageCardImpl({
 
   const handleImageLoad = useCallback(() => {
     setIsLoaded(true);
+    setIsRetrying(false);
     markImageLoaded(currentSrc);
   }, [currentSrc]);
 
   const handleImageError = useCallback(() => {
     if (!isReady) return;
+    setIsRetrying(false);
     if (retryCount >= MAX_THUMBNAIL_RETRIES) {
       setHasFailed(true);
       return;
@@ -175,14 +191,35 @@ function ImageCardImpl({
 
   // Manual retry from the failed-tile UI: reset state and refetch with
   // a cache-busting query string so we don't hit the same poisoned CDN
-  // entry.
+  // entry. Capped at MAX_MANUAL_RETRIES — past that the tile shows a
+  // terminal "Re-upload" state with the filename so the user can
+  // identify the file in their source folder and re-upload it.
   const handleManualRetry = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    if (manualRetryCount >= MAX_MANUAL_RETRIES) return;
     setHasFailed(false);
+    setIsRetrying(true);
     setRetryCount(0);
     setIsLoaded(false);
+    setManualRetryCount(prev => prev + 1);
     setCurrentSrc(`${thumbnailUrl}?retry=${Date.now()}`);
-  }, [thumbnailUrl]);
+  }, [thumbnailUrl, manualRetryCount]);
+
+  // Register / unregister with the gallery-level FailedImagesProvider so
+  // a "Problem images" section can list all failed tiles and offer
+  // Retry-all in one click. Done in an effect so we only update the
+  // context when the failure state actually transitions.
+  useEffect(() => {
+    if (hasFailed) {
+      reportFailed({
+        id: image.id,
+        filename: image.filename,
+        retry: () => handleManualRetry({ stopPropagation: () => {} } as React.MouseEvent),
+      });
+    } else {
+      reportRecovered(image.id);
+    }
+  }, [hasFailed, image.id, image.filename, reportFailed, reportRecovered, handleManualRetry]);
 
   const { mode: cullingScoreMode } = useCullingScoreMode();
   const starRating = cullingScoreToStars(image.culling_score, cullingScoreMode);
@@ -194,38 +231,68 @@ function ImageCardImpl({
   const itemWidth = viewMode === "masonry" ? (computedWidth ?? ROW_HEIGHT * aspectRatio) : undefined;
   const itemHeight = viewMode === "masonry" ? (computedHeight ?? ROW_HEIGHT) : undefined;
 
-  // Render the failed-thumbnail tile — shown when retry budget is
-  // exhausted. Clickable to retry; otherwise the user is stuck staring
-  // at an empty white square forever.
-  const renderFailedTile = () => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md z-10 bg-muted/60 backdrop-blur-sm gap-2">
-      <AlertTriangle className="w-5 h-5 text-muted-foreground" />
-      <button
-        type="button"
-        onClick={handleManualRetry}
-        className="text-[11px] text-primary hover:underline focus:outline-none focus:underline"
-        aria-label="Retry loading thumbnail"
-      >
-        Retry
-      </button>
+  // "Thinking" dots — three pink dots that pulse in succession.
+  // Lighter than a spinner and reads as "working on it". Used both
+  // for the initial-processing state and during a manual retry click.
+  const thinkingDots = (
+    <div className="flex items-center gap-1" aria-label="Processing">
+      <span className="thinking-dot thinking-dot-1" />
+      <span className="thinking-dot thinking-dot-2" />
+      <span className="thinking-dot thinking-dot-3" />
     </div>
   );
+
+  // Overlay that wraps the thinking dots — shown during a manual retry
+  // while we wait for load/error to fire, so the user gets immediate
+  // feedback that their click did something.
+  const renderRetryingOverlay = () => (
+    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md z-10 bg-muted/60 backdrop-blur-sm">
+      {thinkingDots}
+    </div>
+  );
+
+  // Render the failed-thumbnail tile — shown when retry budget is
+  // exhausted. Two visual states:
+  //   1) Manual retries remaining → AlertTriangle + Retry button.
+  //   2) Manual retries spent     → AlertTriangle + "Re-upload"
+  //      label + filename, no clickable retry. At this point the file
+  //      probably isn't coming back from the CDN and we don't want
+  //      the user spamming the storage layer with cache-busting GETs.
+  const renderFailedTile = () => {
+    const manualRetriesLeft = MAX_MANUAL_RETRIES - manualRetryCount;
+    const terminal = manualRetriesLeft <= 0;
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md z-10 bg-muted/60 backdrop-blur-sm gap-1.5 px-2 text-center">
+        <AlertTriangle className={cn("w-5 h-5", terminal ? "text-destructive" : "text-muted-foreground")} />
+        {terminal ? (
+          <>
+            <span className="text-[10px] font-medium text-destructive uppercase tracking-wide">Re-upload</span>
+            <span className="text-[10px] text-muted-foreground truncate max-w-full" title={image.filename}>
+              {image.filename}
+            </span>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={handleManualRetry}
+              className="text-[11px] text-primary hover:underline focus:outline-none focus:underline"
+              aria-label={`Retry loading thumbnail for ${image.filename}`}
+            >
+              Retry
+            </button>
+            <span className="text-[9px] text-muted-foreground truncate max-w-full" title={image.filename}>
+              {image.filename}
+            </span>
+          </>
+        )}
+      </div>
+    );
+  };
 
   // Render status overlay for non-ready images
   const renderStatusOverlay = () => {
     if (isReady) return null;
-
-    // "Thinking" dots — three pink dots that pulse in succession.
-    // Lighter than a spinner (no continuous rotation) and reads as
-    // "working on it" rather than "loading". The staggered delays come
-    // from utility classes in index.css (.thinking-dot-{1,2,3}).
-    const thinkingDots = (
-      <div className="flex items-center gap-1" aria-label="Processing">
-        <span className="thinking-dot thinking-dot-1" />
-        <span className="thinking-dot thinking-dot-2" />
-        <span className="thinking-dot thinking-dot-3" />
-      </div>
-    );
 
     return (
       <div className={cn(
@@ -266,7 +333,7 @@ function ImageCardImpl({
           empty tiles in the grid (the actual <img> below only renders
           for ready images). Always render the skeleton when not
           ready so the user sees the slot the image will live in.   */}
-      {(!isInView || !isReady || (!isLoaded && isReady) || hasFailed) && (
+      {(!isInView || !isReady || (!isLoaded && isReady) || hasFailed || isRetrying) && (
         <div className={cn(
           "rounded-md overflow-hidden border-2 relative",
           isSelected ? "border-primary ring-1 ring-primary/30" : "border-transparent",
@@ -275,7 +342,11 @@ function ImageCardImpl({
         )}
           onClick={() => onImageClick(image.id, index)}
         >
-          {hasFailed ? renderFailedTile() : (!isReady && renderStatusOverlay())}
+          {isRetrying
+            ? renderRetryingOverlay()
+            : hasFailed
+              ? renderFailedTile()
+              : !isReady && renderStatusOverlay()}
           {/* Selection checkbox on placeholder */}
           <button
             type="button"

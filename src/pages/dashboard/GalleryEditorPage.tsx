@@ -69,6 +69,8 @@ import { FilterOptions, defaultFilters } from "@/components/gallery/filter-types
 import { ShareGalleryModal } from "@/components/gallery/ShareGalleryModal";
 import { StyleSelector, StyleComparison } from "@/components/gallery/StyleSelector";
 import { ImageCard } from "@/components/gallery/ImageCard";
+import { FailedImagesProvider } from "@/components/gallery/FailedImagesContext";
+import { ProblemImagesSection } from "@/components/gallery/ProblemImagesSection";
 import { VirtualizedImageGrid } from "@/components/gallery/VirtualizedImageGrid";
 import { CullingStatusBanner } from "@/components/gallery/CullingStatusBanner";
 import { CatalogModeSelector, CatalogMode } from "@/components/gallery/CatalogModeSelector";
@@ -1582,6 +1584,7 @@ export default function GalleryEditorPage() {
   }
 
   return (
+   <FailedImagesProvider>
     <div className="h-full flex flex-col overflow-hidden">
       {/* Compact Single-Row Header */}
       <div 
@@ -1973,6 +1976,10 @@ export default function GalleryEditorPage() {
           />
         </div>
         <div className="p-4 lg:p-6">
+        {/* Surfaces any thumbnails that exhausted their auto-retry
+            budget so the user can see exactly which uploads need
+            attention (by filename) and trigger a batched retry. */}
+        <ProblemImagesSection />
         {/* Recycle Bin View */}
         {showTrash ? (
           <div className="space-y-4">
@@ -3063,6 +3070,7 @@ export default function GalleryEditorPage() {
         hasCullingData={hasCullingData}
       />
     </div>
+   </FailedImagesProvider>
   );
 }
 
