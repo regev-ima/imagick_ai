@@ -7,6 +7,7 @@ import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { isImageLoaded, markImageLoaded } from "@/lib/loadedImageCache";
 import { useFailedImages } from "@/components/gallery/FailedImagesContext";
+import { getPreviewUrl } from "@/lib/imageUrls";
 
 const ROW_HEIGHT = 160;
 
@@ -85,6 +86,16 @@ function ImageCardImpl({
   const [isActiveViewport, setIsActiveViewport] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [manualRetryCount, setManualRetryCount] = useState(0);
+  // Graceful fallback ladder: when the thumbnail repeatedly fails to
+  // load (404 / corrupt / never-generated), fall through to the
+  // compressed preview, then to the original. The original always
+  // exists (the user just saw it in the lightbox at 4MB) so this
+  // turns "blank tile" into "actual image, slightly slower to load"
+  // — far better UX than asking the user to re-upload.
+  //   0 = thumbnail (default, fastest)
+  //   1 = preview / compressed (medium)
+  //   2 = original (slowest, always present)
+  const [fallbackLevel, setFallbackLevel] = useState<0 | 1 | 2>(0);
   // Surfaces a visible "stuck" state once the retry budget is spent so
   // the user can click to retry instead of staring at an empty tile.
   const [hasFailed, setHasFailed] = useState(false);
@@ -103,6 +114,7 @@ function ImageCardImpl({
   useEffect(() => {
     setRetryCount(0);
     setHasFailed(false);
+    setFallbackLevel(0);
     setCurrentSrc(thumbnailUrl);
     // If this URL is already in the in-memory cache (we've shown it
     // before this session) keep isLoaded=true so the user doesn't
@@ -113,6 +125,18 @@ function ImageCardImpl({
       retryTimeoutRef.current = null;
     }
   }, [thumbnailUrl, status]);
+
+  // Compute the URL for a given level in the fallback ladder. Each
+  // level is a different physical asset, so the browser cache won't
+  // hide the fact that level 0 was broken when we ask for level 1.
+  const urlForLevel = useCallback(
+    (level: 0 | 1 | 2): string => {
+      if (level === 0) return thumbnailUrl;
+      if (level === 1) return getPreviewUrl(image.original_url);
+      return image.original_url;
+    },
+    [thumbnailUrl, image.original_url],
+  );
 
   useEffect(() => {
     return () => {
@@ -179,15 +203,26 @@ function ImageCardImpl({
     if (!isReady) return;
     setIsRetrying(false);
     if (retryCount >= MAX_THUMBNAIL_RETRIES) {
+      // Spent the retry budget at the current ladder level. Try the
+      // next fallback level before declaring the tile failed — the
+      // original almost always works even when the thumbnail is
+      // missing, and a slow-but-correct image beats a blank tile.
+      if (fallbackLevel < 2) {
+        const nextLevel = (fallbackLevel + 1) as 1 | 2;
+        setFallbackLevel(nextLevel);
+        setRetryCount(0);
+        setCurrentSrc(`${urlForLevel(nextLevel)}?retry=${Date.now()}`);
+        return;
+      }
       setHasFailed(true);
       return;
     }
     const delay = Math.min(Math.pow(2, retryCount + 1) * 1000, MAX_RETRY_DELAY);
     retryTimeoutRef.current = setTimeout(() => {
-      setCurrentSrc(`${thumbnailUrl}?retry=${Date.now()}`);
+      setCurrentSrc(`${urlForLevel(fallbackLevel)}?retry=${Date.now()}`);
       setRetryCount(prev => prev + 1);
     }, delay);
-  }, [retryCount, thumbnailUrl, isReady]);
+  }, [retryCount, isReady, fallbackLevel, urlForLevel]);
 
   // Manual retry from the failed-tile UI: reset state and refetch with
   // a cache-busting query string so we don't hit the same poisoned CDN
@@ -200,6 +235,7 @@ function ImageCardImpl({
     setHasFailed(false);
     setIsRetrying(true);
     setRetryCount(0);
+    setFallbackLevel(0);
     setIsLoaded(false);
     setManualRetryCount(prev => prev + 1);
     setCurrentSrc(`${thumbnailUrl}?retry=${Date.now()}`);
