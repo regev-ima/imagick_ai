@@ -2701,7 +2701,7 @@ export default function GalleryEditorPage() {
               </AnimatePresence>
 
               <motion.div
-                className="flex-1 flex items-center justify-center min-h-0 min-w-0 overflow-hidden"
+                className="flex-1 flex items-center justify-center min-h-0 min-w-0 overflow-hidden p-3"
                 drag={isMobile ? "y" : false}
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={0.3}
@@ -2747,7 +2747,7 @@ export default function GalleryEditorPage() {
                         <img
                           src={displayUrl}
                           alt={holdingOriginal ? "Original" : `Edited with ${selectedStyleData?.name || "AI"}`}
-                          className="max-h-[75vh] max-w-full object-contain rounded-lg pointer-events-none"
+                          className="max-h-full max-w-full object-contain rounded-lg pointer-events-none"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
@@ -2810,13 +2810,13 @@ export default function GalleryEditorPage() {
                           <img
                             src={originalUrl}
                             alt="Original"
-                            className="max-h-[80vh] max-w-full object-contain rounded-lg pointer-events-none"
+                            className="max-h-full max-w-full object-contain rounded-lg pointer-events-none"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <Badge variant="secondary" className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm">
+                          <Badge variant="secondary" className="absolute top-3 left-3 bg-black/70 text-white border-transparent backdrop-blur-sm">
                             Original
                           </Badge>
                         </div>
@@ -2824,13 +2824,13 @@ export default function GalleryEditorPage() {
                           <img
                             src={editedUrl}
                             alt={selectedStyleData?.name || "Edited"}
-                            className="max-h-[80vh] max-w-full object-contain rounded-lg pointer-events-none"
+                            className="max-h-full max-w-full object-contain rounded-lg pointer-events-none"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <Badge variant="secondary" className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm">
+                          <Badge variant="secondary" className="absolute top-3 right-3 bg-black/70 text-white border-transparent backdrop-blur-sm">
                             {selectedStyleData?.name || "Edited"}
                           </Badge>
                         </div>
@@ -2874,7 +2874,7 @@ export default function GalleryEditorPage() {
                     <img
                       src={getPreviewUrl(currentImage.original_url)}
                       alt={currentImage.original_url.split('/').pop() || "Gallery image"}
-                      className="max-h-[75vh] max-w-full object-contain rounded-lg pointer-events-none"
+                      className="max-h-full max-w-full object-contain rounded-lg pointer-events-none"
                       onError={(e) => {
                         // Fallback to original URL if preview doesn't exist yet
                         const target = e.target as HTMLImageElement;
