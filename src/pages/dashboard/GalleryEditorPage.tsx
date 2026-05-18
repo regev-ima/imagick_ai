@@ -2816,7 +2816,7 @@ export default function GalleryEditorPage() {
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <Badge variant="secondary" className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm">
+                          <Badge variant="secondary" className="absolute top-3 left-3 bg-black/70 text-white border-transparent backdrop-blur-sm">
                             Original
                           </Badge>
                         </div>
@@ -2830,7 +2830,7 @@ export default function GalleryEditorPage() {
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <Badge variant="secondary" className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm">
+                          <Badge variant="secondary" className="absolute top-3 right-3 bg-black/70 text-white border-transparent backdrop-blur-sm">
                             {selectedStyleData?.name || "Edited"}
                           </Badge>
                         </div>
