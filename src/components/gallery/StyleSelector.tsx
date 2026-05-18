@@ -135,7 +135,14 @@ export function StyleComparison({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-lg cursor-ew-resize select-none bg-black inline-block touch-none",
+        // Container fills the parent's bounded box and lets the base
+        // <img> size itself within those bounds via max-h-full /
+        // max-w-full. Was inline-block + max-h-[85vh]/max-w-[90vw]
+        // which is viewport-relative and didn't account for the
+        // lightbox chrome (top bar + thumbnail strip) — so on shorter
+        // viewports the badges anchored at top-3 got clipped under
+        // the top bar.
+        "relative overflow-hidden rounded-lg cursor-ew-resize select-none bg-black max-h-full max-w-full touch-none",
         className
       )}
       onMouseMove={handleMouseMove}
@@ -150,7 +157,7 @@ export function StyleComparison({
       <img
         src={editedUrl}
         alt={`Edited with ${styleName}`}
-        className="block w-auto h-auto max-h-[85vh] max-w-[90vw] object-contain"
+        className="block w-auto h-auto max-h-full max-w-full object-contain"
         onLoad={handleImageLoad}
         onError={(e) => handleImageError(e, editedFallbackUrl || originalUrl)}
       />
@@ -188,16 +195,18 @@ export function StyleComparison({
         </div>
       </div>
 
-      {/* Labels */}
+      {/* Labels — solid-dark pill so they're readable over any image
+          regardless of app theme (these overlays sit on a photo, not
+          on the page surface, so they shouldn't track theme tokens). */}
       <Badge
         variant="secondary"
-        className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm z-10"
+        className="absolute top-3 left-3 bg-black/70 text-white border-transparent backdrop-blur-sm z-10"
       >
         Original
       </Badge>
       <Badge
         variant="secondary"
-        className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm z-10"
+        className="absolute top-3 right-3 bg-black/70 text-white border-transparent backdrop-blur-sm z-10"
       >
         {styleName}
       </Badge>
