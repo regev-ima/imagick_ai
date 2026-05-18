@@ -2804,9 +2804,9 @@ export default function GalleryEditorPage() {
                         animate={{ y: 0, scale: 1, opacity: 1 }}
                         exit={isMobile ? { y: swipeDirection * -300, opacity: 0 } : { scale: 0.95, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        onClick={(e) => e.stopPropagation()} className="flex items-center justify-center gap-2 px-4 w-full"
+                        onClick={(e) => e.stopPropagation()} className="flex items-center justify-center gap-2 px-4 w-full h-full"
                       >
-                        <div className="relative flex-1 flex items-center justify-end min-w-0 overflow-hidden">
+                        <div className="relative flex-1 flex items-center justify-end min-w-0 h-full overflow-hidden">
                           <img
                             src={originalUrl}
                             alt="Original"
@@ -2820,7 +2820,7 @@ export default function GalleryEditorPage() {
                             Original
                           </Badge>
                         </div>
-                        <div className="relative flex-1 flex items-center justify-start min-w-0 overflow-hidden">
+                        <div className="relative flex-1 flex items-center justify-start min-w-0 h-full overflow-hidden">
                           <img
                             src={editedUrl}
                             alt={selectedStyleData?.name || "Edited"}
@@ -2847,7 +2847,7 @@ export default function GalleryEditorPage() {
                       exit={isMobile ? { y: swipeDirection * -300, opacity: 0 } : { scale: 0.95, opacity: 0 }}
                       transition={{ type: "spring", stiffness: 300, damping: 30 }}
                       onClick={(e) => e.stopPropagation()}
-                      className="max-w-full overflow-hidden"
+                      className="max-w-full max-h-full h-full overflow-hidden flex items-center justify-center"
                     >
                       <StyleComparison
                         originalUrl={originalUrl}
