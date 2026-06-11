@@ -37,8 +37,8 @@ const ShortLinkRedirect = lazy(() => import("./pages/ShortLinkRedirect"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
-// Internal design concept (NEXUS) — static mock screens, unlinked from any
-// nav. See docs/design/nexus-concept.md. Safe to remove once a direction
+// Internal design concept (AURA) — static mock screens, unlinked from any
+// nav. See docs/design/aura-concept.md. Safe to remove once a direction
 // is approved and the real theme work starts.
 const DesignPreview = lazy(() => import("./pages/DesignPreview"));
 const PrivacyPage = lazy(() => import("./pages/legal/PrivacyPage"));
