@@ -120,9 +120,25 @@ Done:
 5. Uppy uploader, scrollbars, toasts and legacy glow/gradient utilities
    recolored via tokens.
 
-Remaining before merge:
-- Sweep deep screens for local pink/purple utility accents (a few admin
-  pages, client gallery) and contrast-check both themes.
-- Decide whether the Aura command bar ships visually before the engine
-  exists, or stays behind a flag.
-- Visual QA of the gallery editor at scale (virtualized grid).
+## v4 — dashboard rebuilt from scratch (not a recolor)
+
+Feedback on v3: recoloring the existing layout is not a redesign. The
+dashboard home (`src/pages/dashboard/DashboardHome.tsx`) is now a
+ground-up rebuild with a new composition, wired to the same real data:
+
+- **Conversation-first:** an Aura command bar (rotating `aura-ai-border`
+  + orb) is the centerpiece, with real action chips beneath it. The
+  duplicate command bar was removed from the global header.
+- **Bento telemetry** replaces the flat stat strip: a radial edits gauge,
+  a storage bar, a tappable collections tile, and a live engine tile
+  showing the real processing count via the orb.
+- **"Aura is working on"** — a live queue built from galleries actually
+  in `processing`/`uploading`, with real per-gallery progress.
+- **Recent collections** restyled as editorial glass cards (status LED,
+  live percent, hover lift).
+- **Empty state** rebuilt as a command-deck welcome around the orb.
+- Display type (Unbounded) on the greeting, JetBrains Mono on every
+  number/label. All motion uses the strong ease-out curve.
+
+Next surfaces to rebuild the same way (pending direction approval):
+collections index, gallery editor, billing, settings, then admin.

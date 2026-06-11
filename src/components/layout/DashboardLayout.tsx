@@ -453,18 +453,6 @@ export default function DashboardLayout() {
             >
               <Menu className="w-5 h-5" />
             </Button>
-
-            {/* Aura command bar — visual concept for the approval preview;
-                input is not wired to the engine yet. */}
-            <div className="hidden md:flex w-full max-w-[460px] items-center gap-3 rounded-full border border-border/70 bg-background/50 px-4 py-2 backdrop-blur-md transition-[border-color,box-shadow] duration-150 focus-within:border-primary/60 focus-within:shadow-[0_0_28px_-10px_hsl(var(--glow-primary)/0.7)]">
-              <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-              <input
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
-                placeholder="Ask Aura: cull, retouch, deliver…"
-                aria-label="Ask Aura"
-              />
-              <kbd className="aura-microlabel hidden lg:block rounded-full border border-border/70 px-2 py-0.5">⌘K</kbd>
-            </div>
           </div>
 
           <div className="flex items-center gap-3">
