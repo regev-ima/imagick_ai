@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,186 +8,190 @@
 
 @layer base {
   :root {
-    /* Base dark colors — matches imagick-web dark mode */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* AURA dark — violet-black void */
+    --background: 258 30% 3.5%;
+    --foreground: 260 36% 97%;
 
-    /* Card */
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
+    /* Card / surfaces: raised glass */
+    --card: 256 24% 7.5%;
+    --card-foreground: 260 36% 97%;
 
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 256 24% 7.5%;
+    --popover-foreground: 260 36% 97%;
 
-    /* Primary - Neon Pink (matches imagick-web) */
-    --primary: 330 100% 60%;
+    /* Primary - Aura Violet */
+    --primary: 272 96% 66%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Purple brand color */
-    --secondary: 270 75% 60%;
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary - Quantum Aqua */
+    --secondary: 192 100% 58%;
+    --secondary-foreground: 258 30% 6%;
 
     /* Muted for subtle backgrounds */
-    --muted: 240 10% 15%;
-    --muted-foreground: 240 5% 60%;
+    --muted: 256 20% 13%;
+    --muted-foreground: 258 14% 66%;
 
-    /* Accent - Purple brand (matches imagick-web --accent) */
-    --accent: 270 100% 65%;
+    /* Accent - Fuchsia (legacy brand magenta, evolved) */
+    --accent: 318 100% 62%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 350 80% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 10% 15%;
-    --input: 240 10% 15%;
-    --ring: 330 100% 60%;
+    --border: 258 20% 16%;
+    --input: 258 20% 16%;
+    --ring: 272 96% 66%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
-    /* Neon color tokens (matches imagick-web) */
-    --neon-pink: 330 100% 60%;
-    --neon-purple: 270 100% 65%;
-    --neon-blue: 210 100% 60%;
+    /* Neon tokens — legacy names, AURA hues (used across the app) */
+    --neon-pink: 318 100% 62%;
+    --neon-purple: 272 96% 66%;
+    --neon-blue: 192 100% 58%;
 
     /* Gradient tokens */
-    --gradient-start: 330 100% 60%;
-    --gradient-end: 270 100% 65%;
+    --gradient-start: 272 96% 66%;
+    --gradient-end: 318 100% 62%;
 
     /* Sidebar */
-    --sidebar-background: 240 10% 5%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 330 100% 60%;
+    --sidebar-background: 257 28% 5%;
+    --sidebar-foreground: 260 36% 97%;
+    --sidebar-primary: 272 96% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 12%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 10% 15%;
-    --sidebar-ring: 330 100% 60%;
+    --sidebar-accent: 256 22% 11%;
+    --sidebar-accent-foreground: 260 36% 97%;
+    --sidebar-border: 258 20% 14%;
+    --sidebar-ring: 272 96% 66%;
 
     /* Custom glow tokens */
-    --glow-primary: 330 100% 60%;
-    --glow-secondary: 270 100% 65%;
-    --glow-accent: 240 10% 25%;
+    --glow-primary: 272 96% 66%;
+    --glow-secondary: 318 100% 62%;
+    --glow-accent: 256 20% 25%;
 
-    /* Rating star color */
-    --rating: 45 93% 47%;
+    /* Rating star color — champagne */
+    --rating: 42 96% 62%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(330, 100%, 60%) 0%, hsl(270, 100%, 65%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(330, 100%, 60%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(240, 10%, 25%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(240, 10%, 6%) 0%, hsl(240, 10%, 3.9%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(330, 100%, 60%, 0.15) 0%, transparent 70%);
+    /* Motion tokens — strong curves, UI feedback stays under 250ms */
+    --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+
+    /* The AI signature — reserved for engine actions */
+    --gradient-primary: linear-gradient(115deg, hsl(272 96% 66%) 0%, hsl(318 100% 62%) 50%, hsl(192 100% 58%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(318 100% 62%) 0%, hsl(272 96% 66%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(272 96% 66%) 0%, hsl(256 20% 25%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(256 24% 7.5%) 0%, hsl(258 30% 3.5%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(272 96% 66% / 0.15) 0%, transparent 70%);
 
     /* Glass effect */
-    --glass-background: hsla(240, 10%, 12%, 0.6);
-    --glass-border: hsla(0, 0%, 98%, 0.08);
+    --glass-background: hsla(256, 24%, 11%, 0.6);
+    --glass-border: hsla(260, 36%, 97%, 0.08);
   }
 
   /* Light mode */
   .light {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 10%;
-    --card: 0 0% 98%;
-    --card-foreground: 240 10% 10%;
+    /* Daylight Aura — porcelain glass, same violet identity */
+    --background: 260 40% 98.5%;
+    --foreground: 258 30% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 258 30% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 10%;
-    --primary: 330 85% 50%;
+    --popover-foreground: 258 30% 10%;
+    --primary: 272 80% 56%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 270 60% 55%;
+    --secondary: 192 90% 38%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 240 5% 92%;
-    --muted-foreground: 240 5% 45%;
-    /* Accent - Purple brand (matches imagick-web light mode --accent) */
-    --accent: 270 80% 55%;
+    --muted: 258 25% 93%;
+    --muted-foreground: 258 12% 44%;
+    --accent: 318 85% 52%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 50%;
+    --destructive: 350 75% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5% 88%;
-    --input: 240 5% 92%;
-    --ring: 330 85% 50%;
+    --border: 258 20% 88%;
+    --input: 258 20% 92%;
+    --ring: 272 80% 56%;
 
     /* Neon tokens */
-    --neon-pink: 330 100% 60%;
-    --neon-purple: 270 100% 65%;
-    --neon-blue: 210 100% 60%;
+    --neon-pink: 318 85% 52%;
+    --neon-purple: 272 80% 56%;
+    --neon-blue: 192 90% 38%;
 
     /* Gradient tokens */
-    --gradient-start: 330 85% 50%;
-    --gradient-end: 270 80% 55%;
+    --gradient-start: 272 80% 56%;
+    --gradient-end: 318 85% 52%;
 
     /* Sidebar light */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5% 35%;
-    --sidebar-primary: 330 85% 50%;
+    --sidebar-background: 260 40% 98%;
+    --sidebar-foreground: 258 12% 38%;
+    --sidebar-primary: 272 80% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 94%;
-    --sidebar-accent-foreground: 240 10% 10%;
-    --sidebar-border: 240 5% 88%;
-    --sidebar-ring: 330 85% 50%;
+    --sidebar-accent: 258 25% 94%;
+    --sidebar-accent-foreground: 258 30% 10%;
+    --sidebar-border: 258 20% 88%;
+    --sidebar-ring: 272 80% 56%;
 
     /* Light glow tokens */
-    --glow-primary: 330 85% 50%;
-    --glow-secondary: 270 80% 55%;
+    --glow-primary: 272 80% 56%;
+    --glow-secondary: 318 85% 52%;
 
     /* Light mode glass */
     --glass-background: hsla(0, 0%, 100%, 0.8);
-    --glass-border: hsla(240, 5%, 85%, 0.5);
+    --glass-border: hsla(258, 20%, 85%, 0.5);
 
     /* Light gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(330, 85%, 50%) 0%, hsl(270, 80%, 55%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(270, 80%, 55%) 0%, hsl(330, 85%, 50%) 100%);
+    --gradient-primary: linear-gradient(115deg, hsl(272 80% 56%) 0%, hsl(318 85% 52%) 50%, hsl(192 90% 38%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(318 85% 52%) 0%, hsl(272 80% 56%) 100%);
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 330 100% 60%;
+    --background: 258 30% 3.5%;
+    --foreground: 260 36% 97%;
+    --card: 256 24% 7.5%;
+    --card-foreground: 260 36% 97%;
+    --popover: 256 24% 7.5%;
+    --popover-foreground: 260 36% 97%;
+    --primary: 272 96% 66%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 270 75% 60%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 240 10% 15%;
-    --muted-foreground: 240 5% 60%;
-    --accent: 270 100% 65%;
+    --secondary: 192 100% 58%;
+    --secondary-foreground: 258 30% 6%;
+    --muted: 256 20% 13%;
+    --muted-foreground: 258 14% 66%;
+    --accent: 318 100% 62%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 350 80% 58%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 10% 15%;
-    --input: 240 10% 15%;
-    --ring: 330 100% 60%;
+    --border: 258 20% 16%;
+    --input: 258 20% 16%;
+    --ring: 272 96% 66%;
 
-    --neon-pink: 330 100% 60%;
-    --neon-purple: 270 100% 65%;
-    --neon-blue: 210 100% 60%;
-    --gradient-start: 330 100% 60%;
-    --gradient-end: 270 100% 65%;
+    --neon-pink: 318 100% 62%;
+    --neon-purple: 272 96% 66%;
+    --neon-blue: 192 100% 58%;
+    --gradient-start: 272 96% 66%;
+    --gradient-end: 318 100% 62%;
 
     /* Sidebar dark */
-    --sidebar-background: 240 10% 5%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 330 100% 60%;
+    --sidebar-background: 257 28% 5%;
+    --sidebar-foreground: 260 36% 97%;
+    --sidebar-primary: 272 96% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 12%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 10% 15%;
-    --sidebar-ring: 330 100% 60%;
+    --sidebar-accent: 256 22% 11%;
+    --sidebar-accent-foreground: 260 36% 97%;
+    --sidebar-border: 258 20% 14%;
+    --sidebar-ring: 272 96% 66%;
 
-    --glow-primary: 330 100% 60%;
-    --glow-secondary: 270 100% 65%;
-    --glow-accent: 240 10% 25%;
+    --glow-primary: 272 96% 66%;
+    --glow-secondary: 318 100% 62%;
+    --glow-accent: 256 20% 25%;
 
     /* Dark mode glass */
-    --glass-background: hsla(240, 10%, 12%, 0.6);
-    --glass-border: hsla(0, 0%, 98%, 0.08);
+    --glass-background: hsla(256, 24%, 11%, 0.6);
+    --glass-border: hsla(260, 36%, 97%, 0.08);
 
-    --gradient-primary: linear-gradient(135deg, hsl(330, 100%, 60%) 0%, hsl(270, 100%, 65%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(330, 100%, 60%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(240, 10%, 25%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(240, 10%, 6%) 0%, hsl(240, 10%, 3.9%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(330, 100%, 60%, 0.15) 0%, transparent 70%);
+    --gradient-primary: linear-gradient(115deg, hsl(272 96% 66%) 0%, hsl(318 100% 62%) 50%, hsl(192 100% 58%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(318 100% 62%) 0%, hsl(272 96% 66%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(272 96% 66%) 0%, hsl(256 20% 25%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(256 24% 7.5%) 0%, hsl(258 30% 3.5%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(272 96% 66% / 0.15) 0%, transparent 70%);
   }
 }
 
@@ -198,7 +202,7 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Sora', 'Inter', system-ui, sans-serif;
   }
 
   /* Custom scrollbar */
@@ -234,9 +238,10 @@
   /* Glass card effect */
   .glass-card {
     background: var(--glass-background);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
     border: 1px solid var(--glass-border);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.06);
   }
 
   /* Glow effects */
@@ -321,30 +326,30 @@
 
   /* Glow effects (matches imagick-web) */
   .glow-pink {
-    box-shadow: 0 4px 20px hsl(330 85% 50% / 0.2), 0 8px 40px hsl(330 85% 50% / 0.1);
+    box-shadow: 0 4px 20px hsl(var(--glow-primary) / 0.2), 0 8px 40px hsl(var(--glow-primary) / 0.1);
   }
 
   .dark .glow-pink {
-    box-shadow: 0 0 40px hsl(330 100% 60% / 0.3), 0 0 80px hsl(330 100% 60% / 0.1);
+    box-shadow: 0 0 40px hsl(var(--glow-primary) / 0.3), 0 0 80px hsl(var(--glow-primary) / 0.1);
   }
 
   /* Glow text effect (matches imagick-web) */
   .glow-text {
-    text-shadow: 0 2px 10px hsl(330 85% 50% / 0.3);
+    text-shadow: 0 2px 10px hsl(var(--glow-primary) / 0.3);
   }
 
   .dark .glow-text {
-    text-shadow: 0 0 30px hsl(330 100% 60% / 0.5);
+    text-shadow: 0 0 30px hsl(var(--glow-primary) / 0.5);
   }
 }
 
 /* Keyframes */
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 20px hsl(330 100% 60% / 0.3);
+    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.3);
   }
   50% {
-    box-shadow: 0 0 40px hsl(330 100% 60% / 0.5);
+    box-shadow: 0 0 40px hsl(var(--glow-primary) / 0.5);
   }
 }
 
@@ -397,31 +402,31 @@
   max-width: 100% !important;
   width: 100% !important;
   border-radius: 12px !important;
-  border: 2px dashed hsl(330 100% 60% / 0.30) !important;
-  background: hsl(330 100% 60% / 0.04) !important;
+  border: 2px dashed hsl(var(--primary) / 0.30) !important;
+  background: hsl(var(--primary) / 0.04) !important;
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 .imagick-uppy-dashboard .uppy-Dashboard-inner:hover,
 .imagick-uppy-dashboard .uppy-Dashboard--isDraggingOver .uppy-Dashboard-inner {
-  border-color: hsl(330 100% 60% / 0.60) !important;
-  background: hsl(330 100% 60% / 0.08) !important;
+  border-color: hsl(var(--primary) / 0.60) !important;
+  background: hsl(var(--primary) / 0.08) !important;
 }
 
 /* Solid pink primary buttons (browse files, retry-all, etc.) */
 .imagick-uppy-dashboard .uppy-c-btn-primary,
 .imagick-uppy-dashboard .uppy-DashboardContent-addMore {
-  background-color: hsl(330 100% 60%) !important;
+  background-color: hsl(var(--primary)) !important;
   color: white !important;
   border-radius: 8px !important;
 }
 .imagick-uppy-dashboard .uppy-c-btn-primary:hover,
 .imagick-uppy-dashboard .uppy-DashboardContent-addMore:hover {
-  background-color: hsl(330 100% 55%) !important;
+  background-color: hsl(var(--primary) / 0.9) !important;
 }
 
 /* Pink focus rings everywhere */
 .imagick-uppy-dashboard *:focus-visible {
-  outline-color: hsl(330 100% 60%) !important;
+  outline-color: hsl(var(--primary)) !important;
 }
 
 /* Status bar — dark muted background (matches our card bg), with the
@@ -436,7 +441,7 @@
   background-color: hsl(0 0% 100% / 0.04) !important;
 }
 .imagick-uppy-dashboard .uppy-StatusBar-progress {
-  background-color: hsl(330 100% 60%) !important;
+  background-color: hsl(var(--primary)) !important;
   height: 3px !important;
   opacity: 1 !important;
 }
@@ -445,11 +450,11 @@
   .uppy-StatusBar-progress.is-indeterminate {
   background-image: linear-gradient(
     45deg,
-    hsl(330 100% 60% / 0.6) 25%,
+    hsl(var(--primary) / 0.6) 25%,
     transparent 25%,
     transparent 50%,
-    hsl(330 100% 60% / 0.6) 50%,
-    hsl(330 100% 60% / 0.6) 75%,
+    hsl(var(--primary) / 0.6) 50%,
+    hsl(var(--primary) / 0.6) 75%,
     transparent 75%,
     transparent
   ) !important;
@@ -469,19 +474,19 @@
 .imagick-uppy-dashboard .uppy-StatusBar-actionBtn--retry,
 .imagick-uppy-dashboard .uppy-StatusBar-actionBtn--upload,
 .imagick-uppy-dashboard .uppy-c-btn-link {
-  color: hsl(330 100% 60%) !important;
+  color: hsl(var(--primary)) !important;
 }
 .imagick-uppy-dashboard .uppy-Dashboard-browse:hover,
 .imagick-uppy-dashboard .uppy-Dashboard-AddFiles a:hover,
 .imagick-uppy-dashboard .uppy-c-btn-link:hover {
-  color: hsl(330 100% 70%) !important;
+  color: hsl(var(--primary) / 0.85) !important;
 }
 
 /* Override Uppy's --uppy-c-blue (used in many internal accents) so
  * any element we didn't explicitly target still picks up our pink. */
 .imagick-uppy-dashboard {
-  --uppy-c-blue: hsl(330 100% 60%);
-  --uppy-c-cornflower-blue: hsl(330 100% 60%);
+  --uppy-c-blue: hsl(var(--primary));
+  --uppy-c-cornflower-blue: hsl(var(--primary));
 }
 
 /* ── Light-mode contrast fixes ─────────────────────────────────────
@@ -550,7 +555,7 @@
   width: 6px;
   height: 6px;
   border-radius: 9999px;
-  background-color: hsl(330 100% 60%);
+  background-color: hsl(var(--primary));
   display: inline-block;
   opacity: 0.3;
   animation: thinking-dot 1.2s ease-in-out infinite;
@@ -562,4 +567,186 @@
 @keyframes thinking-dot {
   0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
   40%          { opacity: 1;   transform: scale(1); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   AURA effect kit — global, token-driven. The "intelligence is light"
+   layer of the redesign: rotating iridescent borders for engine
+   actions, the living orb, telemetry chips and gauges. All hues come
+   from the theme tokens, so light/dark both work.
+   ════════════════════════════════════════════════════════════════════ */
+
+@property --aura-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+:where(.aura-ai-border, .aura-orb, .aura-gauge, .aura-chip) {
+  position: relative;
+}
+
+/* Rotating conic border + soft bloom. Reserved for the engine. */
+.aura-ai-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--aura-angle),
+    hsl(var(--primary)),
+    hsl(var(--accent)),
+    hsl(var(--secondary)),
+    hsl(var(--primary))
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.aura-ai-border::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 140deg,
+    hsl(var(--primary)),
+    hsl(var(--accent)),
+    hsl(var(--secondary)),
+    hsl(var(--primary))
+  );
+  filter: blur(16px);
+  opacity: 0.18;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* The living AI core */
+.aura-orb { border-radius: 9999px; }
+.aura-orb-halo {
+  position: absolute;
+  inset: -35%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.4), hsl(var(--accent) / 0.12) 55%, transparent 72%);
+  filter: blur(6px);
+}
+.aura-orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(
+    from 0deg,
+    hsl(var(--secondary)),
+    hsl(var(--primary)),
+    hsl(var(--accent)),
+    transparent 78%,
+    hsl(var(--secondary))
+  );
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3.5px), black calc(100% - 2.5px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 3.5px), black calc(100% - 2.5px));
+}
+.aura-orb-core {
+  position: absolute;
+  inset: 24%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 36% 30%,
+    hsl(0 0% 100% / 0.9),
+    hsl(var(--secondary) / 0.85) 28%,
+    hsl(var(--primary) / 0.8) 62%,
+    hsl(var(--accent) / 0.55) 100%
+  );
+}
+
+/* Telemetry chip + status LEDs */
+.aura-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border) / 0.9);
+  background: hsl(var(--card) / 0.6);
+  backdrop-filter: blur(10px);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: hsl(var(--muted-foreground));
+}
+
+.aura-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  display: inline-block;
+  flex-shrink: 0;
+  background: hsl(var(--led, var(--primary)));
+  box-shadow: 0 0 10px hsl(var(--led, var(--primary)) / 0.9);
+}
+
+/* Ring gauge (credits / storage at a glance) */
+.aura-gauge {
+  border-radius: 9999px;
+  background: conic-gradient(
+    from 230deg,
+    hsl(var(--accent)) 0deg,
+    hsl(var(--primary)) calc(var(--gauge, 70) * 1.3deg),
+    hsl(var(--secondary)) calc(var(--gauge, 70) * 2.6deg),
+    hsl(var(--border)) calc(var(--gauge, 70) * 2.6deg)
+  );
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 6px), black calc(100% - 5px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 6px), black calc(100% - 5px));
+}
+
+/* Mono micro-labels for telemetry */
+.aura-microlabel {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground) / 0.85);
+}
+
+/* Iridescent hairline divider */
+.aura-hairline {
+  height: 1px;
+  border: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--primary) / 0.55) 20%,
+    hsl(var(--accent) / 0.55) 50%,
+    hsl(var(--secondary) / 0.55) 80%,
+    transparent
+  );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .aura-ai-border::before { animation: aura-spin-angle 5s linear infinite; }
+  .aura-orb-ring { animation: aura-rotate 7s linear infinite; }
+  .aura-orb-core { animation: aura-breathe 3.4s ease-in-out infinite; }
+  .aura-orb-halo { animation: aura-breathe 3.4s ease-in-out infinite reverse; }
+  .aura-led-pulse { animation: aura-led 2.2s ease-in-out infinite; }
+}
+
+@keyframes aura-spin-angle {
+  to { --aura-angle: 360deg; }
+}
+@keyframes aura-rotate {
+  to { transform: rotate(360deg); }
+}
+@keyframes aura-breathe {
+  0%, 100% { opacity: 0.8; transform: scale(0.95); }
+  50%      { opacity: 1;   transform: scale(1.06); }
+}
+@keyframes aura-led {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
 }

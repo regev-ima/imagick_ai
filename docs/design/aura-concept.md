@@ -1,7 +1,10 @@
 # IMAGICK // AURA — futuristic redesign concept (v2)
 
-**Status:** concept v2 — awaiting design review. Lives only on a feature
-branch; nothing here is deployed or linked from the product UI.
+**Status:** v3 — AURA is now applied to the ENTIRE app on this branch
+(global tokens, shadcn primitives, dashboard shell), so the Vercel branch
+preview is the full product in the new design. Sign in there to evaluate
+it with real data. Production (`main`) remains untouched until this PR is
+approved and merged.
 
 **Live render:** run the app and open `/design-preview` (lazy route, mock
 data only — no Supabase, no auth).
@@ -97,12 +100,29 @@ Two installed design skills were applied on top of v2:
   rotating border degrades to a static gradient where `@property` is
   unsupported.
 
-## Proposed rollout (after approval)
+## Implementation state (v3, this branch)
 
-1. Promote tokens into `index.css` behind a `.theme-aura` class + feature
-   flag (per-account opt-in: "Try the new look").
-2. Re-skin shell first (DashboardLayout → pill rail + prompt bar), then
-   dashboard tiles, then gallery/culling surfaces.
-3. Light-mode variant ("daylight aura": porcelain glass, same signature
-   gradient) before general availability.
-4. Remove the legacy theme once adoption is healthy.
+Done:
+1. Global tokens in `index.css` (`:root`/`.dark` + "Daylight Aura"
+   `.light`): violet primary, fuchsia accent, aqua secondary, violet-black
+   surfaces, champagne rating, AURA gradients; legacy `--neon-*` names
+   remapped so older code follows automatically.
+2. Type stack: Sora (body/headings), Unbounded (display), JetBrains Mono
+   (telemetry) wired through Tailwind `font-sans/display/mono`.
+3. shadcn primitives restyled (button, card, input, badge, progress,
+   switch, dialog, dropdown, popover, select, tabs, tooltip): pill
+   buttons with 140ms press feedback, glass cards with specular edge,
+   glow focus states. Every screen (incl. admin) inherits them.
+4. Dashboard shell: glass sidebar with pill nav + glow active state,
+   gradient credit bars, Aura command bar in the header (visual for now,
+   engine wiring is a separate effort) and the living orb as the engine
+   presence chip.
+5. Uppy uploader, scrollbars, toasts and legacy glow/gradient utilities
+   recolored via tokens.
+
+Remaining before merge:
+- Sweep deep screens for local pink/purple utility accents (a few admin
+  pages, client gallery) and contrast-check both themes.
+- Decide whether the Aura command bar ships visually before the engine
+  exists, or stays behind a flag.
+- Visual QA of the gallery editor at scale (virtualized grid).

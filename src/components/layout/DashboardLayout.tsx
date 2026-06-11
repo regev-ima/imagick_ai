@@ -28,6 +28,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { BuildVersionBadge } from "@/components/layout/BuildVersionBadge";
+import { Orb } from "@/components/aura/Orb";
 import imagickLogoDark from "@/assets/imagick-logo.png";
 import imagickIconDark from "@/assets/imagick-icon.png";
 import imagickLogoLight from "@/assets/imagick-logo-light.png";
@@ -101,7 +102,7 @@ export default function DashboardLayout() {
       {/* Desktop Sidebar */}
       <motion.aside
         className={cn(
-          "hidden lg:flex flex-col border-r border-border/50 bg-sidebar transition-all duration-300 relative sticky top-0 h-screen overflow-visible z-40",
+          "hidden lg:flex flex-col border-r border-border/40 bg-sidebar/80 backdrop-blur-xl transition-all duration-300 relative sticky top-0 h-screen overflow-visible z-40",
           sidebarOpen ? "w-64" : "w-20"
         )}
         initial={false}
@@ -156,9 +157,9 @@ export default function DashboardLayout() {
                   key={item.href}
                   to={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                    "flex items-center gap-3 px-3.5 py-2.5 rounded-full transition-all duration-200 group",
                     isActive
-                      ? "bg-primary/5 text-primary border-l-[3px] border-l-primary"
+                      ? "bg-primary/10 text-primary shadow-[inset_0_1px_0_hsl(0_0%_100%/0.06),0_0_24px_-8px_hsl(var(--glow-primary)/0.6)]"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                 >
@@ -212,7 +213,7 @@ export default function DashboardLayout() {
               {!isUnlimited && (
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)] transition-all duration-300"
                     style={{ width: `${editsTotal > 0 ? Math.min(100, (editsRemaining / editsTotal) * 100) : 0}%` }}
                   />
                 </div>
@@ -227,7 +228,7 @@ export default function DashboardLayout() {
               </div>
               <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full transition-all duration-300"
+                  className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)] transition-all duration-300"
                   style={{ width: `${maxStorageGb > 0 ? Math.min(100, (storageUsedMb / 1024 / maxStorageGb) * 100) : 0}%` }}
                 />
               </div>
@@ -368,9 +369,9 @@ export default function DashboardLayout() {
                     to={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
+                      "flex items-center gap-3 px-3.5 py-2.5 rounded-full transition-all",
                       isActive
-                        ? "bg-primary/5 text-primary border-l-[3px] border-l-primary"
+                        ? "bg-primary/10 text-primary shadow-[inset_0_1px_0_hsl(0_0%_100%/0.06),0_0_24px_-8px_hsl(var(--glow-primary)/0.6)]"
                         : "text-sidebar-foreground hover:bg-sidebar-accent"
                     )}
                   >
@@ -393,7 +394,7 @@ export default function DashboardLayout() {
                 {!isUnlimited && (
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary rounded-full transition-all duration-300"
+                      className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)] transition-all duration-300"
                       style={{ width: `${editsTotal > 0 ? Math.min(100, (editsRemaining / editsTotal) * 100) : 0}%` }}
                     />
                   </div>
@@ -408,7 +409,7 @@ export default function DashboardLayout() {
                 </div>
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)] transition-all duration-300"
                     style={{ width: `${maxStorageGb > 0 ? Math.min(100, (storageUsedMb / 1024 / maxStorageGb) * 100) : 0}%` }}
                   />
                 </div>
@@ -443,7 +444,7 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
         <header className="h-16 border-b border-border/50 flex items-center justify-between px-4 lg:px-6 glass-card sticky top-0 z-30">
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
             <Button
               variant="ghost"
               size="icon"
@@ -452,9 +453,24 @@ export default function DashboardLayout() {
             >
               <Menu className="w-5 h-5" />
             </Button>
+
+            {/* Aura command bar — visual concept for the approval preview;
+                input is not wired to the engine yet. */}
+            <div className="hidden md:flex w-full max-w-[460px] items-center gap-3 rounded-full border border-border/70 bg-background/50 px-4 py-2 backdrop-blur-md transition-[border-color,box-shadow] duration-150 focus-within:border-primary/60 focus-within:shadow-[0_0_28px_-10px_hsl(var(--glow-primary)/0.7)]">
+              <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
+                placeholder="Ask Aura: cull, retouch, deliver…"
+                aria-label="Ask Aura"
+              />
+              <kbd className="aura-microlabel hidden lg:block rounded-full border border-border/70 px-2 py-0.5">⌘K</kbd>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
+            <span className="aura-chip hidden sm:inline-flex">
+              <Orb className="h-4 w-4" /> Aura ready
+            </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="glow" size="icon" disabled={isImpersonating}>

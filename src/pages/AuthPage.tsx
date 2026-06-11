@@ -394,7 +394,7 @@ export default function AuthPage() {
           <div className="relative text-center mb-8 lg:hidden overflow-hidden rounded-2xl p-6">
             <div className="absolute inset-0 animate-gradient-shift bg-[length:400%_400%] rounded-2xl opacity-80"
               style={{
-                backgroundImage: "linear-gradient(135deg, hsl(270, 50%, 10%) 0%, hsl(330, 40%, 12%) 25%, hsl(240, 40%, 8%) 50%, hsl(200, 50%, 10%) 75%, hsl(270, 50%, 10%) 100%)",
+                backgroundImage: "linear-gradient(135deg, hsl(272, 50%, 10%) 0%, hsl(318, 40%, 12%) 25%, hsl(258, 40%, 7%) 50%, hsl(192, 50%, 10%) 75%, hsl(272, 50%, 10%) 100%)",
               }}
             />
             <div className="relative z-10">
