@@ -274,9 +274,11 @@ export default function DashboardLayout() {
         )}
       </AnimatePresence>
 
-      {/* ── Main column (cleared from the floating rail on lg) ─────── */}
-      <div className="flex h-screen flex-col lg:pl-[88px]">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 px-4 glass-card lg:px-6">
+      {/* ── Main column — full-bleed; the top bar and background span
+          edge to edge, the rail floats over the left, and only the inner
+          content is inset to clear it. ─────────────────────────────── */}
+      <div className="flex h-screen flex-col">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 px-4 glass-card lg:pl-[92px] lg:pr-6">
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileMenuOpen(true)}>
               <Menu className="h-5 w-5" />
@@ -309,7 +311,7 @@ export default function DashboardLayout() {
 
         {isImpersonating && targetUser && (
           <div className="border-b border-amber-500/30 bg-amber-500/10">
-            <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-3 px-4 py-2 lg:px-6">
+            <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 px-4 py-2 lg:pl-[92px] lg:pr-6">
               <p className="truncate text-sm text-amber-500">
                 Viewing account as <span className="font-semibold">{targetUser.fullName || targetUser.email}</span> ({targetUser.email})
               </p>
@@ -322,7 +324,7 @@ export default function DashboardLayout() {
 
         {/* Gallery editor keeps overflow-hidden so it can manage its own
             internal scroll; other pages scroll inside <main>. */}
-        <main className={cn("flex-1", isGalleryEditor ? "overflow-hidden" : "mx-auto w-full max-w-[1400px] overflow-auto")}>
+        <main className={cn("flex-1", isGalleryEditor ? "overflow-hidden" : "overflow-auto lg:pl-[76px]")}>
           <Suspense
             fallback={
               <div className="flex h-full min-h-[60vh] items-center justify-center">
@@ -330,7 +332,13 @@ export default function DashboardLayout() {
               </div>
             }
           >
-            <Outlet />
+            {isGalleryEditor ? (
+              <Outlet />
+            ) : (
+              <div className="mx-auto w-full max-w-[1600px]">
+                <Outlet />
+              </div>
+            )}
           </Suspense>
         </main>
       </div>

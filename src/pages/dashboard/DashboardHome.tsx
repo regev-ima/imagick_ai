@@ -160,7 +160,7 @@ export default function DashboardHome() {
         <div className="absolute bottom-0 -left-[8vw] h-[36vh] w-[32vw] rounded-full bg-accent/[0.07] blur-[120px]" />
       </div>
 
-      <motion.div variants={deck} initial="hidden" animate="show" className="relative mx-auto max-w-6xl space-y-8">
+      <motion.div variants={deck} initial="hidden" animate="show" className="relative w-full space-y-8">
         {/* ── Greeting ───────────────────────────────────────────── */}
         <motion.div variants={rise} className="flex flex-wrap items-end justify-between gap-4">
           <div>

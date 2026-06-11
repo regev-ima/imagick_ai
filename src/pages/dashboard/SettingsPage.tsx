@@ -53,10 +53,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 type Tab = "profile" | "security" | "notifications" | "account";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType; color: string; bg: string }[] = [
-  { id: "profile",       label: "Profile",       icon: User,     color: "text-violet-400", bg: "bg-violet-500/10" },
-  { id: "security",      label: "Security",      icon: Lock,     color: "text-amber-400",  bg: "bg-amber-500/10" },
-  { id: "notifications", label: "Notifications", icon: Bell,     color: "text-blue-400",   bg: "bg-blue-500/10" },
-  { id: "account",       label: "Account",       icon: Settings, color: "text-rose-400",   bg: "bg-rose-500/10" },
+  { id: "profile",       label: "Profile",       icon: User,     color: "text-primary", bg: "bg-primary/10" },
+  { id: "security",      label: "Security",      icon: Lock,     color: "text-primary", bg: "bg-primary/10" },
+  { id: "notifications", label: "Notifications", icon: Bell,     color: "text-primary", bg: "bg-primary/10" },
+  { id: "account",       label: "Account",       icon: Settings, color: "text-primary", bg: "bg-primary/10" },
 ];
 
 export default function SettingsPage() {
@@ -257,7 +257,7 @@ export default function SettingsPage() {
     {
       title: "Collections",
       icon: Image,
-      color: "text-blue-400",
+      color: "text-muted-foreground",
       items: [
         { key: "gallery_upload_complete" as const, label: "Upload complete",  desc: "When all your photos have been uploaded successfully", icon: Upload },
         { key: "gallery_images_ready"   as const, label: "Editing complete", desc: "When the AI finishes editing all images in a collection", icon: Wand2 },
@@ -267,7 +267,7 @@ export default function SettingsPage() {
     {
       title: "AI Styles",
       icon: Sparkles,
-      color: "text-violet-400",
+      color: "text-muted-foreground",
       items: [
         { key: "style_training_started" as const, label: "Training started", desc: "When a new style begins training", icon: Sparkles },
         { key: "style_ready"            as const, label: "Style ready",      desc: "When your style finishes training and is ready to use", icon: Palette },
@@ -276,7 +276,7 @@ export default function SettingsPage() {
     {
       title: "Account",
       icon: CreditCard,
-      color: "text-emerald-400",
+      color: "text-muted-foreground",
       items: [
         { key: "subscription_change" as const, label: "Plan & billing updates", desc: "When your plan changes or credits are added", icon: CreditCard },
       ],
@@ -289,8 +289,8 @@ export default function SettingsPage() {
     <Card className="glass-card border-border/50">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-violet-500/10">
-            <User className="w-5 h-5 text-violet-400" />
+          <div className="p-2 rounded-lg bg-primary/10">
+            <User className="w-5 h-5 text-primary" />
           </div>
           <div>
             <CardTitle>Profile Information</CardTitle>
@@ -354,8 +354,8 @@ export default function SettingsPage() {
         {/* Appearance */}
         <div>
           <div className="flex items-center gap-2.5 mb-3">
-            <div className="p-1.5 rounded-lg bg-pink-500/10">
-              <Palette className="w-4 h-4 text-pink-400" />
+            <div className="p-1.5 rounded-lg bg-primary/10">
+              <Palette className="w-4 h-4 text-primary" />
             </div>
             <div>
               <p className="font-medium text-sm">Appearance</p>
@@ -393,8 +393,8 @@ export default function SettingsPage() {
     <Card className="glass-card border-border/50">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-amber-500/10">
-            <Lock className="w-5 h-5 text-amber-400" />
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Lock className="w-5 h-5 text-primary" />
           </div>
           <div>
             <CardTitle>Security</CardTitle>
@@ -455,8 +455,8 @@ export default function SettingsPage() {
     <Card className="glass-card border-border/50">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-blue-500/10">
-            <Bell className="w-5 h-5 text-blue-400" />
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Bell className="w-5 h-5 text-primary" />
           </div>
           <div>
             <CardTitle>Email Notifications</CardTitle>
@@ -477,7 +477,7 @@ export default function SettingsPage() {
             {notificationGroups.map((group) => (
               <div key={group.title}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className={`p-1.5 rounded-md ${group.color === "text-blue-400" ? "bg-blue-500/10" : group.color === "text-violet-400" ? "bg-violet-500/10" : "bg-emerald-500/10"}`}>
+                  <div className="p-1.5 rounded-md bg-muted">
                     <group.icon className={`w-3.5 h-3.5 ${group.color}`} />
                   </div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
