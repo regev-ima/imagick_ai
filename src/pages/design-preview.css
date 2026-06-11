@@ -38,6 +38,12 @@
   --au-muted: 258 14% 66%;
   --au-line: 264 60% 85%;         /* borders @ low alpha            */
 
+  /* Motion tokens. Built-in CSS easings are too weak for UI feedback;
+     these stronger curves give instant response (fast start, soft
+     settle). UI transitions stay under 300ms. */
+  --au-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --au-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
   /* The AI signature — every "intelligent" element wears it */
   --au-ai: linear-gradient(
     115deg,
@@ -46,11 +52,12 @@
     hsl(var(--au-aqua)) 82%,
     hsl(var(--au-violet))
   );
+  /* Strictly tri-hue: gold stays reserved for premium-tier chips so
+     the intelligence signature reads as one disciplined identity. */
   --au-ai-conic: conic-gradient(
     from var(--au-angle),
     hsl(var(--au-violet)),
     hsl(var(--au-fuchsia)),
-    hsl(var(--au-gold) / 0.85),
     hsl(var(--au-aqua)),
     hsl(var(--au-violet))
   );
@@ -206,9 +213,8 @@
   mask-composite: exclude;
   pointer-events: none;
   opacity: 0.7;
-  transition: opacity 0.35s ease;
+  transition: opacity 180ms ease;
 }
-.au-rim:hover::before { opacity: 1; }
 
 /* Rotating conic gradient border — THE AI marker. Wear sparingly:
    the command bar, the engine, "intelligent" suggestions. */
@@ -272,20 +278,24 @@
     transparent 70%
   );
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity 200ms ease;
   pointer-events: none;
 }
-.au-mouse-glow:hover::after { opacity: 1; }
 
 .au-hover-lift {
-  transition: transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), box-shadow 0.4s ease;
+  transition: transform 200ms var(--au-ease-out), box-shadow 200ms ease;
 }
-.au-hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    inset 0 1px 0 hsl(0 0% 100% / 0.09),
-    0 0 50px -10px hsl(var(--au-violet) / 0.4),
-    0 34px 80px -32px hsl(260 90% 2% / 0.95);
+
+@media (hover: hover) and (pointer: fine) {
+  .au-rim:hover::before { opacity: 1; }
+  .au-mouse-glow:hover::after { opacity: 1; }
+  .au-hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.09),
+      0 0 50px -10px hsl(var(--au-violet) / 0.4),
+      0 34px 80px -32px hsl(260 90% 2% / 0.95);
+  }
 }
 
 /* ── The Aura orb — a living AI core ─────────────────────────────── */
@@ -392,6 +402,7 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   white-space: nowrap;
+  transition: border-color 150ms ease, color 150ms ease;
 }
 .au-chip-active {
   border-color: transparent;
@@ -439,11 +450,16 @@
   font-size: 0.875rem;
   font-weight: 600;
   padding: 0.62rem 1.35rem;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  transition:
+    transform 140ms var(--au-ease-out),
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
   cursor: pointer;
   white-space: nowrap;
 }
-.au-btn:active { transform: translateY(1px) scale(0.99); }
+.au-btn:active { transform: scale(0.97); }
 
 .au-btn-ai {
   background: var(--au-ai);
@@ -456,7 +472,6 @@
     inset 0 1px 0 hsl(0 0% 100% / 0.3);
 }
 .au-btn-ai:hover {
-  transform: translateY(-1px);
   box-shadow:
     0 0 40px -6px hsl(var(--au-violet) / 0.9),
     0 0 40px -6px hsl(var(--au-aqua) / 0.6),
@@ -499,7 +514,7 @@
   font-size: 0.875rem;
   width: 100%;
   outline: none;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 .au-input::placeholder { color: hsl(var(--au-muted) / 0.7); }
 .au-input:focus {
@@ -525,7 +540,7 @@
   height: 17px;
   border-radius: 9999px;
   background: hsl(var(--au-muted));
-  transition: transform 0.28s cubic-bezier(0.3, 1.4, 0.5, 1), background 0.28s ease;
+  transition: transform 220ms cubic-bezier(0.3, 1.4, 0.5, 1), background 220ms ease;
 }
 .au-switch-on {
   background:
@@ -635,6 +650,26 @@
 /* ── Floating hero deck ──────────────────────────────────────────── */
 
 .au-perspective { perspective: 1400px; }
+
+/* ── Page-load entrance ──────────────────────────────────────────────
+   One orchestrated reveal on load: elements fade up 14px with a 60ms
+   cascade (set --i per element). Uses @starting-style so it is pure
+   CSS, interruptible, and simply absent on engines without support. */
+@media (prefers-reduced-motion: no-preference) {
+  .au-enter {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity 600ms var(--au-ease-out) calc(var(--i, 0) * 60ms),
+      transform 600ms var(--au-ease-out) calc(var(--i, 0) * 60ms);
+  }
+  @starting-style {
+    .au-enter {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+}
 
 /* ── Animations (reduced-motion safe) ────────────────────────────── */
 

@@ -26,9 +26,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import imagickLogo from "@/assets/imagick-logo.png";
-import hero1 from "@/assets/hero-gallery-1.jpg";
-import hero2 from "@/assets/hero-gallery-2.jpg";
-import hero3 from "@/assets/hero-gallery-3.jpg";
+// One demo photo for every slot, on purpose: photographers bring their
+// own images, so the concept showcases the platform chrome, not the
+// photography. The repeated frame reads as "your photos go here."
+import demoPhoto from "@/assets/hero-gallery-1.jpg";
 
 /* ════════════════════════════════════════════════════════════════════
    IMAGICK // AURA — design concept v2
@@ -80,12 +81,9 @@ const Sparkles3 = () => (
   </>
 );
 
-const SectionHeader = ({ index, title, subtitle }: { index: string; title: string; subtitle: string }) => (
+const SectionHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
   <div className="mb-8">
-    <div className="flex items-center gap-4">
-      <span className="au-wordmark au-holo-text text-sm font-bold">{index}</span>
-      <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">{title}</h2>
-    </div>
+    <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">{title}</h2>
     <p className="mt-2 text-sm text-[hsl(var(--au-muted))] max-w-2xl leading-relaxed">{subtitle}</p>
     <div className="au-hairline mt-5" />
   </div>
@@ -102,16 +100,16 @@ const railItems = [
 ];
 
 const collections = [
-  { img: hero1, name: "Cohen Wedding", count: "1,284", status: "Processing", led: "au-led-aqua", filter: "saturate(1.05)" },
-  { img: hero2, name: "Noa & Tom — Engagement", count: "312", status: "Culling", led: "au-led-gold", filter: "hue-rotate(-12deg) saturate(1.1)" },
-  { img: hero3, name: "Levi Bat-Mitzvah", count: "743", status: "Delivered", led: "au-led-green", filter: "contrast(1.05)" },
-  { img: hero2, name: "Studio Portraits — June", count: "96", status: "Delivered", led: "au-led-green", filter: "hue-rotate(18deg) brightness(1.05)" },
+  { name: "Cohen Wedding", count: "1,284", status: "Processing", led: "au-led-aqua", pos: "50% 20%" },
+  { name: "Noa & Tom · Engagement", count: "312", status: "Culling", led: "au-led-gold", pos: "30% 45%" },
+  { name: "Levi Bat-Mitzvah", count: "743", status: "Delivered", led: "au-led-green", pos: "70% 35%" },
+  { name: "Studio Portraits · June", count: "96", status: "Delivered", led: "au-led-green", pos: "50% 60%" },
 ];
 
 const queue = [
-  { label: "Neural retouch — Cohen Wedding", detail: "24 / 1,284 images", pct: 62 },
-  { label: "Face clustering — Noa & Tom", detail: "weaving 14 identities", pct: 38 },
-  { label: "Culling scores — Studio Portraits", detail: "reading focus + eyes", pct: 87 },
+  { label: "Neural retouch · Cohen Wedding", detail: "24 / 1,284 images", pct: 62 },
+  { label: "Face clustering · Noa & Tom", detail: "weaving 14 identities", pct: 38 },
+  { label: "Culling scores · Studio Portraits", detail: "reading focus + eyes", pct: 87 },
 ];
 
 const promptChips = [
@@ -122,14 +120,14 @@ const promptChips = [
 ];
 
 const photos = [
-  { img: hero1, score: "98.2", state: "pick" as const, pos: "50% 30%", filter: "none" },
-  { img: hero2, score: "96.7", state: "pick" as const, pos: "50% 40%", filter: "hue-rotate(-10deg)" },
-  { img: hero3, score: "94.1", state: "selected" as const, pos: "50% 20%", filter: "none" },
-  { img: hero2, score: "91.8", state: "none" as const, pos: "30% 50%", filter: "saturate(1.2)" },
-  { img: hero1, score: "88.4", state: "generating" as const, pos: "70% 40%", filter: "hue-rotate(15deg)" },
-  { img: hero3, score: "84.0", state: "none" as const, pos: "40% 60%", filter: "contrast(1.1)" },
-  { img: hero1, score: "41.6", state: "reject" as const, pos: "20% 30%", filter: "none" },
-  { img: hero2, score: "37.2", state: "reject" as const, pos: "60% 20%", filter: "none" },
+  { score: "98.2", state: "pick" as const, pos: "50% 30%" },
+  { score: "96.7", state: "pick" as const, pos: "20% 45%" },
+  { score: "94.1", state: "selected" as const, pos: "50% 20%" },
+  { score: "91.8", state: "none" as const, pos: "75% 50%" },
+  { score: "88.4", state: "generating" as const, pos: "60% 30%" },
+  { score: "84.0", state: "none" as const, pos: "35% 60%" },
+  { score: "41.6", state: "reject" as const, pos: "15% 30%" },
+  { score: "37.2", state: "reject" as const, pos: "80% 25%" },
 ];
 
 const palette = [
@@ -160,33 +158,33 @@ export default function DesignPreview() {
       <div className="relative mx-auto max-w-7xl px-6 py-16 md:py-24">
         {/* ── Concept hero ─────────────────────────────────────────── */}
         <header className="mb-24 md:mb-32">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="au-enter flex flex-wrap items-center gap-3" style={{ "--i": 0 } as CSSProperties}>
             <span className="au-chip">
               <span className="au-led au-led-gold au-led-pulse" />
               Concept v2 · not deployed
             </span>
-            <span className="au-chip">2026-06</span>
-            <span className="au-chip">Internal</span>
           </div>
 
           <div className="mt-12 grid items-center gap-12 lg:grid-cols-[1.1fr,0.9fr]">
             <div>
-              <div className="flex items-center gap-4">
-                <img src={imagickLogo} alt="Imagick.ai" className="h-8 object-contain opacity-90" />
-                <span className="au-microlabel">presents</span>
-              </div>
+              <img
+                src={imagickLogo}
+                alt="Imagick.ai"
+                className="au-enter h-8 object-contain opacity-90"
+                style={{ "--i": 1 } as CSSProperties}
+              />
 
-              <h1 className="au-wordmark mt-6 text-6xl md:text-8xl font-bold leading-none">
+              <h1 className="au-wordmark au-enter mt-6 text-6xl md:text-8xl font-bold leading-none" style={{ "--i": 2 } as CSSProperties}>
                 <span className="au-holo-text">AURA</span>
               </h1>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-[hsl(var(--au-muted))]">
-                One soft, continuous geometry — and the intelligence expressed as{" "}
+              <p className="au-enter mt-6 max-w-xl text-lg leading-relaxed text-[hsl(var(--au-muted))]" style={{ "--i": 3 } as CSSProperties}>
+                One soft, continuous geometry, with the intelligence expressed as{" "}
                 <span className="text-[hsl(var(--au-text))]">light</span>: iridescent borders that
                 slowly rotate, a breathing AI core, sparkles where the engine touches your photos.
                 No hard edges. The machine feels alive, not technical.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="au-enter mt-8 flex flex-wrap gap-3" style={{ "--i": 4 } as CSSProperties}>
                 <span className="au-chip au-chip-active">The AI is light</span>
                 <span className="au-chip">One geometry</span>
                 <span className="au-chip">Conversation-first</span>
@@ -195,20 +193,20 @@ export default function DesignPreview() {
             </div>
 
             {/* Floating deck */}
-            <div className="au-perspective relative hidden h-[380px] lg:block">
+            <div className="au-perspective au-enter relative hidden h-[380px] lg:block" style={{ "--i": 5 } as CSSProperties}>
               <Orb className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2" />
               <div className="au-rim au-float-tl absolute left-0 top-6 w-56 overflow-hidden rounded-3xl au-glass">
-                <img src={hero1} alt="" className="aspect-[3/4] w-full object-cover" />
+                <img src={demoPhoto} alt="" className="aspect-[3/4] w-full object-cover" />
                 <span className="au-chip absolute left-3 top-3 !bg-[hsl(var(--au-void)/0.7)]">
                   <span className="au-led au-led-aqua au-led-pulse" /> Retouching
                 </span>
               </div>
               <div className="au-rim au-float-tr absolute right-0 top-0 w-52 overflow-hidden rounded-3xl au-glass">
-                <img src={hero2} alt="" className="aspect-[3/4] w-full object-cover" />
+                <img src={demoPhoto} alt="" className="aspect-[3/4] w-full object-cover" style={{ objectPosition: "20% 40%" }} />
                 <span className="au-mono absolute left-3 top-3 rounded-full bg-[hsl(var(--au-void)/0.7)] px-2 py-0.5 text-[10px] text-[hsl(var(--au-aqua))]">98.2</span>
               </div>
               <div className="au-rim au-float-c absolute bottom-0 left-1/2 w-60 overflow-hidden rounded-3xl au-glass" style={{ animationDelay: "-3s" }}>
-                <img src={hero3} alt="" className="aspect-[16/10] w-full object-cover" />
+                <img src={demoPhoto} alt="" className="aspect-[16/10] w-full object-cover" style={{ objectPosition: "50% 25%" }} />
                 <div className="relative flex items-center justify-between px-4 py-2.5">
                   <Sparkles3 />
                   <span className="text-xs font-medium">Levi Bat-Mitzvah</span>
@@ -222,9 +220,8 @@ export default function DesignPreview() {
         {/* ── 01 · Dashboard concept ──────────────────────────────── */}
         <section id="concept-dashboard" className="mb-24">
           <SectionHeader
-            index="01"
-            title="Dashboard — Talk to the Studio"
-            subtitle="The home screen is built around a conversation: one prompt bar wearing the rotating AI border, with everything else — telemetry, collections, the engine queue — orbiting around it. While the engine works, the whole frame glows at its edges."
+            title="Talk to the Studio"
+            subtitle="The home screen is built around a conversation. One prompt bar wears the rotating AI border, and everything else (telemetry, collections, the engine queue) orbits around it. While the engine works, the whole frame glows at its edges."
           />
 
           <div className="au-edge-glow rounded-[28px]">
@@ -236,7 +233,7 @@ export default function DesignPreview() {
                   <span className="au-microlabel">Imagick Studio OS</span>
                 </div>
                 <span className="au-mono rounded-full border border-[hsl(var(--au-line)/0.1)] bg-[hsl(var(--au-void)/0.5)] px-3 py-1 text-[10px] text-[hsl(var(--au-muted))]">
-                  app.imagick.ai — concept render
+                  app.imagick.ai · concept render
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="au-chip">
@@ -295,7 +292,7 @@ export default function DesignPreview() {
                       <Sparkles3 />
                       <Sparkles className="h-5 w-5 shrink-0 text-[hsl(var(--au-violet))]" />
                       <span className="flex-1 truncate text-sm text-[hsl(var(--au-muted))]">
-                        Ask Aura — “cull the Cohen wedding, apply Film Noir 02, deliver the top 200”
+                        Ask Aura: “cull the Cohen wedding, apply Film Noir 02, deliver the top 200”
                       </span>
                       <Mic className="hidden h-4 w-4 shrink-0 text-[hsl(var(--au-muted))] sm:block" />
                       <span className="au-chip !py-1 hidden sm:inline-flex">
@@ -390,11 +387,11 @@ export default function DesignPreview() {
                         >
                           <div className="relative aspect-[4/3] overflow-hidden">
                             <img
-                              src={c.img}
+                              src={demoPhoto}
                               alt={c.name}
                               loading="lazy"
-                              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                              style={{ filter: c.filter }}
+                              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                              style={{ objectPosition: c.pos }}
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--au-void)/0.92)] via-transparent to-transparent" />
                             <span className="au-chip absolute left-3 top-3 !bg-[hsl(var(--au-void)/0.72)]">
@@ -424,7 +421,7 @@ export default function DesignPreview() {
                           )}
                         >
                           <div className="au-scan h-11 w-16 shrink-0 overflow-hidden rounded-xl">
-                            <img src={collections[i].img} alt="" loading="lazy" className="h-full w-full object-cover opacity-85" />
+                            <img src={demoPhoto} alt="" loading="lazy" className="h-full w-full object-cover opacity-85" style={{ objectPosition: collections[i].pos }} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{job.label}</p>
@@ -449,9 +446,8 @@ export default function DesignPreview() {
         {/* ── 02 · Gallery / culling concept ──────────────────────── */}
         <section id="concept-gallery" className="mb-24">
           <SectionHeader
-            index="02"
-            title="Gallery — The Living Cull"
-            subtitle="Scores float as soft pills, picks wear the iridescent ring, rejects dissolve into the dark. Frames the engine is still enhancing shimmer and sparkle — and Aura leans in with suggestions instead of burying them in menus."
+            title="The Living Cull"
+            subtitle="Scores float as soft pills, picks wear the iridescent ring, rejects dissolve into the dark. Frames the engine is still enhancing shimmer and sparkle, and Aura leans in with suggestions instead of burying them in menus."
           />
 
           <div className="au-glass-deep rounded-[28px] p-6 md:p-8">
@@ -482,11 +478,11 @@ export default function DesignPreview() {
                   )}
                 >
                   <img
-                    src={p.img}
+                    src={demoPhoto}
                     alt={`Frame ${i + 1}`}
                     loading="lazy"
                     className={cn("h-full w-full object-cover", p.state === "reject" && "au-tile-reject")}
-                    style={{ objectPosition: p.pos, filter: p.state === "reject" ? undefined : p.filter }}
+                    style={{ objectPosition: p.pos }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--au-void)/0.78)] via-transparent to-[hsl(var(--au-void)/0.18)]" />
 
@@ -549,7 +545,7 @@ export default function DesignPreview() {
                 <p className="min-w-0 flex-1 text-sm">
                   <span className="font-semibold au-holo-text">Aura</span>{" "}
                   <span className="text-[hsl(var(--au-muted))]">
-                    found 17 near-duplicate sets — keep the sharpest of each and reject 31 frames?
+                    found 17 near-duplicate sets. Keep the sharpest of each and reject 31 frames?
                   </span>
                 </p>
                 <div className="flex gap-2">
@@ -563,9 +559,9 @@ export default function DesignPreview() {
             <div className="mt-8 grid gap-4 lg:grid-cols-[1.4fr,1fr]">
               <div className="au-rim relative overflow-hidden rounded-3xl">
                 <div className="relative aspect-[21/10]">
-                  <img src={hero3} alt="Raw frame" className="absolute inset-0 h-full w-full object-cover" style={{ filter: "saturate(0.55) contrast(0.9) brightness(0.92)" }} />
+                  <img src={demoPhoto} alt="Raw frame" className="absolute inset-0 h-full w-full object-cover" style={{ filter: "saturate(0.55) contrast(0.9) brightness(0.92)" }} />
                   <img
-                    src={hero3}
+                    src={demoPhoto}
                     alt="Retouched frame"
                     className="absolute inset-0 h-full w-full object-cover"
                     style={{ clipPath: "polygon(46% 0, 100% 0, 100% 100%, 46% 100%)", filter: "saturate(1.18) contrast(1.08)" }}
@@ -615,7 +611,6 @@ export default function DesignPreview() {
         {/* ── 03 · Design tokens ──────────────────────────────────── */}
         <section id="concept-tokens" className="mb-24">
           <SectionHeader
-            index="03"
             title="Design Tokens"
             subtitle="A bioluminescent spectrum on violet-black glass. The animated tri-hue gradient is reserved for intelligence; champagne marks the premium tier; everything sits on one continuous radius scale."
           />
@@ -626,7 +621,7 @@ export default function DesignPreview() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <p className="au-microlabel">The AI signature</p>
-                  <p className="mt-1 text-sm text-[hsl(var(--au-muted))]">violet → fuchsia → champagne → aqua · always in slow motion</p>
+                  <p className="mt-1 text-sm text-[hsl(var(--au-muted))]">violet, fuchsia, aqua. Always in slow motion; champagne stays reserved for the premium tier.</p>
                 </div>
                 <div className="h-10 w-full max-w-md rounded-full au-btn-ai" />
               </div>
@@ -648,7 +643,7 @@ export default function DesignPreview() {
               <p className="au-microlabel mb-5">Typography</p>
               <p className="au-wordmark text-3xl font-bold au-holo-text">Unbounded</p>
               <p className="mt-1 text-sm text-[hsl(var(--au-muted))]">Wordmarks & hero moments only</p>
-              <p className="mt-5 text-3xl font-semibold tracking-tight">Sora 600 — headings with quiet confidence</p>
+              <p className="mt-5 text-3xl font-semibold tracking-tight">Sora 600. Headings with quiet confidence.</p>
               <p className="mt-3 text-sm leading-relaxed text-[hsl(var(--au-muted))]">
                 Sora 400 carries body copy. It is geometric enough to feel engineered, warm enough for wedding albums.
               </p>
@@ -665,10 +660,10 @@ export default function DesignPreview() {
                   </div>
                 </div>
                 <div className="space-y-2.5 text-sm">
-                  <p><span className="font-medium">Concentric radii</span> <span className="au-mono text-[11px] text-[hsl(var(--au-muted))]">— 28 / 20 / 14, pills for actions</span></p>
-                  <p><span className="font-medium">Glass</span> <span className="au-mono text-[11px] text-[hsl(var(--au-muted))]">— blur 24–30 · saturate 150% · grain 3%</span></p>
-                  <p><span className="font-medium">Iridescent rim</span> <span className="au-mono text-[11px] text-[hsl(var(--au-muted))]">— 1px gradient instead of hard borders</span></p>
-                  <p><span className="font-medium">AI border</span> <span className="au-mono text-[11px] text-[hsl(var(--au-muted))]">— rotating conic + bloom, engine only</span></p>
+                  <p><span className="font-medium">Concentric radii</span> <span className="au-mono text-[11px] text-[hsl(var(--au-muted))]">28 / 20 / 14, pills for actions</span></p>
+                  <p><span className="font-medium">Glass</span> <span className="au-mono text-[11px] text-[hsl(var(--au-muted))]">blur 24-30, saturate 150%, grain 3%</span></p>
+                  <p><span className="font-medium">Iridescent rim</span> <span className="au-mono text-[11px] text-[hsl(var(--au-muted))]">1px gradient instead of hard borders</span></p>
+                  <p><span className="font-medium">AI border</span> <span className="au-mono text-[11px] text-[hsl(var(--au-muted))]">rotating conic + bloom, engine only</span></p>
                 </div>
               </div>
             </div>
@@ -678,7 +673,6 @@ export default function DesignPreview() {
         {/* ── 04 · Components ─────────────────────────────────────── */}
         <section id="concept-components" className="mb-20">
           <SectionHeader
-            index="04"
             title="Core Components"
             subtitle="Pill-first controls. The animated gradient belongs to actions the engine performs; everything human stays calm glass."
           />
@@ -755,7 +749,7 @@ export default function DesignPreview() {
                       <div>
                         <p className="text-sm font-semibold au-holo-text">Aura</p>
                         <p className="mt-0.5 text-xs text-[hsl(var(--au-muted))]">
-                          “The dance-floor frames are underexposed — want me to lift shadows on all 84?”
+                          “The dance-floor frames are underexposed. Lift shadows on all 84?”
                         </p>
                         <div className="mt-2.5 flex gap-2">
                           <button className="au-btn au-btn-ai !px-3.5 !py-1.5 !text-xs">Yes, go</button>
@@ -790,7 +784,7 @@ export default function DesignPreview() {
         <footer className="border-t border-[hsl(var(--au-line)/0.08)] pt-8 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="au-mono text-[11px] text-[hsl(var(--au-muted))]">
-              IMAGICK // AURA · concept v2 · branch preview only — not wired to production
+              Aura concept · internal branch preview, not wired to production
             </p>
             <span className="au-chip">
               <span className="au-led au-led-gold au-led-pulse" /> Awaiting design review

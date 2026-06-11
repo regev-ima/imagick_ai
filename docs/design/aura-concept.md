@@ -69,6 +69,24 @@ brand).
 | 03 Tokens | Signature gradient, palette, type, concentric-geometry demo |
 | 04 Components | Buttons, status chips, inputs/switches, progress, Aura voice toasts, generative skeletons |
 
+## v2.1 refinement (design-skills pass)
+
+Two installed design skills were applied on top of v2:
+
+- **emil-design-eng** (motion craft): UI feedback now uses strong custom
+  easing (`cubic-bezier(0.23, 1, 0.32, 1)`) and stays under 250ms; buttons
+  press to `scale(0.97)` in 140ms; hover effects are gated behind
+  `(hover: hover) and (pointer: fine)`; one orchestrated page-load reveal
+  (60ms cascade via `@starting-style`) instead of scattered entrances.
+- **tasteskill** (anti-slop discipline): em/en-dashes removed from all
+  visible copy; numbered section eyebrows dropped; hero stripped to one
+  real status chip; the AI conic signature tightened to strictly three
+  hues (champagne now appears only on premium-tier chips).
+- **One demo photograph everywhere, deliberately:** photographers bring
+  their own images, so the concept sells the platform chrome, not the
+  photography. In the culling grid the repetition even reads true to
+  life: a burst of near-identical frames being scored.
+
 ## Implementation notes
 
 - Everything is scoped under `.aura` in `src/pages/design-preview.css`;

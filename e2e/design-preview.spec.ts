@@ -15,8 +15,8 @@ test.describe("design concept preview", () => {
 
     await expect(page.getByRole("heading", { name: "AURA" })).toBeVisible();
     // One representative element per major section.
-    await expect(page.getByRole("heading", { name: /dashboard — talk to the studio/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /gallery — the living cull/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /talk to the studio/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /the living cull/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /design tokens/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /core components/i })).toBeVisible();
 
