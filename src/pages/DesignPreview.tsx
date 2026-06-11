@@ -8,7 +8,6 @@ import {
   Settings,
   Search,
   Command,
-  Plus,
   HardDrive,
   Zap,
   ArrowUpRight,
@@ -25,6 +24,7 @@ import {
   Send,
   MoveHorizontal,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import imagickLogo from "@/assets/imagick-logo.png";
 import hero1 from "@/assets/hero-gallery-1.jpg";
 import hero2 from "@/assets/hero-gallery-2.jpg";
@@ -44,12 +44,20 @@ import hero3 from "@/assets/hero-gallery-3.jpg";
    particles, sparkles, scan beams and cursor-following glow.
    ════════════════════════════════════════════════════════════════════ */
 
-/* Cursor-following glow on cards (CSS reads --mx/--my) */
+/* Cursor-following glow on cards (CSS reads --mx/--my). Writes are
+   coalesced to one per frame via rAF — mousemove can fire faster than
+   the display refreshes, and each write repaints the glow overlay. */
+let glowFrame = 0;
 const trackGlow = (e: MouseEvent<HTMLElement>) => {
   const el = e.currentTarget;
-  const r = el.getBoundingClientRect();
-  el.style.setProperty("--mx", `${e.clientX - r.left}px`);
-  el.style.setProperty("--my", `${e.clientY - r.top}px`);
+  const { clientX, clientY } = e;
+  if (glowFrame) return;
+  glowFrame = requestAnimationFrame(() => {
+    glowFrame = 0;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${clientX - r.left}px`);
+    el.style.setProperty("--my", `${clientY - r.top}px`);
+  });
 };
 
 const Orb = ({ className = "" }: { className?: string }) => (
@@ -125,8 +133,8 @@ const photos = [
 ];
 
 const palette = [
-  { name: "VOID", value: "258 30% 4%", cls: "bg-[hsl(258_30%_4%)] border" },
-  { name: "GLASS", value: "256 24% 8%", cls: "bg-[hsl(256_24%_8%)] border" },
+  { name: "VOID", value: "258 30% 3.5%", cls: "bg-[hsl(258_30%_3.5%)] border" },
+  { name: "GLASS", value: "256 24% 7.5%", cls: "bg-[hsl(256_24%_7.5%)] border" },
   { name: "AURA VIOLET", value: "272 96% 66%", cls: "bg-[hsl(272_96%_66%)]" },
   { name: "FUCHSIA", value: "318 100% 62%", cls: "bg-[hsl(318_100%_62%)]" },
   { name: "AQUA", value: "192 100% 58%", cls: "bg-[hsl(192_100%_58%)]" },
@@ -248,12 +256,12 @@ export default function DesignPreview() {
                       <div
                         key={item.label}
                         title={item.label}
-                        className={
-                          "grid h-11 w-11 place-items-center rounded-full transition-all " +
-                          (item.active
+                        className={cn(
+                          "grid h-11 w-11 place-items-center rounded-full transition-all",
+                          item.active
                             ? "bg-[hsl(var(--au-violet)/0.18)] text-[hsl(var(--au-text))] shadow-[0_0_24px_-4px_hsl(var(--au-violet)/0.8)]"
-                            : "text-[hsl(var(--au-muted))] hover:text-[hsl(var(--au-text))]")
-                        }
+                            : "text-[hsl(var(--au-muted))] hover:text-[hsl(var(--au-text))]",
+                        )}
                       >
                         <item.icon className="h-5 w-5" />
                       </div>
@@ -410,10 +418,10 @@ export default function DesignPreview() {
                       {queue.map((job, i) => (
                         <div
                           key={job.label}
-                          className={
-                            "flex items-center gap-4 rounded-2xl px-4 py-3.5 " +
-                            (i !== queue.length - 1 ? "border-b border-[hsl(var(--au-line)/0.07)]" : "")
-                          }
+                          className={cn(
+                            "flex items-center gap-4 rounded-2xl px-4 py-3.5",
+                            i !== queue.length - 1 && "border-b border-[hsl(var(--au-line)/0.07)]",
+                          )}
                         >
                           <div className="au-scan h-11 w-16 shrink-0 overflow-hidden rounded-xl">
                             <img src={collections[i].img} alt="" loading="lazy" className="h-full w-full object-cover opacity-85" />
@@ -467,17 +475,17 @@ export default function DesignPreview() {
               {photos.map((p, i) => (
                 <div
                   key={i}
-                  className={
-                    "group relative aspect-[3/4] overflow-hidden rounded-2xl " +
-                    (p.state === "selected" ? "au-ring-select " : "") +
-                    (p.state === "generating" ? "au-scan " : "")
-                  }
+                  className={cn(
+                    "group relative aspect-[3/4] overflow-hidden rounded-2xl",
+                    p.state === "selected" && "au-ring-select",
+                    p.state === "generating" && "au-scan",
+                  )}
                 >
                   <img
                     src={p.img}
                     alt={`Frame ${i + 1}`}
                     loading="lazy"
-                    className={"h-full w-full object-cover " + (p.state === "reject" ? "au-tile-reject" : "")}
+                    className={cn("h-full w-full object-cover", p.state === "reject" && "au-tile-reject")}
                     style={{ objectPosition: p.pos, filter: p.state === "reject" ? undefined : p.filter }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--au-void)/0.78)] via-transparent to-[hsl(var(--au-void)/0.18)]" />
@@ -491,12 +499,10 @@ export default function DesignPreview() {
 
                   {/* Score pill */}
                   <span
-                    className={
-                      "au-mono absolute left-3 top-3 rounded-full px-2 py-0.5 text-[11px] font-medium backdrop-blur-md " +
-                      (p.state === "reject"
-                        ? "bg-[hsl(var(--au-void)/0.65)] text-[hsl(var(--au-muted))]"
-                        : "bg-[hsl(var(--au-void)/0.65)] text-[hsl(var(--au-aqua))]")
-                    }
+                    className={cn(
+                      "au-mono absolute left-3 top-3 rounded-full bg-[hsl(var(--au-void)/0.65)] px-2 py-0.5 text-[11px] font-medium backdrop-blur-md",
+                      p.state === "reject" ? "text-[hsl(var(--au-muted))]" : "text-[hsl(var(--au-aqua))]",
+                    )}
                   >
                     {p.score}
                   </span>

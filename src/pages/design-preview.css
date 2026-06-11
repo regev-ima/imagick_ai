@@ -55,7 +55,10 @@
     hsl(var(--au-violet))
   );
 
-  /* Re-map shadcn tokens inside the concept scope */
+  /* Re-map shadcn tokens inside the concept scope. The page itself uses
+     au-* vars directly, so these are forward-scaffolding: any shadcn/ui
+     component dropped into the concept inherits AURA colors, and this
+     block is the exact token map a future .theme-aura promotion needs. */
   --background: var(--au-void);
   --foreground: var(--au-text);
   --card: var(--au-surface);
@@ -407,7 +410,6 @@
   flex-shrink: 0;
 }
 .au-led-aqua    { background: hsl(var(--au-aqua));    box-shadow: 0 0 10px hsl(var(--au-aqua) / 0.9); }
-.au-led-violet  { background: hsl(var(--au-violet));  box-shadow: 0 0 10px hsl(var(--au-violet) / 0.9); }
 .au-led-fuchsia { background: hsl(var(--au-fuchsia)); box-shadow: 0 0 10px hsl(var(--au-fuchsia) / 0.9); }
 .au-led-green   { background: hsl(var(--au-green));   box-shadow: 0 0 10px hsl(var(--au-green) / 0.9); }
 .au-led-gold    { background: hsl(var(--au-gold));    box-shadow: 0 0 10px hsl(var(--au-gold) / 0.9); }
@@ -633,14 +635,15 @@
 /* ── Floating hero deck ──────────────────────────────────────────── */
 
 .au-perspective { perspective: 1400px; }
-.au-tilt-l { transform: rotateY(16deg) rotateX(4deg) translateZ(0); }
-.au-tilt-r { transform: rotateY(-14deg) rotateX(3deg) translateZ(0); }
 
 /* ── Animations (reduced-motion safe) ────────────────────────────── */
 
 @media (prefers-reduced-motion: no-preference) {
+  /* The blurred ::after bloom stays static — rotating a blur(18px)
+     gradient repaints every frame on 7+ elements and the rotation is
+     imperceptible through the blur. The sharp 1.5px ::before border
+     and the single edge-glow frame carry the motion. */
   .au-ai-border::before,
-  .au-ai-border::after,
   .au-edge-glow::before { animation: au-spin-angle 5s linear infinite; }
 
   .au-holo-text,
@@ -686,8 +689,8 @@
   50%      { opacity: 0.35; }
 }
 @keyframes au-drift {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(70px, -50px, 0) scale(1.18); }
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(70px, -50px, 0); }
 }
 @keyframes au-scan-move {
   0%   { top: -30%; }
