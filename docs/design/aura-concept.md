@@ -140,5 +140,22 @@ ground-up rebuild with a new composition, wired to the same real data:
 - Display type (Unbounded) on the greeting, JetBrains Mono on every
   number/label. All motion uses the strong ease-out curve.
 
+## v5 — gallery creation flow rebuilt
+
+Feedback: make the create-gallery flow clean, easy, and voiced as AI.
+`CreateGalleryPage.tsx` rebuilt (all logic preserved verbatim — gallery
+insert, Uppy upload + streamed processing, Drive transfer, edit-cost math):
+
+- Stripped the visual noise: removed floating particles, drifting orbs,
+  sparkle bursts and the heavy pulsing stepper.
+- Calm segmented stepper (gradient fill + mono step numbers), centered
+  single-column layout with real breathing room.
+- Every step is now Aura talking, first person: "What are we working
+  on?", "How should I edit them?", "Want me to cull first?", "Send me
+  the photos." Buttons read "Hand it to Aura".
+- AURA surfaces throughout: glass step card, pill tabs, rounded type
+  tiles with press feedback, gradient progress, the orb as the culling
+  and header avatar.
+
 Next surfaces to rebuild the same way (pending direction approval):
 collections index, gallery editor, billing, settings, then admin.
