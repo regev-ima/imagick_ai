@@ -37,6 +37,10 @@ const ShortLinkRedirect = lazy(() => import("./pages/ShortLinkRedirect"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
+// Internal design concept (NEXUS) — static mock screens, unlinked from any
+// nav. See docs/design/nexus-concept.md. Safe to remove once a direction
+// is approved and the real theme work starts.
+const DesignPreview = lazy(() => import("./pages/DesignPreview"));
 const PrivacyPage = lazy(() => import("./pages/legal/PrivacyPage"));
 const TermsPage = lazy(() => import("./pages/legal/TermsPage"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/admin/AdminDashboard"));
@@ -109,6 +113,7 @@ const App = () => (
                 <Route path="/legal/privacy" element={<PrivacyPage />} />
                 <Route path="/legal/terms" element={<TermsPage />} />
                 <Route path="/g/:shortId" element={<ShortLinkRedirect />} />
+                <Route path="/design-preview" element={<DesignPreview />} />
                 <Route path="/gallery/:galleryId" element={<ClientGalleryPage />} />
                 <Route
                   path="/dashboard"
