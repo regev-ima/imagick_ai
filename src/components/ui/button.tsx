@@ -19,12 +19,14 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.25)] hover:bg-secondary/85 hover:shadow-[0_0_24px_-8px_hsl(var(--secondary)/0.7)]",
         ghost: "hover:bg-muted hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        // The AI signature — animated tri-hue gradient, reserved for engine CTAs
-        glow: "bg-[image:var(--gradient-primary)] bg-[size:220%_220%] animate-gradient-x text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_28px_-8px_hsl(var(--glow-primary)/0.8),0_0_28px_-8px_hsl(var(--secondary)/0.5)] hover:shadow-[inset_0_1px_0_hsl(0_0%_100%/0.35),0_0_40px_-6px_hsl(var(--glow-primary)/0.9),0_0_40px_-6px_hsl(var(--secondary)/0.6)]",
+        // The AI signature — static tri-hue gradient, reserved for engine
+        // CTAs. Deliberately NOT animated at idle: a looping hue shift on
+        // a resting button reads as flashing (and fails the motion rules).
+        glow: "bg-[image:var(--gradient-primary)] text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_28px_-8px_hsl(var(--glow-primary)/0.8),0_0_28px_-8px_hsl(var(--secondary)/0.5)] hover:shadow-[inset_0_1px_0_hsl(0_0%_100%/0.35),0_0_40px_-6px_hsl(var(--glow-primary)/0.9),0_0_40px_-6px_hsl(var(--secondary)/0.6)]",
         "glow-secondary":
           "bg-secondary text-secondary-foreground shadow-lg shadow-secondary/30 hover:shadow-xl hover:shadow-secondary/40",
         gradient:
-          "bg-[image:var(--gradient-primary)] bg-[size:220%_220%] animate-gradient-x text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_28px_-8px_hsl(var(--glow-primary)/0.8)] hover:shadow-[inset_0_1px_0_hsl(0_0%_100%/0.35),0_0_40px_-6px_hsl(var(--glow-primary)/0.9)]",
+          "bg-[image:var(--gradient-primary)] text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_28px_-8px_hsl(var(--glow-primary)/0.8)] hover:shadow-[inset_0_1px_0_hsl(0_0%_100%/0.35),0_0_40px_-6px_hsl(var(--glow-primary)/0.9)]",
         glass: "glass-card text-foreground hover:bg-muted/80 border border-border/50",
       },
       size: {
