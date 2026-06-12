@@ -133,6 +133,12 @@ export default function CreateGalleryPage() {
     }
   }, [preSelectedStyleId]);
 
+  // Aura hand-off: ⌘K "start a collection named X" lands here with ?name=X
+  const prefillName = searchParams.get("name");
+  useEffect(() => {
+    if (prefillName) setGalleryName((prev) => prev || prefillName);
+  }, [prefillName]);
+
   // Fetch user's preferred language
   useEffect(() => {
     if (!user) return;

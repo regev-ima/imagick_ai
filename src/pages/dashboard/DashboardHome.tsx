@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, type CSSProperties } from "react";
+import { lazy, Suspense, useMemo, useState, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +21,7 @@ import {
 const CreditsUsageChart = lazy(() => import("@/components/dashboard/CreditsUsageChart"));
 import OnboardingQuestionnaire from "@/components/onboarding/OnboardingQuestionnaire";
 import { Orb } from "@/components/aura/Orb";
+import { openAuraCommand } from "@/components/aura/AuraCommand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -59,6 +60,7 @@ const PROMPT_CHIPS = [
 
 export default function DashboardHome() {
   const navigate = useNavigate();
+  const [promptText, setPromptText] = useState("");
   const { effectiveUserId, effectiveDisplayName } = useEffectiveUser();
   const userName = effectiveDisplayName?.split(" ")[0] || "there";
   const {
@@ -139,6 +141,54 @@ export default function DashboardHome() {
 
   const isEmpty = galleries.length === 0 && !galleriesLoading;
 
+  // Aura briefing — up to two genuinely useful observations, derived
+  // from live data. Renders nothing when there is nothing worth saying.
+  const briefing = useMemo(() => {
+    const items: { key: string; text: string; to: string; label: string }[] = [];
+    const working = galleries.filter((g) => g.status === "processing" || g.status === "uploading");
+    if (working.length > 0) {
+      items.push({
+        key: "working",
+        text:
+          working.length === 1
+            ? `I'm working through ${working[0].name} right now.`
+            : `I'm working through ${working.length} collections right now.`,
+        to: `/dashboard/galleries/${working[0].id}`,
+        label: "Watch progress",
+      });
+    }
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const readyRecent = galleries.find(
+      (g) => g.status === "ready" && new Date(g.updated_at) >= sevenDaysAgo,
+    );
+    if (readyRecent) {
+      items.push({
+        key: "ready",
+        text: `${readyRecent.name} is finished and ready to deliver.`,
+        to: `/dashboard/galleries/${readyRecent.id}`,
+        label: "Open it",
+      });
+    }
+    if (storagePercent >= 80) {
+      items.push({
+        key: "storage",
+        text: `Storage is at ${Math.round(storagePercent)}% — worth a look before the next big shoot.`,
+        to: "/dashboard/billing",
+        label: "Review storage",
+      });
+    }
+    if (!isUnlimited && editsTotal > 0 && editsRemaining / editsTotal <= 0.1) {
+      items.push({
+        key: "edits",
+        text: `Only ${editsRemaining.toLocaleString()} edits left this cycle.`,
+        to: "/dashboard/billing",
+        label: "Top up",
+      });
+    }
+    return items.slice(0, 2);
+  }, [galleries, storagePercent, isUnlimited, editsRemaining, editsTotal]);
+
   const formatStorage = (mb: number) =>
     mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 
@@ -181,15 +231,18 @@ export default function DashboardHome() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              navigate("/dashboard/galleries/new");
+              openAuraCommand(promptText);
+              setPromptText("");
             }}
             className="aura-ai-border rounded-full"
           >
             <div className="relative flex items-center gap-3 rounded-full bg-background/70 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4">
               <Orb className="h-7 w-7 shrink-0" />
               <input
+                value={promptText}
+                onChange={(e) => setPromptText(e.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/75 sm:text-base"
-                placeholder="Ask Aura to start something — a new collection, a style, a delivery…"
+                placeholder="Ask Aura: find a collection, start one, train a style… (⌘K)"
                 aria-label="Ask Aura"
               />
               <button
@@ -213,6 +266,27 @@ export default function DashboardHome() {
             ))}
           </div>
         </motion.div>
+
+        {!isEmpty && briefing.length > 0 && (
+          <motion.div variants={rise}>
+            <div className="flex flex-col gap-2.5 rounded-3xl border border-border/60 bg-card/55 p-4 backdrop-blur-xl sm:flex-row sm:items-center sm:gap-4 sm:p-5">
+              <div className="flex shrink-0 items-center gap-2.5">
+                <Orb className="h-6 w-6" />
+                <span className="aura-microlabel">Aura briefing</span>
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                {briefing.map((b) => (
+                  <p key={b.key} className="text-sm text-muted-foreground">
+                    {b.text}{" "}
+                    <Link to={b.to} className="whitespace-nowrap font-medium text-primary hover:underline">
+                      {b.label} →
+                    </Link>
+                  </p>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {galleriesLoading ? (
           <div className="flex items-center justify-center py-24">

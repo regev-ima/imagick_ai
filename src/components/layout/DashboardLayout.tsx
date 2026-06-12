@@ -28,6 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { BuildVersionBadge } from "@/components/layout/BuildVersionBadge";
 import { Orb } from "@/components/aura/Orb";
+import { AuraCommand, openAuraCommand } from "@/components/aura/AuraCommand";
 import imagickLogoDark from "@/assets/imagick-logo.png";
 import imagickIconDark from "@/assets/imagick-icon.png";
 import imagickLogoLight from "@/assets/imagick-logo-light.png";
@@ -90,6 +91,7 @@ export default function DashboardLayout() {
 
   return (
     <div className="relative h-screen overflow-hidden bg-background">
+      <AuraCommand />
       {/* ── Desktop floating pill rail ─────────────────────────────── */}
       <TooltipProvider delayDuration={0}>
         <aside className="fixed left-3 top-1/2 z-40 hidden -translate-y-1/2 lg:flex">
@@ -286,9 +288,15 @@ export default function DashboardLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="aura-chip hidden sm:inline-flex">
-              <Orb className="h-4 w-4" /> Aura ready
-            </span>
+            <button
+              type="button"
+              onClick={() => openAuraCommand()}
+              className="aura-chip hidden sm:inline-flex cursor-pointer transition-[border-color,color] duration-150 hover:border-primary/50 hover:text-foreground"
+              aria-label="Open Aura command palette"
+            >
+              <Orb className="h-4 w-4" /> Ask Aura
+              <kbd className="ml-1 font-mono text-[9px] opacity-70">⌘K</kbd>
+            </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="glow" size="icon" disabled={isImpersonating}>

@@ -1,22 +1,18 @@
-import { useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
   Search,
-  Filter,
   Grid3X3,
   List,
   MoreHorizontal,
   Images,
-  Calendar,
   ExternalLink,
   Trash2,
   Edit3,
-  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,48 +37,45 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEffectiveUser } from "@/hooks/useImpersonation";
+import { Orb } from "@/components/aura/Orb";
 
 type ViewMode = "grid" | "list";
+type StatusFilter = "all" | "working" | "ready" | "error";
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-  uploading: { label: "Uploading", className: "bg-accent text-accent-foreground" },
-  processing: { label: "Processing", className: "bg-secondary text-secondary-foreground" },
-  culling: { label: "AI Culling", className: "bg-secondary text-secondary-foreground" },
-  ready: { label: "Ready", className: "bg-primary text-primary-foreground" },
-  error: { label: "Error", className: "bg-destructive text-destructive-foreground" }
-};
+const WORKING_STATUSES = ["uploading", "processing", "culling", "transferring"];
+
+const statusLed = (status: string) =>
+  status === "ready" ? "var(--secondary)" : status === "error" ? "var(--destructive)" : "var(--rating)";
+
+const statusLabel = (status: string) =>
+  status === "ready" ? "Ready" : status === "error" ? "Error" : "Processing";
 
 export default function GalleriesPage() {
   const { effectiveUserId } = useEffectiveUser();
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const queryClient = useQueryClient();
 
   const { data: galleries = [], isLoading } = useQuery({
     queryKey: ["galleries", effectiveUserId],
     queryFn: async () => {
       if (!effectiveUserId) return [];
-      
       const { data, error } = await supabase
         .from("galleries")
         .select("*")
         .eq("user_id", effectiveUserId)
         .order("created_at", { ascending: false });
-      
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveUserId
+    enabled: !!effectiveUserId,
   });
 
   const deleteGallery = useMutation({
     mutationFn: async (galleryId: string) => {
-      const { error } = await supabase
-        .from("galleries")
-        .delete()
-        .eq("id", galleryId);
-      
+      const { error } = await supabase.from("galleries").delete().eq("id", galleryId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -91,470 +84,433 @@ export default function GalleriesPage() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to delete gallery");
-    }
+    },
   });
 
   const [showcaseDeleteOpen, setShowcaseDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const filteredGalleries = galleries.filter(gallery => {
-    return gallery.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (gallery.description?.toLowerCase() || "").includes(searchQuery.toLowerCase());
-  });
+  const counts = useMemo(
+    () => ({
+      all: galleries.length,
+      working: galleries.filter((g) => WORKING_STATUSES.includes(g.status)).length,
+      ready: galleries.filter((g) => g.status === "ready").length,
+      error: galleries.filter((g) => g.status === "error").length,
+    }),
+    [galleries],
+  );
+
+  const filteredGalleries = useMemo(
+    () =>
+      galleries.filter((gallery) => {
+        const q = searchQuery.toLowerCase();
+        const matchesQuery =
+          gallery.name.toLowerCase().includes(q) || (gallery.description?.toLowerCase() || "").includes(q);
+        const matchesStatus =
+          statusFilter === "all"
+            ? true
+            : statusFilter === "working"
+              ? WORKING_STATUSES.includes(gallery.status)
+              : gallery.status === statusFilter;
+        return matchesQuery && matchesStatus;
+      }),
+    [galleries, searchQuery, statusFilter],
+  );
+
+  const totalImages = useMemo(() => galleries.reduce((sum, g) => sum + (g.total_images || 0), 0), [galleries]);
+
+  const share = (galleryId: string) => {
+    navigator.clipboard.writeText(`${window.location.origin}/gallery/${galleryId}`);
+    toast.success("Gallery link copied!");
+  };
+
+  const requestDelete = (gallery: { id: string; name: string }) => {
+    if (gallery.id === SHOWCASE_GALLERY_ID) setShowcaseDeleteOpen(true);
+    else setDeleteTarget({ id: gallery.id, name: gallery.name });
+  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Orb className="h-12 w-12" />
       </div>
     );
   }
 
+  const filterChips: { key: StatusFilter; label: string; led?: string }[] = [
+    { key: "all", label: "All" },
+    { key: "working", label: "Processing", led: "var(--rating)" },
+    { key: "ready", label: "Ready", led: "var(--secondary)" },
+    ...(counts.error > 0 ? [{ key: "error" as const, label: "Errors", led: "var(--destructive)" }] : []),
+  ];
+
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-      >
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            My <span className="text-gradient-primary">Collections</span>
-          </h1>
-          <p className="text-muted-foreground mt-1.5">
-            Manage and organize your photo galleries
-          </p>
-        </div>
-        <Button variant="glow" asChild>
-          <Link to="/dashboard/galleries/new" className="gap-2">
-            <Plus className="w-4 h-4" />
-            New Collection
-          </Link>
-        </Button>
-      </motion.div>
-
-      {/* Filters Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col sm:flex-row gap-4"
-      >
-        {/* Search */}
-        <div className="flex-1 flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/50 border border-border/50">
-          <Search className="w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search collections..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent border-none outline-none text-sm flex-1 placeholder:text-muted-foreground"
-          />
-        </div>
-
-        {/* Filter & View Toggle */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Filter className="w-4 h-4" />
-            Filter
-          </Button>
-          <div className="flex items-center rounded-lg border border-border/50 p-1">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              className="w-8 h-8"
-              onClick={() => setViewMode("grid")}
-            >
-              <Grid3X3 className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="icon"
-              className="w-8 h-8"
-              onClick={() => setViewMode("list")}
-            >
-              <List className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Gallery Grid/List */}
-      {viewMode === "grid" ? (
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {filteredGalleries.map((gallery, index) => (
-            <GalleryCard
-              key={gallery.id}
-              gallery={gallery}
-              index={index}
-              onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
-              onShare={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/gallery/${gallery.id}`);
-                toast.success("Gallery link copied!");
-              }}
-              onDelete={() => {
-                if (gallery.id === SHOWCASE_GALLERY_ID) {
-                  setShowcaseDeleteOpen(true);
-                } else {
-                  setDeleteTarget({ id: gallery.id, name: gallery.name });
-                }
-              }}
-          />
-        ))}
+    <div className="relative min-h-full px-4 py-6 lg:px-8 lg:py-8">
+      {/* Ambient wash */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-[16vh] left-1/3 h-[42vh] w-[50vw] rounded-full bg-primary/[0.08] blur-[140px]" />
+        <div className="absolute bottom-0 -right-[8vw] h-[32vh] w-[28vw] rounded-full bg-secondary/[0.06] blur-[120px]" />
       </div>
-    ) : (
-      <div className="space-y-3">
-        {filteredGalleries.map((gallery, index) => (
-          <GalleryListItem
-            key={gallery.id}
-            gallery={gallery}
-            index={index}
-            onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
-            onShare={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/gallery/${gallery.id}`);
-              toast.success("Gallery link copied!");
-            }}
-            onDelete={() => {
-              if (gallery.id === SHOWCASE_GALLERY_ID) {
-                setShowcaseDeleteOpen(true);
-              } else {
-                setDeleteTarget({ id: gallery.id, name: gallery.name });
-              }
-            }}
-            />
-          ))}
-        </div>
-      )}
 
-      {/* Empty State */}
-      {filteredGalleries.length === 0 && !isLoading && (
+      <div className="relative w-full space-y-6">
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-16"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+          className="flex flex-wrap items-end justify-between gap-4"
         >
-          <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
-            <Images className="w-8 h-8 text-muted-foreground" />
+          <div>
+            <h1 className="font-display text-3xl font-bold tracking-tight">Collections</h1>
+            <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              {counts.all} collections · {totalImages.toLocaleString()} images
+            </p>
           </div>
-          <h3 className="text-lg font-semibold mb-2">No collections found</h3>
-          <p className="text-muted-foreground mb-6">
-            {searchQuery ? "Try a different search term" : "Create your first collection to get started"}
-          </p>
-          {!searchQuery && (
-            <Button variant="glow" asChild>
-              <Link to="/dashboard/galleries/new" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Create Collection
-              </Link>
-            </Button>
-          )}
+          <Button variant="glow" asChild>
+            <Link to="/dashboard/galleries/new" className="gap-2">
+              <Plus className="h-4 w-4" />
+              New collection
+            </Link>
+          </Button>
         </motion.div>
-      )}
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete collection?</AlertDialogTitle>
-            <AlertDialogDescription>
-              <span className="font-medium text-foreground">{deleteTarget?.name}</span> will be permanently deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (deleteTarget) deleteGallery.mutate(deleteTarget.id);
-                setDeleteTarget(null);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Toolbar: search + status chips + view toggle */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06, duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+          className="flex flex-col gap-3 lg:flex-row lg:items-center"
+        >
+          <div className="flex flex-1 items-center gap-2 rounded-full border border-border/70 bg-card/50 px-4 py-2 backdrop-blur-md transition-[border-color,box-shadow] duration-150 focus-within:border-primary/60 focus-within:shadow-[0_0_24px_-10px_hsl(var(--glow-primary)/0.6)]">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search collections…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/75"
+            />
+          </div>
 
-      {/* Showcase Gallery Delete Warning */}
-      <AlertDialog open={showcaseDeleteOpen} onOpenChange={setShowcaseDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>⚠️ Warning: Showcase Gallery</AlertDialogTitle>
-            <AlertDialogDescription>
-              This gallery serves as the image source for all style Before/After previews (Showcase). 
-              Deleting it will break the Before/After display for all styles. Are you sure you want to proceed?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteGallery.mutate(SHOWCASE_GALLERY_ID)}
-            >
-              Delete Anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <div className="flex flex-wrap items-center gap-2">
+            {filterChips.map((chip) => {
+              const active = statusFilter === chip.key;
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setStatusFilter(chip.key)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-[border-color,color,background-color] duration-150",
+                    active
+                      ? "border-primary/60 bg-primary/10 text-foreground"
+                      : "border-border/70 bg-card/40 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  {chip.led && <span className="aura-led" style={{ "--led": chip.led } as CSSProperties} />}
+                  {chip.label}
+                  <span className={cn("font-mono", active ? "text-primary" : "text-muted-foreground/70")}>
+                    {counts[chip.key]}
+                  </span>
+                </button>
+              );
+            })}
+
+            <div className="ml-auto flex items-center gap-1 rounded-full border border-border/70 bg-card/40 p-1 lg:ml-2">
+              <button
+                type="button"
+                aria-label="Grid view"
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "grid h-8 w-8 place-items-center rounded-full transition-colors",
+                  viewMode === "grid" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="List view"
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "grid h-8 w-8 place-items-center rounded-full transition-colors",
+                  viewMode === "list" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Grid / list */}
+        {viewMode === "grid" ? (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {filteredGalleries.map((gallery) => (
+              <GalleryCard
+                key={gallery.id}
+                gallery={gallery}
+                onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
+                onShare={() => share(gallery.id)}
+                onDelete={() => requestDelete(gallery)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl">
+            {filteredGalleries.map((gallery, i) => (
+              <GalleryRow
+                key={gallery.id}
+                gallery={gallery}
+                last={i === filteredGalleries.length - 1}
+                onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
+                onShare={() => share(gallery.id)}
+                onDelete={() => requestDelete(gallery)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {filteredGalleries.length === 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-20 text-center">
+            <Orb className="mx-auto h-14 w-14" />
+            <h3 className="mt-6 font-display text-lg font-semibold">
+              {searchQuery || statusFilter !== "all" ? "Nothing matches" : "No collections yet"}
+            </h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              {searchQuery || statusFilter !== "all"
+                ? "Try a different search or filter."
+                : "Hand me a shoot and I'll take it from there."}
+            </p>
+            {!searchQuery && statusFilter === "all" && (
+              <Button variant="glow" asChild className="mt-6">
+                <Link to="/dashboard/galleries/new" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create your first collection
+                </Link>
+              </Button>
+            )}
+          </motion.div>
+        )}
+
+        {/* Delete confirmation */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <AlertDialogContent className="max-w-sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete collection?</AlertDialogTitle>
+              <AlertDialogDescription>
+                <span className="font-medium text-foreground">{deleteTarget?.name}</span> will be permanently deleted.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  if (deleteTarget) deleteGallery.mutate(deleteTarget.id);
+                  setDeleteTarget(null);
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Showcase gallery delete warning */}
+        <AlertDialog open={showcaseDeleteOpen} onOpenChange={setShowcaseDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Warning: Showcase Gallery</AlertDialogTitle>
+              <AlertDialogDescription>
+                This gallery serves as the image source for all style Before/After previews (Showcase). Deleting it
+                will break the Before/After display for all styles. Are you sure you want to proceed?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deleteGallery.mutate(SHOWCASE_GALLERY_ID)}
+              >
+                Delete Anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }
 
-interface GalleryCardProps {
+interface GalleryItemProps {
   gallery: any;
-  index: number;
   onDelete: () => void;
   onEdit: () => void;
   onShare: () => void;
 }
 
-function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryCardProps) {
-  const isReady = gallery.status === "ready";
-  const isError = gallery.status === "error";
-  const isProcessing = gallery.status !== "ready" && gallery.status !== "error";
-  const progress = gallery.total_images > 0
-    ? (gallery.processed_images / gallery.total_images) * 100
-    : 0;
-
+function ActionsMenu({ onEdit, onShare, onDelete, className }: Omit<GalleryItemProps, "gallery"> & { className?: string }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-    >
-      <Link to={`/dashboard/galleries/${gallery.id}`}>
-        <Card className={cn(
-          "relative border-border/40 hover:border-primary/40 transition-all duration-300 group overflow-hidden rounded-2xl bg-card/80 backdrop-blur-sm",
-          "hover:shadow-lg hover:shadow-primary/5",
-          isReady && "ring-1 ring-emerald-500/10",
-        )}>
-          {/* Image area */}
-          <div className="relative aspect-video overflow-hidden bg-muted">
-            {gallery.hero_image_url ? (
-              <img
-                src={getThumbnailUrl(gallery.hero_image_url)}
-                alt={gallery.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (target.src !== gallery.hero_image_url) {
-                    target.src = gallery.hero_image_url;
-                  }
-                }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Images className="w-10 h-10 text-muted-foreground/40" />
-              </div>
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent opacity-80" />
-
-            {/* Menu — top-right on hover */}
-            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="glass" size="icon" className="w-8 h-8 bg-black/30 backdrop-blur-md border border-white/10" onClick={(e) => e.preventDefault()}>
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => { e.preventDefault(); onEdit(); }}>
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.preventDefault(); onShare(); }}>
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Share Link
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onDelete();
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Processing progress bar — bottom of image */}
-            {isProcessing && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-amber-500 to-primary"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.5, delay: index * 0.05 }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Card body */}
-          <CardContent className="p-3 space-y-1">
-            {/* Row 1: Status dot + Name */}
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                "w-2 h-2 rounded-full shrink-0",
-                isReady && "bg-emerald-500",
-                isError && "bg-red-500",
-                isProcessing && "bg-amber-500 animate-pulse",
-              )} />
-              <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-                {gallery.name}
-              </h3>
-            </div>
-
-            {/* Row 2: Description */}
-            <p className="text-xs text-muted-foreground truncate">
-              {gallery.description || "No description"}
-            </p>
-
-            {/* Row 3: Stats inline */}
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground/70 pt-0.5">
-              <span className="flex items-center gap-1">
-                <Images className="w-3 h-3" />
-                {gallery.total_images}
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {new Date(gallery.created_at).toLocaleDateString()}
-              </span>
-              {isProcessing && (
-                <span className="ml-auto text-amber-500 font-medium">
-                  {Math.round(progress)}%
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </Link>
-    </motion.div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn("h-8 w-8 rounded-full", className)}
+          onClick={(e) => e.preventDefault()}
+          aria-label="Collection actions"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={(e) => { e.preventDefault(); onEdit(); }}>
+          <Edit3 className="mr-2 h-4 w-4" />
+          Open
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={(e) => { e.preventDefault(); onShare(); }}>
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Copy share link
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-destructive" onClick={(e) => { e.preventDefault(); onDelete(); }}>
+          <Trash2 className="mr-2 h-4 w-4" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-function GalleryListItem({ gallery, index, onDelete, onEdit, onShare }: GalleryCardProps) {
+function GalleryCard({ gallery, onDelete, onEdit, onShare }: GalleryItemProps) {
   const isReady = gallery.status === "ready";
   const isError = gallery.status === "error";
-  const isProcessing = gallery.status !== "ready" && gallery.status !== "error";
-  const progress = gallery.total_images > 0
-    ? (gallery.processed_images / gallery.total_images) * 100
-    : 0;
+  const isWorking = !isReady && !isError;
+  const progress = gallery.total_images > 0 ? Math.round((gallery.processed_images / gallery.total_images) * 100) : 0;
+  const led = statusLed(gallery.status);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05 }}
-    >
-      <Link to={`/dashboard/galleries/${gallery.id}`}>
-        <Card className={cn(
-          "relative border-border/40 hover:border-primary/40 transition-all duration-300 group overflow-hidden rounded-xl bg-card/80 backdrop-blur-sm",
-          "hover:shadow-lg hover:shadow-primary/5",
-          isReady && "ring-1 ring-emerald-500/10",
-        )}>
-          <CardContent className="p-0">
-            <div className="flex items-center gap-3">
-              {/* Thumbnail */}
-              <div className="relative w-28 h-20 flex-shrink-0 overflow-hidden rounded-l-xl bg-muted">
-                {gallery.hero_image_url ? (
-                  <img
-                    src={getThumbnailUrl(gallery.hero_image_url)}
-                    alt={gallery.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      if (target.src !== gallery.hero_image_url) {
-                        target.src = gallery.hero_image_url;
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Images className="w-6 h-6 text-muted-foreground/40" />
-                  </div>
-                )}
-                {/* Processing progress bar */}
-                {isProcessing && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20">
-                    <motion.div
-                      className="h-full bg-gradient-to-r from-amber-500 to-primary"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress}%` }}
-                      transition={{ duration: 0.5 }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 py-2.5 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "w-2 h-2 rounded-full shrink-0",
-                    isReady && "bg-emerald-500",
-                    isError && "bg-red-500",
-                    isProcessing && "bg-amber-500 animate-pulse",
-                  )} />
-                  <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-                    {gallery.name}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground/70">
-                  <span className="flex items-center gap-1">
-                    <Images className="w-3 h-3" />
-                    {gallery.total_images}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    {new Date(gallery.created_at).toLocaleDateString()}
-                  </span>
-                  {isProcessing && (
-                    <span className="text-amber-500 font-medium">{Math.round(progress)}%</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="pr-3">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="w-8 h-8" onClick={(e) => e.preventDefault()}>
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => { e.preventDefault(); onEdit(); }}>
-                      <Edit3 className="w-4 h-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => { e.preventDefault(); onShare(); }}>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Share Link
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        onDelete();
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+    <Link to={`/dashboard/galleries/${gallery.id}`} className="group block">
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_0_44px_-12px_hsl(var(--glow-primary)/0.4)]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+          {gallery.hero_image_url ? (
+            <img
+              src={getThumbnailUrl(gallery.hero_image_url)}
+              alt={gallery.name}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+              onError={(e) => {
+                const t = e.currentTarget;
+                if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url;
+              }}
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center">
+              <Images className="h-8 w-8 text-muted-foreground/40" />
             </div>
-          </CardContent>
-        </Card>
-      </Link>
-    </motion.div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/10 to-transparent" />
+
+          <span
+            className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] backdrop-blur-md"
+            style={{ color: `hsl(${led})` }}
+          >
+            <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
+            {statusLabel(gallery.status)}
+          </span>
+
+          <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <ActionsMenu onEdit={onEdit} onShare={onShare} onDelete={onDelete} className="bg-background/60 backdrop-blur-md" />
+          </div>
+
+          {isWorking && (
+            <div className="absolute inset-x-0 bottom-0 h-1 bg-background/40">
+              <div
+                className="h-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.6)]"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1 px-4 py-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="truncate text-sm font-medium transition-colors group-hover:text-primary">{gallery.name}</h3>
+            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+              {(gallery.total_images || 0).toLocaleString()}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="truncate text-xs text-muted-foreground">
+              {gallery.description || new Date(gallery.created_at).toLocaleDateString()}
+            </p>
+            {isWorking && <span className="shrink-0 font-mono text-[11px] text-primary">{progress}%</span>}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function GalleryRow({ gallery, last, onDelete, onEdit, onShare }: GalleryItemProps & { last: boolean }) {
+  const isReady = gallery.status === "ready";
+  const isError = gallery.status === "error";
+  const isWorking = !isReady && !isError;
+  const progress = gallery.total_images > 0 ? Math.round((gallery.processed_images / gallery.total_images) * 100) : 0;
+  const led = statusLed(gallery.status);
+
+  return (
+    <Link
+      to={`/dashboard/galleries/${gallery.id}`}
+      className={cn(
+        "group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-foreground/[0.03]",
+        !last && "border-b border-border/40",
+      )}
+    >
+      <div className="h-12 w-[72px] shrink-0 overflow-hidden rounded-xl bg-muted">
+        {gallery.hero_image_url ? (
+          <img
+            src={getThumbnailUrl(gallery.hero_image_url)}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover"
+            onError={(e) => {
+              const t = e.currentTarget;
+              if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url;
+            }}
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center">
+            <Images className="h-5 w-5 text-muted-foreground/40" />
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
+          <h3 className="truncate text-sm font-medium transition-colors group-hover:text-primary">{gallery.name}</h3>
+        </div>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+          {(gallery.total_images || 0).toLocaleString()} images · {new Date(gallery.created_at).toLocaleDateString()}
+        </p>
+      </div>
+
+      {isWorking && (
+        <div className="hidden w-36 sm:block">
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+      {isWorking && <span className="w-10 text-right font-mono text-xs text-primary">{progress}%</span>}
+
+      <ActionsMenu onEdit={onEdit} onShare={onShare} onDelete={onDelete} />
+    </Link>
   );
 }

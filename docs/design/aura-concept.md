@@ -157,5 +157,26 @@ insert, Uppy upload + streamed processing, Drive transfer, edit-cost math):
   tiles with press feedback, gradient progress, the orb as the culling
   and header avatar.
 
-Next surfaces to rebuild the same way (pending direction approval):
-collections index, gallery editor, billing, settings, then admin.
+## v6 — Aura becomes a real feature (out-of-the-box round)
+
+User granted creative freedom to invent/change functionality:
+
+1. **Aura Command (new feature)** — a working command palette, global
+   ⌘K / Ctrl+K (`src/components/aura/AuraCommand.tsx`): fuzzy-search
+   your real collections (live Supabase data, thumbnails), actions
+   (new collection, train a style, share), navigation, and a free-text
+   fallback — "Start a collection named X" pre-fills the wizard via
+   `?name=`. The dashboard prompt bar and the header "Ask Aura" chip
+   now open it; the prompt is no longer a visual placeholder.
+2. **Aura Briefing (new feature)** — the dashboard derives up to two
+   real observations from live data (collections processing, finished
+   and ready to deliver, storage ≥80%, edits ≤10%) and says them in
+   Aura's voice with action links. Renders nothing when there's
+   nothing worth saying.
+3. **Collections index rebuilt** — full-width AURA shell, live status
+   filter chips with counts (All / Processing / Ready / Errors),
+   pill search with glow focus, editorial glass cards + a glass list
+   view. All logic preserved (queries, delete + showcase guard,
+   share-link copy).
+
+Next: gallery editor, billing, admin.
