@@ -1599,11 +1599,11 @@ export default function GalleryEditorPage() {
                 <ArrowLeft className="w-4 h-4" />
               </Link>
             </Button>
-            <h1 className="text-sm font-semibold truncate max-w-[200px]">
+            <h1 className="font-display text-sm font-semibold truncate max-w-[200px]">
               {gallery.name}
             </h1>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              ({gallery.total_images})
+            <span className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+              {gallery.total_images}
             </span>
           </div>
 
@@ -1675,12 +1675,12 @@ export default function GalleryEditorPage() {
             )}
 
             {/* View Mode */}
-            <div className="flex items-center rounded-lg border border-border/50 p-0.5 ml-0.5 gap-0.5">
+            <div className="flex items-center rounded-full border border-border/60 bg-card/40 p-0.5 ml-0.5 gap-0.5">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     className={cn(
-                      "w-7 h-7 rounded-md flex items-center justify-center transition-all",
+                      "w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150",
                       viewMode === "masonry"
                         ? "bg-primary/20 text-primary ring-1 ring-primary/60"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -1696,7 +1696,7 @@ export default function GalleryEditorPage() {
                 <TooltipTrigger asChild>
                   <button
                     className={cn(
-                      "w-7 h-7 rounded-md flex items-center justify-center transition-all",
+                      "w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150",
                       viewMode === "grid"
                         ? "bg-primary/20 text-primary ring-1 ring-primary/60"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
