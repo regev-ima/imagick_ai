@@ -333,8 +333,8 @@ export default function BillingPage() {
               <div className="flex items-center gap-6 text-sm">
                 {isPaidPlan && (
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-cyan-500/10">
-                      <CalendarDays className="w-4 h-4 text-cyan-400" />
+                    <div className="p-1.5 rounded-lg bg-primary/10">
+                      <CalendarDays className="w-4 h-4 text-primary" />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">{isCancelling ? "Active until" : "Next billing"}</p>
@@ -521,8 +521,8 @@ export default function BillingPage() {
           <Card className="glass-card border-border/50">
             <CardHeader>
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-violet-500/10">
-                  <Package className="w-4 h-4 text-violet-400" />
+                <div className="p-1.5 rounded-lg bg-primary/10">
+                  <Package className="w-4 h-4 text-primary" />
                 </div>
                 <CardTitle className="text-lg">Active Add-ons</CardTitle>
               </div>

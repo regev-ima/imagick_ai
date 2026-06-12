@@ -378,7 +378,7 @@ export function GalleryRightSidebar({
                 isCullingRunning ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : isCullingStuck ? (
-                  <Wand2 className="w-3 h-3 text-orange-500" />
+                  <Wand2 className="w-3 h-3 text-rating" />
                 ) : (
                   <Wand2 className="w-3 h-3" />
                 )
@@ -688,11 +688,11 @@ function UnifiedFilterPanel({
             className={cn(
               "flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all border",
               filters.showLikedOnly
-                ? "bg-pink-500/15 border-pink-500/30 text-pink-400"
+                ? "bg-accent/15 border-accent/30 text-accent"
                 : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             )}
           >
-            <Heart className={cn("w-3.5 h-3.5", filters.showLikedOnly && "fill-pink-400")} />
+            <Heart className={cn("w-3.5 h-3.5", filters.showLikedOnly && "fill-accent")} />
             Liked
           </button>
           <button
@@ -788,7 +788,7 @@ function UnifiedFilterPanel({
                   isCullingRunning
                     ? "bg-primary/15 border-primary/40 text-primary cursor-not-allowed"
                     : isCullingStuck
-                      ? "bg-orange-500/10 border-orange-500/30 text-orange-300 hover:bg-orange-500/20"
+                      ? "bg-rating/10 border-rating/30 text-rating hover:bg-rating/20"
                       : "bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary",
                 )}
                 onClick={onRunCulling}
@@ -819,11 +819,11 @@ function UnifiedFilterPanel({
                 <p className="text-[9px] text-muted-foreground leading-tight">Star Ratings</p>
               </div>
               <div className="text-center">
-                <Tag className="w-3.5 h-3.5 text-cyan-400 mx-auto mb-0.5" />
+                <Tag className="w-3.5 h-3.5 text-primary mx-auto mb-0.5" />
                 <p className="text-[9px] text-muted-foreground leading-tight">Categories</p>
               </div>
               <div className="text-center">
-                <Copy className="w-3.5 h-3.5 text-pink-400 mx-auto mb-0.5" />
+                <Copy className="w-3.5 h-3.5 text-primary mx-auto mb-0.5" />
                 <p className="text-[9px] text-muted-foreground leading-tight">Duplicates</p>
               </div>
             </div>
@@ -1040,8 +1040,8 @@ function GalleryInfoPanel({
       startedAt: data.uploadStartedAt,
       completedAt: data.uploadCompletedAt,
       status: data.uploadCompletedAt ? "completed" : data.uploadStartedAt ? "active" : "idle",
-      color: "text-cyan-400",
-      bgColor: "bg-cyan-500",
+      color: "text-primary",
+      bgColor: "bg-primary",
     },
     {
       icon: <Scissors className="w-3.5 h-3.5" />,
@@ -1049,8 +1049,8 @@ function GalleryInfoPanel({
       startedAt: data.processingStartedAt,
       completedAt: data.processingCompletedAt,
       status: data.processingCompletedAt ? "completed" : data.processingStartedAt ? "active" : "idle",
-      color: "text-violet-400",
-      bgColor: "bg-violet-500",
+      color: "text-primary",
+      bgColor: "bg-primary",
     },
     {
       icon: <Wand2 className="w-3.5 h-3.5" />,
@@ -1113,7 +1113,7 @@ function GalleryInfoPanel({
               {processingStats.ready} Ready
             </span>
             {processingStats.processing > 0 && (
-              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium">
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary font-medium">
                 <Loader2 className="w-2.5 h-2.5 animate-spin" />
                 {processingStats.processing} Processing
               </span>

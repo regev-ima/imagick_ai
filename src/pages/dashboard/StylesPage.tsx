@@ -211,8 +211,8 @@ export default function StylesPage() {
       {customStyles.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-              <Lock className="w-4 h-4 text-violet-500" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Lock className="w-4 h-4 text-primary" />
             </div>
             <h2 className="text-xl font-semibold">Your Custom Styles</h2>
             <Badge variant="secondary" className="text-xs tabular-nums">
@@ -238,8 +238,8 @@ export default function StylesPage() {
       {presetStyles.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-              <Globe className="w-4 h-4 text-cyan-500" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Globe className="w-4 h-4 text-primary" />
             </div>
             <h2 className="text-xl font-semibold">Public Styles</h2>
             <Badge variant="secondary" className="text-xs tabular-nums">

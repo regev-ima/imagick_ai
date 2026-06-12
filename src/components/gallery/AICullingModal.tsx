@@ -421,7 +421,7 @@ export function AICullingModal({
               Requires an explicit checkbox so a stray double-click
               never overwrites manual ratings/labels. */}
           {requireRerunAck && (
-            <label className="flex items-start gap-2.5 p-3 mb-4 rounded-lg border border-orange-500/30 bg-orange-500/5 cursor-pointer">
+            <label className="flex items-start gap-2.5 p-3 mb-4 rounded-lg border border-rating/30 bg-rating/5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={acknowledgeRerun}

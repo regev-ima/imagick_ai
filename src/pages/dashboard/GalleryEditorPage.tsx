@@ -1815,7 +1815,7 @@ export default function GalleryEditorPage() {
                     {processingStalled ? (
                       <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
                     ) : isAutoRetrying ? (
-                      <RotateCcw className="w-4 h-4 animate-spin text-orange-400 shrink-0" />
+                      <RotateCcw className="w-4 h-4 animate-spin text-rating shrink-0" />
                     ) : (
                       <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
                     )}

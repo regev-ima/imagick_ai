@@ -93,17 +93,19 @@ function SectionCard({ children, className }: { children: React.ReactNode; class
 
 // Section header with gradient icon
 function SectionHeader({ icon: Icon, label, accent = "violet" }: { icon: React.ComponentType<{ className?: string }>; label: string; accent?: "violet" | "blue" | "amber" | "emerald" }) {
+  // One disciplined accent for every section header; the accent prop is
+  // kept for call-site compatibility but no longer fans out into a rainbow.
   const gradientMap = {
-    violet: "from-violet-500/20 to-primary/20",
-    blue: "from-blue-500/20 to-cyan-500/20",
-    amber: "from-amber-500/20 to-orange-500/20",
-    emerald: "from-emerald-500/20 to-teal-500/20",
+    violet: "from-primary/15 to-primary/5",
+    blue: "from-primary/15 to-primary/5",
+    amber: "from-primary/15 to-primary/5",
+    emerald: "from-primary/15 to-primary/5",
   };
   const textMap = {
-    violet: "text-violet-400",
-    blue: "text-blue-400",
-    amber: "text-amber-400",
-    emerald: "text-emerald-400",
+    violet: "text-primary",
+    blue: "text-primary",
+    amber: "text-primary",
+    emerald: "text-primary",
   };
   return (
     <div className="flex items-center gap-2 mb-2.5">
@@ -241,10 +243,10 @@ export function ImageDetailsPanel({
   // Status badge config
   const statusConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; bg: string; text: string; dot: string }> = {
     ready: { icon: CheckCircle2, bg: "bg-emerald-500/15", text: "text-emerald-400", dot: "bg-emerald-400" },
-    processing: { icon: Loader2, bg: "bg-blue-500/15", text: "text-blue-400", dot: "bg-blue-400" },
+    processing: { icon: Loader2, bg: "bg-rating/15", text: "text-rating", dot: "bg-rating" },
     error: { icon: AlertCircle, bg: "bg-red-500/15", text: "text-red-400", dot: "bg-red-400" },
     pending: { icon: Clock, bg: "bg-amber-500/15", text: "text-amber-400", dot: "bg-amber-400" },
-    uploading: { icon: Loader2, bg: "bg-violet-500/15", text: "text-violet-400", dot: "bg-violet-400" },
+    uploading: { icon: Loader2, bg: "bg-rating/15", text: "text-rating", dot: "bg-rating" },
     deleted: { icon: Trash2, bg: "bg-red-500/15", text: "text-red-400", dot: "bg-red-400" },
   };
   const currentStatus = statusConfig[image.status] || statusConfig.ready;
@@ -594,7 +596,7 @@ export function ImageDetailsPanel({
           </span>
         )}
         {image.edited_url && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-gradient-to-r from-violet-500/15 to-primary/15 text-violet-400 border border-violet-500/20">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-primary/15 text-primary border border-primary/20">
             <Zap className="w-3 h-3" />
             AI Edited
           </span>
@@ -660,7 +662,7 @@ export function ImageDetailsPanel({
             <Button
               variant="ghost"
               size="sm"
-              className="w-full text-orange-400/80 hover:text-orange-400 hover:bg-orange-500/10 gap-2 h-8 text-xs"
+              className="w-full text-destructive/80 hover:text-destructive hover:bg-destructive/10 gap-2 h-8 text-xs"
               onClick={(e) => {
                 e.stopPropagation();
                 onDeleteEdit!(effectiveStyleId!);

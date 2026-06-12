@@ -97,8 +97,8 @@ export function CancelSubscriptionModal({
           {/* Lost features list */}
           <div className="space-y-2">
             {[
-              { icon: Wand2, color: "text-violet-400", bg: "bg-violet-500/10", label: "Unlimited AI editing & culling" },
-              { icon: Sparkles, color: "text-cyan-400", bg: "bg-cyan-500/10", label: "Custom AI models access" },
+              { icon: Wand2, color: "text-primary", bg: "bg-primary/10", label: "Unlimited AI editing & culling" },
+              { icon: Sparkles, color: "text-primary", bg: "bg-primary/10", label: "Custom AI models access" },
               { icon: Cloud, color: "text-sky-400", bg: "bg-sky-500/10", label: "Cloud storage (galleries become read-only)" },
               { icon: HeadphonesIcon, color: "text-emerald-400", bg: "bg-emerald-500/10", label: "Priority processing & support" },
             ].map(({ icon: Icon, color, bg, label }) => (

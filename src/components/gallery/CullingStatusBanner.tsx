@@ -74,7 +74,7 @@ export function CullingStatusBanner({
       className={cn(
         "flex items-center gap-3 px-4 py-2.5 border-b",
         isStuck
-          ? "bg-orange-500/10 border-orange-500/30 text-orange-200"
+          ? "bg-rating/10 border-rating/30 text-rating"
           : "bg-primary/10 border-primary/30 text-foreground",
         className,
       )}
@@ -83,7 +83,7 @@ export function CullingStatusBanner({
     >
       <div className="relative shrink-0">
         {isStuck ? (
-          <Sparkles className="w-4 h-4 text-orange-400" />
+          <Sparkles className="w-4 h-4 text-rating" />
         ) : (
           <>
             <Loader2 className="w-4 h-4 text-primary animate-spin" />
