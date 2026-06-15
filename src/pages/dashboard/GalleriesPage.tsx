@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Trash2,
   Edit3,
+  Library,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,7 +46,8 @@ type StatusFilter = "all" | "working" | "ready" | "error";
 
 const WORKING_STATUSES = ["uploading", "processing", "culling", "transferring"];
 
-const EASE = [0.2, 0, 0, 1] as const;
+// LIGHTROOM motion — calm, responsive fades/slides. No bounce, no float.
+const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
 
 const statusLed = (status: string) =>
   status === "ready" ? "var(--secondary)" : status === "error" ? "var(--destructive)" : "var(--rating)";
@@ -54,9 +56,37 @@ const statusLabel = (status: string) =>
   status === "ready" ? "Ready" : status === "error" ? "Error" : "Processing";
 
 /**
- * Inline style helper: a card's accent vars resolve to the photo's dominant
- * hue when available, otherwise the brand `--primary`. Utilities then read
- * `hsl(var(--dynamic-primary))` so glow/accents pick up the image's color.
+ * The AI mark — a 4-point sparkle (the logo star). Royal blue by default.
+ * Copied from the approved LightroomDashboard reference; tinted via
+ * currentColor so it inherits text-primary / text-accent tokens.
+ */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/** A Lightroom-style tonal panel — hairline border, soft shadow. */
+function Panel({ className, children }: { className?: string; children: ReactNode }) {
+  return <div className={cn("glass-card overflow-hidden rounded-[--radius]", className)}>{children}</div>;
+}
+
+/**
+ * Inline style helper: a cell's accent vars resolve to the photo's dominant
+ * hue when available, otherwise the brand `--primary`. A thin per-cell accent
+ * keyline then reads `hsl(var(--dynamic-primary))`.
  */
 const dynamicVars = (color: string | null): CSSProperties =>
   color ? ({ "--dynamic-primary": color } as CSSProperties) : {};
@@ -142,7 +172,7 @@ export default function GalleriesPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
+      <div className="flex min-h-[400px] items-center justify-center bg-background">
         <Orb className="h-12 w-12" />
       </div>
     );
@@ -156,41 +186,47 @@ export default function GalleriesPage() {
   ];
 
   return (
-    <div className="relative min-h-full px-4 py-6 lg:px-8 lg:py-8">
-      {/* Ambient spectral wash behind the masthead — an AI moment, kept faint */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 opacity-[0.5]"
-        style={{ background: "radial-gradient(80% 100% at 18% 0%, hsl(var(--accent) / 0.10), transparent 70%)" }}
-      />
-
-      <div className="relative mx-auto w-full max-w-[1600px] space-y-8">
-        {/* ── Masthead: engine mark + title + live telemetry + CTA ───────── */}
+    <div className="relative min-h-full bg-background px-5 py-7 lg:px-10 lg:py-10">
+      <div className="relative mx-auto w-full max-w-[1600px]">
+        {/* ════ MASTHEAD — mono "LIBRARY" + count readouts + New collection ══ */}
         <motion.header
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: EASE }}
-          className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"
+          transition={{ duration: 0.5, ease: EASE }}
         >
-          <div className="flex items-center gap-4">
-            <Orb className="hidden h-11 w-11 shrink-0 sm:block" />
-            <div className="min-w-0">
-              <p className="aura-microlabel">Library</p>
-              <h1 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-                Collections
-              </h1>
-            </div>
+          <div className="flex items-center justify-between gap-4 pb-3">
+            <span className="caption flex items-center gap-2">
+              <Library className="h-3 w-3" />
+              Library
+            </span>
+            <span className="caption flex flex-wrap items-center gap-x-4 gap-y-1 text-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="folio text-foreground">{counts.all.toLocaleString()}</span>
+                <span className="text-muted-foreground">collections</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="folio text-foreground">{totalImages.toLocaleString()}</span>
+                <span className="text-muted-foreground">images</span>
+              </span>
+              {counts.working > 0 && (
+                <span className="flex items-center gap-1.5 text-[hsl(var(--rating))]">
+                  <span
+                    className="aura-led aura-led-pulse"
+                    style={{ "--led": "var(--rating)" } as CSSProperties}
+                  />
+                  <span className="folio">{counts.working.toLocaleString()}</span>
+                  <span>working</span>
+                </span>
+              )}
+            </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Live telemetry strip */}
-            <div className="hidden items-stretch gap-2 md:flex">
-              <Stat label="Collections" value={counts.all.toLocaleString()} />
-              <Stat label="Images" value={totalImages.toLocaleString()} />
-              {counts.working > 0 && (
-                <Stat label="Processing" value={counts.working.toLocaleString()} led="var(--rating)" pulse />
-              )}
-            </div>
+          <hr className="aura-hairline" />
+
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <h1 className="text-3xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-4xl">
+              Collections
+            </h1>
             <Button variant="glow" asChild>
               <Link to="/dashboard/galleries/new" className="gap-2">
                 <Plus className="h-4 w-4" />
@@ -200,83 +236,102 @@ export default function GalleriesPage() {
           </div>
         </motion.header>
 
-        <hr className="aura-hairline" />
-
-        {/* ── Toolbar: search · status chips · view toggle ───────────────── */}
+        {/* ════ TOOLBAR — pro control strip: search · status · view ═════════ */}
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.06, duration: 0.45, ease: EASE }}
-          className="flex flex-col gap-3 lg:flex-row lg:items-center"
+          transition={{ delay: 0.06, duration: 0.5, ease: EASE }}
+          className="mt-6"
         >
-          <div className="flex flex-1 items-center gap-2 rounded-2xl border border-border/70 bg-card/60 px-4 py-2.5 backdrop-blur-md transition-[border-color,box-shadow] duration-150 focus-within:border-primary/60 focus-within:shadow-[0_0_24px_-10px_hsl(var(--glow-primary)/0.6)]">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search collections…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/75"
-            />
-          </div>
+          <Panel>
+            <div className="flex flex-col gap-3 p-2.5 lg:flex-row lg:items-center">
+              {/* Search */}
+              <div className="flex flex-1 items-center gap-2.5 rounded-[--radius] border border-border bg-background px-3.5 py-2.5 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] focus-within:border-primary/70">
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search collections…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent font-sans text-sm text-foreground outline-none placeholder:text-muted-foreground/75"
+                />
+              </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/60 bg-card/40 p-1 backdrop-blur-md">
-              {filterChips.map((chip) => {
-                const active = statusFilter === chip.key;
-                return (
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Status segmented control */}
+                <div className="flex flex-wrap items-center gap-1 rounded-[--radius] border border-border bg-background p-1">
+                  {filterChips.map((chip) => {
+                    const active = statusFilter === chip.key;
+                    return (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => setStatusFilter(chip.key)}
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-[calc(var(--radius)-2px)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150",
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground",
+                        )}
+                      >
+                        {chip.led && <span className="aura-led" style={{ "--led": chip.led } as CSSProperties} />}
+                        {chip.label}
+                        <span
+                          className={cn(
+                            "font-mono",
+                            active ? "text-primary-foreground/80" : "text-muted-foreground/70",
+                          )}
+                        >
+                          {counts[chip.key]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* View toggle */}
+                <div className="ml-auto flex items-center gap-1 rounded-[--radius] border border-border bg-background p-1 lg:ml-0">
                   <button
-                    key={chip.key}
                     type="button"
-                    onClick={() => setStatusFilter(chip.key)}
+                    aria-label="Grid view"
+                    onClick={() => setViewMode("grid")}
                     className={cn(
-                      "inline-flex items-center gap-2 rounded-xl px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-[color,background-color] duration-150",
-                      active
-                        ? "bg-primary/15 text-foreground"
-                        : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
+                      "grid h-8 w-8 place-items-center rounded-[calc(var(--radius)-2px)] transition-colors",
+                      viewMode === "grid"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {chip.led && <span className="aura-led" style={{ "--led": chip.led } as CSSProperties} />}
-                    {chip.label}
-                    <span className={cn("font-mono", active ? "text-primary" : "text-muted-foreground/70")}>
-                      {counts[chip.key]}
-                    </span>
+                    <Grid3X3 className="h-4 w-4" />
                   </button>
-                );
-              })}
+                  <button
+                    type="button"
+                    aria-label="List view"
+                    onClick={() => setViewMode("list")}
+                    className={cn(
+                      "grid h-8 w-8 place-items-center rounded-[calc(var(--radius)-2px)] transition-colors",
+                      viewMode === "list"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             </div>
-
-            <div className="ml-auto flex items-center gap-1 rounded-2xl border border-border/60 bg-card/40 p-1 backdrop-blur-md lg:ml-1">
-              <button
-                type="button"
-                aria-label="Grid view"
-                onClick={() => setViewMode("grid")}
-                className={cn(
-                  "grid h-8 w-8 place-items-center rounded-xl transition-colors",
-                  viewMode === "grid" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Grid3X3 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                aria-label="List view"
-                onClick={() => setViewMode("list")}
-                className={cn(
-                  "grid h-8 w-8 place-items-center rounded-xl transition-colors",
-                  viewMode === "list" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <List className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+          </Panel>
         </motion.div>
 
-        {/* ── Grid / list ────────────────────────────────────────────────── */}
+        {/* ════ CATALOG — keyline cells (grid) / pro rows (list) ════════════ */}
         {filteredGalleries.length > 0 &&
           (viewMode === "grid" ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5, ease: EASE }}
+              className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+            >
               {filteredGalleries.map((gallery, i) => (
                 <GalleryCard
                   key={gallery.id}
@@ -287,47 +342,59 @@ export default function GalleriesPage() {
                   onDelete={() => requestDelete(gallery)}
                 />
               ))}
-            </div>
+            </motion.div>
           ) : (
-            <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl">
-              {filteredGalleries.map((gallery, i) => (
-                <GalleryRow
-                  key={gallery.id}
-                  gallery={gallery}
-                  last={i === filteredGalleries.length - 1}
-                  onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
-                  onShare={() => share(gallery.id)}
-                  onDelete={() => requestDelete(gallery)}
-                />
-              ))}
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5, ease: EASE }}
+              className="mt-6"
+            >
+              <Panel>
+                <ul className="divide-y divide-border">
+                  {filteredGalleries.map((gallery) => (
+                    <GalleryRow
+                      key={gallery.id}
+                      gallery={gallery}
+                      onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
+                      onShare={() => share(gallery.id)}
+                      onDelete={() => requestDelete(gallery)}
+                    />
+                  ))}
+                </ul>
+              </Panel>
+            </motion.div>
           ))}
 
-        {/* ── Empty state (no-results vs no-collections) ─────────────────── */}
+        {/* ════ EMPTY STATE (no-results vs no-collections) — restyled ═══════ */}
         {filteredGalleries.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE }}
-            className="grid place-items-center rounded-3xl border border-border/60 bg-card/40 px-6 py-24 text-center backdrop-blur-md"
+            className="mt-6"
           >
-            <Orb className="h-14 w-14" />
-            <h3 className="mt-6 font-display text-lg font-semibold">
-              {searchQuery || statusFilter !== "all" ? "Nothing matches" : "No collections yet"}
-            </h3>
-            <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-              {searchQuery || statusFilter !== "all"
-                ? "Try a different search or filter."
-                : "Hand me a shoot and I'll take it from there."}
-            </p>
-            {!searchQuery && statusFilter === "all" && (
-              <Button variant="glow" asChild className="mt-6">
-                <Link to="/dashboard/galleries/new" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create your first collection
-                </Link>
-              </Button>
-            )}
+            <Panel>
+              <div className="grid place-items-center px-6 py-24 text-center">
+                <Orb className="h-14 w-14" />
+                <h3 className="mt-6 text-xl font-semibold tracking-tight">
+                  {searchQuery || statusFilter !== "all" ? "Nothing matches" : "No collections yet"}
+                </h3>
+                <p className="mt-2 max-w-sm font-sans text-sm leading-relaxed text-muted-foreground">
+                  {searchQuery || statusFilter !== "all"
+                    ? "Try a different search or filter."
+                    : "Hand me a shoot and I'll take it from there."}
+                </p>
+                {!searchQuery && statusFilter === "all" && (
+                  <Button variant="glow" asChild className="mt-6">
+                    <Link to="/dashboard/galleries/new" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create your first collection
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </Panel>
           </motion.div>
         )}
 
@@ -381,19 +448,6 @@ export default function GalleriesPage() {
   );
 }
 
-/** Compact masthead telemetry tile (Roboto Mono labels, semantic LED). */
-function Stat({ label, value, led, pulse }: { label: string; value: string; led?: string; pulse?: boolean }) {
-  return (
-    <div className="flex flex-col justify-center rounded-2xl border border-border/60 bg-card/45 px-3.5 py-1.5 backdrop-blur-md">
-      <span className="flex items-center gap-1.5 font-display text-lg font-bold leading-none tabular-nums">
-        {led && <span className={cn("aura-led", pulse && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />}
-        {value}
-      </span>
-      <span className="aura-microlabel mt-1 leading-none">{label}</span>
-    </div>
-  );
-}
-
 interface GalleryItemProps {
   gallery: any;
   onDelete: () => void;
@@ -401,14 +455,19 @@ interface GalleryItemProps {
   onShare: () => void;
 }
 
-function ActionsMenu({ onEdit, onShare, onDelete, className }: Omit<GalleryItemProps, "gallery"> & { className?: string }) {
+function ActionsMenu({
+  onEdit,
+  onShare,
+  onDelete,
+  className,
+}: Omit<GalleryItemProps, "gallery"> & { className?: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          className={cn("h-8 w-8 rounded-full", className)}
+          className={cn("h-8 w-8 rounded-[--radius]", className)}
           onClick={(e) => e.preventDefault()}
           aria-label="Collection actions"
         >
@@ -434,6 +493,7 @@ function ActionsMenu({ onEdit, onShare, onDelete, className }: Omit<GalleryItemP
   );
 }
 
+/** Catalog cell — a Lightroom keyline plate: thumbnail, name, mono count, status dot. */
 function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryItemProps & { index: number }) {
   const isReady = gallery.status === "ready";
   const isError = gallery.status === "error";
@@ -442,25 +502,26 @@ function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryItemP
   const led = statusLed(gallery.status);
 
   const thumb = gallery.hero_image_url ? getThumbnailUrl(gallery.hero_image_url) : null;
-  // Material You: tint this card from its own hero image (falls back to brand).
+  // A thin per-cell accent keyline picks up the hero image's hue (falls back to brand).
   const dynamic = useDominantColor(thumb);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index, 12) * 0.025, duration: 0.4, ease: EASE }}
       style={dynamicVars(dynamic)}
     >
       <Link to={`/dashboard/galleries/${gallery.id}`} className="group block">
-        <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 [transition-timing-function:cubic-bezier(0.2,0,0,1)] hover:-translate-y-1 hover:border-[hsl(var(--dynamic-primary)/0.55)] hover:shadow-[0_18px_50px_-18px_hsl(var(--dynamic-primary)/0.55)]">
-          <div className="relative aspect-[4/5] overflow-hidden bg-muted">
+        <div className="overflow-hidden rounded-[--radius] border border-border bg-card transition-shadow duration-300 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] group-hover:border-[hsl(var(--dynamic-primary)/0.6)] group-hover:shadow-[var(--elevation-2)]">
+          {/* Plate */}
+          <div className="relative aspect-[4/3] overflow-hidden bg-muted plate-keyline">
             {thumb ? (
               <img
                 src={thumb}
                 alt={gallery.name}
                 loading="lazy"
-                className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                 onError={(e) => {
                   const t = e.currentTarget;
                   if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url;
@@ -468,55 +529,58 @@ function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryItemP
               />
             ) : (
               <div className="grid h-full w-full place-items-center">
-                <Images className="h-8 w-8 text-muted-foreground/40" />
+                <Images className="h-7 w-7 text-muted-foreground/40" />
               </div>
             )}
 
-            {/* Legibility scrim grading into the card */}
-            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/35 to-transparent" />
-            {/* Dynamic-color hover wash, sourced from the photo's own hue */}
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_120%,hsl(var(--dynamic-primary)/0.22),transparent_60%)] opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-
+            {/* Status chip */}
             <span
-              className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] backdrop-blur-md"
+              className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-sm bg-background/85 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] backdrop-blur-sm"
               style={{ color: `hsl(${led})` }}
             >
               <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
               {statusLabel(gallery.status)}
             </span>
 
+            {/* Actions */}
             <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-              <ActionsMenu onEdit={onEdit} onShare={onShare} onDelete={onDelete} className="bg-background/60 backdrop-blur-md" />
+              <ActionsMenu
+                onEdit={onEdit}
+                onShare={onShare}
+                onDelete={onDelete}
+                className="bg-background/80 backdrop-blur-sm"
+              />
             </div>
 
-            {/* Title + meta sit over the image foot */}
-            <div className="absolute inset-x-0 bottom-0 space-y-1 p-4">
-              <div className="flex items-end justify-between gap-3">
-                <h3 className="truncate text-sm font-medium text-foreground drop-shadow-sm transition-colors group-hover:text-[hsl(var(--dynamic-primary))]">
-                  {gallery.name}
-                </h3>
-                <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                  {(gallery.total_images || 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <p className="truncate text-xs text-muted-foreground">
-                  {gallery.description || new Date(gallery.created_at).toLocaleDateString()}
-                </p>
-                {isWorking && (
-                  <span className="shrink-0 font-mono text-[11px] text-[hsl(var(--dynamic-primary))]">{progress}%</span>
-                )}
-              </div>
-            </div>
-
+            {/* Processing progress bar */}
             {isWorking && (
-              <div className="absolute inset-x-0 bottom-0 h-1 bg-background/40">
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-black/40">
                 <div
-                  className="h-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.6)]"
-                  style={{ width: `${progress}%` }}
+                  className="h-full"
+                  style={{ width: `${progress}%`, background: "hsl(var(--rating))" }}
                 />
               </div>
             )}
+          </div>
+
+          {/* Meta footer */}
+          <div className="p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="truncate text-sm font-medium tracking-tight text-foreground transition-colors group-hover:text-[hsl(var(--dynamic-primary))]">
+                {gallery.name}
+              </p>
+              {isWorking && (
+                <span className="shrink-0 font-mono text-[11px] text-[hsl(var(--rating))]">{progress}%</span>
+              )}
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {(gallery.total_images || 0).toLocaleString()} images
+              </span>
+              <span className="font-mono text-[10px] text-muted-foreground/70">
+                {new Date(gallery.created_at).toLocaleDateString()}
+              </span>
+            </div>
           </div>
         </div>
       </Link>
@@ -524,7 +588,8 @@ function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryItemP
   );
 }
 
-function GalleryRow({ gallery, last, onDelete, onEdit, onShare }: GalleryItemProps & { last: boolean }) {
+/** Catalog row — a pro list line: thumbnail, name, mono count, status dot, actions. */
+function GalleryRow({ gallery, onDelete, onEdit, onShare }: GalleryItemProps) {
   const isReady = gallery.status === "ready";
   const isError = gallery.status === "error";
   const isWorking = !isReady && !isError;
@@ -532,65 +597,66 @@ function GalleryRow({ gallery, last, onDelete, onEdit, onShare }: GalleryItemPro
   const led = statusLed(gallery.status);
 
   const thumb = gallery.hero_image_url ? getThumbnailUrl(gallery.hero_image_url) : null;
-  // Material You: each row picks up its hero image's hue too.
+  // Each row carries a thin accent keyline from its hero image's hue.
   const dynamic = useDominantColor(thumb);
 
   return (
-    <Link
-      to={`/dashboard/galleries/${gallery.id}`}
-      style={dynamicVars(dynamic)}
-      className={cn(
-        "group relative flex items-center gap-4 px-4 py-3 transition-colors hover:bg-[hsl(var(--dynamic-primary)/0.06)]",
-        !last && "border-b border-border/40",
-      )}
-    >
-      {/* Dynamic-color accent bar (appears on hover) */}
-      <span className="pointer-events-none absolute inset-y-2 left-0 w-[3px] rounded-full bg-[hsl(var(--dynamic-primary))] opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
+    <li>
+      <Link
+        to={`/dashboard/galleries/${gallery.id}`}
+        style={dynamicVars(dynamic)}
+        className="group relative flex items-center gap-4 px-4 py-3 transition-colors hover:bg-foreground/[0.03]"
+      >
+        {/* Per-row accent keyline (appears on hover) */}
+        <span className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-[hsl(var(--dynamic-primary))] opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
 
-      <div className="h-12 w-[72px] shrink-0 overflow-hidden rounded-xl bg-muted">
-        {thumb ? (
-          <img
-            src={thumb}
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover"
-            onError={(e) => {
-              const t = e.currentTarget;
-              if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url;
-            }}
-          />
-        ) : (
-          <div className="grid h-full w-full place-items-center">
-            <Images className="h-5 w-5 text-muted-foreground/40" />
+        <div className="h-12 w-16 shrink-0 overflow-hidden rounded-sm bg-muted plate-keyline">
+          {thumb ? (
+            <img
+              src={thumb}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                const t = e.currentTarget;
+                if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url;
+              }}
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center">
+              <Images className="h-5 w-5 text-muted-foreground/40" />
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
+            <p className="truncate text-base font-medium tracking-tight transition-colors group-hover:text-[hsl(var(--dynamic-primary))]">
+              {gallery.name}
+            </p>
+          </div>
+          <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+            {(gallery.total_images || 0).toLocaleString()} images · {new Date(gallery.created_at).toLocaleDateString()}
+          </p>
+        </div>
+
+        {isWorking && (
+          <div className="hidden w-40 sm:block">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${progress}%`, background: "hsl(var(--rating))" }}
+              />
+            </div>
           </div>
         )}
-      </div>
+        {isWorking && (
+          <span className="w-12 text-right font-mono text-sm text-[hsl(var(--rating))]">{progress}%</span>
+        )}
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
-          <h3 className="truncate text-sm font-medium transition-colors group-hover:text-[hsl(var(--dynamic-primary))]">
-            {gallery.name}
-          </h3>
-        </div>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
-          {(gallery.total_images || 0).toLocaleString()} images · {new Date(gallery.created_at).toLocaleDateString()}
-        </p>
-      </div>
-
-      {isWorking && (
-        <div className="hidden w-36 sm:block">
-          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-      )}
-      {isWorking && <span className="w-10 text-right font-mono text-xs text-primary">{progress}%</span>}
-
-      <ActionsMenu onEdit={onEdit} onShare={onShare} onDelete={onDelete} />
-    </Link>
+        <ActionsMenu onEdit={onEdit} onShare={onShare} onDelete={onDelete} />
+      </Link>
+    </li>
   );
 }
