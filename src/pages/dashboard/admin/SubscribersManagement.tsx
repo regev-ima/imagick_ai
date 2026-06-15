@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
@@ -10,10 +10,8 @@ import {
   AlertTriangle,
   ExternalLink,
   Search,
-  Filter,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -101,19 +99,62 @@ export default function SubscribersManagement() {
   const cancelling = subscribers.filter((u) => u.cancel_at_period_end).length;
 
   const statusBadge = (status: string | null, cancelling: boolean) => {
-    if (cancelling) return <Badge variant="outline" className="border-yellow-500/50 text-yellow-500">Cancelling</Badge>;
-    if (status === "active") return <Badge variant="outline" className="border-green-500/50 text-green-500">Active</Badge>;
-    if (status === "suspended") return <Badge variant="outline" className="border-destructive/50 text-destructive">Suspended</Badge>;
+    if (cancelling)
+      return (
+        <Badge variant="outline" className="border-[hsl(var(--rating))]/40 text-[hsl(var(--rating))]">
+          Cancelling
+        </Badge>
+      );
+    if (status === "active") return <Badge variant="secondary">Active</Badge>;
+    if (status === "suspended") return <Badge variant="destructive">Suspended</Badge>;
     return <Badge variant="outline">{status || "—"}</Badge>;
   };
 
+  const stats: {
+    label: string;
+    icon: typeof Users;
+    tone: string;
+    render: () => ReactNode;
+  }[] = [
+    {
+      label: "Paying Subscribers",
+      icon: Users,
+      tone: "var(--primary)",
+      render: () => <p className="folio text-3xl leading-none text-foreground">{totalPaid}</p>,
+    },
+    {
+      label: "MRR",
+      icon: DollarSign,
+      tone: "var(--secondary)",
+      render: () => <p className="folio text-3xl leading-none text-foreground">${mrr.toFixed(2)}</p>,
+    },
+    {
+      label: "By Plan",
+      icon: TrendingUp,
+      tone: "var(--accent)",
+      render: () => (
+        <div className="mt-1 flex flex-wrap gap-2">
+          {Object.entries(byPlan).map(([name, count]) => (
+            <Badge key={name} variant="secondary" className="text-xs">{name}: {count}</Badge>
+          ))}
+          {Object.keys(byPlan).length === 0 && <span className="text-muted-foreground text-sm">—</span>}
+        </div>
+      ),
+    },
+    {
+      label: "Cancelling",
+      icon: AlertTriangle,
+      tone: "var(--rating)",
+      render: () => <p className="folio text-3xl leading-none text-foreground">{cancelling}</p>,
+    },
+  ];
+
   return (
-    <div className="p-6 lg:p-8 space-y-8">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-8">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <h1 className="text-3xl font-bold">
-          <span className="text-gradient-primary">Subscribers</span> Management
-        </h1>
-        <p className="text-muted-foreground mt-1">View and manage all paying subscribers</p>
+        <span className="caption">Admin · Billing</span>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Subscribers Management</h1>
+        <p className="mt-1 font-sans text-sm text-muted-foreground">View and manage all paying subscribers</p>
       </motion.div>
 
       {/* Stat Cards */}
@@ -123,63 +164,24 @@ export default function SubscribersManagement() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.1 }}
       >
-        <Card className="glass-card border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Paying Subscribers</p>
-                <p className="text-2xl font-bold">{totalPaid}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-primary/10">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="glass-card border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">MRR</p>
-                <p className="text-2xl font-bold">${mrr.toFixed(2)}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-green-500/10">
-                <DollarSign className="w-6 h-6 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="glass-card border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">By Plan</p>
-                <div className="flex gap-2 mt-1 flex-wrap">
-                  {Object.entries(byPlan).map(([name, count]) => (
-                    <Badge key={name} variant="secondary" className="text-xs">{name}: {count}</Badge>
-                  ))}
-                  {Object.keys(byPlan).length === 0 && <span className="text-muted-foreground text-sm">—</span>}
+        {stats.map((stat) => (
+          <Card key={stat.label} className="glass-card rounded-[--radius]">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="caption">{stat.label}</p>
+                  <div className="mt-2">{stat.render()}</div>
+                </div>
+                <div
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[--radius] border border-border"
+                  style={{ backgroundColor: `hsl(${stat.tone} / 0.1)` }}
+                >
+                  <stat.icon className="w-5 h-5" style={{ color: `hsl(${stat.tone})` }} />
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-secondary/10">
-                <TrendingUp className="w-6 h-6 text-secondary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="glass-card border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Cancelling</p>
-                <p className="text-2xl font-bold">{cancelling}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-yellow-500/10">
-                <AlertTriangle className="w-6 h-6 text-yellow-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </motion.div>
 
       {/* Filters */}
@@ -238,75 +240,73 @@ export default function SubscribersManagement() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.3 }}
       >
-        <Card className="glass-card border-border/50">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
+        <div className="glass-card overflow-hidden rounded-[--radius]">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="caption">User</TableHead>
+                <TableHead className="caption">Plan</TableHead>
+                <TableHead className="caption">Status</TableHead>
+                <TableHead className="caption">Cycle</TableHead>
+                <TableHead className="caption">Amount</TableHead>
+                <TableHead className="caption">Period End</TableHead>
+                <TableHead className="caption">Last Payment</TableHead>
+                <TableHead className="caption">PayPal ID</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Cycle</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Period End</TableHead>
-                  <TableHead>Last Payment</TableHead>
-                  <TableHead>PayPal ID</TableHead>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Loading...</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Loading...</TableCell>
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No subscribers found</TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-sm text-foreground">{u.full_name || "—"}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{u.email}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{u.plan_name}</Badge>
+                    </TableCell>
+                    <TableCell>{statusBadge(u.subscription_status, u.cancel_at_period_end)}</TableCell>
+                    <TableCell className="capitalize text-sm">{u.billing_cycle || "—"}</TableCell>
+                    <TableCell className="folio text-sm text-foreground">
+                      ${u.billing_cycle === "yearly" ? u.price_yearly : u.price_monthly}/{u.billing_cycle === "yearly" ? "yr" : "mo"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {u.current_period_end ? format(new Date(u.current_period_end), "MMM d, yyyy") : "—"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {u.last_payment_at ? format(new Date(u.last_payment_at), "MMM d, yyyy") : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {u.paypal_subscription_id ? (
+                        <a
+                          href={`https://www.sandbox.paypal.com/billing/subscriptions/${u.paypal_subscription_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-xs text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          {u.paypal_subscription_id.slice(0, 12)}…
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
-                ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No subscribers found</TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-sm">{u.full_name || "—"}</p>
-                          <p className="text-xs text-muted-foreground">{u.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{u.plan_name}</Badge>
-                      </TableCell>
-                      <TableCell>{statusBadge(u.subscription_status, u.cancel_at_period_end)}</TableCell>
-                      <TableCell className="capitalize text-sm">{u.billing_cycle || "—"}</TableCell>
-                      <TableCell className="text-sm font-medium">
-                        ${u.billing_cycle === "yearly" ? u.price_yearly : u.price_monthly}/{u.billing_cycle === "yearly" ? "yr" : "mo"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {u.current_period_end ? format(new Date(u.current_period_end), "MMM d, yyyy") : "—"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {u.last_payment_at ? format(new Date(u.last_payment_at), "MMM d, yyyy") : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {u.paypal_subscription_id ? (
-                          <a
-                            href={`https://www.sandbox.paypal.com/billing/subscriptions/${u.paypal_subscription_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                          >
-                            {u.paypal_subscription_id.slice(0, 12)}…
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </motion.div>
     </div>
   );

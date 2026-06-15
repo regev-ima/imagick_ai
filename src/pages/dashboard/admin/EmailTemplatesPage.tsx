@@ -109,24 +109,23 @@ export default function EmailTemplatesPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">
-          Email <span className="text-gradient-primary">Templates</span>
-        </h1>
+        <span className="caption">Transactional email</span>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Email Templates</h1>
         <p className="text-muted-foreground mt-1">
           Preview and send test emails for all template types
         </p>
       </div>
 
-      <Card className="glass-card border-border/50">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Mail className="w-4 h-4 text-primary" />
+      <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
+        <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
+          <CardTitle className="aura-microlabel flex items-center gap-2 text-muted-foreground">
+            <Mail className="w-3.5 h-3.5" />
             Recipient Email
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           <Input
             type="email"
             placeholder="Enter recipient email..."
@@ -140,23 +139,23 @@ export default function EmailTemplatesPage() {
         </CardContent>
       </Card>
 
-      <Card className="glass-card border-border/50">
+      <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Template</TableHead>
-                <TableHead className="hidden md:table-cell">Description</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="caption">Template</TableHead>
+                <TableHead className="caption hidden md:table-cell">Description</TableHead>
+                <TableHead className="caption text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {EMAIL_TEMPLATES.map((template) => (
-                <TableRow key={template.key}>
+                <TableRow key={template.key} className="border-border">
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="font-mono text-xs">
+                      <Badge variant="outline" className="font-mono text-xs border-border text-muted-foreground">
                         {template.key}
                       </Badge>
                       <span className="font-medium hidden sm:inline">{template.label}</span>

@@ -56,9 +56,9 @@ function HBarChart({ data, total }: { data: { label: string; count: number }[]; 
           <div key={label} className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground w-28 shrink-0 truncate capitalize">{label.replace(/_/g, " ")}</span>
             <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} className="h-full rounded-full bg-gradient-to-r from-primary to-secondary" />
+              <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} className="h-full rounded-full bg-accent" />
             </div>
-            <span className="text-xs text-muted-foreground w-12 text-right shrink-0">{count} ({pct}%)</span>
+            <span className="folio text-xs text-muted-foreground w-12 text-right shrink-0">{count} ({pct}%)</span>
           </div>
         );
       })}
@@ -107,15 +107,16 @@ export default function OnboardingInsightsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="sm">
           <Link to="/dashboard/admin"><ArrowLeft className="w-4 h-4 mr-1" />Admin</Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-primary" />Onboarding Insights
+          <span className="caption">Questionnaire</span>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <BarChart3 className="w-6 h-6 text-accent" />Onboarding Insights
           </h1>
           <p className="text-sm text-muted-foreground">Questionnaire responses and question management</p>
         </div>
@@ -135,19 +136,19 @@ export default function OnboardingInsightsPage() {
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {[
-                  { label: "Users Answered", value: totalUsersAnswered, icon: Users, color: "text-primary", bg: "bg-primary/10" },
-                  { label: "Total Answers", value: (answers ?? []).length, icon: CheckCircle2, color: "text-green-400", bg: "bg-green-500/10" },
-                  { label: "Active Questions", value: (questions ?? []).filter((q) => q.is_active).length, icon: BarChart3, color: "text-secondary", bg: "bg-secondary/10" },
+                  { label: "Users Answered", value: totalUsersAnswered, icon: Users, color: "text-foreground", bg: "bg-muted" },
+                  { label: "Total Answers", value: (answers ?? []).length, icon: CheckCircle2, color: "text-secondary", bg: "bg-secondary/10" },
+                  { label: "Active Questions", value: (questions ?? []).filter((q) => q.is_active).length, icon: BarChart3, color: "text-accent", bg: "bg-accent/10" },
                 ].map(({ label, value, icon: Icon, color, bg }, i) => (
                   <motion.div key={label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                    <Card className="glass-card border-border/50">
+                    <Card className="glass-card rounded-[--radius] border-border">
                       <CardContent className="pt-5">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm text-muted-foreground">{label}</p>
-                            <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                            <p className="caption">{label}</p>
+                            <p className={`folio text-3xl mt-1 ${color}`}>{value}</p>
                           </div>
-                          <div className={`p-3 rounded-xl ${bg}`}><Icon className={`w-5 h-5 ${color}`} /></div>
+                          <div className={`p-3 rounded-[--radius] ${bg}`}><Icon className={`w-5 h-5 ${color}`} /></div>
                         </div>
                       </CardContent>
                     </Card>
@@ -159,12 +160,12 @@ export default function OnboardingInsightsPage() {
                 {(questions ?? []).filter((q) => q.is_active).map((q) => {
                   const qAnswerCount = (answers ?? []).filter((a) => a.question_id === q.id).length;
                   return (
-                    <Card key={q.id} className="glass-card border-border/50">
-                      <CardHeader className="pb-2">
+                    <Card key={q.id} className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
+                      <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
                         <CardTitle className="text-sm">{q.title}</CardTitle>
-                        <p className="text-xs text-muted-foreground">{qAnswerCount} responses · {q.question_type}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{qAnswerCount} responses · {q.question_type}</p>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="p-4">
                         <HBarChart data={getDistribution(q.id)} total={qAnswerCount} />
                       </CardContent>
                     </Card>
@@ -245,14 +246,14 @@ function ManageQuestionsTab({ questions, queryClient }: { questions: OnboardingQ
   return (
     <>
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Questions ({questions.length})</h3>
+        <h3 className="aura-microlabel text-muted-foreground">Questions ({questions.length})</h3>
         <Button size="sm" variant="outline" onClick={() => setShowForm((v) => !v)} className="gap-1">
           <Plus className="w-3.5 h-3.5" />{showForm ? "Cancel" : "Add Question"}
         </Button>
       </div>
 
       {showForm && (
-        <Card className="glass-card border-border/50">
+        <Card className="glass-card rounded-[--radius] border-border">
           <CardContent className="pt-5 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -297,7 +298,7 @@ function ManageQuestionsTab({ questions, queryClient }: { questions: OnboardingQ
               <Label className="text-xs">Options (one per line, format: id:label)</Label>
               <Textarea value={newQ.options_text} onChange={(e) => setNewQ((p) => ({ ...p, options_text: e.target.value }))} rows={4} placeholder={"35mm:35mm\n50mm:50mm\n85mm:85mm"} className="font-mono text-sm" />
             </div>
-            <Button onClick={() => addQuestion.mutate()} disabled={!newQ.question_key || !newQ.title || addQuestion.isPending} className="w-full gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90">
+            <Button onClick={() => addQuestion.mutate()} disabled={!newQ.question_key || !newQ.title || addQuestion.isPending} className="w-full gap-2">
               {addQuestion.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Add Question
             </Button>
@@ -307,24 +308,24 @@ function ManageQuestionsTab({ questions, queryClient }: { questions: OnboardingQ
 
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Order</TableHead>
-            <TableHead>Key</TableHead>
-            <TableHead>Title</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Options</TableHead>
-            <TableHead>Active</TableHead>
-            <TableHead></TableHead>
+          <TableRow className="border-border hover:bg-transparent">
+            <TableHead className="caption">Order</TableHead>
+            <TableHead className="caption">Key</TableHead>
+            <TableHead className="caption">Title</TableHead>
+            <TableHead className="caption">Type</TableHead>
+            <TableHead className="caption">Options</TableHead>
+            <TableHead className="caption">Active</TableHead>
+            <TableHead className="caption"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {questions.map((q) => (
-            <TableRow key={q.id}>
-              <TableCell className="text-sm">{q.sort_order}</TableCell>
+            <TableRow key={q.id} className="border-border">
+              <TableCell className="folio text-sm">{q.sort_order}</TableCell>
               <TableCell className="font-mono text-xs text-muted-foreground">{q.question_key}</TableCell>
               <TableCell className="text-sm font-medium">{q.title}</TableCell>
-              <TableCell><Badge variant="outline" className="text-xs">{q.question_type}</Badge></TableCell>
-              <TableCell className="text-sm">{(q.options ?? []).length}</TableCell>
+              <TableCell><Badge variant="outline" className="text-xs border-border text-muted-foreground">{q.question_type}</Badge></TableCell>
+              <TableCell className="folio text-sm">{(q.options ?? []).length}</TableCell>
               <TableCell>
                 <Switch checked={q.is_active} onCheckedChange={(v) => toggleActive.mutate({ id: q.id, is_active: v })} />
               </TableCell>

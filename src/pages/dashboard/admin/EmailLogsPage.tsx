@@ -50,7 +50,7 @@ function ErrorDetailsDialog({ errorMessage }: { errorMessage: string }) {
             </DialogTitle>
           </DialogHeader>
           <div className="relative">
-            <pre className="bg-muted rounded-lg p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all font-mono text-foreground">
+            <pre className="surface-2 rounded-[--radius] p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all font-mono text-foreground">
               {formatted}
             </pre>
             <Button
@@ -59,7 +59,7 @@ function ErrorDetailsDialog({ errorMessage }: { errorMessage: string }) {
               className="absolute top-2 right-2 h-7 gap-1.5 text-xs"
               onClick={handleCopy}
             >
-              {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+              {copied ? <Check className="w-3 h-3 text-secondary" /> : <Copy className="w-3 h-3" />}
               {copied ? "Copied!" : "Copy"}
             </Button>
           </div>
@@ -85,7 +85,7 @@ const EMAIL_TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; classes: string }> = {
-  sent:    { label: "Sent",    icon: <CheckCircle2 className="w-3 h-3" />, classes: "bg-green-500/10 text-green-500 border-green-500/30" },
+  sent:    { label: "Sent",    icon: <CheckCircle2 className="w-3 h-3" />, classes: "bg-secondary/10 text-secondary border-secondary/30" },
   failed:  { label: "Failed",  icon: <XCircle      className="w-3 h-3" />, classes: "bg-destructive/10 text-destructive border-destructive/30" },
   skipped: { label: "Skipped", icon: <SkipForward  className="w-3 h-3" />, classes: "bg-muted text-muted-foreground border-border" },
 };
@@ -389,14 +389,17 @@ export default function EmailLogsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-6">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center gap-3 mb-1">
           <Button variant="ghost" size="icon" asChild className="w-8 h-8">
             <Link to="/dashboard/admin"><ArrowLeft className="w-4 h-4" /></Link>
           </Button>
-          <h1 className="text-3xl font-bold">Email Logs</h1>
+          <div>
+            <span className="caption">Delivery via Resend</span>
+            <h1 className="text-3xl font-semibold tracking-tight">Email Logs</h1>
+          </div>
         </div>
         <p className="text-muted-foreground pl-11">
           All transactional emails sent from Imagick.ai via Resend.
@@ -405,7 +408,7 @@ export default function EmailLogsPage() {
 
       {hasMetadataFilters && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="glass-card border-border/50">
+          <Card className="glass-card rounded-[--radius] border-border">
             <CardContent className="pt-4 flex flex-wrap items-center gap-2">
               {leadIdFilter && <Badge variant="secondary">Lead: {leadIdFilter}</Badge>}
               {scheduledEmailIdFilter && <Badge variant="secondary">Scheduled Email: {scheduledEmailIdFilter}</Badge>}
@@ -427,52 +430,52 @@ export default function EmailLogsPage() {
         {/* Totals */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: `Sent (${periodLabel})`,    value: summaryData?.sent    ?? "–", color: "text-green-500" },
+            { label: `Sent (${periodLabel})`,    value: summaryData?.sent    ?? "–", color: "text-secondary" },
             { label: `Failed (${periodLabel})`,  value: summaryData?.failed  ?? "–", color: "text-destructive" },
             { label: `Skipped (${periodLabel})`, value: summaryData?.skipped ?? "–", color: "text-muted-foreground" },
           ].map(({ label, value, color }) => (
-            <Card key={label} className="glass-card border-border/50">
+            <Card key={label} className="glass-card rounded-[--radius] border-border">
               <CardContent className="pt-4 pb-4">
-                <p className={cn("text-2xl font-bold", color)}>{value}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+                <p className={cn("folio text-2xl", color)}>{value}</p>
+                <p className="caption mt-1">{label}</p>
               </CardContent>
             </Card>
           ))}
         </div>
         {/* Marketing vs System split */}
         <div className="grid grid-cols-2 gap-4">
-          <Card className="glass-card border-border/50">
+          <Card className="glass-card rounded-[--radius] border-border">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-1.5 rounded-md bg-blue-500/10"><Mail className="w-3.5 h-3.5 text-blue-400" /></div>
+                <div className="p-1.5 rounded-[--radius] bg-accent/10"><Mail className="w-3.5 h-3.5 text-accent" /></div>
                 <span className="text-sm font-medium">Marketing (Lead Campaign)</span>
               </div>
               <div className="flex items-center gap-6">
                 <div>
-                  <p className="text-xl font-bold text-green-500">{summaryData?.marketing?.sent ?? "–"}</p>
-                  <p className="text-[10px] text-muted-foreground">Sent</p>
+                  <p className="folio text-xl text-secondary">{summaryData?.marketing?.sent ?? "–"}</p>
+                  <p className="caption mt-0.5">Sent</p>
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-destructive">{summaryData?.marketing?.failed ?? "–"}</p>
-                  <p className="text-[10px] text-muted-foreground">Failed</p>
+                  <p className="folio text-xl text-destructive">{summaryData?.marketing?.failed ?? "–"}</p>
+                  <p className="caption mt-0.5">Failed</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card border-border/50">
+          <Card className="glass-card rounded-[--radius] border-border">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-1.5 rounded-md bg-violet-500/10"><Mail className="w-3.5 h-3.5 text-violet-400" /></div>
+                <div className="p-1.5 rounded-[--radius] bg-primary/10"><Mail className="w-3.5 h-3.5 text-primary" /></div>
                 <span className="text-sm font-medium">System (Transactional)</span>
               </div>
               <div className="flex items-center gap-6">
                 <div>
-                  <p className="text-xl font-bold text-green-500">{summaryData?.system?.sent ?? "–"}</p>
-                  <p className="text-[10px] text-muted-foreground">Sent</p>
+                  <p className="folio text-xl text-secondary">{summaryData?.system?.sent ?? "–"}</p>
+                  <p className="caption mt-0.5">Sent</p>
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-destructive">{summaryData?.system?.failed ?? "–"}</p>
-                  <p className="text-[10px] text-muted-foreground">Failed</p>
+                  <p className="folio text-xl text-destructive">{summaryData?.system?.failed ?? "–"}</p>
+                  <p className="caption mt-0.5">Failed</p>
                 </div>
               </div>
             </CardContent>
@@ -481,7 +484,7 @@ export default function EmailLogsPage() {
 
         {/* Error Summary */}
         {errorSummary && errorSummary.length > 0 && (
-          <Card className="glass-card border-destructive/20 bg-destructive/5">
+          <Card className="glass-card rounded-[--radius] border-destructive/20 bg-destructive/5">
             <CardContent className="pt-4 pb-4">
               <button
                 onClick={() => setErrorSummaryExpanded((v) => !v)}
@@ -596,7 +599,7 @@ export default function EmailLogsPage() {
           size="sm"
           onClick={handleRetryClick}
           disabled={retrying}
-          className="gap-1.5 text-orange-500 border-orange-500/30 hover:bg-orange-500/10"
+          className="gap-1.5 text-[hsl(var(--rating))] border-[hsl(var(--rating))]/30 hover:bg-[hsl(var(--rating))]/10"
         >
           {retrying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
           Retry Failed
@@ -609,11 +612,11 @@ export default function EmailLogsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="glass-card border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Mail className="w-4 h-4" />
-              {totalLogs.toLocaleString()} total logs
+        <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
+          <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
+            <CardTitle className="aura-microlabel flex items-center gap-2 text-muted-foreground">
+              <Mail className="w-3.5 h-3.5" />
+              <span className="folio">{totalLogs.toLocaleString()}</span> total logs
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -631,13 +634,13 @@ export default function EmailLogsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border/50 text-xs text-muted-foreground">
-                      <th className="text-left px-4 py-3 font-medium">Date</th>
-                      <th className="text-left px-4 py-3 font-medium">Type</th>
-                      <th className="text-left px-4 py-3 font-medium">Recipient</th>
-                      <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Subject</th>
-                      <th className="text-left px-4 py-3 font-medium">Status</th>
-                      <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Resend ID</th>
+                    <tr className="border-b border-border">
+                      <th className="caption text-left px-4 py-3">Date</th>
+                      <th className="caption text-left px-4 py-3">Type</th>
+                      <th className="caption text-left px-4 py-3">Recipient</th>
+                      <th className="caption text-left px-4 py-3 hidden md:table-cell">Subject</th>
+                      <th className="caption text-left px-4 py-3">Status</th>
+                      <th className="caption text-left px-4 py-3 hidden lg:table-cell">Resend ID</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -648,11 +651,11 @@ export default function EmailLogsPage() {
                         <tr
                           key={log.id}
                           className={cn(
-                            "border-b border-border/30 hover:bg-muted/30 transition-colors",
-                            i % 2 === 0 ? "" : "bg-muted/10"
+                            "border-b border-border hover:bg-foreground/[0.03] transition-colors",
+                            i % 2 === 0 ? "" : "bg-foreground/[0.015]"
                           )}
                         >
-                          <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                             <div>{date.toLocaleDateString()}</div>
                             <div>{date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                           </td>
@@ -681,7 +684,7 @@ export default function EmailLogsPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleRetrySingle(log.metadata.scheduled_email_id); }}
                                   disabled={retryingSingle === log.metadata.scheduled_email_id}
-                                  className="ml-1 inline-flex items-center text-orange-500 hover:text-orange-400 transition-colors disabled:opacity-50"
+                                  className="ml-1 inline-flex items-center text-[hsl(var(--rating))] hover:opacity-80 transition-opacity disabled:opacity-50"
                                   title="Retry this email"
                                 >
                                   {retryingSingle === log.metadata.scheduled_email_id
@@ -747,7 +750,7 @@ export default function EmailLogsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRetryConfirm} className="bg-orange-500 hover:bg-orange-600">
+            <AlertDialogAction onClick={handleRetryConfirm} className="bg-[hsl(var(--rating))] text-background hover:opacity-90">
               Retry {retryPreviewCount} email{retryPreviewCount !== 1 ? "s" : ""}
             </AlertDialogAction>
           </AlertDialogFooter>

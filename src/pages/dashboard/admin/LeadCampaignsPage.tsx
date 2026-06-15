@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -201,28 +200,27 @@ export default function LeadCampaignsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Lead Campaigns</h1>
-        <p className="text-muted-foreground mt-1">
+        <span className="caption">Admin · Lead generation</span>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Lead Campaigns</h1>
+        <p className="mt-1 font-sans text-sm text-muted-foreground">
           Global default campaign configuration, send window, and 10-step sequence overview.
         </p>
       </div>
 
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarClock className="w-4 h-4 text-primary" />
+      <div className="glass-card overflow-hidden rounded-[--radius]">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+          <span className="aura-microlabel flex items-center gap-2">
+            <CalendarClock className="h-3.5 w-3.5" />
             Campaign Settings
-          </CardTitle>
-          <CardDescription>
-            Configure active/default campaign and send window (local campaign timezone).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </span>
+          <span className="caption">Send window · local TZ</span>
+        </div>
+        <div className="space-y-4 p-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Select campaign</Label>
+              <Label className="aura-microlabel">Select campaign</Label>
               <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose campaign" />
@@ -237,7 +235,7 @@ export default function LeadCampaignsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Timezone</Label>
+              <Label className="aura-microlabel">Timezone</Label>
               <Input
                 value={formState.timezone}
                 onChange={(e) => setFormState((prev) => ({ ...prev, timezone: e.target.value }))}
@@ -248,7 +246,7 @@ export default function LeadCampaignsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>Send window start (hour)</Label>
+              <Label className="aura-microlabel">Send window start (hour)</Label>
               <Input
                 type="number"
                 min={0}
@@ -260,7 +258,7 @@ export default function LeadCampaignsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Send window end (hour)</Label>
+              <Label className="aura-microlabel">Send window end (hour)</Label>
               <Input
                 type="number"
                 min={1}
@@ -291,9 +289,9 @@ export default function LeadCampaignsPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+          <div className="flex items-center justify-between rounded-[--radius] border border-border bg-surface-2 p-3">
             <div className="space-y-1">
-              <Label>Pause lead emails</Label>
+              <Label className="aura-microlabel">Pause lead emails</Label>
               <p className="text-xs text-muted-foreground">
                 Stops the queue from sending new lead emails. Scheduled emails remain pending.
               </p>
@@ -307,54 +305,50 @@ export default function LeadCampaignsPage() {
               Save Campaign
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="text-base">Sequence Steps</CardTitle>
-          <CardDescription>
-            Timeline and sender profile per step. Use Lead Templates page to preview/test full email content.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Step</TableHead>
-                <TableHead>Delay (hours)</TableHead>
-                <TableHead>Cum. Day</TableHead>
-                <TableHead>Sender</TableHead>
-                <TableHead>Style</TableHead>
-                <TableHead>Subject</TableHead>
+      <div className="glass-card overflow-hidden rounded-[--radius]">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+          <span className="aura-microlabel">Sequence Steps</span>
+          <span className="caption">10-step sequence</span>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="caption">Step</TableHead>
+              <TableHead className="caption">Delay (hours)</TableHead>
+              <TableHead className="caption">Cum. Day</TableHead>
+              <TableHead className="caption">Sender</TableHead>
+              <TableHead className="caption">Style</TableHead>
+              <TableHead className="caption">Subject</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {steps.map((step) => (
+              <TableRow key={step.id}>
+                <TableCell className="folio text-foreground">{step.step_order}</TableCell>
+                <TableCell className="folio text-foreground">{step.delay_hours}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">Day {cumulativeDays(steps, step.step_order)}</TableCell>
+                <TableCell>
+                  <Badge variant={step.sender_profile === "sapir" ? "default" : "secondary"} className="font-mono">
+                    {step.sender_profile === "sapir" ? "sapir@imagick.ai" : "contact@imagick.ai"}
+                  </Badge>
+                </TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">{step.is_reply ? "RE:" : "Normal"}</TableCell>
+                <TableCell className="max-w-[520px] truncate text-sm">{step.subject}</TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {steps.map((step) => (
-                <TableRow key={step.id}>
-                  <TableCell>{step.step_order}</TableCell>
-                  <TableCell>{step.delay_hours}</TableCell>
-                  <TableCell>Day {cumulativeDays(steps, step.step_order)}</TableCell>
-                  <TableCell>
-                    <Badge variant={step.sender_profile === "sapir" ? "default" : "secondary"}>
-                      {step.sender_profile === "sapir" ? "sapir@imagick.ai" : "contact@imagick.ai"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{step.is_reply ? "RE:" : "Normal"}</TableCell>
-                  <TableCell className="max-w-[520px] truncate">{step.subject}</TableCell>
-                </TableRow>
-              ))}
-              {steps.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No steps found for this campaign.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            ))}
+            {steps.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  No steps found for this campaign.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

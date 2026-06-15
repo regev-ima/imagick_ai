@@ -50,12 +50,12 @@ function StepCard({ step, index, onChange, onDelete }: { step: SequenceStep; ind
   const [expanded, setExpanded] = useState(index === 0);
 
   return (
-    <div className="border border-border/60 rounded-xl overflow-hidden">
-      <button type="button" onClick={() => setExpanded((e) => !e)} className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left">
+    <div className="border border-border rounded-[--radius] overflow-hidden">
+      <button type="button" onClick={() => setExpanded((e) => !e)} className="w-full flex items-center justify-between px-4 py-3 surface-2 hover:bg-foreground/[0.04] transition-colors text-left">
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-xs">Step {step.step_order}</Badge>
+          <Badge variant="outline" className="text-xs border-border text-muted-foreground">Step {step.step_order}</Badge>
           <span className="text-sm font-medium truncate max-w-[300px]">{step.subject || "No subject yet"}</span>
-          <span className="text-xs text-muted-foreground">{step.delay_hours === 0 ? "Immediate" : `+${step.delay_hours}h`}</span>
+          <span className="font-mono text-xs text-muted-foreground">{step.delay_hours === 0 ? "Immediate" : `+${step.delay_hours}h`}</span>
         </div>
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive hover:text-destructive h-7 w-7 p-0">
@@ -166,23 +166,23 @@ function SequenceEditor({ sequence, onSaved }: { sequence: EmailSequence | null;
           )}
         </div>
       </div>
-      <div className="flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-muted/20">
+      <div className="flex items-center gap-3 p-3 rounded-[--radius] border border-border surface-2">
         <Switch id="seq-active" checked={isActive} onCheckedChange={setIsActive} />
         <Label htmlFor="seq-active" className="text-sm cursor-pointer">{isActive ? "Active" : "Inactive — draft mode"}</Label>
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold">Steps ({steps.length})</h3>
+          <h3 className="aura-microlabel text-muted-foreground">Steps ({steps.length})</h3>
           <Button type="button" variant="outline" size="sm" onClick={addStep} className="gap-1"><Plus className="w-3.5 h-3.5" />Add Step</Button>
         </div>
         <div className="space-y-2">
           {steps.map((step, i) => (<StepCard key={i} step={step} index={i} onChange={(u) => updateStep(i, u)} onDelete={() => deleteStep(i)} />))}
-          {steps.length === 0 && <div className="text-center py-8 text-muted-foreground text-sm border border-dashed border-border/60 rounded-xl">No steps yet</div>}
+          {steps.length === 0 && <div className="text-center py-8 text-muted-foreground text-sm border border-dashed border-border rounded-[--radius]">No steps yet</div>}
         </div>
       </div>
 
-      <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !name} className="w-full gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90">
+      <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !name} className="w-full gap-2">
         {saveMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Save Sequence
       </Button>
     </div>
@@ -231,20 +231,21 @@ export default function EmailSequencesPage() {
   const showEditor = selectedId !== null;
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-6">
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="sm"><Link to="/dashboard/admin"><ArrowLeft className="w-4 h-4 mr-1" />Admin</Link></Button>
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><MailOpen className="w-6 h-6 text-primary" />Email Sequences</h1>
+          <span className="caption">Lifecycle automation</span>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight flex items-center gap-2"><MailOpen className="w-6 h-6 text-accent" />Email Sequences</h1>
           <p className="text-sm text-muted-foreground">Create and manage automated lifecycle email campaigns</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="glass-card border-border/50 lg:col-span-1">
-          <CardHeader className="pb-3">
+        <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0 lg:col-span-1">
+          <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Sequences</CardTitle>
+              <CardTitle className="aura-microlabel text-muted-foreground">Sequences</CardTitle>
               <Button size="sm" variant="outline" onClick={() => setSelectedId("new")} className="gap-1 h-7"><Plus className="w-3.5 h-3.5" />New</Button>
             </div>
           </CardHeader>
@@ -252,14 +253,14 @@ export default function EmailSequencesPage() {
             {isLoading ? (
               <div className="flex justify-center py-8"><RefreshCw className="w-5 h-5 animate-spin text-muted-foreground" /></div>
             ) : (
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-border">
                 {(sequences ?? []).map((seq) => (
-                  <button key={seq.id} type="button" onClick={() => setSelectedId(seq.id)} className={cn("w-full text-left px-4 py-3 hover:bg-muted/30 transition-colors", selectedId === seq.id && "bg-primary/5 border-l-2 border-primary")}>
+                  <button key={seq.id} type="button" onClick={() => setSelectedId(seq.id)} className={cn("w-full text-left px-4 py-3 hover:bg-foreground/[0.03] transition-colors", selectedId === seq.id && "bg-primary/[0.08] border-l-2 border-primary")}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium truncate">{seq.name}</span>
-                      <Badge variant={seq.is_active ? "default" : "outline"} className="text-xs ml-2 shrink-0">{seq.is_active ? "Active" : "Draft"}</Badge>
+                      <Badge variant={seq.is_active ? "default" : "outline"} className={cn("text-xs ml-2 shrink-0", !seq.is_active && "border-border text-muted-foreground")}>{seq.is_active ? "Active" : "Draft"}</Badge>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
                       <span>{seq.trigger_type === "stage_enter" ? `On: ${seq.trigger_value}` : `Day ${seq.trigger_value}`}</span>
                       <span>·</span>
                       <span>{seq.steps?.length ?? 0} steps</span>
@@ -272,10 +273,10 @@ export default function EmailSequencesPage() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-border/50 lg:col-span-2">
-          <CardHeader>
+        <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0 lg:col-span-2">
+          <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{selectedId === "new" ? "New Sequence" : selectedSequence ? selectedSequence.name : "Select a sequence"}</CardTitle>
+              <CardTitle className="aura-microlabel text-muted-foreground">{selectedId === "new" ? "New Sequence" : selectedSequence ? selectedSequence.name : "Select a sequence"}</CardTitle>
               {selectedSequence && (
                 <Button variant="ghost" size="sm" onClick={() => deleteSequence.mutate(selectedSequence.id)} className="text-destructive hover:text-destructive gap-1">
                   <Trash2 className="w-3.5 h-3.5" />Delete
@@ -283,7 +284,7 @@ export default function EmailSequencesPage() {
               )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-5">
             {showEditor ? (
               <SequenceEditor sequence={selectedSequence} onSaved={() => setSelectedId(null)} />
             ) : (

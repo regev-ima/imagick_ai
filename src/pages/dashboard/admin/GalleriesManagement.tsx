@@ -15,7 +15,6 @@ import {
  import { Link, useNavigate } from "react-router-dom";
  import { Button } from "@/components/ui/button";
  import { Input } from "@/components/ui/input";
- import { Card, CardContent, CardHeader } from "@/components/ui/card";
  import { Badge } from "@/components/ui/badge";
  import {
    Table,
@@ -162,57 +161,65 @@ export default function GalleriesManagement() {
    const getStatusBadge = (status: string) => {
      switch (status) {
        case "ready":
-         return <Badge className="bg-green-500/10 text-green-500 border-green-500/50">Ready</Badge>;
+         return <Badge variant="secondary">Ready</Badge>;
        case "processing":
-         return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/50">Processing</Badge>;
+         return (
+           <Badge className="border-[hsl(var(--rating)/0.4)] bg-[hsl(var(--rating)/0.15)] text-[hsl(var(--rating))]">
+             Processing
+           </Badge>
+         );
        case "uploading":
-         return <Badge className="bg-primary/10 text-primary border-primary/50">Uploading</Badge>;
+         return <Badge variant="default">Uploading</Badge>;
        default:
          return <Badge variant="outline">{status}</Badge>;
      }
    };
- 
+
    return (
-     <div className="p-6 lg:p-8 space-y-6">
-       <div className="flex items-center gap-4">
+     <div className="min-h-full bg-background p-6 lg:p-8">
+       <div className="mx-auto w-full max-w-[1320px] space-y-5">
+       <div className="flex items-center gap-3">
          <Button variant="ghost" size="icon" asChild>
            <Link to="/dashboard/admin">
              <ArrowLeft className="w-5 h-5" />
            </Link>
          </Button>
          <div className="flex-1">
-           <h1 className="text-3xl font-bold">Galleries Management</h1>
-           <p className="text-muted-foreground">View and manage all galleries</p>
+           <h1 className="text-2xl font-semibold tracking-tight">Galleries Management</h1>
+           <p className="caption mt-1 flex items-center gap-1.5">
+             <Images className="h-3 w-3" />
+             View and manage all galleries
+           </p>
          </div>
        </div>
- 
-       <Card className="glass-card">
-         <CardHeader>
-           <div className="flex items-center gap-2 max-w-md">
-             <Search className="w-4 h-4 text-muted-foreground" />
+
+       <div className="glass-card overflow-hidden rounded-[--radius]">
+         <div className="border-b border-border bg-background/40 p-3">
+           <div className="flex max-w-md items-center gap-2 rounded-[--radius] border border-border bg-background px-3">
+             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
              <Input
                placeholder="Search galleries..."
                value={searchQuery}
                onChange={(e) => setSearchQuery(e.target.value)}
-               className="flex-1"
+               className="flex-1 border-0 bg-transparent px-0 focus-visible:ring-0"
              />
            </div>
-         </CardHeader>
-         <CardContent>
+         </div>
+         <div>
            {isLoading ? (
-             <div className="text-center py-8 text-muted-foreground">Loading galleries...</div>
+             <div className="caption py-12 text-center">Loading galleries…</div>
            ) : galleries?.length === 0 ? (
-             <div className="text-center py-8 text-muted-foreground">No galleries found</div>
+             <div className="caption py-12 text-center">No galleries found</div>
            ) : (
              <Table>
                <TableHeader>
-                 <TableRow>
-                   <TableHead>Gallery</TableHead>
-                   <TableHead>Status</TableHead>
-                   <TableHead>Images</TableHead>
-                   <TableHead>Owner</TableHead>
-                   <TableHead>Created</TableHead>
-                   <TableHead className="text-right">Actions</TableHead>
+                 <TableRow className="hover:bg-transparent">
+                   <TableHead className="aura-microlabel">Gallery</TableHead>
+                   <TableHead className="aura-microlabel">Status</TableHead>
+                   <TableHead className="aura-microlabel">Images</TableHead>
+                   <TableHead className="aura-microlabel">Owner</TableHead>
+                   <TableHead className="aura-microlabel">Created</TableHead>
+                   <TableHead className="aura-microlabel text-right">Actions</TableHead>
                  </TableRow>
                </TableHeader>
                <TableBody>
@@ -221,22 +228,22 @@ export default function GalleriesManagement() {
                      <TableCell>
                        <div>
                          <p className="font-medium">{gallery.name}</p>
-                         <p className="text-sm text-muted-foreground truncate max-w-xs">
+                         <p className="max-w-xs truncate text-sm text-muted-foreground">
                            {gallery.description || "No description"}
                          </p>
                        </div>
                      </TableCell>
                      <TableCell>{getStatusBadge(gallery.status)}</TableCell>
-                     <TableCell>{gallery.total_images}</TableCell>
+                     <TableCell className="folio">{gallery.total_images}</TableCell>
                      <TableCell>
                        <div className="flex items-center gap-2">
                          <User className="w-4 h-4 text-muted-foreground" />
-                         <span className="font-mono text-sm">
+                         <span className="font-mono text-sm text-muted-foreground">
                            {gallery.user_id.substring(0, 8)}...
                          </span>
                        </div>
                      </TableCell>
-                     <TableCell className="text-muted-foreground">
+                     <TableCell className="folio text-muted-foreground">
                        {format(new Date(gallery.created_at), "MMM d, yyyy")}
                      </TableCell>
                      <TableCell className="text-right">
@@ -299,9 +306,9 @@ export default function GalleriesManagement() {
                </TableBody>
              </Table>
            )}
-         </CardContent>
-       </Card>
- 
+         </div>
+       </div>
+
        {/* Delete Confirmation Dialog */}
        <AlertDialog open={!!deleteGalleryId} onOpenChange={() => setDeleteGalleryId(null)}>
          <AlertDialogContent>
@@ -349,5 +356,6 @@ export default function GalleriesManagement() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+    </div>
     );
   }

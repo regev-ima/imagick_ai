@@ -37,7 +37,6 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,34 +70,34 @@ export default function UserDetailPage() {
   const fmtDate = (d: string | null) => (d ? format(new Date(d), "dd/MM/yyyy") : "—");
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <div className="min-h-full space-y-5 bg-background p-4 sm:p-6 lg:p-8">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground overflow-x-auto">
+      <div className="flex items-center gap-2 overflow-x-auto text-sm text-muted-foreground">
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
           <Link to="/dashboard/admin/users">
             <ArrowLeft className="w-4 h-4" />
           </Link>
         </Button>
-        <Link to="/dashboard/admin" className="hover:text-foreground transition-colors shrink-0">Admin</Link>
+        <Link to="/dashboard/admin" className="shrink-0 transition-colors hover:text-foreground">Admin</Link>
         <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-        <Link to="/dashboard/admin/users" className="hover:text-foreground transition-colors shrink-0">Users</Link>
+        <Link to="/dashboard/admin/users" className="shrink-0 transition-colors hover:text-foreground">Users</Link>
         <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-        <span className="text-foreground font-medium truncate max-w-[160px] sm:max-w-[240px]">
-          {isLoading ? <Skeleton className="h-4 w-32 inline-block" /> : data?.user?.email || "User"}
+        <span className="max-w-[160px] truncate font-medium text-foreground sm:max-w-[240px]">
+          {isLoading ? <Skeleton className="inline-block h-4 w-32" /> : data?.user?.email || "User"}
         </span>
       </div>
 
       {/* Header */}
-      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-          <User className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 sm:h-12 sm:w-12">
+          <User className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-lg sm:text-2xl font-bold truncate">
+          <h1 className="truncate text-lg font-semibold tracking-tight sm:text-2xl">
             {isLoading ? <Skeleton className="h-7 w-64" /> : data?.user?.email || "User Details"}
           </h1>
           {data?.user?.full_name && (
-            <p className="text-sm sm:text-base text-muted-foreground mt-0.5">{data.user.full_name}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground sm:text-base">{data.user.full_name}</p>
           )}
         </div>
       </div>
@@ -128,13 +127,13 @@ export default function UserDetailPage() {
           {/* === OVERVIEW === */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-              <InfoCard icon={Mail} label="Email" value={data.user.email} color="text-blue-400" bg="bg-blue-500/10" />
-              <InfoCard icon={User} label="Name" value={data.user.full_name || "—"} color="text-violet-400" bg="bg-violet-500/10" />
+              <InfoCard icon={Mail} label="Email" value={data.user.email} color="" bg="" />
+              <InfoCard icon={User} label="Name" value={data.user.full_name || "—"} color="" bg="" />
               <InfoCard
                 icon={Fingerprint}
                 label="Auth Method"
-                color="text-emerald-400"
-                bg="bg-emerald-500/10"
+                color=""
+                bg=""
                 value={
                   <Badge variant={data.user.provider === "google" ? "default" : "outline"}>
                     {data.user.provider === "google" ? "Google" : "Email"}
@@ -144,60 +143,58 @@ export default function UserDetailPage() {
               <InfoCard
                 icon={Shield}
                 label="Role"
-                color="text-amber-400"
-                bg="bg-amber-500/10"
+                color=""
+                bg=""
                 value={
                   <Badge
                     className={
-                      data.user.role === "admin"
-                        ? "bg-red-500/10 text-red-500 border-red-500/50"
-                        : data.user.role === "moderator"
-                        ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/50"
+                      data.user.role === "moderator"
+                        ? "border-[hsl(var(--rating)/0.4)] bg-[hsl(var(--rating)/0.15)] text-[hsl(var(--rating))]"
                         : ""
                     }
-                    variant={!data.user.role ? "outline" : "default"}
+                    variant={!data.user.role ? "outline" : data.user.role === "admin" ? "destructive" : "default"}
                   >
                     {data.user.role || "User"}
                   </Badge>
                 }
               />
-              <InfoCard icon={Calendar} label="Signed Up" value={fmt(data.user.created_at)} color="text-cyan-400" bg="bg-cyan-500/10" />
-              <InfoCard icon={Clock} label="Last Sign In" value={fmt(data.user.last_sign_in_at)} color="text-pink-400" bg="bg-pink-500/10" />
+              <InfoCard icon={Calendar} label="Signed Up" value={fmt(data.user.created_at)} color="" bg="" />
+              <InfoCard icon={Clock} label="Last Sign In" value={fmt(data.user.last_sign_in_at)} color="" bg="" />
             </div>
 
             {data.subscription && (
-              <Card className="glass-card border-border/50">
-                <CardContent className="pt-5 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-primary" />
-                    <h4 className="font-semibold text-sm">Subscription</h4>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    <InfoCard icon={CreditCard} label="Plan" value={data.subscription.plan_name} color="text-primary" bg="bg-primary/10" />
-                    <InfoCard icon={Activity} label="Status" value={data.subscription.status} color="text-green-400" bg="bg-green-500/10" />
+              <div className="glass-card overflow-hidden rounded-[--radius]">
+                <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="aura-microlabel">Subscription</span>
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+                    <InfoCard icon={CreditCard} label="Plan" value={data.subscription.plan_name} color="" bg="" />
+                    <InfoCard icon={Activity} label="Status" value={data.subscription.status} color="" bg="" />
                     <InfoCard
                       icon={Zap}
                       label="Edits"
-                      color="text-amber-400"
-                      bg="bg-amber-500/10"
+                      color=""
+                      bg=""
                       value={`${data.subscription.edits_remaining === -1 ? "Unlimited" : data.subscription.edits_remaining + " remaining"} (${data.subscription.edits_used} used)`}
                     />
                     <InfoCard
                       icon={HardDrive}
                       label="Storage"
-                      color="text-sky-400"
-                      bg="bg-sky-500/10"
+                      color=""
+                      bg=""
                       value={`${data.subscription.storage_used_mb} MB`}
                     />
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
 
             <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              <StatCard label="Collections" value={data.galleries?.length || 0} icon={LayoutGrid} color="text-violet-400" bg="bg-violet-500/10" />
-              <StatCard label="Images" value={data.images_count} icon={Image} color="text-blue-400" bg="bg-blue-500/10" />
-              <StatCard label="Edits" value={data.edits_count} icon={Zap} color="text-amber-400" bg="bg-amber-500/10" />
+              <StatCard label="Collections" value={data.galleries?.length || 0} icon={LayoutGrid} color="" bg="" />
+              <StatCard label="Images" value={data.images_count} icon={Image} color="" bg="" />
+              <StatCard label="Edits" value={data.edits_count} icon={Zap} color="" bg="" />
             </div>
           </TabsContent>
 
@@ -208,115 +205,118 @@ export default function UserDetailPage() {
             ) : (
               <div className="grid gap-5">
                 {data.galleries?.map((g: any) => {
-                  const statusColor =
-                    g.status === "ready" ? "bg-green-500/10 text-green-500 border-green-500/50" :
-                    g.status === "processing" || g.status === "culling" ? "bg-amber-500/10 text-amber-500 border-amber-500/50" :
-                    g.status === "error" ? "bg-red-500/10 text-red-500 border-red-500/50" :
-                    "";
+                  const statusVariant: "secondary" | "destructive" | "outline" | "rating" =
+                    g.status === "ready" ? "secondary" :
+                    g.status === "processing" || g.status === "culling" ? "rating" :
+                    g.status === "error" ? "destructive" :
+                    "outline";
                   const cullingDone = g.culling_status === "ready";
 
                   return (
-                    <Card key={g.id} className="glass-card border-border/50 overflow-hidden">
-                      <CardContent className="p-0">
-                        {/* Top section: thumbnail + header */}
-                        <div className="flex flex-col sm:flex-row">
-                          {/* Thumbnail */}
-                          <div className="h-32 sm:h-auto sm:w-32 md:w-40 shrink-0 bg-muted/20 relative">
-                            {g.hero_image_url ? (
-                              <img src={g.hero_image_url} alt={g.name} className="w-full h-full object-cover absolute inset-0" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center min-h-[120px] sm:min-h-[160px]">
-                                <Image className="w-10 h-10 text-muted-foreground/20" />
-                              </div>
-                            )}
+                    <div key={g.id} className="glass-card overflow-hidden rounded-[--radius]">
+                      {/* Top section: thumbnail + header */}
+                      <div className="flex flex-col sm:flex-row">
+                        {/* Thumbnail */}
+                        <div className="relative h-32 shrink-0 bg-muted plate-keyline sm:h-auto sm:w-32 md:w-40">
+                          {g.hero_image_url ? (
+                            <img src={g.hero_image_url} alt={g.name} className="absolute inset-0 h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex min-h-[120px] w-full items-center justify-center sm:min-h-[160px]">
+                              <Image className="h-10 w-10 text-muted-foreground/30" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right content */}
+                        <div className="min-w-0 flex-1 space-y-3 p-4 sm:space-y-4 sm:p-5">
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="truncate font-semibold">{g.name}</h3>
+                              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">Created {fmtDate(g.created_at)}</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {(cullingDone || g.culling_status === "processing") && (
+                                <Badge
+                                  variant={cullingDone ? "secondary" : "outline"}
+                                  className={cullingDone
+                                    ? "gap-1 text-xs"
+                                    : "gap-1 border-[hsl(var(--rating)/0.4)] bg-[hsl(var(--rating)/0.15)] text-[hsl(var(--rating))] text-xs"
+                                  }
+                                >
+                                  <Scissors className="w-3 h-3" />
+                                  {cullingDone ? "Culled" : "Culling..."}
+                                </Badge>
+                              )}
+                              {statusVariant === "rating" ? (
+                                <Badge className="border-[hsl(var(--rating)/0.4)] bg-[hsl(var(--rating)/0.15)] text-[hsl(var(--rating))]">{g.status}</Badge>
+                              ) : (
+                                <Badge variant={statusVariant}>{g.status}</Badge>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Right content */}
-                          <div className="flex-1 p-4 sm:p-5 min-w-0 space-y-3 sm:space-y-4">
-                            {/* Header */}
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <h3 className="font-semibold truncate">{g.name}</h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">Created {fmtDate(g.created_at)}</p>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {(cullingDone || g.culling_status === "processing") && (
-                                  <Badge
-                                    className={cullingDone
-                                      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/50 text-xs gap-1"
-                                      : "bg-amber-500/10 text-amber-500 border-amber-500/50 text-xs gap-1"
-                                    }
-                                  >
-                                    <Scissors className="w-3 h-3" />
-                                    {cullingDone ? "Culled" : "Culling..."}
-                                  </Badge>
-                                )}
-                                <Badge className={statusColor} variant={statusColor ? "default" : "outline"}>{g.status}</Badge>
-                              </div>
+                          {/* Stats row */}
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+                            <div className="rounded-[--radius] border border-border bg-popover p-2.5 text-center">
+                              <Image className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />
+                              <p className="folio text-lg leading-tight">{g.total_images || 0}</p>
+                              <p className="aura-microlabel">Images</p>
                             </div>
-
-                            {/* Stats row */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                              <div className="border rounded-lg p-2.5 text-center">
-                                <Image className="w-4 h-4 text-blue-400 mx-auto mb-1" />
-                                <p className="text-lg font-bold leading-tight">{g.total_images || 0}</p>
-                                <p className="text-[10px] text-muted-foreground">Images</p>
-                              </div>
-                              <div className="border rounded-lg p-2.5 text-center">
-                                <Zap className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                                <p className="text-lg font-bold leading-tight">{g.edits_count || 0}</p>
-                                <p className="text-[10px] text-muted-foreground">Edits</p>
-                              </div>
-                              <div className="border rounded-lg p-2.5 text-center">
-                                <Layers className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-                                <p className="text-lg font-bold leading-tight">{g.edits_spent || 0}</p>
-                                <p className="text-[10px] text-muted-foreground">Credits</p>
-                              </div>
-                              <div className="border rounded-lg p-2.5 text-center">
-                                <Sparkles className="w-4 h-4 text-violet-400 mx-auto mb-1" />
-                                <p className="text-lg font-bold leading-tight">{g.styles_used?.length || 0}</p>
-                                <p className="text-[10px] text-muted-foreground">Styles</p>
-                              </div>
+                            <div className="rounded-[--radius] border border-border bg-popover p-2.5 text-center">
+                              <Zap className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />
+                              <p className="folio text-lg leading-tight">{g.edits_count || 0}</p>
+                              <p className="aura-microlabel">Edits</p>
                             </div>
+                            <div className="rounded-[--radius] border border-border bg-popover p-2.5 text-center">
+                              <Layers className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />
+                              <p className="folio text-lg leading-tight">{g.edits_spent || 0}</p>
+                              <p className="aura-microlabel">Credits</p>
+                            </div>
+                            <div className="rounded-[--radius] border border-border bg-popover p-2.5 text-center">
+                              <Sparkles className="mx-auto mb-1 h-4 w-4 text-accent" />
+                              <p className="folio text-lg leading-tight">{g.styles_used?.length || 0}</p>
+                              <p className="aura-microlabel">Styles</p>
+                            </div>
+                          </div>
 
-                            {/* Styles + Culling labels */}
-                            {(g.styles_used?.length > 0 || (cullingDone && g.culling_labels?.length > 0)) && (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {g.styles_used?.map((s: string) => (
-                                  <Badge key={s} className="bg-violet-500/10 text-violet-400 border-violet-500/30 text-xs gap-1">
-                                    <Palette className="w-3 h-3" />{s}
-                                  </Badge>
-                                ))}
-                                {cullingDone && g.culling_labels?.map((l: string) => (
-                                  <Badge key={l} variant="outline" className="text-xs gap-1">
-                                    <Scissors className="w-3 h-3" />{l}
-                                  </Badge>
-                                ))}
-                              </div>
+                          {/* Styles + Culling labels */}
+                          {(g.styles_used?.length > 0 || (cullingDone && g.culling_labels?.length > 0)) && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {g.styles_used?.map((s: string) => (
+                                <Badge key={s} variant="default" className="gap-1 text-xs">
+                                  <Palette className="w-3 h-3" />{s}
+                                </Badge>
+                              ))}
+                              {cullingDone && g.culling_labels?.map((l: string) => (
+                                <Badge key={l} variant="outline" className="gap-1 text-xs">
+                                  <Scissors className="w-3 h-3" />{l}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Timeline */}
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 font-mono text-[11px] text-muted-foreground">
+                            {g.first_upload_at && (
+                              <span className="flex items-center gap-1.5">
+                                <Upload className="h-3.5 w-3.5 text-muted-foreground" /> Uploaded {fmt(g.first_upload_at)}
+                              </span>
                             )}
-
-                            {/* Timeline */}
-                            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-                              {g.first_upload_at && (
-                                <span className="flex items-center gap-1.5">
-                                  <Upload className="w-3.5 h-3.5 text-cyan-400" /> Uploaded {fmt(g.first_upload_at)}
-                                </span>
-                              )}
-                              {g.first_edit_at && (
-                                <span className="flex items-center gap-1.5">
-                                  <Timer className="w-3.5 h-3.5 text-pink-400" /> First edit {fmt(g.first_edit_at)}
-                                </span>
-                              )}
-                              {g.last_edit_at && g.first_edit_at && g.last_edit_at !== g.first_edit_at && (
-                                <span className="flex items-center gap-1.5">
-                                  <Timer className="w-3.5 h-3.5 text-orange-400" /> Last edit {fmt(g.last_edit_at)}
-                                </span>
-                              )}
-                            </div>
+                            {g.first_edit_at && (
+                              <span className="flex items-center gap-1.5">
+                                <Timer className="h-3.5 w-3.5 text-muted-foreground" /> First edit {fmt(g.first_edit_at)}
+                              </span>
+                            )}
+                            {g.last_edit_at && g.first_edit_at && g.last_edit_at !== g.first_edit_at && (
+                              <span className="flex items-center gap-1.5">
+                                <Timer className="h-3.5 w-3.5 text-muted-foreground" /> Last edit {fmt(g.last_edit_at)}
+                              </span>
+                            )}
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -326,36 +326,36 @@ export default function UserDetailPage() {
           {/* === USAGE & ACTIVITY === */}
           <TabsContent value="usage" className="space-y-6">
             <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              <StatCard label="Last Upload" value={fmt(data.last_upload_at)} icon={Calendar} color="text-cyan-400" bg="bg-cyan-500/10" isText />
-              <StatCard label="Total Images" value={data.images_count} icon={Image} color="text-blue-400" bg="bg-blue-500/10" />
-              <StatCard label="Total Edits" value={data.edits_count} icon={Palette} color="text-pink-400" bg="bg-pink-500/10" />
+              <StatCard label="Last Upload" value={fmt(data.last_upload_at)} icon={Calendar} color="" bg="" isText />
+              <StatCard label="Total Images" value={data.images_count} icon={Image} color="" bg="" />
+              <StatCard label="Total Edits" value={data.edits_count} icon={Palette} color="" bg="" />
             </div>
 
-            <Card className="glass-card border-border/50">
-              <CardContent className="pt-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-amber-400" />
-                  <h4 className="font-semibold text-sm">Credit Usage History</h4>
-                </div>
+            <div className="glass-card overflow-hidden rounded-[--radius]">
+              <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                <Zap className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="aura-microlabel">Credit Usage History</span>
+              </div>
+              <div className="p-4">
                 {data.edit_logs?.length === 0 ? (
-                  <p className="text-muted-foreground text-sm py-2">No credit usage</p>
+                  <p className="caption py-2">No credit usage</p>
                 ) : (
-                  <div className="overflow-x-auto -mx-4 sm:mx-0"><Table>
+                  <div className="-mx-4 overflow-x-auto sm:mx-0"><Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Credits</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Description</TableHead>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="aura-microlabel">Action</TableHead>
+                        <TableHead className="aura-microlabel">Credits</TableHead>
+                        <TableHead className="aura-microlabel">Date</TableHead>
+                        <TableHead className="aura-microlabel">Description</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {data.edit_logs?.map((log: any, i: number) => (
                         <TableRow key={i}>
                           <TableCell>{log.action_type}</TableCell>
-                          <TableCell>{log.edits_spent}</TableCell>
-                          <TableCell>{fmtDate(log.created_at)}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs max-w-[300px] truncate">
+                          <TableCell className="folio">{log.edits_spent}</TableCell>
+                          <TableCell className="folio text-muted-foreground">{fmtDate(log.created_at)}</TableCell>
+                          <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground">
                             {log.description || "—"}
                           </TableCell>
                         </TableRow>
@@ -363,27 +363,27 @@ export default function UserDetailPage() {
                     </TableBody>
                   </Table></div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="glass-card border-border/50">
-              <CardContent className="pt-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-green-400" />
-                  <h4 className="font-semibold text-sm">Credit Grants</h4>
-                </div>
+            <div className="glass-card overflow-hidden rounded-[--radius]">
+              <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="aura-microlabel">Credit Grants</span>
+              </div>
+              <div className="p-4">
                 {!data.credit_grants || data.credit_grants.length === 0 ? (
-                  <p className="text-muted-foreground text-sm py-2">No credit grants</p>
+                  <p className="caption py-2">No credit grants</p>
                 ) : (
-                  <div className="overflow-x-auto -mx-4 sm:mx-0"><Table>
+                  <div className="-mx-4 overflow-x-auto sm:mx-0"><Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Initial</TableHead>
-                        <TableHead>Remaining</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Expires</TableHead>
-                        <TableHead>Note</TableHead>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="aura-microlabel">Type</TableHead>
+                        <TableHead className="aura-microlabel">Initial</TableHead>
+                        <TableHead className="aura-microlabel">Remaining</TableHead>
+                        <TableHead className="aura-microlabel">Status</TableHead>
+                        <TableHead className="aura-microlabel">Expires</TableHead>
+                        <TableHead className="aura-microlabel">Note</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -392,17 +392,17 @@ export default function UserDetailPage() {
                           <TableCell>
                             <Badge variant="outline" className="capitalize">{grant.grant_type}</Badge>
                           </TableCell>
-                          <TableCell>{grant.credits_initial}</TableCell>
-                          <TableCell>{grant.credits_remaining}</TableCell>
+                          <TableCell className="folio">{grant.credits_initial}</TableCell>
+                          <TableCell className="folio">{grant.credits_remaining}</TableCell>
                           <TableCell>
-                            <Badge className={
-                              grant.status === "active" ? "bg-green-500/10 text-green-500 hover:bg-green-500/20" :
-                              grant.status === "expired" ? "bg-red-500/10 text-red-500 hover:bg-red-500/20" :
-                              "bg-muted text-muted-foreground"
+                            <Badge variant={
+                              grant.status === "active" ? "secondary" :
+                              grant.status === "expired" ? "destructive" :
+                              "outline"
                             }>{grant.status}</Badge>
                           </TableCell>
-                          <TableCell>{fmtDate(grant.expires_at)}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs max-w-[200px] truncate">
+                          <TableCell className="folio">{fmtDate(grant.expires_at)}</TableCell>
+                          <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
                             {grant.reason || "—"}
                           </TableCell>
                         </TableRow>
@@ -410,8 +410,8 @@ export default function UserDetailPage() {
                     </TableBody>
                   </Table></div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* === EMAILS === */}
@@ -419,13 +419,13 @@ export default function UserDetailPage() {
             {data.email_logs?.length === 0 ? (
               <EmptyState icon={Send} message="No emails sent" />
             ) : (
-              <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0"><Table>
+              <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"><Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="aura-microlabel">Type</TableHead>
+                    <TableHead className="aura-microlabel">Subject</TableHead>
+                    <TableHead className="aura-microlabel">Status</TableHead>
+                    <TableHead className="aura-microlabel">Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -434,16 +434,16 @@ export default function UserDetailPage() {
                       <TableCell>
                         <Badge variant="outline" className="text-xs">{log.email_type}</Badge>
                       </TableCell>
-                      <TableCell className="max-w-[200px] sm:max-w-[300px] truncate">{log.subject}</TableCell>
+                      <TableCell className="max-w-[200px] truncate sm:max-w-[300px]">{log.subject}</TableCell>
                       <TableCell>
                         <Badge
-                          variant={log.status === "sent" ? "default" : "destructive"}
+                          variant={log.status === "sent" ? "secondary" : "destructive"}
                           className="text-xs"
                         >
                           {log.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{fmtDate(log.created_at)}</TableCell>
+                      <TableCell className="folio text-muted-foreground">{fmtDate(log.created_at)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -456,12 +456,12 @@ export default function UserDetailPage() {
             {data.styles?.length === 0 ? (
               <EmptyState icon={Sparkles} message="No styles created" />
             ) : (
-              <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0"><Table>
+              <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"><Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="aura-microlabel">Name</TableHead>
+                    <TableHead className="aura-microlabel">Status</TableHead>
+                    <TableHead className="aura-microlabel">Created</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -471,7 +471,7 @@ export default function UserDetailPage() {
                       <TableCell>
                         <Badge variant="outline">{s.status}</Badge>
                       </TableCell>
-                      <TableCell>{fmtDate(s.created_at)}</TableCell>
+                      <TableCell className="folio text-muted-foreground">{fmtDate(s.created_at)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -486,22 +486,20 @@ export default function UserDetailPage() {
             ) : (
               <div className="grid gap-4">
                 {data.sessions?.map((s: any) => (
-                  <Card key={s.id} className="glass-card border-border/50">
-                    <CardContent className="pt-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <p className="text-sm font-semibold">{fmt(s.created_at)}</p>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        <InfoCard icon={s.device_type === "mobile" ? Smartphone : Laptop} label="Device" value={s.device_type || "—"} color="text-violet-400" bg="bg-violet-500/10" />
-                        <InfoCard icon={Monitor} label="OS" value={s.os || "—"} color="text-blue-400" bg="bg-blue-500/10" />
-                        <InfoCard icon={Globe} label="Browser" value={s.browser || "—"} color="text-emerald-400" bg="bg-emerald-500/10" />
-                        <InfoCard icon={Wifi} label="IP" value={<span className="font-mono text-xs break-all">{s.ip_address || "—"}</span>} color="text-amber-400" bg="bg-amber-500/10" />
-                        <InfoCard icon={Monitor} label="Resolution" value={s.screen_width && s.screen_height ? `${s.screen_width}x${s.screen_height}` : "—"} color="text-cyan-400" bg="bg-cyan-500/10" />
-                        <InfoCard icon={SunMoon} label="Theme" value={s.color_scheme || "—"} color="text-pink-400" bg="bg-pink-500/10" />
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div key={s.id} className="glass-card overflow-hidden rounded-[--radius]">
+                    <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="aura-microlabel">{fmt(s.created_at)}</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 md:grid-cols-3">
+                      <InfoCard icon={s.device_type === "mobile" ? Smartphone : Laptop} label="Device" value={s.device_type || "—"} color="" bg="" />
+                      <InfoCard icon={Monitor} label="OS" value={s.os || "—"} color="" bg="" />
+                      <InfoCard icon={Globe} label="Browser" value={s.browser || "—"} color="" bg="" />
+                      <InfoCard icon={Wifi} label="IP" value={<span className="break-all font-mono text-xs">{s.ip_address || "—"}</span>} color="" bg="" />
+                      <InfoCard icon={Monitor} label="Resolution" value={s.screen_width && s.screen_height ? `${s.screen_width}x${s.screen_height}` : "—"} color="" bg="" />
+                      <InfoCard icon={SunMoon} label="Theme" value={s.color_scheme || "—"} color="" bg="" />
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -527,45 +525,43 @@ export default function UserDetailPage() {
                     const options = Array.isArray(q.options) ? q.options : [];
 
                     return (
-                      <Card key={q.id} className="glass-card border-border/50">
-                        <CardContent className="pt-4 pb-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                              <div className={`p-1.5 rounded-lg ${userAnswer ? "bg-primary/10" : "bg-muted"}`}>
-                                <ClipboardList className={`w-4 h-4 ${userAnswer ? "text-primary" : "text-muted-foreground"}`} />
-                              </div>
-                              <p className="text-sm font-semibold">{q.title}</p>
+                      <div key={q.id} className="glass-card space-y-2 rounded-[--radius] p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`rounded-[--radius] p-1.5 ${userAnswer ? "bg-primary/10" : "border border-border bg-popover"}`}>
+                              <ClipboardList className={`h-4 w-4 ${userAnswer ? "text-primary" : "text-muted-foreground"}`} />
                             </div>
-                            {userAnswer ? (
-                              <div className="flex items-center gap-1.5">
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                <span className="text-xs text-muted-foreground">{fmtDate(userAnswer.answered_at)}</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5">
-                                <CircleDashed className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">Not answered</span>
-                              </div>
-                            )}
+                            <p className="text-sm font-semibold">{q.title}</p>
                           </div>
                           {userAnswer ? (
-                            <div className="flex flex-wrap gap-1.5 mt-1 pl-9">
-                              {(Array.isArray(userAnswer.answer) ? userAnswer.answer : [userAnswer.answer]).map((ans: string, i: number) => {
-                                const opt = options.find((o: any) => o.id === ans);
-                                return (
-                                  <Badge key={i} className="bg-primary/10 text-primary border-primary/30">
-                                    {opt?.label || ans}
-                                  </Badge>
-                                );
-                              })}
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle2 className="h-4 w-4 text-secondary" />
+                              <span className="font-mono text-[11px] text-muted-foreground">{fmtDate(userAnswer.answered_at)}</span>
                             </div>
                           ) : (
-                            <div className="pl-9">
-                              <Badge variant="outline" className="text-muted-foreground">Not answered</Badge>
+                            <div className="flex items-center gap-1.5">
+                              <CircleDashed className="h-4 w-4 text-muted-foreground" />
+                              <span className="caption">Not answered</span>
                             </div>
                           )}
-                        </CardContent>
-                      </Card>
+                        </div>
+                        {userAnswer ? (
+                          <div className="mt-1 flex flex-wrap gap-1.5 pl-9">
+                            {(Array.isArray(userAnswer.answer) ? userAnswer.answer : [userAnswer.answer]).map((ans: string, i: number) => {
+                              const opt = options.find((o: any) => o.id === ans);
+                              return (
+                                <Badge key={i} variant="default">
+                                  {opt?.label || ans}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="pl-9">
+                            <Badge variant="outline" className="text-muted-foreground">Not answered</Badge>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -593,12 +589,12 @@ function InfoCard({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className={`p-2 rounded-lg ${bg} shrink-0`}>
-        <Icon className={`w-4 h-4 ${color}`} />
+      <div className="shrink-0 rounded-[--radius] border border-border bg-popover p-2">
+        <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="text-sm font-medium truncate">{value}</div>
+        <p className="aura-microlabel">{label}</p>
+        <div className="mt-0.5 truncate text-sm font-medium">{value}</div>
       </div>
     </div>
   );
@@ -606,37 +602,35 @@ function InfoCard({
 
 function StatCard({ label, value, icon: Icon, color, bg, isText }: { label: string; value: number | string; icon: LucideIcon; color: string; bg: string; isText?: boolean }) {
   return (
-    <Card className="glass-card border-border/50">
-      <CardContent className="pt-3 pb-3 sm:pt-5 sm:pb-4 flex flex-col items-center text-center gap-1.5 sm:gap-2 px-2 sm:px-4">
-        <div className={`p-2 sm:p-2.5 rounded-xl ${bg}`}>
-          <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${color}`} />
-        </div>
-        <div className="min-w-0 w-full">
-          <p className={`${isText ? "text-xs sm:text-sm truncate" : "text-xl sm:text-2xl"} font-bold`}>{value}</p>
-          <p className="text-[10px] sm:text-xs text-muted-foreground">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="glass-card overflow-hidden rounded-[--radius]">
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-3 py-2">
+        <span className="aura-microlabel truncate">{label}</span>
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      </div>
+      <div className="px-3 py-3 text-center sm:text-left">
+        <p className={`folio ${isText ? "truncate text-xs sm:text-sm" : "text-2xl sm:text-3xl"} text-foreground`}>{value}</p>
+      </div>
+    </div>
   );
 }
 
 function MiniStat({ icon: Icon, label, value, color }: { icon: LucideIcon; label: string; value: number | string; color: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <Icon className={`w-3.5 h-3.5 ${color} shrink-0`} />
+      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-xs font-semibold">{value}</span>
+      <span className="folio text-xs">{value}</span>
     </div>
   );
 }
 
 function EmptyState({ icon: Icon, message }: { icon: LucideIcon; message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-      <div className="p-4 rounded-2xl bg-muted/50">
+    <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+      <div className="rounded-[--radius] border border-border bg-popover p-4">
         <Icon className="w-8 h-8" />
       </div>
-      <p className="text-sm">{message}</p>
+      <p className="caption">{message}</p>
     </div>
   );
 }

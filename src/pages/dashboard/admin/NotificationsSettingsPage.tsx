@@ -102,26 +102,25 @@ export default function NotificationsSettingsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link to="/dashboard/admin"><ArrowLeft className="w-5 h-5" /></Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">
-            WhatsApp <span className="text-gradient-primary">Notifications</span>
-          </h1>
+          <span className="caption">WhatsApp alerts</span>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Notifications</h1>
           <p className="text-muted-foreground mt-1">Manage who receives WhatsApp notifications</p>
         </div>
       </div>
 
       {/* Add Recipient */}
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Plus className="w-5 h-5" /> Add Recipient</CardTitle>
-          <CardDescription>Add a new WhatsApp number to receive notifications</CardDescription>
+      <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
+        <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
+          <CardTitle className="aura-microlabel flex items-center gap-2 text-muted-foreground"><Plus className="w-3.5 h-3.5" /> Add Recipient</CardTitle>
+          <CardDescription className="text-xs">Add a new WhatsApp number to receive notifications</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 space-y-1">
               <Label htmlFor="name">Name</Label>
@@ -141,22 +140,22 @@ export default function NotificationsSettingsPage() {
       </Card>
 
       {/* Recipients List */}
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><MessageSquare className="w-5 h-5" /> Recipients ({recipients.length})</CardTitle>
+      <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
+        <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
+          <CardTitle className="aura-microlabel flex items-center gap-2 text-muted-foreground"><MessageSquare className="w-3.5 h-3.5" /> Recipients ({recipients.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           {isLoading ? (
-            <p className="text-muted-foreground">Loading...</p>
+            <p className="text-sm text-muted-foreground">Loading...</p>
           ) : recipients.length === 0 ? (
-            <p className="text-muted-foreground">No recipients configured. Falling back to default GREEN_API_CHAT_ID.</p>
+            <p className="text-sm text-muted-foreground">No recipients configured. Falling back to default GREEN_API_CHAT_ID.</p>
           ) : (
             <div className="space-y-2">
               {recipients.map((r) => (
-                <div key={r.chatId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
+                <div key={r.chatId} className="flex items-center justify-between p-3 rounded-[--radius] surface-2 border border-border">
                   <div>
                     <p className="font-medium">{r.name}</p>
-                    <p className="text-sm text-muted-foreground">{r.chatId.replace("@c.us", "")}</p>
+                    <p className="font-mono text-sm text-muted-foreground">{r.chatId.replace("@c.us", "")}</p>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => handleRemove(r.chatId)} disabled={saveMutation.isPending}>
                     <Trash2 className="w-4 h-4 text-destructive" />
@@ -169,12 +168,12 @@ export default function NotificationsSettingsPage() {
       </Card>
 
       {/* Test Message */}
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Send className="w-5 h-5" /> Send Test Message</CardTitle>
-          <CardDescription>Send a test message to all configured recipients</CardDescription>
+      <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
+        <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
+          <CardTitle className="aura-microlabel flex items-center gap-2 text-muted-foreground"><Send className="w-3.5 h-3.5" /> Send Test Message</CardTitle>
+          <CardDescription className="text-xs">Send a test message to all configured recipients</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           <div className="flex gap-3">
             <Input
               placeholder="Type a test message..."

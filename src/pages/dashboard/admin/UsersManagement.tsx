@@ -17,7 +17,6 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -141,8 +140,15 @@ export default function UsersManagement() {
   });
 
   const getRoleBadge = (role: string | null) => {
-    if (role === "admin") return <Badge className="bg-red-500/10 text-red-500 border-red-500/50">Admin</Badge>;
-    if (role === "moderator") return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/50">Moderator</Badge>;
+    if (role === "admin") return <Badge variant="destructive">Admin</Badge>;
+    if (role === "moderator")
+      return (
+        <Badge
+          className="border-[hsl(var(--rating)/0.4)] bg-[hsl(var(--rating)/0.15)] text-[hsl(var(--rating))]"
+        >
+          Moderator
+        </Badge>
+      );
     return <Badge variant="outline">User</Badge>;
   };
 
@@ -179,44 +185,46 @@ export default function UsersManagement() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/dashboard/admin">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Users Management</h1>
-          <p className="text-muted-foreground">
-            {users.length} users total
-          </p>
-        </div>
-        {isImpersonating && targetUser && (
-          <Button
-            variant="outline"
-            className="ml-auto gap-2"
-            onClick={() => {
-              stopImpersonation();
-              toast.success("Impersonation stopped");
-            }}
-          >
-            <Undo2 className="w-4 h-4" />
-            Exit {targetUser.email}
+    <div className="min-h-full bg-background p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-[1320px] space-y-5">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/dashboard/admin">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
           </Button>
-        )}
-      </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Users Management</h1>
+            <p className="caption mt-1 flex items-center gap-1.5">
+              <Users className="h-3 w-3" />
+              {users.length} users total
+            </p>
+          </div>
+          {isImpersonating && targetUser && (
+            <Button
+              variant="outline"
+              className="ml-auto gap-2"
+              onClick={() => {
+                stopImpersonation();
+                toast.success("Impersonation stopped");
+              }}
+            >
+              <Undo2 className="w-4 h-4" />
+              Exit {targetUser.email}
+            </Button>
+          )}
+        </div>
 
-      <Card className="glass-card">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4 justify-between">
-            <div className="flex items-center gap-2 flex-1 max-w-md">
-              <Search className="w-4 h-4 text-muted-foreground" />
+        <div className="glass-card overflow-hidden rounded-[--radius]">
+          {/* Toolbar — search + filter */}
+          <div className="flex flex-col justify-between gap-3 border-b border-border bg-background/40 p-3 sm:flex-row">
+            <div className="flex max-w-md flex-1 items-center gap-2 rounded-[--radius] border border-border bg-background px-3">
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
               <Input
                 placeholder="Search by email or name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
+                className="flex-1 border-0 bg-transparent px-0 focus-visible:ring-0"
               />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
@@ -231,43 +239,42 @@ export default function UsersManagement() {
               </SelectContent>
             </Select>
           </div>
-        </CardHeader>
-        <CardContent>
+
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading users...</div>
+            <div className="caption py-12 text-center">Loading users…</div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No users found</div>
+            <div className="caption py-12 text-center">No users found</div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Auth</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Sign Up</TableHead>
-                    <TableHead className="text-center">Collections</TableHead>
-                    <TableHead className="text-center">Images</TableHead>
-                    <TableHead className="text-center">Edits</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="aura-microlabel">Email</TableHead>
+                    <TableHead className="aura-microlabel">Auth</TableHead>
+                    <TableHead className="aura-microlabel">Role</TableHead>
+                    <TableHead className="aura-microlabel">Sign Up</TableHead>
+                    <TableHead className="aura-microlabel text-center">Collections</TableHead>
+                    <TableHead className="aura-microlabel text-center">Images</TableHead>
+                    <TableHead className="aura-microlabel text-center">Edits</TableHead>
+                    <TableHead className="aura-microlabel text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((user) => (
                     <TableRow
                       key={user.id}
-                      className={`cursor-pointer hover:bg-muted/50 ${targetUser?.id === user.id ? "bg-primary/5" : ""}`}
+                      className={`cursor-pointer hover:bg-foreground/[0.03] ${targetUser?.id === user.id ? "bg-primary/5" : ""}`}
                       onClick={() => openDetail(user.id)}
                     >
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <User className="w-4 h-4 text-primary" />
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                            <User className="h-4 w-4 text-primary" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-medium truncate max-w-[200px]">{user.email}</p>
+                            <p className="max-w-[200px] truncate font-medium">{user.email}</p>
                             {user.full_name && (
-                              <p className="text-xs text-muted-foreground truncate">{user.full_name}</p>
+                              <p className="truncate text-xs text-muted-foreground">{user.full_name}</p>
                             )}
                           </div>
                         </div>
@@ -278,12 +285,12 @@ export default function UsersManagement() {
                         </Badge>
                       </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="folio text-sm text-muted-foreground">
                         {format(new Date(user.created_at), "dd/MM/yyyy")}
                       </TableCell>
-                      <TableCell className="text-center">{user.galleries_count}</TableCell>
-                      <TableCell className="text-center">{user.images_count}</TableCell>
-                      <TableCell className="text-center">{user.edits_count}</TableCell>
+                      <TableCell className="folio text-center">{user.galleries_count}</TableCell>
+                      <TableCell className="folio text-center">{user.images_count}</TableCell>
+                      <TableCell className="folio text-center">{user.edits_count}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" onClick={() => openDetail(user.id)}>
@@ -326,21 +333,21 @@ export default function UsersManagement() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {grantTarget && (
-        <GrantCreditsModal
-          isOpen={!!grantTarget}
-          onClose={() => setGrantTarget(null)}
-          userId={grantTarget.userId}
-          userEmail={grantTarget.email}
-          onGranted={() => {
-            setGrantTarget(null);
-            queryClient.invalidateQueries({ queryKey: ["admin-users-list"] });
-          }}
-        />
-      )}
+        {grantTarget && (
+          <GrantCreditsModal
+            isOpen={!!grantTarget}
+            onClose={() => setGrantTarget(null)}
+            userId={grantTarget.userId}
+            userEmail={grantTarget.email}
+            onGranted={() => {
+              setGrantTarget(null);
+              queryClient.invalidateQueries({ queryKey: ["admin-users-list"] });
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
