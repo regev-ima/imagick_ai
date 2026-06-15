@@ -9,7 +9,6 @@ import {
   Download,
   Trash2,
   Star,
-  Sparkles,
   Share2,
   Settings,
   Check,
@@ -42,7 +41,6 @@ import { cullingScoreToStars } from "@/lib/cullingScore";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
 import { CullingScoreModeToggle } from "@/components/gallery/CullingScoreModeToggle";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -94,7 +92,19 @@ import { useJustifiedLayout, computeJustifiedLayout } from "@/hooks/useJustified
 import { useImageDimensions } from "@/hooks/useImageDimensions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
+import { Orb } from "@/components/aura/Orb";
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 export default function GalleryEditorPage() {
   const { id } = useParams();
@@ -1586,9 +1596,9 @@ export default function GalleryEditorPage() {
   return (
    <FailedImagesProvider>
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Compact Single-Row Header */}
-      <div 
-        className="border-b border-border/50 glass-card sticky top-0 z-20 cursor-pointer md:cursor-default"
+      {/* Compact Single-Row Header — module bar */}
+      <div
+        className="border-b border-border glass-card sticky top-0 z-20 cursor-pointer md:cursor-default"
         onClick={() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
       >
         <div className="px-3 py-2 flex items-center gap-2">
@@ -1599,11 +1609,12 @@ export default function GalleryEditorPage() {
                 <ArrowLeft className="w-4 h-4" />
               </Link>
             </Button>
+            <Sparkle size={13} className="text-primary shrink-0" />
             <h1 className="font-display text-sm font-semibold truncate max-w-[200px]">
               {gallery.name}
             </h1>
-            <span className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
-              {gallery.total_images}
+            <span className="aura-chip">
+              <span className="folio text-foreground">{gallery.total_images}</span> frames
             </span>
           </div>
 
@@ -1674,13 +1685,13 @@ export default function GalleryEditorPage() {
               </Tooltip>
             )}
 
-            {/* View Mode */}
-            <div className="flex items-center rounded-full border border-border/60 bg-card/40 p-0.5 ml-0.5 gap-0.5">
+            {/* View Mode — density toggle */}
+            <div className="flex items-center rounded-sm border border-border bg-surface-2 p-0.5 ml-0.5 gap-0.5">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     className={cn(
-                      "w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150",
+                      "w-7 h-7 rounded-sm flex items-center justify-center transition-colors duration-150",
                       viewMode === "masonry"
                         ? "bg-primary/20 text-primary ring-1 ring-primary/60"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -1696,7 +1707,7 @@ export default function GalleryEditorPage() {
                 <TooltipTrigger asChild>
                   <button
                     className={cn(
-                      "w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150",
+                      "w-7 h-7 rounded-sm flex items-center justify-center transition-colors duration-150",
                       viewMode === "grid"
                         ? "bg-primary/20 text-primary ring-1 ring-primary/60"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -1711,9 +1722,13 @@ export default function GalleryEditorPage() {
             </div>
             </TooltipProvider>
 
-            {/* Image count */}
-            <span className="text-[11px] text-muted-foreground hidden sm:inline ml-1">
-              {hasActiveFilters ? `${filteredImages.length.toLocaleString()}/${(gallery?.total_images || images.length).toLocaleString()}` : `${(gallery?.total_images || images.length).toLocaleString()}`}
+            {/* Image count — mono readout */}
+            <span className="font-mono text-[11px] text-muted-foreground hidden sm:inline ml-1 tabular-nums">
+              {hasActiveFilters ? (
+                <><span className="text-foreground folio">{filteredImages.length.toLocaleString()}</span>/{(gallery?.total_images || images.length).toLocaleString()}</>
+              ) : (
+                <span className="text-foreground folio">{(gallery?.total_images || images.length).toLocaleString()}</span>
+              )}
             </span>
 
             {/* Trash toggle */}
@@ -1763,7 +1778,7 @@ export default function GalleryEditorPage() {
             exit={{ y: 50, opacity: 0 }}
             className="fixed bottom-20 left-0 right-0 z-30 flex justify-center px-4 pointer-events-none"
           >
-            <div className="pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-2xl glass-card border border-primary/20 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.3)] text-sm max-w-lg w-full">
+            <div className="pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-[--radius] glass-card border border-primary/25 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.3)] text-sm max-w-lg w-full">
               {gallery.status === "transferring" && (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
@@ -1813,7 +1828,7 @@ export default function GalleryEditorPage() {
                 return (
                   <>
                     {processingStalled ? (
-                      <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
+                      <AlertTriangle className="w-4 h-4 text-rating shrink-0" />
                     ) : isAutoRetrying ? (
                       <RotateCcw className="w-4 h-4 animate-spin text-rating shrink-0" />
                     ) : (
@@ -1858,11 +1873,14 @@ export default function GalleryEditorPage() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-6 left-0 right-0 z-30 flex justify-center px-4"
           >
-            <div className="flex items-center gap-2 px-4 py-3 rounded-2xl glass-card border border-border/50 shadow-xl">
-              <span className="text-sm font-medium mr-2">{selectedImages.length} selected</span>
-              <Button 
-                variant="outline" 
-                size="sm" 
+            <div className="flex items-center gap-2 px-4 py-3 rounded-[--radius] glass-card border border-border shadow-[var(--elevation-3)]">
+              <span className="aura-chip" style={{ ['--led' as any]: 'hsl(var(--primary))' }}>
+                <span className="aura-led" />
+                <span className="folio text-foreground">{selectedImages.length}</span> selected
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
                 className="gap-1.5"
                 onClick={selectAll}
               >
@@ -1897,13 +1915,13 @@ export default function GalleryEditorPage() {
                 <Star className="w-4 h-4" />
                 Hero
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="glow"
+                size="sm"
                 className="gap-1.5"
                 onClick={() => setShowReEditModal(true)}
               >
-                <Sparkles className="w-4 h-4" />
+                <Sparkle size={14} className="text-current" />
                 Re-edit
               </Button>
               <DropdownMenu>
@@ -1985,13 +2003,13 @@ export default function GalleryEditorPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-sm bg-destructive/10 border border-destructive/20 flex items-center justify-center">
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Recycle Bin</h3>
                   <p className="text-xs text-muted-foreground">
-                    {trashedImages.length} image{trashedImages.length !== 1 ? "s" : ""} — auto-deleted after 30 days
+                    <span className="folio">{trashedImages.length}</span> image{trashedImages.length !== 1 ? "s" : ""} — auto-deleted after 30 days
                   </p>
                 </div>
               </div>
@@ -2057,14 +2075,14 @@ export default function GalleryEditorPage() {
                     ? Math.max(0, 30 - Math.floor((Date.now() - new Date(img.deleted_at).getTime()) / (1000 * 60 * 60 * 24)))
                     : 30;
                   return (
-                    <div key={img.id} className="relative group rounded-lg overflow-hidden border border-border/50 aspect-square">
+                    <div key={img.id} className="relative group rounded-sm overflow-hidden border border-border/60 aspect-square plate-keyline">
                       <img
                         src={img.original_url}
                         alt={img.filename}
                         className="w-full h-full object-cover opacity-60 grayscale"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <span className="absolute top-1 left-1 text-[9px] bg-black/60 text-white/70 px-1.5 py-0.5 rounded-full tabular-nums">
+                      <span className="absolute top-1 left-1 font-mono text-[9px] bg-black/60 text-white/70 px-1.5 py-0.5 rounded-sm tabular-nums">
                         {daysLeft}d
                       </span>
                       <div className="absolute bottom-0 inset-x-0 flex gap-0.5 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2109,7 +2127,7 @@ export default function GalleryEditorPage() {
               </div>
             )}
 
-            <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-400 flex items-start gap-2">
+            <div className="rounded-sm bg-rating/10 border border-rating/20 px-3 py-2 text-xs text-rating flex items-start gap-2">
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
               <span>Images in the recycle bin still count toward your storage quota. Empty the trash to free up space.</span>
             </div>
@@ -2124,25 +2142,14 @@ export default function GalleryEditorPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.4 }}
-              className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center gap-4"
+              className="mb-4 rounded-[--radius] border border-primary/25 bg-primary/[0.06] aura-ai-border p-4 flex items-center gap-4"
             >
-              <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0">
-                <BackgroundGradientAnimation
-                  gradientBackgroundStart="rgb(15, 5, 25)"
-                  gradientBackgroundEnd="rgb(5, 10, 40)"
-                  firstColor="232, 92, 155"
-                  secondColor="155, 90, 212"
-                  thirdColor="100, 180, 255"
-                  fourthColor="200, 50, 120"
-                  fifthColor="120, 80, 200"
-                  pointerColor="232, 92, 155"
-                  size="150%"
-                  interactive={false}
-                  containerClassName="w-full h-full"
-                />
-              </div>
+              <Orb className="w-10 h-10 shrink-0" />
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">AI is editing your images</h3>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Sparkle size={14} className="text-primary" />
+                  Aura is editing your images
+                </h3>
                 <p className="text-muted-foreground text-xs">
                   This usually takes a minute or two — your originals are shown below
                 </p>
@@ -2239,7 +2246,7 @@ export default function GalleryEditorPage() {
                   key={stars}
                   title={`${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`}
                   count={starImages.length}
-                  icon={<Star className={cn("w-4 h-4", stars >= 4 ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} />}
+                  icon={<Star className={cn("w-4 h-4", stars >= 4 ? "text-rating fill-rating" : "text-muted-foreground")} />}
                   defaultExpanded={stars >= 4}
                 >
                   <div className={cn(
@@ -2579,7 +2586,7 @@ export default function GalleryEditorPage() {
 
                 {/* Center: Compare Mode Toggle */}
                 {galleryStylesData.length > 0 && (
-                  <div className="absolute left-1/2 -translate-x-1/2 flex items-center bg-muted/50 rounded-lg p-0.5 gap-0.5">
+                  <div className="absolute left-1/2 -translate-x-1/2 flex items-center surface-2 border border-border rounded-sm p-0.5 gap-0.5">
                     <TooltipProvider>
                       {!isMobile && (
                       <Tooltip>
@@ -2587,7 +2594,7 @@ export default function GalleryEditorPage() {
                           <button
                             onClick={() => setCompareMode("slider")}
                             className={cn(
-                              "p-1.5 rounded-md transition-colors text-xs font-medium",
+                              "p-1.5 rounded-sm transition-colors text-xs font-medium",
                               compareMode === "slider" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                             )}
                           >
@@ -2602,7 +2609,7 @@ export default function GalleryEditorPage() {
                           <button
                             onClick={() => setCompareMode("edited")}
                             className={cn(
-                              "p-1.5 rounded-md transition-colors text-xs font-medium",
+                              "p-1.5 rounded-sm transition-colors text-xs font-medium",
                               compareMode === "edited" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                             )}
                           >
@@ -2616,7 +2623,7 @@ export default function GalleryEditorPage() {
                           <button
                             onClick={() => setCompareMode("side-by-side")}
                             className={cn(
-                              "p-1.5 rounded-md transition-colors text-xs font-medium",
+                              "p-1.5 rounded-sm transition-colors text-xs font-medium",
                               compareMode === "side-by-side" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                             )}
                           >
@@ -2762,10 +2769,10 @@ export default function GalleryEditorPage() {
                                 <button
                                   key={style.id}
                                   className={cn(
-                                    "flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors pointer-events-auto",
+                                    "flex-shrink-0 px-3 py-1.5 rounded-sm text-xs font-medium transition-colors pointer-events-auto border",
                                     isActive
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-muted/60 backdrop-blur-sm text-muted-foreground hover:bg-muted"
+                                      ? "bg-primary text-primary-foreground border-primary"
+                                      : "surface-2 backdrop-blur-sm text-muted-foreground border-border/60 hover:text-foreground"
                                   )}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2816,9 +2823,9 @@ export default function GalleryEditorPage() {
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <Badge variant="secondary" className="absolute top-3 left-3 bg-black/70 text-white border-transparent backdrop-blur-sm">
+                          <span className="aura-chip absolute top-3 left-3 bg-black/70 text-white/90 backdrop-blur-sm">
                             Original
-                          </Badge>
+                          </span>
                         </div>
                         <div className="relative flex-1 flex items-center justify-start min-w-0 overflow-hidden">
                           <img
@@ -2830,9 +2837,10 @@ export default function GalleryEditorPage() {
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <Badge variant="secondary" className="absolute top-3 right-3 bg-black/70 text-white border-transparent backdrop-blur-sm">
+                          <span className="aura-chip absolute top-3 right-3 bg-black/70 text-primary backdrop-blur-sm">
+                            <Sparkle size={10} className="text-primary" />
                             {selectedStyleData?.name || "Edited"}
-                          </Badge>
+                          </span>
                         </div>
                       </motion.div>
                     );

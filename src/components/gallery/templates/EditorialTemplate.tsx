@@ -5,15 +5,13 @@ import { cn } from "@/lib/utils";
 import type { TemplateProps } from "./types";
 import { GalleryLightbox } from "./GalleryLightbox";
 import { CategoryNav } from "./CategoryNav";
-import { useDominantColor } from "@/hooks/useDominantColor";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
 /**
- * EDITORIAL — PRISM. A magazine: a typographic masthead, a featured full-bleed
- * image, a paired spread, then an asymmetric staggered grid. Unified PRISM type
- * (Figtree) with a single tasteful italic masthead accent for editorial
- * identity. Dynamic-color rule + accents drawn from the photography.
+ * EDITORIAL — Imagick.ai brand. A magazine: a typographic masthead, a featured
+ * full-bleed image, a paired spread, then an asymmetric staggered grid. Clean
+ * modern Inter type with a brand royal-blue (#2B50F0) masthead rule + accents.
  */
 export function EditorialTemplate({
   galleryName,
@@ -34,12 +32,6 @@ export function EditorialTemplate({
   const heroImages = images.slice(0, 1);
   const pairImages = images.slice(1, 5);
   const gridImages = images.slice(5);
-
-  const sampleUrl = heroImage || heroImages[0]?.original_url;
-  const dynamic = useDominantColor(sampleUrl);
-  const dynamicStyle = dynamic
-    ? ({ "--dynamic-primary": dynamic } as React.CSSProperties)
-    : undefined;
 
   const ImageOverlay = ({ image }: { image: (typeof images)[0] }) => (
     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
@@ -83,20 +75,19 @@ export function EditorialTemplate({
   return (
     <div
       className={cn("min-h-screen bg-background text-foreground", darkMode ? "dark" : "light")}
-      style={dynamicStyle}
     >
       {/* Magazine Masthead */}
       <header className="py-16 lg:py-24 px-8 text-center relative overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--dynamic-primary)/0.5)] to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: EASE }}
         >
-          <p className="font-mono text-xs tracking-[0.32em] uppercase mb-5 text-[hsl(var(--dynamic-primary))]">
+          <p className="font-mono text-xs tracking-[0.32em] uppercase mb-5 text-primary">
             Gallery Collection
           </p>
-          <h1 className="font-display text-5xl lg:text-7xl font-light italic tracking-tight mb-6">
+          <h1 className="font-display text-5xl lg:text-7xl font-semibold tracking-tight mb-6">
             {galleryName}
           </h1>
           {description && (

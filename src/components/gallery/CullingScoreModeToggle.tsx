@@ -2,7 +2,18 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Sparkles } from "lucide-react";
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 /**
  * Admin-only debug toggle to switch how culling_score is converted to stars.
@@ -22,9 +33,9 @@ export function CullingScoreModeToggle() {
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/40 px-2 py-1">
-            <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground hidden sm:inline">Score</span>
+          <div className="flex items-center gap-2 rounded-sm border border-border/60 surface-2 px-2 py-1">
+            <Sparkle size={13} className="text-primary" />
+            <span className="aura-microlabel hidden sm:inline">Score</span>
             <ToggleGroup
               type="single"
               size="sm"

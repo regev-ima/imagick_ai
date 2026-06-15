@@ -74,8 +74,8 @@ export function AIAnalysisSection({
       {metrics.culling_score !== null && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">AI Score</span>
-            <span className="text-sm text-muted-foreground">
+            <span className="aura-microlabel">AI Score</span>
+            <span className="font-mono text-sm text-foreground folio tabular-nums">
               {(metrics.culling_score * 100).toFixed(0)}%
             </span>
           </div>
@@ -85,8 +85,8 @@ export function AIAnalysisSection({
                 key={i}
                 className={cn(
                   "w-5 h-5 transition-colors",
-                  i < stars 
-                    ? "text-yellow-500 fill-yellow-500" 
+                  i < stars
+                    ? "text-rating fill-rating"
                     : "text-muted-foreground/30"
                 )}
               />
@@ -98,8 +98,8 @@ export function AIAnalysisSection({
       {/* Category */}
       {metrics.culling_label && (
         <div>
-          <span className="text-sm font-medium block mb-1.5">Category</span>
-           <span className="inline-flex px-3 py-1 rounded-full text-xs bg-muted text-foreground">
+          <span className="aura-microlabel block mb-1.5">Category</span>
+           <span className="aura-chip text-foreground normal-case tracking-normal">
             {normalizeLabel(metrics.culling_label)}
           </span>
         </div>
@@ -110,7 +110,7 @@ export function AIAnalysisSection({
         <>
           <Separator />
           <div>
-            <h4 className="text-sm font-medium mb-3">Quality Metrics</h4>
+            <h4 className="aura-microlabel mb-3">Quality Metrics</h4>
             <div className="space-y-2">
               {metrics.subject_sharpness !== null && (
                 <MetricRow 
@@ -161,8 +161,8 @@ export function AIAnalysisSection({
           <Separator />
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium">
-                Similar Images ({similarImages.length})
+              <h4 className="aura-microlabel">
+                Similar · <span className="folio text-foreground">{similarImages.length}</span>
               </h4>
             </div>
             {/* Similarity Level Selector */}
@@ -176,10 +176,10 @@ export function AIAnalysisSection({
                       onSimilarityLevelChange(level);
                     }}
                     className={cn(
-                      "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all",
+                      "px-2.5 py-1 rounded-sm text-[11px] font-medium transition-all border",
                       similarityLevel === level
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "surface-2 text-muted-foreground border-border/60 hover:text-foreground"
                     )}
                   >
                     {level === "loose" ? "Low" : level === "medium" ? "Med" : "High"}
@@ -215,12 +215,12 @@ function MetricRow({ icon, label, value }: MetricRowProps) {
         <span className="text-xs">{label}</span>
       </div>
       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-foreground/60 rounded-full transition-all" 
-          style={{ width: `${percentage}%` }} 
+        <div
+          className="h-full bg-primary rounded-full transition-all"
+          style={{ width: `${percentage}%` }}
         />
       </div>
-      <span className="text-[10px] tabular-nums text-muted-foreground w-7 text-right">{percentage}%</span>
+      <span className="font-mono text-[10px] tabular-nums text-muted-foreground w-7 text-right">{percentage}%</span>
     </div>
   );
 }

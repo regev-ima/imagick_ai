@@ -17,10 +17,11 @@ interface GalleryLightboxProps {
 const EASE = [0.2, 0, 0, 1] as const;
 
 /**
- * PRISM lightbox — immersive graphite scrim so the photo is the hero. Chrome is
- * Material tonal: rounded-full controls, hairline borders, soft elevation. The
- * like is Google red; the counter + AI rating use Roboto Mono / amber. Keyboard
- * (Esc / ← / →), touch-swipe, prev/next/close all preserved.
+ * Brand lightbox — immersive graphite scrim so the photo is the hero. Chrome is
+ * clean: rounded-full controls, hairline borders, soft elevation, with a royal-
+ * blue (#2B50F0) keyline on hover. The like stays a warm red; the counter + AI
+ * rating use the mono readout / amber. Keyboard (Esc / ← / →), touch-swipe,
+ * prev/next/close all preserved.
  */
 export function GalleryLightbox({
   images,
@@ -60,7 +61,7 @@ export function GalleryLightbox({
   if (!currentImageId || !currentImage) return null;
 
   const ctrl =
-    "p-3 rounded-full bg-white/10 text-white backdrop-blur-md border border-white/10 hover:bg-white/20 transition-colors";
+    "p-3 rounded-full bg-white/10 text-white backdrop-blur-md border border-white/10 hover:bg-white/20 hover:border-[#2B50F0]/60 transition-colors";
 
   return (
     <AnimatePresence>
@@ -170,7 +171,7 @@ export function GalleryLightbox({
                 e.stopPropagation();
                 onDownload(currentImageId);
               }}
-              className="px-5 py-2.5 rounded-full bg-white/10 text-white border border-white/10 backdrop-blur-md hover:bg-white/20 transition-colors flex items-center gap-2 text-sm font-medium"
+              className="px-5 py-2.5 rounded-full bg-white/10 text-white border border-white/10 backdrop-blur-md hover:bg-[#2B50F0] hover:border-transparent transition-colors flex items-center gap-2 text-sm font-medium"
             >
               <Download className="w-4 h-4" />
               Download

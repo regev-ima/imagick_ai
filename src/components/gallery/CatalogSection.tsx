@@ -26,14 +26,16 @@ export function CatalogSection({
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className={cn("mb-6", className)}>
       <CollapsibleTrigger asChild>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="w-full justify-between p-3 h-auto hover:bg-muted/50"
         >
           <div className="flex items-center gap-2">
             {icon}
             <span className="font-semibold">{title}</span>
-            <span className="text-sm text-muted-foreground">({count} images)</span>
+            <span className="aura-chip">
+              <span className="folio text-foreground">{count}</span> frames
+            </span>
           </div>
           <ChevronDown className={cn(
             "w-5 h-5 transition-transform duration-200",

@@ -5,14 +5,14 @@ import { cn } from "@/lib/utils";
 import type { TemplateProps } from "./types";
 import { GalleryLightbox } from "./GalleryLightbox";
 import { CategoryNav } from "./CategoryNav";
-import { useDominantColor } from "@/hooks/useDominantColor";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
 /**
- * CLASSIC — PRISM. A timeless gallery: a full-bleed cover with a centered title
- * over a dynamic-color wash, then a composed uniform 3:2 grid. Calm, formal,
- * Figtree display type, hairline rules, Google-red likes.
+ * CLASSIC — Imagick.ai brand. A timeless gallery: a full-bleed cover with a
+ * centered title over a clean neutral scrim, then a composed uniform 3:2 grid.
+ * Calm, formal, modern Inter type, hairline rules, brand royal-blue accents,
+ * warm-red likes.
  */
 export function ClassicTemplate({
   galleryName,
@@ -30,21 +30,16 @@ export function ClassicTemplate({
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const coverImage = heroImage || (images.length > 0 ? images[0].original_url : null);
-  const dynamic = useDominantColor(coverImage);
-  const dynamicStyle = dynamic
-    ? ({ "--dynamic-primary": dynamic } as React.CSSProperties)
-    : undefined;
 
   return (
     <div
       className={cn("min-h-screen bg-background text-foreground", darkMode ? "dark" : "light")}
-      style={dynamicStyle}
     >
       {/* Full-height Hero Cover */}
       {coverImage && (
         <div className="relative h-[90vh] overflow-hidden">
           <img src={coverImage} alt={galleryName} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--dynamic-primary)/0.4)] via-black/30 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/20" />
           <div className="absolute inset-0 flex items-center justify-center text-center px-8">
             <motion.div
               initial={{ opacity: 0, y: 30 }}

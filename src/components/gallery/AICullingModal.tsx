@@ -1,8 +1,21 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { X, Wand2, Tag, Plus, Check, Loader2, Globe } from "lucide-react";
+import { X, Tag, Plus, Check, Loader2, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Orb } from "@/components/aura/Orb";
 import { Card } from "@/components/ui/card";
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -223,17 +236,18 @@ export function AICullingModal({
         className="w-full max-w-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <Card className="glass-card border-border/50 p-6">
+        <Card className="glass-card border-border rounded-[--radius] p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Wand2 className="w-5 h-5 text-primary" />
-              </div>
+              <Orb className="w-10 h-10 shrink-0" />
               <div>
-                <h2 className="text-xl font-bold">AI Culling</h2>
-                <p className="text-sm text-muted-foreground">
-                  Analyze {imageCount} images
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Sparkle size={16} className="text-primary" />
+                  AI Culling
+                </h2>
+                <p className="aura-microlabel mt-0.5">
+                  Analyze <span className="folio text-foreground">{imageCount}</span> images
                 </p>
               </div>
             </div>
@@ -279,7 +293,7 @@ export function AICullingModal({
           )}
 
           {/* Description */}
-          <div className="p-4 rounded-lg bg-muted/50 mb-6">
+          <div className="p-4 rounded-[--radius] surface-2 border border-border/60 mb-6">
             <p className="text-sm text-muted-foreground">
               AI Culling will analyze your images and provide:
             </p>
@@ -335,10 +349,10 @@ export function AICullingModal({
                   onClick={() => toggleTag(tag)}
                   disabled={selectedTags.length >= 20 && !selectedTags.includes(tag)}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                    "px-3 py-1.5 rounded-sm text-sm font-medium transition-all border",
                     selectedTags.includes(tag)
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80",
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "surface-2 border-border/60 text-muted-foreground hover:text-foreground hover:border-border",
                     selectedTags.length >= 20 && !selectedTags.includes(tag) && "opacity-50 cursor-not-allowed"
                   )}
                 >
@@ -376,11 +390,8 @@ export function AICullingModal({
               action buttons with status info so users can't click
               'Start' a second time and trigger a duplicate API call. */}
           {isCurrentlyRunning && (
-            <div className="flex items-start gap-3 p-4 mb-4 rounded-lg border border-primary/30 bg-primary/5">
-              <div className="relative shrink-0 mt-0.5">
-                <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                <span className="absolute inset-0 rounded-full bg-primary/30 blur-md -z-10" aria-hidden />
-              </div>
+            <div className="flex items-start gap-3 p-4 mb-4 rounded-[--radius] border border-primary/30 bg-primary/5">
+              <Orb className="w-5 h-5 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">
                   AI Culling already in progress
@@ -465,12 +476,12 @@ export function AICullingModal({
                 </>
               ) : hasCompletedCulling ? (
                 <>
-                  <Wand2 className="w-4 h-4" />
+                  <Sparkle size={15} className="text-current" />
                   Re-run AI Culling
                 </>
               ) : (
                 <>
-                  <Wand2 className="w-4 h-4" />
+                  <Sparkle size={15} className="text-current" />
                   Start AI Culling
                 </>
               )}

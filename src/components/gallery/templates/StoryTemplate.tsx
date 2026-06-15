@@ -5,14 +5,14 @@ import { cn } from "@/lib/utils";
 import type { TemplateProps } from "./types";
 import { GalleryLightbox } from "./GalleryLightbox";
 import { CategoryNav } from "./CategoryNav";
-import { useDominantColor } from "@/hooks/useDominantColor";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
 /**
- * STORY — PRISM. A full-screen, vertically snapping photo story. Chrome floats
- * as Material tonal pills (title fades on scroll, persistent like/download for
- * the active frame, a Roboto-Mono counter). Accents tint from the photography.
+ * STORY — Imagick.ai brand. A full-screen, vertically snapping photo story.
+ * Chrome floats as clean tonal pills (title fades on scroll, persistent like/
+ * download for the active frame, a mono counter). Photos are the hero; the
+ * brand royal blue carries through the shared chrome (nav, lightbox).
  */
 export function StoryTemplate({
   galleryName,
@@ -31,12 +31,6 @@ export function StoryTemplate({
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [headerOpacity, setHeaderOpacity] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const sampleUrl = heroImage || images[0]?.original_url;
-  const dynamic = useDominantColor(sampleUrl);
-  const dynamicStyle = dynamic
-    ? ({ "--dynamic-primary": dynamic } as React.CSSProperties)
-    : undefined;
 
   // Track scroll for header fade and visible section
   useEffect(() => {
@@ -78,7 +72,6 @@ export function StoryTemplate({
         "h-screen flex flex-col overflow-hidden relative bg-background text-foreground",
         darkMode ? "dark" : "light"
       )}
-      style={dynamicStyle}
     >
       {/* Top scrim so floating chrome stays legible over any photo */}
       <div className="pointer-events-none absolute top-0 left-0 right-0 h-40 z-10 bg-gradient-to-b from-black/50 to-transparent" />

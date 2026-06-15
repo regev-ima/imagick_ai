@@ -10,13 +10,14 @@ interface CategoryNavProps {
 }
 
 /**
- * PRISM category filter — a tonal pill rail. The active pill is tinted from
- * the gallery's dynamic color (Material You); inactive pills are calm Material
- * tonal surfaces. Chrome recedes so the photos stay the hero.
+ * Brand category filter — a clean pill rail. The active pill carries the brand
+ * royal blue (#2B50F0); inactive pills are calm tonal surfaces. Chrome recedes
+ * so the photos stay the hero.
  *
  * `darkMode` is kept in the signature (every template passes it) but theming
  * now flows through the semantic tokens scoped on each template's root, so the
- * rail inherits the correct porcelain / graphite palette automatically.
+ * rail inherits the correct porcelain / graphite palette automatically, and the
+ * accent stays brand royal blue across both themes.
  */
 export function CategoryNav({
   categories,
@@ -45,7 +46,7 @@ export function CategoryNav({
               className={cn(
                 pillBase,
                 isActive
-                  ? "text-[hsl(var(--dynamic-primary))]"
+                  ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -53,7 +54,7 @@ export function CategoryNav({
                 <motion.span
                   layoutId="category-pill"
                   transition={{ duration: 0.4, ease: [0.2, 0, 0, 1] }}
-                  className="absolute inset-0 rounded-full bg-[hsl(var(--dynamic-primary)/0.14)] ring-1 ring-[hsl(var(--dynamic-primary)/0.35)]"
+                  className="absolute inset-0 rounded-full bg-primary/10 ring-1 ring-primary/35"
                 />
               )}
               {!isActive && (

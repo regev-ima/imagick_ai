@@ -5,14 +5,13 @@ import { cn } from "@/lib/utils";
 import type { TemplateProps } from "./types";
 import { GalleryLightbox } from "./GalleryLightbox";
 import { CategoryNav } from "./CategoryNav";
-import { useDominantColor } from "@/hooks/useDominantColor";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
 /**
- * FILMSTRIP — PRISM. A cinematic horizontal reel: a calm tonal top bar, full
- * snap-scrolling frames centered on screen, and a Roboto-Mono frame counter.
- * The active frame's progress and accents tint from the photography.
+ * FILMSTRIP — Imagick.ai brand. A cinematic horizontal reel: a calm tonal top
+ * bar, full snap-scrolling frames centered on screen, and a mono frame counter.
+ * The active frame's progress carries the brand royal-blue (#2B50F0).
  */
 export function FilmstripTemplate({
   galleryName,
@@ -30,12 +29,6 @@ export function FilmstripTemplate({
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const sampleUrl = heroImage || images[0]?.original_url;
-  const dynamic = useDominantColor(sampleUrl);
-  const dynamicStyle = dynamic
-    ? ({ "--dynamic-primary": dynamic } as React.CSSProperties)
-    : undefined;
 
   // Track visible slide via IntersectionObserver
   useEffect(() => {
@@ -67,7 +60,6 @@ export function FilmstripTemplate({
         "h-screen flex flex-col overflow-hidden bg-background text-foreground",
         darkMode ? "dark" : "light"
       )}
-      style={dynamicStyle}
     >
       {/* Fixed Top Bar */}
       <header className="shrink-0 px-6 py-4 flex items-center justify-between gap-4 z-10 border-b border-border/60">
@@ -170,7 +162,7 @@ export function FilmstripTemplate({
       <div className="shrink-0 px-6 py-4 flex flex-col items-center gap-2 border-t border-border/60">
         <div className="w-40 h-0.5 rounded-full bg-muted overflow-hidden">
           <motion.div
-            className="h-full rounded-full bg-[hsl(var(--dynamic-primary))]"
+            className="h-full rounded-full bg-primary"
             animate={{ width: `${progress}%` }}
             transition={{ duration: 0.4, ease: EASE }}
           />

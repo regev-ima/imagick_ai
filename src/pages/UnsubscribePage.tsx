@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { CheckCircle, XCircle, Loader2, Sparkles, ArrowRight } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import imagickLogo from "@/assets/imagick-logo.png";
 
 type ViewState = "loading" | "retain" | "success" | "error";
 type UnsubscribeKind = "lead" | "journey";
@@ -11,8 +12,25 @@ const TRACE_VERSION = "unsubscribe-retention-v2-2026-03-11";
 // previews and any future domain change without a code edit.
 const AUTH_URL = `${typeof window !== "undefined" ? window.location.origin : ""}/auth`;
 const REQUEST_TIMEOUT_MS = 9000;
-const LOGO_DARK_URL =
-  "https://zfcltfqgrhytpvgqkkfo.supabase.co/storage/v1/object/public/gallery-images/brand%2Fimagick-logo-dark.png";
+
+// The AI mark — a royal-blue 4-point sparkle (the logo star).
+function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -114,43 +132,57 @@ export default function UnsubscribePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#05050B] px-4 py-12">
-      <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#0b0b16] shadow-[0_0_40px_rgba(0,0,0,0.45)]">
-        <div className="rounded-t-3xl bg-gradient-to-r from-[#12082a] via-[#1a0d3f] to-[#09091c] px-8 py-7 text-center">
-          <img src={LOGO_DARK_URL} alt="Imagick.ai" className="mx-auto h-8 opacity-95" />
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+      <div className="w-full max-w-2xl glass-card rounded-md overflow-hidden">
+        {/* Header — brand row over a hairline */}
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-8 py-5">
+          <div className="flex items-center gap-2.5">
+            <Sparkle size={16} className="text-primary" />
+            <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
+          </div>
+          <span className="aura-microlabel">Email · Preferences</span>
         </div>
 
-        <div className="px-8 py-9 text-white">
+        <div className="px-8 py-9">
           {view === "loading" && (
             <div className="space-y-4 text-center">
-              <Loader2 className="mx-auto h-12 w-12 animate-spin text-[#ff4ca0]" />
-              <p className="text-sm text-white/80">Checking your unsubscribe link...</p>
+              <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Checking your unsubscribe link...</p>
             </div>
           )}
 
           {view === "retain" && (
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#ff4ca0]/40 bg-[#ff4ca0]/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#ff7bbd]">
-                <Sparkles className="h-3.5 w-3.5" />
+              <div className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/[0.08] px-3 py-1 caption text-accent">
+                <Sparkle size={11} className="text-accent" />
                 Before you go
               </div>
-              <h1 className="text-3xl font-bold leading-tight">Get free credits and faster edits with Imagick.ai</h1>
-              <p className="text-sm leading-relaxed text-white/75">
+              <h1 className="font-sans text-3xl font-bold leading-tight tracking-tight text-foreground">
+                Get free credits and faster edits with Imagick.ai
+              </h1>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 Most photographers stay because they save hours every week and deliver galleries faster. You can keep
                 these updates and start free with no commitment.
               </p>
-              <ul className="space-y-2.5 text-sm text-white/85">
-                <li>Custom AI styles trained on your own look</li>
-                <li>Faster culling and less manual sorting</li>
-                <li>Client-ready galleries that look premium</li>
-                <li>Free trial access to test everything end-to-end</li>
+              <ul className="space-y-2.5 text-sm text-foreground/85">
+                {[
+                  "Custom AI styles trained on your own look",
+                  "Faster culling and less manual sorting",
+                  "Client-ready galleries that look premium",
+                  "Free trial access to test everything end-to-end",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5">
+                    <Sparkle size={11} className="mt-1 shrink-0 text-accent" />
+                    {item}
+                  </li>
+                ))}
               </ul>
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
                   onClick={goToSignup}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4ca0] to-[#9f63ff] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:opacity-90"
                 >
                   Start for free
                   <ArrowRight className="h-4 w-4" />
@@ -158,7 +190,7 @@ export default function UnsubscribePage() {
                 <button
                   type="button"
                   onClick={goToSignup}
-                  className="rounded-xl border border-white/20 px-5 py-3 text-sm font-medium text-white/90 transition hover:bg-white/5"
+                  className="rounded-md border border-border bg-surface-2 px-5 py-3 text-sm font-medium text-foreground transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:border-primary/40 hover:bg-muted"
                 >
                   Keep me subscribed
                 </button>
@@ -169,7 +201,7 @@ export default function UnsubscribePage() {
                   type="button"
                   onClick={handleConfirmUnsubscribe}
                   disabled={isActionLoading}
-                  className="text-xs text-white/50 underline underline-offset-4 hover:text-white/70 disabled:opacity-60"
+                  className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground disabled:opacity-60"
                 >
                   {isActionLoading ? "Unsubscribing..." : "Unsubscribe anyway"}
                 </button>
@@ -179,15 +211,15 @@ export default function UnsubscribePage() {
 
           {view === "success" && (
             <div className="space-y-4 text-center">
-              <CheckCircle className="mx-auto h-14 w-14 text-green-400" />
-              <h1 className="text-2xl font-bold">You are unsubscribed</h1>
-              <p className="text-sm text-white/75">
+              <CheckCircle className="mx-auto h-14 w-14 text-secondary" />
+              <h1 className="font-sans text-2xl font-bold tracking-tight text-foreground">You are unsubscribed</h1>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 You will no longer receive marketing emails from Imagick.ai. You can still start free anytime.
               </p>
               <button
                 type="button"
                 onClick={goToSignup}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4ca0] to-[#9f63ff] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:opacity-90"
               >
                 Start for free
                 <ArrowRight className="h-4 w-4" />
@@ -197,13 +229,15 @@ export default function UnsubscribePage() {
 
           {view === "error" && (
             <div className="space-y-4 text-center">
-              <XCircle className="mx-auto h-14 w-14 text-red-400" />
-              <h1 className="text-2xl font-bold">We could not complete this request</h1>
-              <p className="text-sm text-white/75">
+              <XCircle className="mx-auto h-14 w-14 text-destructive" />
+              <h1 className="font-sans text-2xl font-bold tracking-tight text-foreground">
+                We could not complete this request
+              </h1>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {errorMessage}
                 <br />
                 If this keeps happening, contact us at{" "}
-                <a className="text-[#ff7bbd] underline" href="mailto:contact@imagick.ai">
+                <a className="text-primary underline underline-offset-4 hover:no-underline" href="mailto:contact@imagick.ai">
                   contact@imagick.ai
                 </a>
                 .
@@ -211,7 +245,7 @@ export default function UnsubscribePage() {
               <button
                 type="button"
                 onClick={goToSignup}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4ca0] to-[#9f63ff] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:opacity-90"
               >
                 Start for free
                 <ArrowRight className="h-4 w-4" />
@@ -220,9 +254,9 @@ export default function UnsubscribePage() {
           )}
         </div>
 
-        <div className="border-t border-white/10 px-8 py-4 text-center text-xs text-white/40">
-          <p>© {new Date().getFullYear()} Imagick.ai</p>
-          <p className="mt-1">{TRACE_VERSION}</p>
+        <div className="border-t border-border bg-background/40 px-8 py-4 text-center">
+          <p className="caption">© {new Date().getFullYear()} Imagick.ai</p>
+          <p className="caption mt-1 opacity-60">{TRACE_VERSION}</p>
         </div>
       </div>
     </div>

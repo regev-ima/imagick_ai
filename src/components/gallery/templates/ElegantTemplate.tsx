@@ -5,14 +5,14 @@ import { cn } from "@/lib/utils";
 import type { TemplateProps } from "./types";
 import { GalleryLightbox } from "./GalleryLightbox";
 import { CategoryNav } from "./CategoryNav";
-import { useDominantColor } from "@/hooks/useDominantColor";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
 /**
- * ELEGANT — PRISM. Airy editorial masonry on a calm tonal surface. A tall hero
- * with a dynamic-color wash drawn from the photography itself (Material You).
- * Figtree display type, hairline tonal cards, Google-red likes, amber AI stars.
+ * ELEGANT — Imagick.ai brand. Airy editorial masonry on a clean tonal surface
+ * (porcelain white in light, graphite in dark). A tall photo-first hero with a
+ * neutral scrim. Modern Inter type, hairline cards, brand royal-blue (#2B50F0)
+ * accents, warm-red likes, amber AI ratings.
  */
 export function ElegantTemplate({
   galleryName,
@@ -28,24 +28,17 @@ export function ElegantTemplate({
   onCategoryChange,
 }: TemplateProps) {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const sampleUrl = heroImage || images[0]?.original_url;
-  const dynamic = useDominantColor(sampleUrl);
-  const dynamicStyle = dynamic
-    ? ({ "--dynamic-primary": dynamic } as React.CSSProperties)
-    : undefined;
 
   return (
     <div
       className={cn("min-h-screen bg-background text-foreground", darkMode ? "dark" : "light")}
-      style={dynamicStyle}
     >
       {/* Hero Section */}
       {heroImage && (
         <div className="relative h-[85vh] overflow-hidden">
           <img src={heroImage} alt={galleryName} className="w-full h-full object-cover" />
-          {/* Dynamic-color wash from the photography */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--dynamic-primary)/0.45)] via-black/25 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+          {/* Clean neutral scrim — photo stays the hero */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-8 lg:p-16">
             <motion.h1
               initial={{ opacity: 0, y: 24 }}
@@ -80,7 +73,7 @@ export function ElegantTemplate({
       {/* Gallery Header (if no hero) */}
       {!heroImage && (
         <header className="py-16 px-8 text-center border-b border-border/60 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--dynamic-primary)/0.08)] to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.06] to-transparent pointer-events-none" />
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

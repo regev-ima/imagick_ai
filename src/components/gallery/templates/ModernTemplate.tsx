@@ -5,14 +5,13 @@ import { cn } from "@/lib/utils";
 import type { TemplateProps } from "./types";
 import { GalleryLightbox } from "./GalleryLightbox";
 import { CategoryNav } from "./CategoryNav";
-import { useDominantColor } from "@/hooks/useDominantColor";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
 /**
- * MODERN — PRISM. A Material 3 app: sticky tonal top bar with a grid-density
- * toggle, a tight edge-to-edge square mosaic. Calm chrome, dynamic-color accents
- * (active toggle, hero wash) pulled from the photography.
+ * MODERN — Imagick.ai brand. A clean app: sticky tonal top bar with a grid-
+ * density toggle, a tight edge-to-edge square mosaic. Calm chrome, brand royal-
+ * blue (#2B50F0) accents on the active toggle, neutral photo-first hero scrim.
  */
 export function ModernTemplate({
   galleryName,
@@ -29,16 +28,10 @@ export function ModernTemplate({
 }: TemplateProps) {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [gridSize, setGridSize] = useState<"small" | "large">("large");
-  const sampleUrl = heroImage || images[0]?.original_url;
-  const dynamic = useDominantColor(sampleUrl);
-  const dynamicStyle = dynamic
-    ? ({ "--dynamic-primary": dynamic } as React.CSSProperties)
-    : undefined;
 
   return (
     <div
       className={cn("min-h-screen bg-background text-foreground", darkMode ? "dark" : "light")}
-      style={dynamicStyle}
     >
       {/* Sticky Material app bar */}
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b border-border/60">
@@ -58,7 +51,7 @@ export function ModernTemplate({
               className={cn(
                 "p-2 rounded-full transition-colors",
                 gridSize === "large"
-                  ? "bg-[hsl(var(--dynamic-primary)/0.18)] text-[hsl(var(--dynamic-primary))]"
+                  ? "bg-primary/15 text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -70,7 +63,7 @@ export function ModernTemplate({
               className={cn(
                 "p-2 rounded-full transition-colors",
                 gridSize === "small"
-                  ? "bg-[hsl(var(--dynamic-primary)/0.18)] text-[hsl(var(--dynamic-primary))]"
+                  ? "bg-primary/15 text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -84,7 +77,7 @@ export function ModernTemplate({
       {heroImage && (
         <div className="relative h-[60vh] overflow-hidden">
           <img src={heroImage} alt={galleryName} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--dynamic-primary)/0.25)] via-transparent to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-background" />
           <div className="absolute bottom-8 left-6 right-6">
             <h2 className="font-display text-3xl font-semibold text-white tracking-tight">
               {galleryName}

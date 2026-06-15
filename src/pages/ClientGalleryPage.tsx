@@ -13,7 +13,6 @@ import {
   Download,
   Eye,
   Check,
-  Sparkles,
   Loader2,
   AlertCircle
 } from "lucide-react";
@@ -35,9 +34,27 @@ import { StoryTemplate } from "@/components/gallery/templates/StoryTemplate";
 import { ScanFace } from "lucide-react";
 import { FaceThumbnail } from "@/components/gallery/FaceThumbnail";
 import { Badge } from "@/components/ui/badge";
-import { Orb } from "@/components/aura/Orb";
 
 const PRISM_EASE = [0.2, 0, 0, 1] as const;
+
+/** The 4-point AI sparkle — marks AI moments in the brand royal blue (#2B50F0). */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 interface GalleryImage {
   id: string;
@@ -431,8 +448,8 @@ export default function ClientGalleryPage() {
         )}
       >
         <div className="text-center max-w-md">
-          <div className="mx-auto mb-6 w-14 h-14">
-            <Orb className="w-14 h-14" />
+          <div className="mx-auto mb-6 w-14 h-14 rounded-2xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center">
+            <Sparkle size={26} className="text-primary" />
           </div>
           <h1 className="font-display text-3xl font-semibold tracking-tight mb-3">
             {gallery.name}
@@ -483,27 +500,28 @@ export default function ClientGalleryPage() {
 
   return (
     <>
-      {/* Face Search Bar — AI face clustering, so it carries the Gemini
-          spectral signature (Orb + spectral active ring). Scoped to the
-          gallery's theme so it matches the template beneath it. */}
+      {/* Face Search Bar — AI face clustering, so it carries the brand AI
+          signature: the 4-point royal-blue sparkle + a royal-blue active ring
+          on the selected face. Scoped to the gallery's theme so it matches the
+          template beneath it. */}
       {faceClusters.length > 0 && isAuthenticated && (
         <div className={cn(darkMode ? "dark" : "light")}>
           <div className="sticky top-0 z-40 bg-background/85 backdrop-blur-xl border-b border-border/60">
             <div className="max-w-7xl mx-auto px-4 py-3">
               <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
                 <div className="flex items-center gap-2.5 flex-shrink-0">
-                  <Orb className="w-5 h-5" />
+                  <Sparkle size={18} className="text-primary" />
                   <span className="font-display text-sm font-medium whitespace-nowrap text-foreground">
                     Find your photos
                   </span>
-                  <span className="aura-microlabel hidden sm:inline">AI</span>
+                  <span className="aura-microlabel hidden sm:inline text-primary/80">AI</span>
                 </div>
                 <button
                   onClick={() => setActiveFaceCluster(null)}
                   className={cn(
                     "flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors",
                     !activeFaceCluster
-                      ? "bg-foreground text-background"
+                      ? "bg-primary text-primary-foreground"
                       : "bg-muted hover:bg-muted/70 text-muted-foreground"
                   )}
                 >

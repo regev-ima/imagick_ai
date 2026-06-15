@@ -1,9 +1,20 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Image, Layers } from "lucide-react";
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 12, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 interface StyleSelectorProps {
   availableStyles: Array<{ id: string; name: string; apiId?: string }>;
@@ -135,7 +146,7 @@ export function StyleComparison({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-lg cursor-ew-resize select-none bg-black inline-block touch-none",
+        "relative overflow-hidden rounded-sm cursor-ew-resize select-none bg-black inline-block touch-none plate-keyline",
         className
       )}
       onMouseMove={handleMouseMove}
@@ -188,19 +199,14 @@ export function StyleComparison({
         </div>
       </div>
 
-      {/* Labels */}
-      <Badge
-        variant="secondary"
-        className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm z-10"
-      >
+      {/* Labels — mono readout chips */}
+      <span className="aura-chip absolute top-3 left-3 z-10 bg-background/85 backdrop-blur-sm">
         Original
-      </Badge>
-      <Badge
-        variant="secondary"
-        className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm z-10"
-      >
+      </span>
+      <span className="aura-chip absolute top-3 right-3 z-10 bg-background/85 backdrop-blur-sm text-primary">
+        <Sparkle size={10} className="text-primary" />
         {styleName}
-      </Badge>
+      </span>
     </div>
   );
 }

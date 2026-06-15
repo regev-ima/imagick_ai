@@ -79,7 +79,7 @@ export function GroupingView({
             key={i}
             className={cn(
               "w-3 h-3",
-              i < stars ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground/30"
+              i < stars ? "text-rating fill-rating" : "text-muted-foreground/30"
             )}
           />
         ))}
@@ -92,8 +92,8 @@ export function GroupingView({
       {/* Level Selector */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Similarity Level:</span>
-          <ToggleGroup 
+          <span className="aura-microlabel">Similarity Level</span>
+          <ToggleGroup
             type="single" 
             value={level} 
             onValueChange={(v) => v && setLevel(v as GroupingLevel)}
@@ -110,8 +110,8 @@ export function GroupingView({
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
-        <span className="text-sm text-muted-foreground">
-          {groups.length} groups found
+        <span className="aura-chip">
+          <span className="folio text-foreground">{groups.length}</span> groups
         </span>
       </div>
 
@@ -131,7 +131,7 @@ export function GroupingView({
               <Card
                 key={group.id}
                 className={cn(
-                  "overflow-hidden cursor-pointer transition-all duration-200",
+                  "overflow-hidden cursor-pointer transition-all duration-200 rounded-sm",
                   "hover:shadow-lg hover:border-primary/50",
                   isExpanded && "col-span-full"
                 )}
@@ -140,7 +140,7 @@ export function GroupingView({
                 {!isExpanded ? (
                   // Collapsed view - show representative image
                   <div className="p-2">
-                    <div className="relative aspect-square rounded-md overflow-hidden mb-2">
+                    <div className="relative aspect-square rounded-sm overflow-hidden mb-2 plate-keyline">
                       <img
                         src={getThumbnailUrl(representative.original_url)}
                         alt=""
@@ -148,12 +148,12 @@ export function GroupingView({
                         loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-xs">
-                        <span>{group.images.length} images</span>
+                      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white">
+                        <span className="aura-chip bg-black/55 text-white/90"><span className="folio">{group.images.length}</span> frames</span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Group #{group.id}</span>
+                      <span className="font-mono text-xs font-medium tracking-tight">Group <span className="folio">#{group.id}</span></span>
                       {renderStars(avgScore)}
                     </div>
                   </div>
@@ -162,9 +162,9 @@ export function GroupingView({
                   <div className="p-4">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-lg font-semibold">Group #{group.id}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {group.images.length} images
+                        <span className="font-mono text-lg font-semibold tracking-tight">Group <span className="folio">#{group.id}</span></span>
+                        <span className="aura-chip">
+                          <span className="folio text-foreground">{group.images.length}</span> frames
                         </span>
                         {renderStars(avgScore)}
                       </div>
@@ -186,12 +186,12 @@ export function GroupingView({
                         <div
                           key={img.id}
                           className={cn(
-                            "relative aspect-square rounded-md overflow-hidden cursor-pointer",
+                            "relative aspect-square rounded-sm overflow-hidden cursor-pointer",
                             "border-2 transition-all",
-                            selectedImages.includes(img.id) 
-                              ? "border-primary" 
-                              : "border-transparent hover:border-primary/50",
-                            idx === 0 && "ring-2 ring-yellow-500 ring-offset-2"
+                            selectedImages.includes(img.id)
+                              ? "border-primary ring-2 ring-primary/50"
+                              : "border-border/40 hover:border-primary/50",
+                            idx === 0 && "ring-2 ring-rating ring-offset-2 ring-offset-background"
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -205,12 +205,12 @@ export function GroupingView({
                             loading="lazy"
                           />
                           {idx === 0 && (
-                            <div className="absolute top-1 left-1 bg-yellow-500 text-black text-[10px] px-1.5 py-0.5 rounded font-medium">
-                              Best
+                            <div className="absolute top-1 left-1 bg-rating text-black font-mono text-[9px] uppercase tracking-[0.12em] px-1.5 py-0.5 rounded-sm font-semibold">
+                              Pick
                             </div>
                           )}
                           {img.culling_score !== null && (
-                            <div className="absolute bottom-1 right-1 bg-background/80 backdrop-blur-sm text-[10px] px-1 rounded">
+                            <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm font-mono text-[10px] px-1 rounded-sm tabular-nums text-white/90">
                               {Math.round(img.culling_score * 100)}%
                             </div>
                           )}
