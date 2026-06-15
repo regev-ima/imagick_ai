@@ -1,6 +1,6 @@
 import { useState, useMemo, type CSSProperties, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -13,8 +13,32 @@ import {
   Loader2,
   Image as ImageIcon,
   Plus,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { StyleStatusCard } from "@/components/styles/StyleStatusCard";
 import { BeforeAfterSlider } from "@/components/styles/BeforeAfterSlider";
 import { useImportProgress } from "@/hooks/useImportProgress";
@@ -23,6 +47,7 @@ import { Orb } from "@/components/aura/Orb";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import { getThumbnailUrl, getPreviewUrl } from "@/lib/imageUrls";
 import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 
@@ -121,9 +146,16 @@ export default function StyleDetailsPage() {
   const { styleId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [activeSliderIndex, setActiveSliderIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<"after" | "before">("after");
+
+  // ── Owner-action UI state ───────────────────────────────────────────
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [renameDescription, setRenameDescription] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: style, isLoading } = useQuery({
     queryKey: ["style", styleId],
@@ -188,6 +220,105 @@ export default function StyleDetailsPage() {
     style?.total_images_to_import
   );
 
+  // ── Owner mutations ─────────────────────────────────────────────────
+  const renameMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description: string | null }) => {
+      if (!styleId) throw new Error("Missing style id");
+      const { error } = await supabase
+        .from("styles")
+        .update({ name, description })
+        .eq("id", styleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["style", styleId] });
+      toast.success("Style updated");
+      setRenameOpen(false);
+    },
+    onError: (error: any) => {
+      console.error("Error renaming style:", error);
+      toast.error(error?.message || "Failed to update style");
+    },
+  });
+
+  const visibilityMutation = useMutation({
+    mutationFn: async (nextVisibility: "private" | "public") => {
+      if (!styleId) throw new Error("Missing style id");
+      const { error } = await supabase
+        .from("styles")
+        .update({ visibility: nextVisibility })
+        .eq("id", styleId);
+      if (error) throw error;
+      return nextVisibility;
+    },
+    onSuccess: (nextVisibility) => {
+      queryClient.invalidateQueries({ queryKey: ["style", styleId] });
+      toast.success(nextVisibility === "public" ? "Style is now public" : "Style is now private");
+    },
+    onError: (error: any) => {
+      console.error("Error changing visibility:", error);
+      toast.error(error?.message || "Failed to change visibility");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!styleId) throw new Error("Missing style id");
+      const { error } = await supabase
+        .from("styles")
+        .delete()
+        .eq("id", styleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["styles"] });
+      toast.success("Style deleted");
+      setDeleteOpen(false);
+      navigate("/dashboard/styles");
+    },
+    onError: (error: any) => {
+      console.error("Error deleting style:", error);
+      toast.error(error?.message || "Failed to delete style");
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: async () => {
+      if (!style || !styleId) throw new Error("Missing style");
+      // Reconstruct the train-style contract from the style row alone:
+      // dirs are deterministic paths keyed on user_id + style id, and the
+      // model type is stored on the style (category / first associated tag).
+      const modelType = style.category || style.associated_tags?.[0] || "event";
+      const beforeDir = `styles/${style.user_id}/${styleId}/before/`;
+      const afterDir = `styles/${style.user_id}/${styleId}/after/`;
+
+      // Flip status back to training so the page reflects the retry immediately.
+      const { error: statusError } = await supabase
+        .from("styles")
+        .update({ status: "training", error_details: null })
+        .eq("id", styleId);
+      if (statusError) throw statusError;
+
+      const { error } = await supabase.functions.invoke("train-style", {
+        body: {
+          styleId,
+          modelType,
+          beforeDirs: [beforeDir],
+          afterDirs: [afterDir],
+        },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["style", styleId] });
+      toast.success("Training restarted");
+    },
+    onError: (error: any) => {
+      console.error("Error retrying training:", error);
+      toast.error(error?.message || "Failed to restart training");
+    },
+  });
+
   const afterImages: string[] = useMemo(() => {
     if (editPairs.length > 0) return editPairs.map(p => p.after);
     return [...(style?.after_image_urls?.filter(Boolean) || [])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
@@ -230,6 +361,15 @@ export default function StyleDetailsPage() {
   const status = statusConfig[style.status as StyleStatus] || statusConfig.ready;
   const isOwner = user?.id === style.user_id;
   const isReady = style.status === "ready";
+  const isErrored = style.status === "error";
+  const isBusy = style.status === "training" || style.status === "importing";
+  const isPublic = style.visibility === "public";
+
+  const openRename = () => {
+    setRenameName(style.name ?? "");
+    setRenameDescription(style.description ?? "");
+    setRenameOpen(true);
+  };
 
   const heroImage = afterImages[0] ? getPreviewUrl(afterImages[0]) : null;
 
@@ -343,17 +483,72 @@ export default function StyleDetailsPage() {
                   })()}
                 </div>
 
-                {style.status === "ready" && (
-                  <Button
-                    variant="glow"
-                    size="sm"
-                    onClick={() => navigate(`/dashboard/galleries/new?styleId=${style.id}`)}
-                    className="gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Create Gallery
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {/* Retry training — only in an error state, owner only */}
+                  {isOwner && isErrored && (
+                    <Button
+                      variant="glow"
+                      size="sm"
+                      onClick={() => retryMutation.mutate()}
+                      disabled={retryMutation.isPending}
+                      className="gap-1.5"
+                    >
+                      {retryMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      Retry training
+                    </Button>
+                  )}
+
+                  {style.status === "ready" && (
+                    <Button
+                      variant="glow"
+                      size="sm"
+                      onClick={() => navigate(`/dashboard/galleries/new?styleId=${style.id}`)}
+                      className="gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Create Gallery
+                    </Button>
+                  )}
+
+                  {/* Owner actions — Rename / Visibility / Delete */}
+                  {isOwner && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" className="shrink-0" aria-label="Style options">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={openRename}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={visibilityMutation.isPending}
+                          onClick={() => visibilityMutation.mutate(isPublic ? "private" : "public")}
+                        >
+                          {isPublic ? (
+                            <><Lock className="mr-2 h-4 w-4" /> Make private</>
+                          ) : (
+                            <><Globe className="mr-2 h-4 w-4" /> Make public</>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeleteOpen(true)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
             </motion.div>
           </div>
@@ -489,6 +684,94 @@ export default function StyleDetailsPage() {
               )}
             </DialogContent>
           </Dialog>
+
+          {/* Owner — Rename dialog */}
+          {isOwner && (
+            <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Sparkle size={14} className="text-accent" />
+                    Edit style
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div>
+                    <Label htmlFor="style-rename" className="mb-2 block">
+                      Name
+                    </Label>
+                    <Input
+                      id="style-rename"
+                      value={renameName}
+                      onChange={(e) => setRenameName(e.target.value)}
+                      placeholder="Style name"
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="style-redescribe" className="mb-2 block">
+                      Description
+                    </Label>
+                    <Textarea
+                      id="style-redescribe"
+                      value={renameDescription}
+                      onChange={(e) => setRenameDescription(e.target.value)}
+                      placeholder="Describe the look and feel..."
+                      className="min-h-[80px] bg-input border-border"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setRenameOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="glow"
+                    disabled={!renameName.trim() || renameMutation.isPending}
+                    onClick={() =>
+                      renameMutation.mutate({
+                        name: renameName.trim(),
+                        description: renameDescription.trim() || null,
+                      })
+                    }
+                    className="gap-1.5"
+                  >
+                    {renameMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Save
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Owner — Delete confirmation */}
+          {isOwner && (
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this style?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This can't be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={deleteMutation.isPending}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      deleteMutation.mutate();
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
 
           {/* Empty state */}
           {afterImages.length === 0 && (

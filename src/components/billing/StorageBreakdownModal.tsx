@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useStorageBreakdown } from "@/hooks/useStorageBreakdown";
@@ -30,25 +29,27 @@ export function StorageBreakdownModal({ isOpen, onClose, onViewPlans }: StorageB
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <HardDrive className="w-5 h-5 text-primary" />
-            Storage Breakdown
+      <DialogContent className="surface-2 max-h-[85vh] overflow-y-auto p-0 sm:max-w-2xl sm:rounded-[--radius]">
+        <DialogHeader className="space-y-0">
+          <DialogTitle asChild>
+            <span className="aura-microlabel sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+              <HardDrive className="h-3.5 w-3.5" />
+              Storage Breakdown
+            </span>
           </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 p-5">
             {/* Summary */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold">{formatSize(totalMb)}</span>
-                <span className="text-muted-foreground">/ {maxGb} GB</span>
+              <div className="flex items-baseline justify-between">
+                <span className="folio text-2xl text-foreground">{formatSize(totalMb)}</span>
+                <span className="folio text-muted-foreground">/ {maxGb} GB</span>
               </div>
               <Progress value={Math.min(usagePercent, 100)} className="h-3" />
               <p className="text-sm text-muted-foreground">
@@ -62,8 +63,8 @@ export function StorageBreakdownModal({ isOpen, onClose, onViewPlans }: StorageB
             {/* By Gallery */}
             {data?.galleries && data.galleries.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">By Gallery</h3>
-                <div className="rounded-lg border border-border overflow-hidden">
+                <h3 className="aura-microlabel mb-3">By Gallery</h3>
+                <div className="overflow-hidden rounded-[--radius] border border-border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -105,7 +106,7 @@ export function StorageBreakdownModal({ isOpen, onClose, onViewPlans }: StorageB
             {/* By Type */}
             {data?.storageByType && totalMb > 0 && (
               <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">By Type</h3>
+                <h3 className="aura-microlabel mb-3">By Type</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { label: "Original Images", icon: Image, value: data.storageByType.originals },
@@ -113,15 +114,13 @@ export function StorageBreakdownModal({ isOpen, onClose, onViewPlans }: StorageB
                     { label: "Thumbnails", icon: FileImage, value: data.storageByType.thumbnails },
                     { label: "Trash", icon: Trash2, value: data.storageByType.trash },
                   ].map((item) => (
-                    <Card key={item.label} className="border-border/50">
-                      <CardContent className="p-3 flex items-center gap-3">
-                        <item.icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-xs text-muted-foreground">{item.label}</p>
-                          <p className="font-semibold text-sm">{formatSize(item.value)}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div key={item.label} className="flex items-center gap-3 rounded-[--radius] border border-border bg-card p-3">
+                      <item.icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                        <p className="folio text-sm text-foreground">{formatSize(item.value)}</p>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -129,54 +128,48 @@ export function StorageBreakdownModal({ isOpen, onClose, onViewPlans }: StorageB
 
             {/* Tips */}
             <div>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">Free Up Space</h3>
+              <h3 className="aura-microlabel mb-3">Free Up Space</h3>
               <div className="space-y-2">
                 {(data?.trashCount || 0) > 0 && (
-                  <Card className="border-border/50">
-                    <CardContent className="p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                        <div>
-                          <p className="text-sm font-medium">Empty Trash</p>
-                          <p className="text-xs text-muted-foreground">
-                            {data!.trashCount} images in trash · ~{formatSize(data!.storageByType.trash)}
-                          </p>
-                        </div>
+                  <div className="flex items-center justify-between rounded-[--radius] border border-border bg-card p-3">
+                    <div className="flex items-center gap-3">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <div>
+                        <p className="text-sm font-medium tracking-tight">Empty Trash</p>
+                        <p className="text-xs text-muted-foreground">
+                          {data!.trashCount} images in trash · ~{formatSize(data!.storageByType.trash)}
+                        </p>
                       </div>
-                      <Button size="sm" variant="outline">Empty Now</Button>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <Button size="sm" variant="outline">Empty Now</Button>
+                  </div>
                 )}
 
                 {(data?.inactiveGalleries?.length || 0) > 0 && (
-                  <Card className="border-border/50">
-                    <CardContent className="p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Archive className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">Archive Old Galleries</p>
-                          <p className="text-xs text-muted-foreground">
-                            {data!.inactiveGalleries.length} galleries inactive for 90+ days
-                          </p>
-                        </div>
-                      </div>
-                      <Button size="sm" variant="outline">Review</Button>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <Card className="border-border/50">
-                  <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center justify-between rounded-[--radius] border border-border bg-card p-3">
                     <div className="flex items-center gap-3">
-                      <ArrowUpCircle className="w-4 h-4 text-primary" />
+                      <Archive className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium">Need More Space?</p>
-                        <p className="text-xs text-muted-foreground">Upgrade your plan for more storage</p>
+                        <p className="text-sm font-medium tracking-tight">Archive Old Galleries</p>
+                        <p className="text-xs text-muted-foreground">
+                          {data!.inactiveGalleries.length} galleries inactive for 90+ days
+                        </p>
                       </div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => { onClose(); onViewPlans?.(); }}>View Plans</Button>
-                  </CardContent>
-                </Card>
+                    <Button size="sm" variant="outline">Review</Button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between rounded-[--radius] border border-border bg-card p-3">
+                  <div className="flex items-center gap-3">
+                    <ArrowUpCircle className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium tracking-tight">Need More Space?</p>
+                      <p className="text-xs text-muted-foreground">Upgrade your plan for more storage</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => { onClose(); onViewPlans?.(); }}>View Plans</Button>
+                </div>
               </div>
             </div>
           </div>

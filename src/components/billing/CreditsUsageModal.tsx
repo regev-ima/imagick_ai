@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCreditsUsage } from "@/hooks/useCreditsUsage";
 import { Zap, Plus, Loader2, Gift, Crown } from "lucide-react";
@@ -31,34 +30,36 @@ export function CreditsUsageModal({ isOpen, onClose, onBuyCredits }: CreditsUsag
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg truncate">
-            <Zap className="w-5 h-5 text-primary shrink-0" />
-            <span className="truncate">AI Edits Usage</span>
+      <DialogContent className="surface-2 max-h-[85vh] overflow-y-auto p-0 sm:max-w-2xl sm:rounded-[--radius]">
+        <DialogHeader className="space-y-0">
+          <DialogTitle asChild>
+            <span className="aura-microlabel sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-primary/[0.08] px-4 py-2.5 text-accent">
+              <Zap className="h-3.5 w-3.5" />
+              <span className="truncate">AI Edits Usage</span>
+            </span>
           </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 p-5">
             {/* Summary */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-2xl font-bold">{editsUsed.toLocaleString()}</span>
+                <div className="folio">
+                  <span className="text-2xl text-foreground">{editsUsed.toLocaleString()}</span>
                   <span className="text-muted-foreground"> / {isUnlimited ? "Unlimited" : editsTotal.toLocaleString()}</span>
                 </div>
                 <Button size="sm" className="gap-1" onClick={onBuyCredits}>
-                  <Plus className="w-4 h-4" />
+                  <Plus className="h-4 w-4" />
                   Upgrade Plan
                 </Button>
               </div>
               <Progress value={Math.min(usagePercent, 100)} className="h-3" />
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground">
                 <span>{isUnlimited ? "Unlimited" : `${editsRemaining.toLocaleString()} remaining`}</span>
                 <span>{periodLabel}</span>
               </div>
@@ -67,30 +68,34 @@ export function CreditsUsageModal({ isOpen, onClose, onBuyCredits }: CreditsUsag
             {/* Credit Sources */}
             {giftCreditsTotal > 0 && !isUnlimited && (
               <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">Edit Sources</h3>
+                <h3 className="aura-microlabel mb-3">Edit Sources</h3>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 text-sm">
+                  <div className="flex items-center justify-between rounded-[--radius] border border-border bg-card p-3 text-sm">
                     <div className="flex items-center gap-2">
-                      <Crown className="w-4 h-4 text-primary" />
+                      <Crown className="h-4 w-4 text-primary" />
                       <span>Plan edits</span>
                     </div>
-                    <span className="font-medium">{planCreditsRemaining.toLocaleString()}</span>
+                    <span className="folio">{planCreditsRemaining.toLocaleString()}</span>
                   </div>
                   {creditGrants.filter((g: any) => g.status === "active").map((grant: any) => (
-                    <div key={grant.id} className="flex items-center justify-between p-3 rounded-lg bg-green-500/5 border border-green-500/20 text-sm">
+                    <div
+                      key={grant.id}
+                      className="flex items-center justify-between rounded-[--radius] border bg-card p-3 text-sm"
+                      style={{ borderColor: "hsl(var(--secondary) / 0.3)" }}
+                    >
                       <div className="flex items-center gap-2">
-                        <Gift className="w-4 h-4 text-green-500" />
+                        <Gift className="h-4 w-4" style={{ color: "hsl(var(--secondary))" }} />
                         <div>
                           <span>Gift credits</span>
                           <p className="text-xs text-muted-foreground">
                             Expires {format(parseISO(grant.expires_at), "MMM d, yyyy")}
                           </p>
                           {grant.reason && (
-                            <p className="text-xs text-muted-foreground italic">{grant.reason}</p>
+                            <p className="text-xs italic text-muted-foreground">{grant.reason}</p>
                           )}
                         </div>
                       </div>
-                      <span className="font-medium">{grant.credits_remaining.toLocaleString()}</span>
+                      <span className="folio" style={{ color: "hsl(var(--secondary))" }}>{grant.credits_remaining.toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -100,8 +105,8 @@ export function CreditsUsageModal({ isOpen, onClose, onBuyCredits }: CreditsUsag
             {/* By Gallery */}
             {data?.editsByGallery && data.editsByGallery.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">AI Edits by Gallery</h3>
-                <div className="rounded-lg border border-border overflow-hidden">
+                <h3 className="aura-microlabel mb-3">AI Edits by Gallery</h3>
+                <div className="overflow-hidden rounded-[--radius] border border-border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -127,7 +132,7 @@ export function CreditsUsageModal({ isOpen, onClose, onBuyCredits }: CreditsUsag
             )}
 
             {data?.editsByGallery?.length === 0 && (
-              <div className="text-center py-6 text-muted-foreground text-sm">
+              <div className="py-6 text-center text-sm text-muted-foreground">
                 No AI edits this billing period yet.
               </div>
             )}
@@ -135,7 +140,7 @@ export function CreditsUsageModal({ isOpen, onClose, onBuyCredits }: CreditsUsag
             {/* Daily Timeline */}
             {data?.dailyUsage && data.dailyUsage.length > 1 && (
               <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">Daily Usage</h3>
+                <h3 className="aura-microlabel mb-3">Daily Usage</h3>
                 <div className="h-[180px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={data.dailyUsage}>
@@ -155,7 +160,7 @@ export function CreditsUsageModal({ isOpen, onClose, onBuyCredits }: CreditsUsag
                         contentStyle={{
                           backgroundColor: "hsl(var(--popover))",
                           border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
+                          borderRadius: "var(--radius)",
                           color: "hsl(var(--foreground))",
                         }}
                         labelFormatter={(v) => format(parseISO(v as string), "MMM d")}
@@ -182,23 +187,19 @@ export function CreditsUsageModal({ isOpen, onClose, onBuyCredits }: CreditsUsag
 
             {/* Tips */}
             <div>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">Save Edits</h3>
+              <h3 className="aura-microlabel mb-3">Save Edits</h3>
               <div className="space-y-2">
-                <Card className="border-border/50">
-                  <CardContent className="p-3">
-                    <p className="text-sm font-medium">Cull Before Editing</p>
-                    <p className="text-xs text-muted-foreground">Run AI culling first to edit only the best photos</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-border/50">
-                  <CardContent className="p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">Upgrade Your Plan</p>
-                      <p className="text-xs text-muted-foreground">Get more edits with a higher plan</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={onBuyCredits}>Upgrade Plan</Button>
-                  </CardContent>
-                </Card>
+                <div className="rounded-[--radius] border border-border bg-card p-3">
+                  <p className="text-sm font-medium tracking-tight">Cull Before Editing</p>
+                  <p className="text-xs text-muted-foreground">Run AI culling first to edit only the best photos</p>
+                </div>
+                <div className="flex items-center justify-between rounded-[--radius] border border-border bg-card p-3">
+                  <div>
+                    <p className="text-sm font-medium tracking-tight">Upgrade Your Plan</p>
+                    <p className="text-xs text-muted-foreground">Get more edits with a higher plan</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={onBuyCredits}>Upgrade Plan</Button>
+                </div>
               </div>
             </div>
           </div>

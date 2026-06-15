@@ -322,6 +322,22 @@ export default function SettingsPage() {
 
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // ── Delete-account confirmation gate ──────────────────────────────────────
+  // The destructive action stays disabled until the user types their exact
+  // account email (case-insensitive, trimmed). Typing the word DELETE is an
+  // accepted fallback. The typed value is reset whenever the dialog closes.
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
+  const normalizedConfirm = deleteConfirmInput.trim().toLowerCase();
+  const deleteConfirmed =
+    normalizedConfirm.length > 0 &&
+    (normalizedConfirm === (email || "").trim().toLowerCase() || normalizedConfirm === "delete");
+
+  const handleDeleteDialogOpenChange = (open: boolean) => {
+    setDeleteDialogOpen(open);
+    if (!open) setDeleteConfirmInput("");
+  };
+
   const handleDeleteAccount = async () => {
     if (isImpersonating) {
       toast.info("Account deletion is disabled while impersonating");
@@ -602,7 +618,7 @@ export default function SettingsPage() {
           title={<span className="text-destructive">Delete Account</span>}
           desc="Permanently delete your account and all data"
           control={
-            <AlertDialog>
+            <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="gap-2">
                   <Trash2 className="h-4 w-4" />
@@ -613,14 +629,38 @@ export default function SettingsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your account and remove
-                    all your data including galleries, styles, and images.
+                    This permanently deletes your galleries, styles, and images. This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+
+                <div className="space-y-2">
+                  <Label htmlFor="delete-confirm" className="aura-microlabel text-destructive">
+                    Type your email to confirm
+                  </Label>
+                  <Input
+                    id="delete-confirm"
+                    type="text"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={deleteConfirmInput}
+                    onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                    placeholder={email || "DELETE"}
+                    aria-label="Confirm account deletion by typing your email"
+                    className="border-destructive/40 bg-background focus-visible:ring-destructive"
+                  />
+                  <p className="font-mono text-[11px] text-muted-foreground">
+                    Enter{" "}
+                    <span className="font-medium text-foreground">{email || "your account email"}</span>{" "}
+                    to enable deletion.
+                  </p>
+                </div>
+
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteAccount} disabled={isDeleting}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  <AlertDialogAction onClick={handleDeleteAccount} disabled={isDeleting || !deleteConfirmed}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-50">
                     {isDeleting ? "Deleting..." : "Delete Account"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
