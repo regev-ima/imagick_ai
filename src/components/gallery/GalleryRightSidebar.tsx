@@ -1114,7 +1114,7 @@ function GalleryInfoPanel({
           {/* Progress bar */}
           <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
+              className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${processingStats.percentage}%` }}
             />
           </div>
