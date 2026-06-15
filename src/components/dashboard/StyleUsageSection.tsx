@@ -66,38 +66,41 @@ export default function StyleUsageSection() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.6 }}
     >
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Style Usage</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-display text-lg font-semibold tracking-tight">Style usage</h2>
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/dashboard/styles" className="gap-1 text-muted-foreground hover:text-foreground">
-            All Styles
-            <ArrowRight className="w-4 h-4" />
+          <Link
+            to="/dashboard/styles"
+            className="gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground hover:text-primary"
+          >
+            All styles
+            <ArrowRight className="h-3 w-3" />
           </Link>
         </Button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
         {styleUsage.map((style) => (
           <Link key={style.id} to={`/dashboard/styles/${style.id}`}>
-            <Card className="glass-card border-border/50 hover:border-primary/30 transition-all group overflow-hidden h-full">
+            <Card className="glass-card group h-full overflow-hidden rounded-3xl border-border/60 transition-[transform,border-color] duration-200 [transition-timing-function:cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 hover:border-primary/50">
               <CardContent className="p-0">
-                <div className="h-20 bg-muted relative overflow-hidden">
+                <div className="relative h-20 overflow-hidden bg-muted">
                   {style.thumbnail_url ? (
                     <img
                       src={getThumbnailUrl(style.thumbnail_url)}
                       alt={style.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Sparkles className="w-6 h-6 text-muted-foreground" />
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Sparkles className="h-6 w-6 text-muted-foreground" />
                     </div>
                   )}
                 </div>
                 <div className="p-3">
-                  <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                  <p className="truncate text-sm font-medium transition-colors group-hover:text-primary">
                     {style.name}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                     {style.editCount} edit{style.editCount !== 1 ? "s" : ""}
                   </p>
                 </div>

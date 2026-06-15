@@ -47,9 +47,10 @@ const deck = {
   hidden: {},
   show: { transition: { staggerChildren: 0.06 } },
 };
+const EASE: [number, number, number, number] = [0.2, 0, 0, 1];
 const rise = {
   hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.2, 0, 0, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
 };
 
 const PROMPT_CHIPS = [

@@ -34,10 +34,10 @@ function cleanDescription(raw: string | null): string {
 }
 
 const iconMap = {
-  ai_edit: { Icon: Sparkles, bg: "bg-primary/15", color: "text-primary" },
+  ai_edit: { Icon: Sparkles, bg: "bg-primary/12", color: "text-primary" },
   client_view: { Icon: Eye, bg: "bg-secondary/15", color: "text-secondary" },
-  upload: { Icon: Images, bg: "bg-accent/15", color: "text-accent-foreground" },
-  style_train: { Icon: Zap, bg: "bg-primary/15", color: "text-primary" },
+  upload: { Icon: Images, bg: "bg-accent/15", color: "text-accent" },
+  style_train: { Icon: Zap, bg: "bg-primary/12", color: "text-primary" },
 };
 
 export default function ActivityFeed() {
@@ -85,32 +85,32 @@ export default function ActivityFeed() {
   });
 
   return (
-    <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
-      <CardHeader className="pb-3 px-5 pt-5">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
-            <Clock className="w-4 h-4 text-primary" />
+    <Card className="glass-card rounded-3xl border-border/60 transition-colors hover:border-primary/30">
+      <CardHeader className="px-5 pb-3 pt-5">
+        <div className="flex items-center gap-2.5">
+          <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary/12 text-primary">
+            <Clock className="h-4 w-4" />
           </div>
-          <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
+          <CardTitle className="font-display text-base font-semibold tracking-tight">Recent activity</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="px-5 pb-4">
         {isLoading ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex items-center gap-3 animate-pulse">
-                <div className="w-8 h-8 rounded-lg bg-muted flex-shrink-0" />
+              <div key={i} className="flex animate-pulse items-center gap-3">
+                <div className="h-8 w-8 flex-shrink-0 rounded-xl bg-muted" />
                 <div className="flex-1 space-y-1.5">
-                  <div className="h-3 bg-muted rounded w-3/4" />
-                  <div className="h-2.5 bg-muted rounded w-1/2" />
+                  <div className="h-3 w-3/4 rounded bg-muted" />
+                  <div className="h-2.5 w-1/2 rounded bg-muted" />
                 </div>
               </div>
             ))}
           </div>
         ) : activities.length === 0 ? (
-          <div className="py-8 flex flex-col items-center gap-2 text-muted-foreground">
-            <Clock className="w-8 h-8 opacity-20" />
-            <p className="text-xs">No recent activity</p>
+          <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+            <Clock className="h-8 w-8 opacity-20" />
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em]">No recent activity</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -124,22 +124,22 @@ export default function ActivityFeed() {
                   transition={{ delay: i * 0.04 }}
                   className="flex items-start gap-3"
                 >
-                  <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                    <Icon className={`w-4 h-4 ${color}`} />
+                  <div className={`mt-0.5 grid h-8 w-8 flex-shrink-0 place-items-center rounded-xl ${bg} ${color}`}>
+                    <Icon className="h-4 w-4" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm leading-snug truncate">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm leading-snug">
                       {item.description}
                       {item.galleryName && (
                         <span className="text-muted-foreground"> · {item.galleryName}</span>
                       )}
                     </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground">{timeAgo(item.timestamp)}</span>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className="font-mono text-[11px] text-muted-foreground">{timeAgo(item.timestamp)}</span>
                       {item.credits != null && item.credits > 0 && (
                         <>
-                          <span className="text-border text-xs">·</span>
-                          <span className="text-xs text-primary font-medium">−{item.credits} cr</span>
+                          <span className="text-[11px] text-border">·</span>
+                          <span className="font-mono text-[11px] font-medium text-primary">−{item.credits} cr</span>
                         </>
                       )}
                     </div>

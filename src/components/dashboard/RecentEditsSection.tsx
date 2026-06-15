@@ -57,7 +57,7 @@ export default function RecentEditsSection() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.65 }}
     >
-      <h2 className="text-xl font-semibold mb-4">Recent Edits</h2>
+      <h2 className="mb-4 font-display text-lg font-semibold tracking-tight">Recent edits</h2>
       <ScrollArea className="w-full whitespace-nowrap">
         <div className="flex gap-3 pb-2">
           {recentEdits.map((edit) => (
@@ -66,23 +66,23 @@ export default function RecentEditsSection() {
               to={`/dashboard/galleries/${edit.gallery_id}`}
               className="shrink-0"
             >
-              <Card className="glass-card border-border/50 hover:border-primary/30 transition-all group overflow-hidden w-[160px]">
-                <div className="h-24 bg-muted relative overflow-hidden">
+              <Card className="glass-card group w-[160px] overflow-hidden rounded-3xl border-border/60 transition-[transform,border-color] duration-200 [transition-timing-function:cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 hover:border-primary/50">
+                <div className="relative h-24 overflow-hidden bg-muted">
                   <img
                     src={getThumbnailUrl(edit.edited_url)}
                     alt="Edited image"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     onError={(e) => {
                       e.currentTarget.src = edit.edited_url;
                     }}
                   />
                 </div>
                 <div className="p-2.5">
-                  <p className="text-xs font-medium truncate flex items-center gap-1 text-foreground">
-                    <Paintbrush className="w-3 h-3 text-primary shrink-0" />
+                  <p className="flex items-center gap-1 truncate text-xs font-medium text-foreground">
+                    <Paintbrush className="h-3 w-3 shrink-0 text-primary" />
                     {edit.style_name || "Unknown style"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
                     {formatTimeAgo(edit.created_at)}
                   </p>
                 </div>

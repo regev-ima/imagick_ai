@@ -35,6 +35,9 @@ import { StoryTemplate } from "@/components/gallery/templates/StoryTemplate";
 import { ScanFace } from "lucide-react";
 import { FaceThumbnail } from "@/components/gallery/FaceThumbnail";
 import { Badge } from "@/components/ui/badge";
+import { Orb } from "@/components/aura/Orb";
+
+const PRISM_EASE = [0.2, 0, 0, 1] as const;
 
 interface GalleryImage {
   id: string;
@@ -313,9 +316,11 @@ export default function ClientGalleryPage() {
   if (galleryError || !gallery) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="glass-card border-border/50 p-8 text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Gallery Not Found</h1>
+        <Card className="surface-1 rounded-3xl border-border/60 p-10 text-center max-w-md">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-5">
+            <AlertCircle className="w-8 h-8 text-destructive" />
+          </div>
+          <h1 className="font-display text-2xl font-semibold mb-2">Gallery not found</h1>
           <p className="text-muted-foreground">
             The gallery you're looking for doesn't exist or the link may have expired.
           </p>
@@ -327,42 +332,34 @@ export default function ClientGalleryPage() {
   // Password Protection Screen
   if (!isAuthenticated && gallery.requires_password) {
     return (
-      <div className={cn(
-        "min-h-screen flex items-center justify-center p-4",
-        darkMode ? "bg-[#0a0a0f]" : "bg-[#faf9f7]"
-      )}>
+      <div
+        className={cn(
+          "min-h-screen flex items-center justify-center p-4 bg-background text-foreground",
+          darkMode ? "dark" : "light"
+        )}
+      >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: PRISM_EASE }}
           className="w-full max-w-md"
         >
-          <div className={cn(
-            "rounded-2xl p-8 text-center border",
-            darkMode 
-              ? "bg-white/5 border-white/10 text-white" 
-              : "bg-white border-gray-200 text-gray-900"
-          )}>
-            <div className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6",
-              darkMode ? "bg-white/10" : "bg-gray-100"
-            )}>
-              <Lock className={cn("w-8 h-8", darkMode ? "text-white" : "text-gray-900")} />
+          <div className="surface-1 rounded-3xl p-8 text-center border border-border/60">
+            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-6">
+              <Lock className="w-7 h-7 text-foreground" />
             </div>
-            
-            <h1 className="text-2xl font-light mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
+
+            <h1 className="font-display text-2xl font-semibold tracking-tight mb-2">
               {gallery.name}
             </h1>
-            <p className={cn("mb-6", darkMode ? "text-white/60" : "text-gray-500")}>
-              {gallery.description || "Protected Gallery"}
+            <p className="text-muted-foreground mb-7">
+              {gallery.description || "Protected gallery"}
             </p>
 
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="text-left">
-                <label className={cn(
-                  "text-sm font-medium mb-2 block",
-                  darkMode ? "text-white/80" : "text-gray-700"
-                )}>
-                  Your Name
+                <label className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 block">
+                  Your name
                 </label>
                 <input
                   type="text"
@@ -370,48 +367,30 @@ export default function ClientGalleryPage() {
                   value={clientName}
                   maxLength={100}
                   onChange={(e) => setClientName(e.target.value.replace(/[<>]/g, ''))}
-                  className={cn(
-                    "w-full px-4 py-3 rounded-lg border outline-none transition-colors",
-                    darkMode
-                      ? "bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/30"
-                      : "bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50"
-                  )}
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-muted/50 text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/60 focus:bg-muted"
                 />
               </div>
 
               <div className="text-left">
-                <label className={cn(
-                  "text-sm font-medium mb-2 block",
-                  darkMode ? "text-white/80" : "text-gray-700"
-                )}>
-                  Gallery Password
+                <label className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 block">
+                  Gallery password
                 </label>
                 <input
                   type="password"
                   placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={cn(
-                    "w-full px-4 py-3 rounded-lg border outline-none transition-colors",
-                    darkMode
-                      ? "bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/30"
-                      : "bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50"
-                  )}
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-muted/50 text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/60 focus:bg-muted"
                 />
                 {passwordError && (
-                  <p className="text-red-400 text-sm mt-2">{passwordError}</p>
+                  <p className="text-destructive text-sm mt-2">{passwordError}</p>
                 )}
               </div>
 
-              <button 
+              <button
                 type="submit"
                 disabled={isVerifying}
-                className={cn(
-                  "w-full py-3 rounded-lg font-medium transition-all disabled:opacity-50",
-                  darkMode 
-                    ? "bg-white text-black hover:bg-white/90" 
-                    : "bg-gray-900 text-white hover:bg-gray-800"
-                )}
+                className="w-full py-3 rounded-full font-medium bg-primary text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50"
               >
                 <span className="flex items-center justify-center gap-2">
                   {isVerifying ? (
@@ -419,15 +398,12 @@ export default function ClientGalleryPage() {
                   ) : (
                     <Eye className="w-4 h-4" />
                   )}
-                  {isVerifying ? "Verifying..." : "View Gallery"}
+                  {isVerifying ? "Verifying..." : "View gallery"}
                 </span>
               </button>
             </form>
 
-            <p className={cn(
-              "text-xs mt-6",
-              darkMode ? "text-white/40" : "text-gray-400"
-            )}>
+            <p className="text-xs text-muted-foreground/80 mt-6 leading-relaxed">
               This gallery is password protected. Please enter the password provided by your photographer.
             </p>
           </div>
@@ -448,18 +424,23 @@ export default function ClientGalleryPage() {
   // Empty gallery
   if (images.length === 0) {
     return (
-      <div className={cn(
-        "min-h-screen flex items-center justify-center p-4",
-        darkMode ? "bg-[#0a0a0f] text-white" : "bg-[#faf9f7] text-gray-900"
-      )}>
+      <div
+        className={cn(
+          "min-h-screen flex items-center justify-center p-4 bg-background text-foreground",
+          darkMode ? "dark" : "light"
+        )}
+      >
         <div className="text-center max-w-md">
-          <h1 className="text-3xl font-light mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <div className="mx-auto mb-6 w-14 h-14">
+            <Orb className="w-14 h-14" />
+          </div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight mb-3">
             {gallery.name}
           </h1>
-          <p className={cn("text-base mb-2", darkMode ? "text-white/80" : "text-gray-700")}>
-            ✨ Your photos are still being prepared.
+          <p className="text-base text-foreground/90 mb-2">
+            Your photos are still being prepared.
           </p>
-          <p className={cn("text-sm", darkMode ? "text-white/50" : "text-gray-500")}>
+          <p className="text-sm text-muted-foreground">
             Please check back soon — your photographer will let you know when they're ready.
           </p>
         </div>
@@ -502,55 +483,62 @@ export default function ClientGalleryPage() {
 
   return (
     <>
-      {/* Face Search Bar — shown when face clusters exist */}
+      {/* Face Search Bar — AI face clustering, so it carries the Gemini
+          spectral signature (Orb + spectral active ring). Scoped to the
+          gallery's theme so it matches the template beneath it. */}
       {faceClusters.length > 0 && isAuthenticated && (
-        <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border/50">
-          <div className="max-w-7xl mx-auto px-4 py-3">
-            <div className="flex items-center gap-3 overflow-x-auto">
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <ScanFace className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium whitespace-nowrap">Find your photos:</span>
-              </div>
-              <button
-                onClick={() => setActiveFaceCluster(null)}
-                className={cn(
-                  "flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors",
-                  !activeFaceCluster
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                )}
-              >
-                All
-              </button>
-              {faceClusters.map((cluster: any) => (
+        <div className={cn(darkMode ? "dark" : "light")}>
+          <div className="sticky top-0 z-40 bg-background/85 backdrop-blur-xl border-b border-border/60">
+            <div className="max-w-7xl mx-auto px-4 py-3">
+              <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center gap-2.5 flex-shrink-0">
+                  <Orb className="w-5 h-5" />
+                  <span className="font-display text-sm font-medium whitespace-nowrap text-foreground">
+                    Find your photos
+                  </span>
+                  <span className="aura-microlabel hidden sm:inline">AI</span>
+                </div>
                 <button
-                  key={cluster.id}
-                  onClick={() => setActiveFaceCluster(
-                    activeFaceCluster === cluster.id ? null : cluster.id
-                  )}
+                  onClick={() => setActiveFaceCluster(null)}
                   className={cn(
-                    "flex items-center gap-2 flex-shrink-0 rounded-full pr-3 transition-all",
-                    activeFaceCluster === cluster.id
-                      ? "bg-primary/20 ring-2 ring-primary"
-                      : "bg-muted hover:bg-muted/80"
+                    "flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors",
+                    !activeFaceCluster
+                      ? "bg-foreground text-background"
+                      : "bg-muted hover:bg-muted/70 text-muted-foreground"
                   )}
                 >
-                  {cluster.representative_image && cluster.representative_bbox ? (
-                    <FaceThumbnail
-                      imageUrl={cluster.representative_image.original_url}
-                      bbox={cluster.representative_bbox}
-                      size={32}
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-muted-foreground/20 flex items-center justify-center">
-                      <ScanFace className="w-4 h-4" />
-                    </div>
-                  )}
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {cluster.face_count}
-                  </Badge>
+                  All
                 </button>
-              ))}
+                {faceClusters.map((cluster: any) => (
+                  <button
+                    key={cluster.id}
+                    onClick={() => setActiveFaceCluster(
+                      activeFaceCluster === cluster.id ? null : cluster.id
+                    )}
+                    className={cn(
+                      "flex items-center gap-2 flex-shrink-0 rounded-full pr-3 p-0.5 transition-all",
+                      activeFaceCluster === cluster.id
+                        ? "aura-ai-border bg-muted"
+                        : "bg-muted hover:bg-muted/70"
+                    )}
+                  >
+                    {cluster.representative_image && cluster.representative_bbox ? (
+                      <FaceThumbnail
+                        imageUrl={cluster.representative_image.original_url}
+                        bbox={cluster.representative_bbox}
+                        size={32}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-muted-foreground/20 flex items-center justify-center">
+                        <ScanFace className="w-4 h-4" />
+                      </div>
+                    )}
+                    <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0">
+                      {cluster.face_count}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -565,33 +553,38 @@ export default function ClientGalleryPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            transition={{ duration: 0.2, ease: PRISM_EASE }}
+            className={cn(
+              "fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4",
+              darkMode ? "dark" : "light"
+            )}
             onClick={() => setShowFeedbackModal(null)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ duration: 0.3, ease: PRISM_EASE }}
               className="w-full max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-2xl">
+              <div className="surface-2 rounded-3xl p-6 border border-border/60">
                 {feedbackSubmitted ? (
                   <div className="text-center py-8">
-                    <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-                      <Check className="w-8 h-8 text-green-600 dark:text-green-400" />
+                    <div className="w-16 h-16 rounded-2xl bg-secondary/15 flex items-center justify-center mx-auto mb-4">
+                      <Check className="w-8 h-8 text-secondary" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Thank you!</h3>
-                    <p className="text-gray-500 dark:text-gray-400">Your feedback has been submitted.</p>
+                    <h3 className="font-display text-lg font-semibold text-foreground">Thank you!</h3>
+                    <p className="text-muted-foreground">Your feedback has been submitted.</p>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                          <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                        <div className="w-10 h-10 rounded-2xl bg-muted flex items-center justify-center">
+                          <MessageSquare className="w-5 h-5 text-foreground" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Feedback</h3>
+                        <h3 className="font-display text-lg font-semibold text-foreground">Add feedback</h3>
                       </div>
                       <button
                         onClick={() => setShowFeedbackModal(null)}
@@ -600,24 +593,24 @@ export default function ClientGalleryPage() {
                         <X className="w-5 h-5 text-muted-foreground" />
                       </button>
                     </div>
-                    
+
                     <Textarea
                       placeholder="Share your thoughts about this image..."
                       value={feedback}
                       onChange={(e) => setFeedback(e.target.value)}
-                      className="min-h-[120px] bg-muted border-border"
+                      className="min-h-[120px] rounded-2xl bg-muted/60 border-border"
                     />
-                    
+
                     <div className="flex gap-3 mt-4">
                       <Button
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 rounded-full"
                         onClick={() => setShowFeedbackModal(null)}
                       >
                         Cancel
                       </Button>
                       <Button
-                        className="flex-1 gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+                        className="flex-1 gap-2 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
                         onClick={() => {
                           if (feedback.trim() && showFeedbackModal) {
                             feedbackMutation.mutate({ imageId: showFeedbackModal, feedbackText: feedback });

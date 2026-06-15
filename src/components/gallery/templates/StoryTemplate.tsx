@@ -1,15 +1,24 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Heart, Download } from "lucide-react";
+import { Heart, Download, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TemplateProps } from "./types";
 import { GalleryLightbox } from "./GalleryLightbox";
 import { CategoryNav } from "./CategoryNav";
+import { useDominantColor } from "@/hooks/useDominantColor";
 
+const EASE = [0.2, 0, 0, 1] as const;
+
+/**
+ * STORY — PRISM. A full-screen, vertically snapping photo story. Chrome floats
+ * as Material tonal pills (title fades on scroll, persistent like/download for
+ * the active frame, a Roboto-Mono counter). Accents tint from the photography.
+ */
 export function StoryTemplate({
   galleryName,
   description,
   images,
+  heroImage,
   darkMode,
   downloadEnabled,
   onLike,
@@ -23,9 +32,11 @@ export function StoryTemplate({
   const [headerOpacity, setHeaderOpacity] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const bgClass = darkMode ? "bg-black" : "bg-white";
-  const textClass = darkMode ? "text-white" : "text-gray-900";
-  const mutedClass = darkMode ? "text-white/40" : "text-gray-400";
+  const sampleUrl = heroImage || images[0]?.original_url;
+  const dynamic = useDominantColor(sampleUrl);
+  const dynamicStyle = dynamic
+    ? ({ "--dynamic-primary": dynamic } as React.CSSProperties)
+    : undefined;
 
   // Track scroll for header fade and visible section
   useEffect(() => {
@@ -58,16 +69,32 @@ export function StoryTemplate({
     };
   }, [images]);
 
+  const floatCtrl =
+    "p-3 rounded-full backdrop-blur-md border border-white/15 transition-colors bg-white/10 text-white hover:bg-white/20";
+
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden relative", bgClass, textClass)}>
+    <div
+      className={cn(
+        "h-screen flex flex-col overflow-hidden relative bg-background text-foreground",
+        darkMode ? "dark" : "light"
+      )}
+      style={dynamicStyle}
+    >
+      {/* Top scrim so floating chrome stays legible over any photo */}
+      <div className="pointer-events-none absolute top-0 left-0 right-0 h-40 z-10 bg-gradient-to-b from-black/50 to-transparent" />
+
       {/* Fixed Header */}
       <div
         className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between transition-opacity duration-300"
         style={{ opacity: headerOpacity, pointerEvents: headerOpacity < 0.3 ? "none" : "auto" }}
       >
         <div>
-          <h1 className="text-lg font-medium tracking-tight">{galleryName}</h1>
-          {description && <p className={cn("text-xs", mutedClass)}>{description}</p>}
+          <h1 className="font-display text-lg font-semibold tracking-tight text-white drop-shadow">
+            {galleryName}
+          </h1>
+          {description && (
+            <p className="text-xs text-white/70 drop-shadow">{description}</p>
+          )}
         </div>
       </div>
 
@@ -84,23 +111,32 @@ export function StoryTemplate({
 
       {/* Fixed Counter */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
-        <span className={cn("text-sm tabular-nums tracking-widest", mutedClass)}>
-          {visibleIndex + 1} / {images.length}
+        <span className="font-mono text-xs tabular-nums tracking-widest text-white/80 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-md">
+          {String(visibleIndex + 1).padStart(2, "0")} / {String(images.length).padStart(2, "0")}
         </span>
       </div>
 
-      {/* Fixed Like Button */}
+      {/* Bottom scrim */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-32 z-10 bg-gradient-to-t from-black/50 to-transparent" />
+
+      {/* Fixed Like / Download for the active frame */}
       {images[visibleIndex] && (
         <div className="absolute bottom-6 right-6 z-20 flex items-center gap-2">
+          {images[visibleIndex].ai_rating != null && images[visibleIndex].ai_rating! > 0 && (
+            <div className="flex items-center gap-1 px-3 py-2 rounded-full bg-black/30 backdrop-blur-md border border-white/15">
+              <Star className="w-3.5 h-3.5 text-rating fill-rating" />
+              <span className="font-mono text-xs text-white/90 tabular-nums">
+                {images[visibleIndex].ai_rating!.toFixed(1)}
+              </span>
+            </div>
+          )}
           <button
             onClick={() => onLike(images[visibleIndex].id)}
             className={cn(
-              "p-3 rounded-full backdrop-blur-sm transition-all",
+              "p-3 rounded-full backdrop-blur-md border transition-colors",
               images[visibleIndex].is_liked
-                ? "bg-red-500 text-white"
-                : darkMode
-                  ? "bg-white/10 text-white hover:bg-white/20"
-                  : "bg-black/10 text-gray-900 hover:bg-black/20"
+                ? "bg-destructive text-destructive-foreground border-transparent"
+                : "bg-white/10 text-white border-white/15 hover:bg-white/20"
             )}
           >
             <Heart className={cn("w-5 h-5", images[visibleIndex].is_liked && "fill-current")} />
@@ -108,12 +144,7 @@ export function StoryTemplate({
           {downloadEnabled && (
             <button
               onClick={() => onDownload(images[visibleIndex].id)}
-              className={cn(
-                "p-3 rounded-full backdrop-blur-sm transition-colors",
-                darkMode
-                  ? "bg-white/10 text-white hover:bg-white/20"
-                  : "bg-black/10 text-gray-900 hover:bg-black/20"
-              )}
+              className={floatCtrl}
             >
               <Download className="w-5 h-5" />
             </button>
@@ -124,7 +155,7 @@ export function StoryTemplate({
       {/* Scrollable Sections */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto snap-y snap-mandatory scrollbar-hide"
+        className="flex-1 overflow-y-auto snap-y snap-mandatory scrollbar-hide bg-black"
       >
         {images.map((image, index) => (
           <div
@@ -137,7 +168,7 @@ export function StoryTemplate({
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: 0.6, ease: EASE }}
               src={image.original_url}
               alt={image.filename}
               loading={index < 2 ? "eager" : "lazy"}

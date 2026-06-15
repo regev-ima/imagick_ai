@@ -65,22 +65,32 @@ export default function TipsSuggestionsSection({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.7 }}
     >
-      <Card className="glass-card border-border/50 overflow-hidden relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none" />
-        <CardContent className="p-5 flex items-center gap-5 relative">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <Lightbulb className="w-6 h-6 text-primary" />
+      <Card className="glass-card relative overflow-hidden rounded-3xl border-border/60">
+        {/* Suggestion = an AI moment → soft Gemini spectral wash */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            background:
+              "radial-gradient(120% 90% at 0% 0%, hsl(var(--neon-blue) / 0.08), transparent 55%), radial-gradient(120% 90% at 100% 100%, hsl(var(--neon-pink) / 0.07), transparent 55%)",
+          }}
+        />
+        <CardContent className="relative flex items-center gap-5 p-5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[image:var(--gradient-primary)] text-white shadow-[0_0_22px_-6px_hsl(var(--glow-primary)/0.7)]">
+            <Lightbulb className="h-6 w-6" />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Icon className="w-4 h-4 text-secondary" />
-              <h3 className="font-semibold text-sm">{tip.title}</h3>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="aura-microlabel inline-flex items-center gap-1.5">
+                <Icon className="h-3 w-3 text-primary" /> Aura suggests
+              </span>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
+            <h3 className="text-sm font-semibold">{tip.title}</h3>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
               {tip.description}
             </p>
           </div>
-          <Button variant="outline" size="sm" asChild className="shrink-0">
+          <Button variant="outline" size="sm" asChild className="shrink-0 rounded-full">
             <Link to={tip.to}>{tip.cta}</Link>
           </Button>
         </CardContent>

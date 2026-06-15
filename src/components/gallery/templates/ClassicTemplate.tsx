@@ -1,11 +1,19 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, Download } from "lucide-react";
+import { Heart, Download, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TemplateProps } from "./types";
 import { GalleryLightbox } from "./GalleryLightbox";
 import { CategoryNav } from "./CategoryNav";
+import { useDominantColor } from "@/hooks/useDominantColor";
 
+const EASE = [0.2, 0, 0, 1] as const;
+
+/**
+ * CLASSIC — PRISM. A timeless gallery: a full-bleed cover with a centered title
+ * over a dynamic-color wash, then a composed uniform 3:2 grid. Calm, formal,
+ * Figtree display type, hairline rules, Google-red likes.
+ */
 export function ClassicTemplate({
   galleryName,
   description,
@@ -21,42 +29,37 @@ export function ClassicTemplate({
 }: TemplateProps) {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
-  const bgClass = darkMode ? "bg-[#0c0c0c]" : "bg-white";
-  const textClass = darkMode ? "text-white" : "text-gray-900";
-  const mutedClass = darkMode ? "text-gray-500" : "text-gray-400";
-  const borderClass = darkMode ? "border-white/10" : "border-gray-200";
-
   const coverImage = heroImage || (images.length > 0 ? images[0].original_url : null);
+  const dynamic = useDominantColor(coverImage);
+  const dynamicStyle = dynamic
+    ? ({ "--dynamic-primary": dynamic } as React.CSSProperties)
+    : undefined;
 
   return (
-    <div className={cn("min-h-screen", bgClass, textClass)}>
+    <div
+      className={cn("min-h-screen bg-background text-foreground", darkMode ? "dark" : "light")}
+      style={dynamicStyle}
+    >
       {/* Full-height Hero Cover */}
       {coverImage && (
         <div className="relative h-[90vh] overflow-hidden">
-          <img
-            src={coverImage}
-            alt={galleryName}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/10" />
+          <img src={coverImage} alt={galleryName} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--dynamic-primary)/0.4)] via-black/30 to-black/20" />
           <div className="absolute inset-0 flex items-center justify-center text-center px-8">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
+              transition={{ duration: 0.8, ease: EASE }}
             >
-              <h1
-                className="text-5xl lg:text-7xl font-light text-white tracking-wide mb-4"
-                style={{ fontFamily: "'Playfair Display', serif" }}
-              >
+              <h1 className="font-display text-5xl lg:text-7xl font-semibold text-white tracking-tight mb-4">
                 {galleryName}
               </h1>
               {description && (
-                <p className="text-lg text-white/70 max-w-2xl mx-auto leading-relaxed">
+                <p className="text-lg text-white/80 max-w-2xl mx-auto leading-relaxed">
                   {description}
                 </p>
               )}
-              <p className="text-sm text-white/40 mt-6 tracking-[0.3em] uppercase">
+              <p className="font-mono text-xs text-white/60 mt-6 tracking-[0.3em] uppercase">
                 {images.length} photographs
               </p>
             </motion.div>
@@ -66,29 +69,23 @@ export function ClassicTemplate({
 
       {/* No-cover header */}
       {!coverImage && (
-        <header className={cn("py-20 px-8 text-center border-b", borderClass)}>
-          <h1
-            className="text-5xl lg:text-6xl font-light tracking-wide mb-4"
-            style={{ fontFamily: "'Playfair Display', serif" }}
-          >
+        <header className="py-20 px-8 text-center border-b border-border/60">
+          <h1 className="font-display text-5xl lg:text-6xl font-semibold tracking-tight mb-4">
             {galleryName}
           </h1>
           {description && (
-            <p className={cn("text-lg max-w-2xl mx-auto leading-relaxed", mutedClass)}>
+            <p className="text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
               {description}
             </p>
           )}
-          <p className={cn("text-sm mt-6 tracking-[0.3em] uppercase", mutedClass)}>
+          <p className="font-mono text-xs mt-6 tracking-[0.3em] uppercase text-muted-foreground">
             {images.length} photographs
           </p>
         </header>
       )}
 
-      {/* Separator */}
-      <div className={cn("border-t mx-8 lg:mx-16", borderClass)} />
-
       {/* Category Nav */}
-      <div className="max-w-7xl mx-auto px-6 pt-6">
+      <div className="max-w-7xl mx-auto px-6 pt-8">
         <CategoryNav
           categories={categories}
           activeCategory={activeCategory}
@@ -106,8 +103,8 @@ export function ClassicTemplate({
               key={image.id}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(index * 0.03, 0.5) }}
-              className="relative group cursor-pointer overflow-hidden rounded-sm"
+              transition={{ delay: Math.min(index * 0.03, 0.5), duration: 0.5, ease: EASE }}
+              className="relative group cursor-pointer overflow-hidden rounded-2xl surface-1 border border-border/60"
               onClick={() => setLightboxImage(image.id)}
             >
               <img
@@ -116,7 +113,17 @@ export function ClassicTemplate({
                 loading={index < 6 ? "eager" : "lazy"}
                 className="w-full aspect-[3/2] object-cover transition-transform duration-500 group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors" />
+
+              {/* AI rating */}
+              {image.ai_rating != null && image.ai_rating > 0 && (
+                <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full bg-black/40 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Star className="w-3 h-3 text-rating fill-rating" />
+                  <span className="font-mono text-[10px] text-white tabular-nums">
+                    {image.ai_rating.toFixed(1)}
+                  </span>
+                </div>
+              )}
 
               {/* Hover actions */}
               <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -126,9 +133,9 @@ export function ClassicTemplate({
                     onLike(image.id);
                   }}
                   className={cn(
-                    "p-2 rounded-full backdrop-blur-sm transition-colors",
+                    "p-2.5 rounded-full backdrop-blur-md transition-colors",
                     image.is_liked
-                      ? "bg-red-500/80 text-white"
+                      ? "bg-destructive text-destructive-foreground"
                       : "bg-white/20 text-white hover:bg-white/30"
                   )}
                 >
@@ -140,7 +147,7 @@ export function ClassicTemplate({
                       e.stopPropagation();
                       onDownload(image.id);
                     }}
-                    className="p-2 rounded-full bg-white/20 text-white backdrop-blur-sm hover:bg-white/30 transition-colors"
+                    className="p-2.5 rounded-full bg-white/20 text-white backdrop-blur-md hover:bg-white/30 transition-colors"
                   >
                     <Download className="w-5 h-5" />
                   </button>
@@ -149,7 +156,7 @@ export function ClassicTemplate({
 
               {image.is_liked && (
                 <div className="absolute top-3 right-3">
-                  <Heart className="w-4 h-4 text-red-500 fill-current" />
+                  <Heart className="w-4 h-4 text-destructive fill-destructive drop-shadow" />
                 </div>
               )}
             </motion.div>
@@ -158,8 +165,8 @@ export function ClassicTemplate({
       </div>
 
       {/* Footer */}
-      <footer className={cn("py-10 text-center border-t", borderClass)}>
-        <p className={cn("text-xs tracking-widest uppercase", mutedClass)}>
+      <footer className="py-10 text-center border-t border-border/60">
+        <p className="font-mono text-[11px] tracking-widest uppercase text-muted-foreground">
           &copy; {new Date().getFullYear()} &middot; {galleryName}
         </p>
       </footer>
