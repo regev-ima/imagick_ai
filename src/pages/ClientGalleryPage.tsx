@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock,
@@ -31,6 +31,7 @@ import { EditorialTemplate } from "@/components/gallery/templates/EditorialTempl
 import { ClassicTemplate } from "@/components/gallery/templates/ClassicTemplate";
 import { FilmstripTemplate } from "@/components/gallery/templates/FilmstripTemplate";
 import { StoryTemplate } from "@/components/gallery/templates/StoryTemplate";
+import { LightboxFeedbackProvider } from "@/components/gallery/templates/GalleryLightbox";
 import { ScanFace } from "lucide-react";
 import { FaceThumbnail } from "@/components/gallery/FaceThumbnail";
 import { Badge } from "@/components/ui/badge";
@@ -80,7 +81,6 @@ interface Gallery {
 
 export default function ClientGalleryPage() {
   const { galleryId } = useParams();
-  const queryClient = useQueryClient();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [password, setPassword] = useState("");
@@ -93,6 +93,22 @@ export default function ClientGalleryPage() {
   const [activeFaceCluster, setActiveFaceCluster] = useState<string | null>(null);
 
   const [passwordError, setPasswordError] = useState("");
+
+  // The client's OWN likes, persisted per-device. The DB's gallery_images.is_liked
+  // is the PHOTOGRAPHER's global flag, so we track the client's likes locally and
+  // override is_liked when rendering — this keeps the heart filled after refetch
+  // and across reloads on this device.
+  const [clientLikes, setClientLikes] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = window.localStorage.getItem(`imagick-client-likes-${galleryId}`);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? new Set(parsed as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   // Fetch gallery by client_link using secure function (bypasses RLS safely)
   const { data: gallery, isLoading: galleryLoading, error: galleryError } = useQuery({
@@ -169,7 +185,10 @@ export default function ClientGalleryPage() {
     }
   }, [gallery]);
 
-  // Toggle like mutation - only record interaction, don't directly update gallery_images
+  // Toggle like mutation - only record interaction, don't directly update gallery_images.
+  // We deliberately do NOT invalidate ["client-gallery-images"] here: that query returns
+  // the PHOTOGRAPHER's global is_liked flag (unchanged by this insert), so refetching would
+  // flip the client's heart back. The client's own like is tracked in `clientLikes` instead.
   const likeMutation = useMutation({
     mutationFn: async ({ imageId, isLiked }: { imageId: string; isLiked: boolean }) => {
       // Record the interaction (client_interactions table allows public inserts for shared galleries)
@@ -179,9 +198,6 @@ export default function ClientGalleryPage() {
         interaction_type: isLiked ? "like" : "unlike",
         client_name: clientName || null
       });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["client-gallery-images"] });
     }
   });
 
@@ -256,10 +272,25 @@ export default function ClientGalleryPage() {
   };
 
   const handleLike = (imageId: string) => {
-    const image = images.find(img => img.id === imageId);
-    if (image) {
-      likeMutation.mutate({ imageId, isLiked: !image.is_liked });
-    }
+    // Toggle against the CLIENT's own likes (not the photographer's is_liked flag),
+    // optimistically and persisted per-device, so the heart stays filled across refetch/reload.
+    const next = !clientLikes.has(imageId);
+    setClientLikes((prev) => {
+      const updated = new Set(prev);
+      if (next) updated.add(imageId);
+      else updated.delete(imageId);
+      try {
+        window.localStorage.setItem(
+          `imagick-client-likes-${galleryId}`,
+          JSON.stringify(Array.from(updated))
+        );
+      } catch {
+        // Ignore storage failures (private mode, quota) — in-memory state still works.
+      }
+      return updated;
+    });
+    likeMutation.mutate({ imageId, isLiked: next });
+    toast(next ? "Added to your favorites" : "Removed from favorites");
   };
 
   const handleDownload = async (imageId: string) => {
@@ -306,15 +337,22 @@ export default function ClientGalleryPage() {
     return result;
   }, [images, activeCategory, activeFaceCluster, faceClusterImageIds]);
 
-  // Prepare images for templates — use compressed/preview URLs so RAW files display correctly
-  const templateImages = filteredImages.map(img => ({
-    id: img.id,
-    filename: img.filename,
-    original_url: getPreviewUrl(img.original_url),
-    is_liked: img.is_liked,
-    ai_rating: img.ai_rating,
-    culling_label: img.culling_label
-  }));
+  // Prepare images for templates — use compressed/preview URLs so RAW files display correctly.
+  // is_liked is overridden with the CLIENT's own likes so the heart reflects what THIS client
+  // tapped (the DB's is_liked is the photographer's global flag). The same list feeds the
+  // template grid AND the lightbox, so both stay in sync.
+  const templateImages = useMemo(
+    () =>
+      filteredImages.map(img => ({
+        id: img.id,
+        filename: img.filename,
+        original_url: getPreviewUrl(img.original_url),
+        is_liked: clientLikes.has(img.id),
+        ai_rating: img.ai_rating,
+        culling_label: img.culling_label
+      })),
+    [filteredImages, clientLikes]
+  );
 
   const template = gallery?.template || "elegant";
   const darkMode = gallery?.client_dark_mode ?? true;
@@ -376,11 +414,11 @@ export default function ClientGalleryPage() {
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="text-left">
                 <label className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 block">
-                  Your name
+                  Your name (optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="Enter your name"
+                  placeholder="Enter your name (optional)"
                   value={clientName}
                   maxLength={100}
                   onChange={(e) => setClientName(e.target.value.replace(/[<>]/g, ''))}
@@ -562,7 +600,12 @@ export default function ClientGalleryPage() {
         </div>
       )}
 
-      {renderTemplate()}
+      {/* Provide the feedback handler to the lightbox (rendered inside the template) so the
+          "Leave a note" button opens the existing styled modal for that photo. This wires the
+          modal without changing the locked TemplateProps contract. */}
+      <LightboxFeedbackProvider onFeedback={(id) => setShowFeedbackModal(id)}>
+        {renderTemplate()}
+      </LightboxFeedbackProvider>
 
       {/* Feedback Modal - Overlay on top of templates */}
       <AnimatePresence>

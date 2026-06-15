@@ -34,8 +34,10 @@ export function EditorialTemplate({
   const gridImages = images.slice(5);
 
   const ImageOverlay = ({ image }: { image: (typeof images)[0] }) => (
-    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-      <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+    // Actions reveal on hover, but stay visible on touch devices (no hover) so the
+    // per-photo like/download remain discoverable.
+    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 [@media(hover:none)]:bg-black/25 transition-colors flex items-center justify-center">
+      <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
         <button
           onClick={(e) => {
             e.stopPropagation();

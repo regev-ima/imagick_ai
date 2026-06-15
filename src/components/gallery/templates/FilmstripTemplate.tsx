@@ -120,7 +120,9 @@ export function FilmstripTemplate({
                 </div>
               )}
 
-              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Actions — kept visible on touch devices (no hover) so the per-photo
+                  like/download remain discoverable. */}
+              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

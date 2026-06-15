@@ -130,9 +130,10 @@ export function ModernTemplate({
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               />
 
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Overlay — actions reveal on hover, but stay visible on touch devices
+                  (no hover) so the per-photo like/download remain discoverable. */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 [@media(hover:none)]:bg-black/30 transition-colors flex items-center justify-center">
+                <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
