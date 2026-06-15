@@ -462,76 +462,91 @@ export default function CreateGalleryPage() {
   const busy = isUploading || isTransferring;
 
   return (
-    <div className="relative min-h-full px-4 py-6 lg:px-8 lg:py-10">
+    <div className="relative min-h-full px-4 py-8 lg:px-8 lg:py-12">
       <div className="relative mx-auto max-w-3xl">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/galleries")} aria-label="Back to galleries">
-            <ArrowLeft className="h-5 w-5" />
+        {/* Folio header — back mark + running title */}
+        <div className="flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/dashboard/galleries")}
+            aria-label="Back to galleries"
+            className="-ml-2 gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="caption">Galleries</span>
           </Button>
-          <div className="flex items-center gap-3">
-            <Orb className="h-9 w-9" />
-            <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight">New gallery</h1>
-              <p className="text-sm text-muted-foreground">I'll cull, edit and prep your shoot. Four quick steps.</p>
-            </div>
-          </div>
+          <span className="caption hidden sm:inline">New gallery · No. {String(active.number).padStart(2, "0")} / 04</span>
         </div>
 
-        {/* Stepper — clean segmented progress */}
-        <div className="mt-8 grid grid-cols-4 gap-2">
-          {steps.map((step) => {
-            const isActive = currentStep === step.number;
-            const isDone = currentStep > step.number || completedSteps.has(step.number);
-            return (
-              <button
-                key={step.number}
-                type="button"
-                disabled={!isDone || busy}
-                onClick={() => isDone && setCurrentStep(step.number)}
-                className="group text-left"
-              >
-                <div
+        {/* Editorial stepper — a mono numbered index on a hairline */}
+        <div className="mt-6">
+          <hr className="aura-hairline" />
+          <div className="-mt-px flex flex-wrap items-stretch">
+            {steps.map((step, i) => {
+              const isActive = currentStep === step.number;
+              const isDone = currentStep > step.number || completedSteps.has(step.number);
+              const reachable = isDone;
+              return (
+                <button
+                  key={step.number}
+                  type="button"
+                  disabled={!reachable || busy}
+                  onClick={() => reachable && setCurrentStep(step.number)}
                   className={cn(
-                    "h-1 rounded-full transition-colors duration-300",
-                    isActive || isDone ? "bg-[image:var(--gradient-primary)]" : "bg-muted",
+                    "group relative flex items-center gap-2 py-3 pr-5",
+                    i > 0 && "pl-5",
+                    reachable ? "cursor-pointer" : "cursor-default",
                   )}
-                />
-                <div className="mt-2.5 flex items-center gap-2">
+                >
+                  {/* active vermilion tick on the rule */}
                   <span
                     className={cn(
-                      "grid h-5 w-5 shrink-0 place-items-center rounded-full font-mono text-[10px] transition-colors",
-                      isDone
-                        ? "bg-primary/15 text-primary"
-                        : isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground",
+                      "absolute left-0 top-0 h-px w-full -translate-y-px transition-colors",
+                      isActive ? "bg-accent" : "bg-transparent",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "folio text-sm transition-colors",
+                      isActive ? "text-accent" : isDone ? "text-foreground" : "text-muted-foreground/60",
                     )}
                   >
-                    {isDone ? <Check className="h-3 w-3" /> : step.number}
+                    {String(step.number).padStart(2, "0")}
                   </span>
                   <span
                     className={cn(
-                      "truncate font-mono text-[11px] uppercase tracking-[0.12em]",
-                      isActive ? "text-foreground" : "text-muted-foreground",
+                      "caption transition-colors",
+                      isActive
+                        ? "text-foreground"
+                        : isDone
+                          ? "text-muted-foreground group-hover:text-foreground"
+                          : "text-muted-foreground/55",
                     )}
                   >
                     {step.title}
                   </span>
-                </div>
-              </button>
-            );
-          })}
+                  {isDone && !isActive && <Check className="h-3 w-3 text-accent" />}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Aura's prompt for this step */}
-        <div className="mt-8 mb-5">
-          <h2 className="font-display text-xl font-semibold tracking-tight lg:text-2xl">{active.ask}</h2>
-          <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-muted-foreground">{active.say}</p>
+        {/* Masthead — Aura seal + Fraunces ask + helper line */}
+        <div className="mb-7 mt-9 flex items-start gap-4">
+          <Orb className="mt-1 h-10 w-10 shrink-0" />
+          <div className="min-w-0">
+            <span className="caption text-accent">Aura</span>
+            <h1 className="mt-1 font-display text-3xl font-semibold leading-[1.05] tracking-tight lg:text-4xl">
+              {active.ask}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{active.say}</p>
+          </div>
         </div>
 
-        {/* Step card */}
-        <div className="rounded-3xl border border-border/60 bg-card/55 p-5 backdrop-blur-xl lg:p-7">
+        {/* Step plate */}
+        <div className="plate rounded-md p-5 lg:p-8">
           <AnimatePresence mode="wait">
             {/* Step 1: Details */}
             {currentStep === 1 && (
@@ -540,11 +555,11 @@ export default function CreateGalleryPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-                className="space-y-6"
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                className="space-y-8"
               >
                 <div>
-                  <label className="aura-microlabel mb-2 block">Gallery name</label>
+                  <label className="aura-microlabel mb-2.5 block">Gallery name</label>
                   <Input
                     placeholder="Cohen Wedding, June 2026"
                     value={galleryName}
@@ -554,18 +569,21 @@ export default function CreateGalleryPage() {
                 </div>
 
                 <div>
-                  <label className="aura-microlabel mb-2 block">Notes for me (optional)</label>
+                  <label className="aura-microlabel mb-2.5 block">Notes for me (optional)</label>
                   <Textarea
                     placeholder="Anything I should know about this shoot?"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="min-h-[90px] rounded-2xl"
+                    className="min-h-[90px]"
                   />
                 </div>
 
                 <div>
-                  <label className="aura-microlabel mb-3 block">What kind of shoot?</label>
-                  <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
+                  <div className="mb-4 flex items-baseline justify-between border-b border-border pb-2">
+                    <label className="aura-microlabel">What kind of shoot?</label>
+                    <span className="folio text-xs text-muted-foreground/70">{String(galleryTypes.length).padStart(2, "0")}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-4">
                     {galleryTypes.map((type) => {
                       const selected = galleryType === type.value;
                       return (
@@ -574,13 +592,13 @@ export default function CreateGalleryPage() {
                           type="button"
                           onClick={() => setGalleryType(type.value)}
                           className={cn(
-                            "flex flex-col items-center gap-2 rounded-2xl border p-3.5 transition-[border-color,background-color,transform] duration-150 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]",
-                            selected
-                              ? "border-primary/60 bg-primary/10 shadow-[0_0_24px_-10px_hsl(var(--glow-primary)/0.8)]"
-                              : "border-border/60 bg-background/40 hover:border-primary/40",
+                            "relative flex flex-col items-center gap-2.5 bg-card p-4 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                            selected ? "bg-accent/[0.06]" : "hover:bg-muted/60",
                           )}
                         >
-                          <type.icon className={cn("h-5 w-5 transition-colors", selected ? "text-primary" : "text-muted-foreground")} />
+                          {/* active = vermilion keyline, NOT a glowing fill */}
+                          {selected && <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-accent" />}
+                          <type.icon className={cn("h-5 w-5 transition-colors", selected ? "text-accent" : "text-foreground/70")} strokeWidth={1.5} />
                           <span className={cn("text-xs font-medium transition-colors", selected ? "text-foreground" : "text-muted-foreground")}>
                             {type.label}
                           </span>
@@ -599,31 +617,31 @@ export default function CreateGalleryPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-                className="space-y-5"
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                className="space-y-6"
               >
-                {/* Tabs */}
-                <div className="inline-flex items-center gap-1 rounded-full bg-muted/70 p-1">
+                {/* Tabs — editorial segmented control */}
+                <div className="inline-flex items-center rounded-md border border-border bg-card p-0.5">
                   {([["public", "Public looks", Globe], ["yours", "Your looks", Sparkles]] as const).map(([key, label, Icon]) => (
                     <button
                       key={key}
                       type="button"
                       onClick={() => setStyleTab(key)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
-                        styleTab === key ? "bg-background text-foreground shadow-[0_0_18px_-8px_hsl(var(--glow-primary)/0.6)]" : "text-muted-foreground hover:text-foreground",
+                        "inline-flex items-center gap-1.5 rounded-[5px] px-4 py-1.5 text-xs font-semibold transition-colors",
+                        styleTab === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      <Icon className="h-3.5 w-3.5" />
+                      <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
                       {label}
                     </button>
                   ))}
                 </div>
 
-                {/* Selected bar */}
-                <div className="rounded-2xl border border-border/60 bg-background/40 p-3">
+                {/* Selected index — chips with cover + count */}
+                <div className="border-y border-border py-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-mono text-[11px] text-muted-foreground">{selectedStyles.length}/3</span>
+                    <span className="folio shrink-0 text-sm text-accent">{String(selectedStyles.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 03</span></span>
                     {selectedStyles.length === 0 ? (
                       <span className="text-sm text-muted-foreground">Nothing picked yet. Choose a look below.</span>
                     ) : (
@@ -637,18 +655,19 @@ export default function CreateGalleryPage() {
                               <motion.div
                                 key={id}
                                 layout
-                                initial={{ scale: 0.8, opacity: 0 }}
+                                initial={{ scale: 0.9, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0.8, opacity: 0 }}
-                                className="flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 py-1 pl-1 pr-2"
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
+                                className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/[0.06] py-1 pl-1 pr-2"
                               >
                                 {chipCover ? (
                                   <img src={getThumbnailUrl(chipCover)} alt="" className="h-6 w-6 rounded-full object-cover" />
                                 ) : (
-                                  <div className="h-6 w-6 rounded-full bg-[image:var(--gradient-primary)]" />
+                                  <div className="h-6 w-6 rounded-full bg-accent/20" />
                                 )}
                                 <span className="max-w-[80px] truncate text-xs font-medium">{style.name}</span>
-                                <button onClick={() => toggleStyle(id)} className="grid h-4 w-4 place-items-center rounded-full transition-colors hover:bg-primary/20">
+                                <button onClick={() => toggleStyle(id)} className="grid h-4 w-4 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent/15 hover:text-accent">
                                   <X className="h-3 w-3" />
                                 </button>
                               </motion.div>
@@ -667,15 +686,15 @@ export default function CreateGalleryPage() {
                   });
 
                   return filteredStyles.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <Palette className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                      <p className="text-muted-foreground">
+                    <div className="border-t border-border py-14 text-center">
+                      <Orb className="mx-auto mb-4 h-9 w-9" />
+                      <p className="font-display text-lg text-foreground">
                         {styleTab === "yours" ? "You haven't trained a look yet." : "No public looks available."}
                       </p>
                       {styleTab === "yours" && (
                         <>
-                          <p className="mt-1 text-sm text-muted-foreground">Train one and I'll match your editing exactly.</p>
-                          <Button variant="glow" size="sm" className="mt-4 gap-1.5" onClick={() => navigate("/dashboard/styles/new")}>
+                          <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">Train one and I'll match your editing exactly.</p>
+                          <Button variant="glow" size="sm" className="mt-5 gap-1.5" onClick={() => navigate("/dashboard/styles/new")}>
                             <Plus className="h-3.5 w-3.5" />
                             Train a look
                           </Button>
@@ -683,7 +702,7 @@ export default function CreateGalleryPage() {
                       )}
                     </div>
                   ) : (
-                    <ScrollArea className="h-[340px] pr-2">
+                    <ScrollArea className="h-[360px] pr-2">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {filteredStyles.map((style) => {
                           const coverUrl = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined) || style.thumbnail_url || undefined;
@@ -703,29 +722,29 @@ export default function CreateGalleryPage() {
                                 }
                               }}
                               className={cn(
-                                "group flex cursor-pointer items-center gap-3 rounded-2xl border p-2.5 transition-[border-color,box-shadow] duration-150",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                isSelected
-                                  ? "border-primary/60 shadow-[0_0_28px_-12px_hsl(var(--glow-primary)/0.7)]"
-                                  : "border-border/60 hover:border-primary/40",
+                                "plate group relative flex cursor-pointer items-center gap-3.5 rounded-md p-2.5 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent",
+                                isSelected ? "bg-accent/[0.04]" : "hover:bg-muted/50",
                               )}
                             >
+                              {/* selected = vermilion keyline */}
+                              {isSelected && <span className="pointer-events-none absolute inset-0 rounded-md ring-1 ring-inset ring-accent" />}
                               {coverUrl ? (
-                                <img src={getThumbnailUrl(coverUrl)} alt={style.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                                <img src={getThumbnailUrl(coverUrl)} alt={style.name} className="plate-keyline h-16 w-16 shrink-0 rounded object-cover" />
                               ) : (
-                                <div className="h-16 w-16 shrink-0 rounded-xl bg-[image:var(--gradient-primary)] opacity-30" />
+                                <div className="plate-keyline h-16 w-16 shrink-0 rounded bg-muted" />
                               )}
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                  {style.is_preset ? <Palette className="h-3.5 w-3.5 shrink-0 text-primary" /> : <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                                  <span className="truncate text-sm font-semibold">{style.name}</span>
+                                  {style.is_preset ? <Palette className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.75} /> : <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.75} />}
+                                  <span className="truncate font-display text-base font-medium leading-tight">{style.name}</span>
                                 </div>
-                                {style.description && <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{style.description}</p>}
-                                <div className="mt-1 flex flex-wrap items-center gap-1">
-                                  {style.category && <Badge variant="secondary" className="h-4 px-1.5 py-0 text-[10px]">{style.category}</Badge>}
+                                {style.description && <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{style.description}</p>}
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                  {style.category && <span className="caption text-[0.625rem] tracking-[0.14em]">{style.category}</span>}
                                   {style.associated_tags?.slice(0, 2).map((tag) => (
-                                    <Badge key={tag} variant="outline" className="h-4 px-1.5 py-0 text-[10px]">{tag}</Badge>
+                                    <Badge key={tag} variant="outline" className="h-4 px-1.5 py-0 text-[10px] font-normal">{tag}</Badge>
                                   ))}
                                 </div>
                               </div>
@@ -736,12 +755,12 @@ export default function CreateGalleryPage() {
                                     e.stopPropagation();
                                     window.open(`/dashboard/styles/${style.id}`, "_blank");
                                   }}
-                                  className="grid h-8 w-8 place-items-center rounded-full bg-muted/50 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                  className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
                                 >
-                                  <Eye className="h-4 w-4 text-muted-foreground" />
+                                  <Eye className="h-4 w-4" />
                                 </button>
                                 {isSelected && (
-                                  <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground">
+                                  <span className="grid h-7 w-7 place-items-center rounded-full bg-accent text-accent-foreground">
                                     <Check className="h-4 w-4" />
                                   </span>
                                 )}
@@ -763,15 +782,15 @@ export default function CreateGalleryPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-                className="space-y-5"
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                className="space-y-6"
               >
-                <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 bg-background/40 p-5">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-4 border-y border-border py-5">
+                  <div className="flex items-center gap-3.5">
                     <Orb className="h-10 w-10 shrink-0" />
                     <div>
-                      <p className="font-medium">Let me cull this gallery</p>
-                      <p className="text-sm text-muted-foreground">I rank every frame before any editing, so you only pay to edit the keepers.</p>
+                      <p className="font-display text-lg font-medium leading-tight">Let me cull this gallery</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">I rank every frame before any editing, so you only pay to edit the keepers.</p>
                     </div>
                   </div>
                   <Switch checked={aiCulling} onCheckedChange={setAiCulling} />
@@ -783,17 +802,18 @@ export default function CreateGalleryPage() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
                       className="overflow-hidden"
                     >
-                      <div className="space-y-3 rounded-2xl border border-border/50 bg-background/30 p-4">
-                        <div className="flex items-center justify-between">
+                      <div className="space-y-4 rounded-md border border-border bg-card p-4">
+                        <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2">
-                            <Tag className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">What should I look for? ({selectedCategories.length}/20)</span>
+                            <Tag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                            <span className="text-sm font-medium">What should I look for?</span>
+                            <span className="folio text-xs text-accent">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                            <Globe className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
                             <Select value={cullingLanguage} onValueChange={(v) => handleLanguageChange(v as LanguageCode)}>
                               <SelectTrigger className="h-8 w-[140px] text-xs">
                                 <SelectValue />
@@ -846,12 +866,14 @@ export default function CreateGalleryPage() {
                                 onClick={() => toggleCategory(category)}
                                 disabled={locked}
                                 className={cn(
-                                  "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                                  on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80",
+                                  "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                                  on
+                                    ? "border-accent/50 bg-accent/[0.06] text-foreground"
+                                    : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground",
                                   locked && "cursor-not-allowed opacity-50",
                                 )}
                               >
-                                {on && <Check className="mr-1 inline h-3 w-3" />}
+                                {on && <Check className="mr-1 inline h-3 w-3 text-accent" />}
                                 {category}
                               </button>
                             );
@@ -877,7 +899,7 @@ export default function CreateGalleryPage() {
                 </AnimatePresence>
 
                 {!aiCulling && (
-                  <p className="py-2 text-center text-sm text-muted-foreground">
+                  <p className="py-2 text-center text-sm italic text-muted-foreground">
                     No problem. You can ask me to cull anytime from the editor.
                   </p>
                 )}
@@ -891,22 +913,25 @@ export default function CreateGalleryPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-                className="space-y-5"
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                className="space-y-6"
               >
-                <UploadSourceSelector
-                  value={uploadSource}
-                  onChange={(source) => {
-                    setUploadSource(source);
-                    if (source === "local") {
-                      setDriveFolderInfo(null);
-                      setDriveLinks([]);
-                    } else {
-                      uppy.cancelAll();
-                    }
-                  }}
-                  disabled={isUploading || isTransferring}
-                />
+                <div>
+                  <span className="aura-microlabel mb-2.5 block">Source</span>
+                  <UploadSourceSelector
+                    value={uploadSource}
+                    onChange={(source) => {
+                      setUploadSource(source);
+                      if (source === "local") {
+                        setDriveFolderInfo(null);
+                        setDriveLinks([]);
+                      } else {
+                        uppy.cancelAll();
+                      }
+                    }}
+                    disabled={isUploading || isTransferring}
+                  />
+                </div>
 
                 {uploadSource === "drive" && (
                   <GoogleDriveInput
@@ -939,22 +964,22 @@ export default function CreateGalleryPage() {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.3, ease: "easeOut" }}
-                          className="space-y-3 overflow-hidden rounded-2xl border border-border/60 bg-background/40 p-4"
+                          transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                          className="space-y-3 overflow-hidden rounded-md border border-border bg-card p-4"
                         >
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                          <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
                             <motion.div
-                              className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_12px_hsl(var(--glow-primary)/0.6)]"
+                              className="h-full rounded-full bg-accent"
                               initial={{ width: 0 }}
                               animate={{ width: `${percentage}%` }}
-                              transition={{ duration: 0.5, ease: "easeOut" }}
+                              transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
                             />
                           </div>
                           <div className="flex items-center justify-between text-sm">
                             <span className="truncate text-muted-foreground">
                               Receiving <span className="font-medium text-foreground">{uploadProgress.currentFile}</span>
                             </span>
-                            <span className="shrink-0 font-mono text-primary">
+                            <span className="shrink-0 font-mono text-accent">
                               {percentage}% · {formatMB(uploadedBytes)}/{formatMB(totalBytes)} MB
                             </span>
                           </div>
@@ -966,22 +991,22 @@ export default function CreateGalleryPage() {
 
                 {/* Edit cost summary */}
                 {imageCount > 0 && stylesCount > 0 && (
-                  <div className={cn("rounded-2xl border p-4 text-sm", hasInsufficientEdits && !isUnlimited ? "border-destructive/40 bg-destructive/10" : "border-border/60 bg-background/40")}>
+                  <div className={cn("rounded-md border p-4 text-sm", hasInsufficientEdits && !isUnlimited ? "border-destructive/40 bg-destructive/[0.06]" : "border-border bg-card")}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-muted-foreground">
-                        {imageCount} photos
-                        <span className="text-muted-foreground/60"> × </span>
-                        {stylesCount} look{stylesCount > 1 ? "s" : ""}
-                        <span className="text-muted-foreground/60"> = </span>
-                        <strong className="font-mono text-foreground">{editsNeeded} edits</strong>
+                        <span className="folio text-foreground">{imageCount}</span> photos
+                        <span className="text-muted-foreground/50"> × </span>
+                        <span className="folio text-foreground">{stylesCount}</span> look{stylesCount > 1 ? "s" : ""}
+                        <span className="text-muted-foreground/50"> = </span>
+                        <strong className="folio text-accent">{editsNeeded} edits</strong>
                       </span>
                       {isUnlimited ? (
-                        <span className="inline-flex items-center gap-1.5 text-primary">
+                        <span className="inline-flex items-center gap-1.5 text-accent">
                           <Check className="h-4 w-4" /> Covered by your plan
                         </span>
                       ) : (
                         <span className="text-muted-foreground">
-                          <strong className={cn("font-mono", hasInsufficientEdits ? "text-destructive" : "text-primary")}>{availableEdits.toLocaleString()}</strong> available
+                          <strong className={cn("folio", hasInsufficientEdits ? "text-destructive" : "text-foreground")}>{availableEdits.toLocaleString()}</strong> available
                           {editsReserved > 0 && <span className="ml-1 text-xs">({editsReserved.toLocaleString()} reserved)</span>}
                         </span>
                       )}
@@ -1010,15 +1035,14 @@ export default function CreateGalleryPage() {
           </AnimatePresence>
 
           {/* Navigation */}
-          <div className="mt-7 flex items-center justify-between border-t border-border/50 pt-6">
-            <Button variant="ghost" onClick={() => setCurrentStep((p) => p - 1)} disabled={currentStep === 1 || busy} className="gap-2">
+          <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
+            <Button variant="ghost" onClick={() => setCurrentStep((p) => p - 1)} disabled={currentStep === 1 || busy} className="gap-2 text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
 
             {currentStep < 4 ? (
               <Button
-                variant="glow"
                 onClick={() => {
                   setCompletedSteps((prev) => new Set([...prev, currentStep]));
                   setCurrentStep((p) => p + 1);
