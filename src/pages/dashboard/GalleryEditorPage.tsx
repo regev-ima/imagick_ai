@@ -1874,8 +1874,8 @@ export default function GalleryEditorPage() {
             className="fixed bottom-6 left-0 right-0 z-30 flex justify-center px-4"
           >
             <div className="flex items-center gap-2 px-4 py-3 rounded-[--radius] glass-card border border-border shadow-[var(--elevation-3)]">
-              <span className="aura-chip" style={{ ['--led' as any]: 'hsl(var(--primary))' }}>
-                <span className="aura-led" />
+              <span className="aura-chip">
+                <span className="aura-led aura-led-pulse" />
                 <span className="folio text-foreground">{selectedImages.length}</span> selected
               </span>
               <Button

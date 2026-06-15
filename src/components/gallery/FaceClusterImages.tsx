@@ -45,8 +45,8 @@ export function FaceClusterImages({ clusterId, onBack, onBackToGallery, onImageC
             Back to Gallery
           </Button>
         )}
-        <span className="text-sm text-muted-foreground">
-          {images.length} {images.length === 1 ? "photo" : "photos"}
+        <span className="aura-chip">
+          <span className="folio text-foreground">{images.length}</span> {images.length === 1 ? "photo" : "photos"}
         </span>
       </div>
 
@@ -60,7 +60,7 @@ export function FaceClusterImages({ clusterId, onBack, onBackToGallery, onImageC
             <div
               key={image.id}
               className={cn(
-                "aspect-square overflow-hidden cursor-pointer rounded-md",
+                "aspect-square overflow-hidden cursor-pointer rounded-sm border border-border/40 plate-keyline",
                 "hover:ring-2 hover:ring-primary/50 transition-all"
               )}
               onClick={() => onImageClick?.(image.id)}

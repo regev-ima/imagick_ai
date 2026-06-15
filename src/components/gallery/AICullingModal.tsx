@@ -258,8 +258,8 @@ export function AICullingModal({
 
           {/* Culling Processing Note */}
           {cullingStatus === "processing" && !isCullingStuck && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-4">
-              <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+            <div className="p-3 rounded-sm bg-rating/10 border border-rating/25 mb-4">
+              <p className="text-sm text-rating font-medium">
                 ⏳ AI Culling is currently in progress. Please wait for it to finish before running again.
               </p>
             </div>
@@ -267,8 +267,8 @@ export function AICullingModal({
 
           {/* Culling Stuck Note */}
           {cullingStatus === "processing" && isCullingStuck && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-4">
-              <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+            <div className="p-3 rounded-sm bg-rating/10 border border-rating/25 mb-4">
+              <p className="text-sm text-rating font-medium">
                 ⚠️ AI Culling seems stuck. You can try running it again.
               </p>
             </div>
@@ -276,8 +276,8 @@ export function AICullingModal({
 
           {/* Re-run Warning */}
           {cullingStatus === "ready" && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-4">
-              <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+            <div className="p-3 rounded-sm bg-rating/10 border border-rating/25 mb-4">
+              <p className="text-sm text-rating font-medium">
                 ⚠️ Re-running AI Culling will overwrite existing ratings and groupings.
               </p>
             </div>
@@ -413,8 +413,8 @@ export function AICullingModal({
               with different topics), but we steer them away from a
               wasted run. */}
           {!isCurrentlyRunning && noNewImagesSinceCulling && (
-            <div className="flex items-start gap-3 p-4 mb-4 rounded-lg border border-border/50 bg-muted/30">
-              <Check className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-4 mb-4 rounded-sm border border-border/60 surface-2">
+              <Check className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">
                   No new photos since last culling

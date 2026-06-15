@@ -134,7 +134,7 @@ function TimelineDot({ color = "default", pulse = false }: { color?: "default" |
   const colorMap = {
     default: "bg-muted-foreground/40",
     primary: "bg-primary",
-    yellow: "bg-yellow-500",
+    yellow: "bg-rating",
     red: "bg-destructive",
   };
   return (
@@ -346,7 +346,7 @@ export function ImageDetailsPanel({
           size="sm"
           className={cn(
             "gap-2 h-9 text-xs border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-all",
-            image.is_hero && "border-amber-500/30 bg-amber-500/5 text-amber-400"
+            image.is_hero && "border-rating/30 bg-rating/5 text-rating"
           )}
           onClick={(e) => { e.stopPropagation(); onSetAsHero(); }}
         >
@@ -465,7 +465,7 @@ export function ImageDetailsPanel({
         )}
         {/* Attempts warning */}
         {(image.processing_attempts ?? 0) > 1 && (
-          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-400">
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-rating">
             <AlertCircle className="w-3 h-3" />
             <span>{image.processing_attempts} attempts</span>
           </div>

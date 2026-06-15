@@ -407,7 +407,7 @@ export function GalleryRightSidebar({
                 faceSearchStatus === "processing" ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : faceSearchStatus === "completed" ? (
-                  <ScanFace className="w-3 h-3 text-green-500" />
+                  <ScanFace className="w-3 h-3 text-secondary" />
                 ) : (
                   <ScanFace className="w-3 h-3" />
                 )
@@ -1070,8 +1070,8 @@ function GalleryInfoPanel({
       startedAt: data.cullingStartedAt,
       completedAt: data.cullingCompletedAt,
       status: data.cullingCompletedAt ? "completed" : data.cullingStartedAt ? "active" : "idle",
-      color: "text-amber-400",
-      bgColor: "bg-amber-500",
+      color: "text-primary",
+      bgColor: "bg-primary",
     },
   ];
 
@@ -1194,7 +1194,7 @@ function GalleryInfoPanel({
                     </span>
                   )}
                   {stage.status === "active" && (
-                    <span className="text-[10px] text-amber-400 animate-pulse">In progress</span>
+                    <span className="text-[10px] text-rating animate-pulse">In progress</span>
                   )}
                 </div>
                 {stage.startedAt && (

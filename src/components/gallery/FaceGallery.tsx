@@ -236,20 +236,20 @@ export function FaceGallery({
           <div className="w-full max-w-xs space-y-3">
             <div className="flex items-center justify-center gap-6">
               <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">{processed}/{total}</p>
-                <p className="text-xs text-muted-foreground">Photos scanned</p>
+                <p className="font-mono text-2xl font-bold text-foreground folio tabular-nums">{processed}/{total}</p>
+                <p className="aura-microlabel mt-0.5">Photos scanned</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-primary">{facesFound}</p>
-                <p className="text-xs text-muted-foreground">Faces found</p>
+                <p className="font-mono text-2xl font-bold text-primary folio tabular-nums">{facesFound}</p>
+                <p className="aura-microlabel mt-0.5">Faces found</p>
               </div>
             </div>
 
             {/* Progress bar */}
             <div className="space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
+              <div className="flex justify-between font-mono text-xs text-muted-foreground tabular-nums">
                 <span>Progress</span>
-                <span>{percentage}%</span>
+                <span className="text-foreground folio">{percentage}%</span>
               </div>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
@@ -261,8 +261,8 @@ export function FaceGallery({
           </div>
 
           <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-4 py-2">
-              <Check className="w-3.5 h-3.5 text-green-500" />
+            <div className="flex items-center gap-2 text-xs text-muted-foreground surface-2 border border-border/60 rounded-sm px-4 py-2">
+              <Check className="w-3.5 h-3.5 text-secondary" />
               <span>Processing happens in your browser — keep this tab open</span>
             </div>
             {onCancel && (
@@ -337,8 +337,8 @@ export function FaceGallery({
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <ScanFace className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">
-            {clusters.length} {clusters.length === 1 ? "person" : "people"} detected
+          <span className="aura-chip">
+            <span className="folio text-foreground">{clusters.length}</span> {clusters.length === 1 ? "person" : "people"}
           </span>
         </div>
         <Button variant="ghost" size="sm" onClick={onResetFaceSearch} className="gap-1.5 text-xs text-muted-foreground">
@@ -352,7 +352,7 @@ export function FaceGallery({
           <Card
             key={cluster.id}
             className={cn(
-              "flex flex-col items-center gap-2 p-3 cursor-pointer transition-all duration-200",
+              "flex flex-col items-center gap-2 p-3 cursor-pointer transition-all duration-200 rounded-sm",
               "hover:shadow-lg hover:border-primary/50"
             )}
             onClick={() => onClusterSelect(cluster.id)}
@@ -368,9 +368,9 @@ export function FaceGallery({
                 <ScanFace className="w-6 h-6 text-muted-foreground" />
               </div>
             )}
-            <Badge variant="secondary" className="text-xs">
-              {cluster.face_count} {cluster.face_count === 1 ? "photo" : "photos"}
-            </Badge>
+            <span className="aura-chip">
+              <span className="folio text-foreground">{cluster.face_count}</span> {cluster.face_count === 1 ? "photo" : "photos"}
+            </span>
           </Card>
         ))}
       </div>
