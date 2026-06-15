@@ -91,9 +91,12 @@ export default function DashboardLayout() {
 
   return (
     <div className="relative h-screen overflow-hidden bg-background">
-      {/* Atelier: the canvas is the paper itself — no ambient glow. */}
+      {/* Lightroom: neutral graphite canvas, no ambient glow. */}
       <AuraCommand />
-      {/* ── Desktop floating pill rail ─────────────────────────────── */}
+      {/* ── Desktop floating pill rail — hidden inside the gallery editor so
+          the workspace becomes a true focus mode (no global nav to slip out
+          through, and nothing floating over the loupe). ───────────────── */}
+      {!isGalleryEditor && (
       <TooltipProvider delayDuration={0}>
         <aside className="fixed left-3 top-1/2 z-40 hidden -translate-y-1/2 lg:flex">
           <div className="flex max-h-[calc(100vh-1.5rem)] flex-col items-center gap-1.5 rounded-[22px] border border-sidebar-border bg-sidebar px-2 py-3 shadow-[var(--elevation-2)]">
@@ -174,6 +177,7 @@ export default function DashboardLayout() {
           </div>
         </aside>
       </TooltipProvider>
+      )}
 
       {/* ── Mobile overlay + sheet ─────────────────────────────────── */}
       <AnimatePresence>
@@ -281,6 +285,7 @@ export default function DashboardLayout() {
           edge to edge, the rail floats over the left, and only the inner
           content is inset to clear it. Sits above the ambient wash. ─── */}
       <div className="relative z-10 flex h-screen flex-col">
+        {!isGalleryEditor && (
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 px-4 glass-card lg:pl-[92px] lg:pr-6">
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileMenuOpen(true)}>
@@ -317,6 +322,7 @@ export default function DashboardLayout() {
             </DropdownMenu>
           </div>
         </header>
+        )}
 
         {isImpersonating && targetUser && (
           <div className="border-b border-amber-500/30 bg-amber-500/10">
