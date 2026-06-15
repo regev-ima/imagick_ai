@@ -2442,44 +2442,29 @@ export default function GalleryEditorPage() {
             <div className="flex-1 flex flex-col relative min-w-0">
               {/* Top Bar - static, above image */}
               <div
-                className="relative z-20 flex items-center justify-between px-4 h-14 shrink-0 bg-background/60 backdrop-blur-sm border-b border-border/30"
+                className="relative z-20 flex items-center gap-2 px-3 sm:px-4 h-14 shrink-0 bg-background/60 backdrop-blur-sm border-b border-border/30"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Left: Close */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={closeLightbox}
-                >
-                  <X className="w-6 h-6" />
-                </Button>
+                {/* Left zone: Close + filename (truncates; can't collide with the centered toggle) */}
+                <div className="flex flex-1 items-center gap-2 min-w-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={closeLightbox}
+                    className="shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                  {currentDetailsImage && (
+                    <span dir="ltr" className="caption truncate min-w-0 text-left" title={currentDetailsImage.filename}>
+                      {currentDetailsImage.filename}
+                    </span>
+                  )}
+                </div>
 
-                {/* Photo identity — minimal mono readout (filename · index/total · stars) */}
-                {currentDetailsImage && (() => {
-                  const stars = cullingScoreToStars((currentDetailsImage as any).culling_score, cullingScoreMode) || currentDetailsImage.ai_rating || 0;
-                  const total = filteredImages.length;
-                  const position = currentLightboxIndex >= 0 ? currentLightboxIndex + 1 : 1;
-                  return (
-                    <div className="hidden sm:flex items-center gap-2 min-w-0 ml-1 mr-2">
-                      <span className="caption truncate max-w-[200px]" title={currentDetailsImage.filename}>
-                        {currentDetailsImage.filename}
-                      </span>
-                      <span className="aura-chip tabular-nums">
-                        <span className="folio text-foreground">{position}</span>/{total}
-                      </span>
-                      {stars > 0 && (
-                        <span className="aura-chip tabular-nums">
-                          <Star className="w-3 h-3 text-rating fill-rating" />
-                          {stars}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* Center: Compare Mode Toggle */}
+                {/* Center zone: Compare Mode Toggle (shrink-0; the two flex-1 side zones keep it centered) */}
                 {galleryStylesData.length > 0 && (
-                  <div className="absolute left-1/2 -translate-x-1/2 flex items-center surface-2 border border-border rounded-sm p-0.5 gap-0.5">
+                  <div className="shrink-0 flex items-center surface-2 border border-border rounded-sm p-0.5 gap-0.5">
                     <TooltipProvider>
                       {!isMobile && (
                       <Tooltip>
@@ -2529,12 +2514,31 @@ export default function GalleryEditorPage() {
                   </div>
                 )}
 
-                {/* Right: Info */}
-                <div className="flex items-center gap-2">
+                {/* Right zone: position · rating · info */}
+                <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
+                  {currentDetailsImage && (() => {
+                    const stars = cullingScoreToStars((currentDetailsImage as any).culling_score, cullingScoreMode) || currentDetailsImage.ai_rating || 0;
+                    const total = filteredImages.length;
+                    const position = currentLightboxIndex >= 0 ? currentLightboxIndex + 1 : 1;
+                    return (
+                      <div className="hidden sm:flex items-center gap-2 shrink-0">
+                        <span className="aura-chip tabular-nums">
+                          <span className="folio text-foreground">{position}</span>/{total}
+                        </span>
+                        {stars > 0 && (
+                          <span className="aura-chip tabular-nums">
+                            <Star className="w-3 h-3 text-rating fill-rating" />
+                            {stars}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setShowDetailsPanel(!showDetailsPanel)}
+                    className="shrink-0"
                   >
                     <Info className="w-5 h-5" />
                   </Button>
