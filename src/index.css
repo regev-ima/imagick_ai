@@ -1,197 +1,232 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Figtree:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Imagick.ai Design System - Unified with imagick-web */
+/* ════════════════════════════════════════════════════════════════════
+   PRISM — Imagick.ai design system (v1)
+   Direction: Google / Gemini — clean, futuristic, friendly. Dark-first.
+   - Neutral graphite surfaces (Material 3 tonal elevation), not glass-neon.
+   - Google blue primary; Gemini spectral (blue→purple→pink) reserved for AI.
+   - Dynamic color: surfaces can be tinted from a photo's dominant hue
+     via --dynamic-* vars (Material You "color from content").
+   - Type: Inter (UI), Figtree (display), Roboto Mono (telemetry).
+   Token *names* are kept stable so every existing screen inherits the new
+   language untouched; only the values + shared utilities change.
+   ════════════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
-    /* AURA dark — violet-black void */
-    --background: 258 30% 3.5%;
-    --foreground: 260 36% 97%;
+    /* PRISM dark — neutral graphite void */
+    --background: 225 7% 9%;
+    --foreground: 220 14% 96%;
 
-    /* Card / surfaces: raised glass */
-    --card: 256 24% 7.5%;
-    --card-foreground: 260 36% 97%;
+    /* Surfaces — Material tonal elevation */
+    --card: 222 8% 13%;
+    --card-foreground: 220 14% 96%;
+    --popover: 222 9% 15%;
+    --popover-foreground: 220 14% 96%;
+    --surface-1: 222 8% 13%;
+    --surface-2: 222 8% 16%;
+    --surface-3: 222 9% 19%;
 
-    --popover: 256 24% 7.5%;
-    --popover-foreground: 260 36% 97%;
-
-    /* Primary - Aura Violet */
-    --primary: 272 96% 66%;
+    /* Primary — Google blue (#4285F4) */
+    --primary: 217 89% 61%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Quantum Aqua */
-    --secondary: 192 100% 58%;
-    --secondary-foreground: 258 30% 6%;
+    /* Secondary — Google green, also the "ready/success" semantic */
+    --secondary: 137 53% 45%;
+    --secondary-foreground: 0 0% 100%;
 
-    /* Muted for subtle backgrounds */
-    --muted: 256 20% 13%;
-    --muted-foreground: 258 14% 66%;
+    /* Muted */
+    --muted: 222 7% 18%;
+    --muted-foreground: 220 9% 65%;
 
-    /* Accent - Fuchsia (legacy brand magenta, evolved) */
-    --accent: 318 100% 62%;
+    /* Accent — Gemini purple (#9B72CB), spectral midpoint */
+    --accent: 280 44% 62%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 350 80% 58%;
+    --destructive: 4 80% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 258 20% 16%;
-    --input: 258 20% 16%;
-    --ring: 272 96% 66%;
+    --border: 220 7% 21%;
+    --input: 220 7% 21%;
+    --ring: 217 89% 61%;
 
     --radius: 1rem;
 
-    /* Neon tokens — legacy names, AURA hues (used across the app) */
-    --neon-pink: 318 100% 62%;
-    --neon-purple: 272 96% 66%;
-    --neon-blue: 192 100% 58%;
+    /* Dynamic color (Material You) — overridden per-context from a hero
+       image's dominant hue; defaults to the brand blue. */
+    --dynamic-primary: 217 89% 61%;
+    --dynamic-soft: 217 60% 30%;
 
-    /* Gradient tokens */
-    --gradient-start: 272 96% 66%;
-    --gradient-end: 318 100% 62%;
+    /* Spectral poles — legacy "neon" names remapped to Gemini hues */
+    --neon-pink: 354 62% 64%;     /* #D96570 pole */
+    --neon-purple: 280 44% 62%;   /* #9B72CB mid  */
+    --neon-blue: 217 89% 61%;     /* #4285F4 pole */
+
+    /* Text-gradient endpoints */
+    --gradient-start: 217 89% 61%;
+    --gradient-end: 354 62% 64%;
 
     /* Sidebar */
-    --sidebar-background: 257 28% 5%;
-    --sidebar-foreground: 260 36% 97%;
-    --sidebar-primary: 272 96% 66%;
+    --sidebar-background: 224 8% 11%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-primary: 217 89% 61%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 256 22% 11%;
-    --sidebar-accent-foreground: 260 36% 97%;
-    --sidebar-border: 258 20% 14%;
-    --sidebar-ring: 272 96% 66%;
+    --sidebar-accent: 222 8% 16%;
+    --sidebar-accent-foreground: 220 14% 96%;
+    --sidebar-border: 220 7% 18%;
+    --sidebar-ring: 217 89% 61%;
 
-    /* Custom glow tokens */
-    --glow-primary: 272 96% 66%;
-    --glow-secondary: 318 100% 62%;
-    --glow-accent: 256 20% 25%;
+    /* Glow tokens (spectral) */
+    --glow-primary: 217 89% 61%;
+    --glow-secondary: 280 44% 62%;
+    --glow-accent: 354 62% 64%;
 
-    /* Rating star color — champagne */
-    --rating: 42 96% 62%;
+    /* Rating star — warm amber (Google), theme-invariant */
+    --rating: 42 96% 60%;
 
-    /* Motion tokens — strong curves, UI feedback stays under 250ms */
-    --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-    --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+    /* Motion — Material emphasized easing; UI feedback stays under 250ms */
+    --ease-out-strong: cubic-bezier(0.2, 0, 0, 1);
+    --ease-in-out-strong: cubic-bezier(0.3, 0, 0, 1);
 
-    /* The AI signature — reserved for engine actions */
-    --gradient-primary: linear-gradient(115deg, hsl(272 96% 66%) 0%, hsl(318 100% 62%) 50%, hsl(192 100% 58%) 100%);
-    --gradient-secondary: linear-gradient(115deg, hsl(318 100% 62%) 0%, hsl(272 96% 66%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(272 96% 66%) 0%, hsl(256 20% 25%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(256 24% 7.5%) 0%, hsl(258 30% 3.5%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(272 96% 66% / 0.15) 0%, transparent 70%);
+    /* The AI signature — Gemini spectral gradient. Reserved for engine
+       actions (Aura, processing, suggestions, generate). */
+    --gradient-primary: linear-gradient(115deg, hsl(217 89% 61%) 0%, hsl(280 44% 62%) 50%, hsl(354 62% 64%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(217 89% 61%) 0%, hsl(280 44% 62%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(280 44% 62%) 0%, hsl(217 89% 61%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(222 8% 13%) 0%, hsl(225 7% 9%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(217 89% 61% / 0.18) 0%, transparent 70%);
 
-    /* Glass effect */
-    --glass-background: hsla(256, 24%, 11%, 0.6);
-    --glass-border: hsla(260, 36%, 97%, 0.08);
+    /* Surface fill (replaces heavy glass) — tonal + faint blur */
+    --glass-background: hsla(222, 8%, 14%, 0.72);
+    --glass-border: hsla(220, 14%, 96%, 0.08);
+
+    /* Material elevation shadows */
+    --elevation-1: 0 1px 2px hsl(0 0% 0% / 0.30), 0 1px 3px 1px hsl(0 0% 0% / 0.15);
+    --elevation-2: 0 1px 2px hsl(0 0% 0% / 0.30), 0 2px 6px 2px hsl(0 0% 0% / 0.15);
+    --elevation-3: 0 4px 8px 3px hsl(0 0% 0% / 0.15), 0 1px 3px hsl(0 0% 0% / 0.30);
   }
 
-  /* Light mode */
+  /* Light mode — Google daylight: porcelain + blue */
   .light {
-    /* Daylight Aura — porcelain glass, same violet identity */
-    --background: 260 40% 98.5%;
-    --foreground: 258 30% 10%;
+    --background: 210 33% 99%;
+    --foreground: 222 18% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 258 30% 10%;
+    --card-foreground: 222 18% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 258 30% 10%;
-    --primary: 272 80% 56%;
+    --popover-foreground: 222 18% 14%;
+    --surface-1: 0 0% 100%;
+    --surface-2: 220 22% 97%;
+    --surface-3: 220 20% 94%;
+
+    --primary: 214 82% 51%;        /* #1a73e8 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 192 90% 38%;
+    --secondary: 137 60% 33%;      /* #188038 */
     --secondary-foreground: 0 0% 100%;
-    --muted: 258 25% 93%;
-    --muted-foreground: 258 12% 44%;
-    --accent: 318 85% 52%;
+    --muted: 220 16% 95%;
+    --muted-foreground: 220 9% 43%;
+    --accent: 280 44% 52%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 350 75% 50%;
+    --destructive: 4 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 258 20% 88%;
-    --input: 258 20% 92%;
-    --ring: 272 80% 56%;
+    --border: 220 16% 88%;
+    --input: 220 16% 90%;
+    --ring: 214 82% 51%;
 
-    /* Neon tokens */
-    --neon-pink: 318 85% 52%;
-    --neon-purple: 272 80% 56%;
-    --neon-blue: 192 90% 38%;
+    --dynamic-primary: 214 82% 51%;
+    --dynamic-soft: 214 70% 90%;
 
-    /* Gradient tokens */
-    --gradient-start: 272 80% 56%;
-    --gradient-end: 318 85% 52%;
+    --neon-pink: 354 58% 54%;
+    --neon-purple: 280 44% 52%;
+    --neon-blue: 214 82% 51%;
+    --gradient-start: 214 82% 51%;
+    --gradient-end: 354 58% 54%;
 
-    /* Sidebar light */
-    --sidebar-background: 260 40% 98%;
-    --sidebar-foreground: 258 12% 38%;
-    --sidebar-primary: 272 80% 56%;
+    --sidebar-background: 210 33% 99%;
+    --sidebar-foreground: 220 12% 36%;
+    --sidebar-primary: 214 82% 51%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 258 25% 94%;
-    --sidebar-accent-foreground: 258 30% 10%;
-    --sidebar-border: 258 20% 88%;
-    --sidebar-ring: 272 80% 56%;
+    --sidebar-accent: 220 22% 95%;
+    --sidebar-accent-foreground: 222 18% 14%;
+    --sidebar-border: 220 16% 88%;
+    --sidebar-ring: 214 82% 51%;
 
-    /* Light glow tokens */
-    --glow-primary: 272 80% 56%;
-    --glow-secondary: 318 85% 52%;
+    --glow-primary: 214 82% 51%;
+    --glow-secondary: 280 44% 52%;
+    --glow-accent: 354 58% 54%;
 
-    /* Light mode glass */
-    --glass-background: hsla(0, 0%, 100%, 0.8);
-    --glass-border: hsla(258, 20%, 85%, 0.5);
+    --glass-background: hsla(0, 0%, 100%, 0.78);
+    --glass-border: hsla(220, 16%, 80%, 0.5);
 
-    /* Light gradients */
-    --gradient-primary: linear-gradient(115deg, hsl(272 80% 56%) 0%, hsl(318 85% 52%) 50%, hsl(192 90% 38%) 100%);
-    --gradient-secondary: linear-gradient(115deg, hsl(318 85% 52%) 0%, hsl(272 80% 56%) 100%);
+    --elevation-1: 0 1px 2px hsl(220 40% 20% / 0.10), 0 1px 3px 1px hsl(220 40% 20% / 0.08);
+    --elevation-2: 0 1px 2px hsl(220 40% 20% / 0.10), 0 2px 6px 2px hsl(220 40% 20% / 0.08);
+    --elevation-3: 0 4px 8px 3px hsl(220 40% 20% / 0.10), 0 1px 3px hsl(220 40% 20% / 0.12);
+
+    --gradient-primary: linear-gradient(115deg, hsl(214 82% 51%) 0%, hsl(280 44% 52%) 50%, hsl(354 58% 54%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(214 82% 51%) 0%, hsl(280 44% 52%) 100%);
   }
 
+  /* Explicit dark (mirror of :root) */
   .dark {
-    --background: 258 30% 3.5%;
-    --foreground: 260 36% 97%;
-    --card: 256 24% 7.5%;
-    --card-foreground: 260 36% 97%;
-    --popover: 256 24% 7.5%;
-    --popover-foreground: 260 36% 97%;
-    --primary: 272 96% 66%;
+    --background: 225 7% 9%;
+    --foreground: 220 14% 96%;
+    --card: 222 8% 13%;
+    --card-foreground: 220 14% 96%;
+    --popover: 222 9% 15%;
+    --popover-foreground: 220 14% 96%;
+    --surface-1: 222 8% 13%;
+    --surface-2: 222 8% 16%;
+    --surface-3: 222 9% 19%;
+    --primary: 217 89% 61%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 192 100% 58%;
-    --secondary-foreground: 258 30% 6%;
-    --muted: 256 20% 13%;
-    --muted-foreground: 258 14% 66%;
-    --accent: 318 100% 62%;
+    --secondary: 137 53% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 222 7% 18%;
+    --muted-foreground: 220 9% 65%;
+    --accent: 280 44% 62%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 350 80% 58%;
+    --destructive: 4 80% 58%;
     --destructive-foreground: 0 0% 100%;
-    --border: 258 20% 16%;
-    --input: 258 20% 16%;
-    --ring: 272 96% 66%;
+    --border: 220 7% 21%;
+    --input: 220 7% 21%;
+    --ring: 217 89% 61%;
 
-    --neon-pink: 318 100% 62%;
-    --neon-purple: 272 96% 66%;
-    --neon-blue: 192 100% 58%;
-    --gradient-start: 272 96% 66%;
-    --gradient-end: 318 100% 62%;
+    --dynamic-primary: 217 89% 61%;
+    --dynamic-soft: 217 60% 30%;
+    --neon-pink: 354 62% 64%;
+    --neon-purple: 280 44% 62%;
+    --neon-blue: 217 89% 61%;
+    --gradient-start: 217 89% 61%;
+    --gradient-end: 354 62% 64%;
 
-    /* Sidebar dark */
-    --sidebar-background: 257 28% 5%;
-    --sidebar-foreground: 260 36% 97%;
-    --sidebar-primary: 272 96% 66%;
+    --sidebar-background: 224 8% 11%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-primary: 217 89% 61%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 256 22% 11%;
-    --sidebar-accent-foreground: 260 36% 97%;
-    --sidebar-border: 258 20% 14%;
-    --sidebar-ring: 272 96% 66%;
+    --sidebar-accent: 222 8% 16%;
+    --sidebar-accent-foreground: 220 14% 96%;
+    --sidebar-border: 220 7% 18%;
+    --sidebar-ring: 217 89% 61%;
 
-    --glow-primary: 272 96% 66%;
-    --glow-secondary: 318 100% 62%;
-    --glow-accent: 256 20% 25%;
+    --glow-primary: 217 89% 61%;
+    --glow-secondary: 280 44% 62%;
+    --glow-accent: 354 62% 64%;
 
-    /* Dark mode glass */
-    --glass-background: hsla(256, 24%, 11%, 0.6);
-    --glass-border: hsla(260, 36%, 97%, 0.08);
+    --glass-background: hsla(222, 8%, 14%, 0.72);
+    --glass-border: hsla(220, 14%, 96%, 0.08);
 
-    --gradient-primary: linear-gradient(115deg, hsl(272 96% 66%) 0%, hsl(318 100% 62%) 50%, hsl(192 100% 58%) 100%);
-    --gradient-secondary: linear-gradient(115deg, hsl(318 100% 62%) 0%, hsl(272 96% 66%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(272 96% 66%) 0%, hsl(256 20% 25%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(256 24% 7.5%) 0%, hsl(258 30% 3.5%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(272 96% 66% / 0.15) 0%, transparent 70%);
+    --elevation-1: 0 1px 2px hsl(0 0% 0% / 0.30), 0 1px 3px 1px hsl(0 0% 0% / 0.15);
+    --elevation-2: 0 1px 2px hsl(0 0% 0% / 0.30), 0 2px 6px 2px hsl(0 0% 0% / 0.15);
+    --elevation-3: 0 4px 8px 3px hsl(0 0% 0% / 0.15), 0 1px 3px hsl(0 0% 0% / 0.30);
+
+    --gradient-primary: linear-gradient(115deg, hsl(217 89% 61%) 0%, hsl(280 44% 62%) 50%, hsl(354 62% 64%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(217 89% 61%) 0%, hsl(280 44% 62%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(280 44% 62%) 0%, hsl(217 89% 61%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(222 8% 13%) 0%, hsl(225 7% 9%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(217 89% 61% / 0.18) 0%, transparent 70%);
   }
 }
 
@@ -202,7 +237,7 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Sora', 'Inter', system-ui, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
   }
 
   /* Custom scrollbar */
@@ -210,17 +245,14 @@
     width: 8px;
     height: 8px;
   }
-
   ::-webkit-scrollbar-track {
     @apply bg-background;
   }
-
   ::-webkit-scrollbar-thumb {
     @apply bg-muted rounded-full;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
-
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/30;
   }
@@ -235,40 +267,36 @@
 }
 
 @layer components {
-  /* Glass card effect */
+  /* Surface card — Material tonal surface (replaces the old heavy glass).
+     Kept under the same class name so every screen updates at once. */
   .glass-card {
     background: var(--glass-background);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
     border: 1px solid var(--glass-border);
-    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.06);
+    box-shadow: var(--elevation-1);
   }
+
+  /* Solid Material surfaces by elevation */
+  .surface-1 { background: hsl(var(--surface-1)); box-shadow: var(--elevation-1); }
+  .surface-2 { background: hsl(var(--surface-2)); box-shadow: var(--elevation-2); }
+  .surface-3 { background: hsl(var(--surface-3)); box-shadow: var(--elevation-3); }
 
   /* Glow effects */
-  .glow-primary {
-    box-shadow: 0 0 30px -5px hsl(var(--glow-primary) / 0.4);
-  }
+  .glow-primary { box-shadow: 0 0 30px -5px hsl(var(--glow-primary) / 0.4); }
+  .glow-secondary { box-shadow: 0 0 30px -5px hsl(var(--glow-secondary) / 0.4); }
+  .glow-accent { box-shadow: 0 0 30px -5px hsl(var(--glow-accent) / 0.4); }
 
-  .glow-secondary {
-    box-shadow: 0 0 30px -5px hsl(var(--glow-secondary) / 0.4);
-  }
-
-  .glow-accent {
-    box-shadow: 0 0 30px -5px hsl(var(--glow-accent) / 0.4);
-  }
-
-  /* Text gradients */
+  /* Text gradients (now Gemini spectral) */
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[hsl(var(--gradient-start))] to-[hsl(var(--gradient-end))];
   }
-
   .text-gradient-primary {
     background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-
   .text-gradient-secondary {
     background: var(--gradient-secondary);
     -webkit-background-clip: text;
@@ -283,17 +311,13 @@
       linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
     background-size: 40px 40px;
   }
-
   .bg-dots-pattern {
     background-image: radial-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px);
     background-size: 20px 20px;
   }
 
-  /* Gradient borders */
-  .gradient-border {
-    position: relative;
-  }
-
+  /* Gradient (spectral) borders */
+  .gradient-border { position: relative; }
   .gradient-border::before {
     content: '';
     position: absolute;
@@ -307,101 +331,59 @@
     mask-composite: exclude;
     pointer-events: none;
   }
+
+  /* Dynamic-color tint helper — set --dynamic-primary inline (from a
+     photo's dominant hue) and this paints a soft Material You wash. */
+  .dynamic-tint {
+    background:
+      radial-gradient(120% 80% at 50% -10%, hsl(var(--dynamic-primary) / 0.16), transparent 60%),
+      hsl(var(--card));
+  }
 }
 
 @layer utilities {
-  /* Animation utilities */
-  .animate-gradient {
-    background-size: 200% 200%;
-    animation: gradient-shift 3s ease infinite;
-  }
+  .animate-gradient { background-size: 200% 200%; animation: gradient-shift 3s ease infinite; }
+  .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+  .animate-float { animation: float 3s ease-in-out infinite; }
 
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
-
-  /* Glow effects (matches imagick-web) */
-  .glow-pink {
-    box-shadow: 0 4px 20px hsl(var(--glow-primary) / 0.2), 0 8px 40px hsl(var(--glow-primary) / 0.1);
-  }
-
-  .dark .glow-pink {
-    box-shadow: 0 0 40px hsl(var(--glow-primary) / 0.3), 0 0 80px hsl(var(--glow-primary) / 0.1);
-  }
-
-  /* Glow text effect (matches imagick-web) */
-  .glow-text {
-    text-shadow: 0 2px 10px hsl(var(--glow-primary) / 0.3);
-  }
-
-  .dark .glow-text {
-    text-shadow: 0 0 30px hsl(var(--glow-primary) / 0.5);
-  }
+  .glow-pink { box-shadow: 0 4px 20px hsl(var(--glow-primary) / 0.2), 0 8px 40px hsl(var(--glow-primary) / 0.1); }
+  .dark .glow-pink { box-shadow: 0 0 40px hsl(var(--glow-primary) / 0.3), 0 0 80px hsl(var(--glow-primary) / 0.1); }
+  .glow-text { text-shadow: 0 2px 10px hsl(var(--glow-primary) / 0.3); }
+  .dark .glow-text { text-shadow: 0 0 30px hsl(var(--glow-primary) / 0.5); }
 }
 
 /* Keyframes */
 @keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.3);
-  }
-  50% {
-    box-shadow: 0 0 40px hsl(var(--glow-primary) / 0.5);
-  }
+  0%, 100% { box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.3); }
+  50% { box-shadow: 0 0 40px hsl(var(--glow-primary) / 0.5); }
 }
-
 @keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
-
 @keyframes gradient-shift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
   20%, 40%, 60%, 80% { transform: translateX(2px); }
 }
-
 @keyframes neon-pulse {
-  0%, 100% {
-    box-shadow: 0 0 6px hsl(var(--primary) / 0.6);
-  }
-  50% {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.9), 0 0 40px hsl(var(--primary) / 0.3);
-  }
+  0%, 100% { box-shadow: 0 0 6px hsl(var(--primary) / 0.6); }
+  50% { box-shadow: 0 0 20px hsl(var(--primary) / 0.9), 0 0 40px hsl(var(--primary) / 0.3); }
 }
+.animate-neon-pulse { animation: neon-pulse 1.5s ease-in-out infinite; }
 
-.animate-neon-pulse {
-  animation: neon-pulse 1.5s ease-in-out infinite;
-}
-
-/* ── Uppy Dashboard — imagick.ai theming ──────────────────────────────
- * Match the rest of the app's pink-on-dark visual language:
- *   - rounded-xl (12px) outer corners, like our cards
- *   - dashed pink border at 30% opacity, like our previous custom
- *     drop zone
- *   - pink accents on buttons / progress / focus rings
- *   - full-width grid (Uppy's default leaves a gap on wide screens)
- */
-.imagick-uppy-dashboard .uppy-Dashboard {
-  width: 100% !important;
-}
+/* ── Uppy Dashboard — PRISM theming (drives off --primary, so it follows
+ * the new blue automatically) ──────────────────────────────────────── */
+.imagick-uppy-dashboard .uppy-Dashboard { width: 100% !important; }
 .imagick-uppy-dashboard .uppy-Dashboard-inner {
   max-width: 100% !important;
   width: 100% !important;
-  border-radius: 12px !important;
+  border-radius: 16px !important;
   border: 2px dashed hsl(var(--primary) / 0.30) !important;
   background: hsl(var(--primary) / 0.04) !important;
   transition: border-color 0.2s ease, background-color 0.2s ease;
@@ -411,169 +393,93 @@
   border-color: hsl(var(--primary) / 0.60) !important;
   background: hsl(var(--primary) / 0.08) !important;
 }
-
-/* Solid pink primary buttons (browse files, retry-all, etc.) */
 .imagick-uppy-dashboard .uppy-c-btn-primary,
 .imagick-uppy-dashboard .uppy-DashboardContent-addMore {
   background-color: hsl(var(--primary)) !important;
   color: white !important;
-  border-radius: 8px !important;
+  border-radius: 9999px !important;
 }
 .imagick-uppy-dashboard .uppy-c-btn-primary:hover,
 .imagick-uppy-dashboard .uppy-DashboardContent-addMore:hover {
   background-color: hsl(var(--primary) / 0.9) !important;
 }
-
-/* Pink focus rings everywhere */
-.imagick-uppy-dashboard *:focus-visible {
-  outline-color: hsl(var(--primary)) !important;
-}
-
-/* Status bar — dark muted background (matches our card bg), with the
- * progress fill itself in pink. Previously we coloured BOTH the bar
- * background and the fill, which produced a jarring solid-pink slab. */
+.imagick-uppy-dashboard *:focus-visible { outline-color: hsl(var(--primary)) !important; }
 .imagick-uppy-dashboard .uppy-StatusBar {
   background-color: hsl(0 0% 100% / 0.04) !important;
   color: hsl(0 0% 100% / 0.85) !important;
   border-top: 1px solid hsl(0 0% 100% / 0.06) !important;
 }
-.imagick-uppy-dashboard .uppy-StatusBar.is-uploading {
-  background-color: hsl(0 0% 100% / 0.04) !important;
-}
+.imagick-uppy-dashboard .uppy-StatusBar.is-uploading { background-color: hsl(0 0% 100% / 0.04) !important; }
 .imagick-uppy-dashboard .uppy-StatusBar-progress {
   background-color: hsl(var(--primary)) !important;
   height: 3px !important;
   opacity: 1 !important;
 }
-/* The faint "track" line behind the progress fill */
-.imagick-uppy-dashboard .uppy-StatusBar:not(.is-error)
-  .uppy-StatusBar-progress.is-indeterminate {
-  background-image: linear-gradient(
-    45deg,
-    hsl(var(--primary) / 0.6) 25%,
-    transparent 25%,
-    transparent 50%,
-    hsl(var(--primary) / 0.6) 50%,
-    hsl(var(--primary) / 0.6) 75%,
-    transparent 75%,
-    transparent
-  ) !important;
+.imagick-uppy-dashboard .uppy-StatusBar:not(.is-error) .uppy-StatusBar-progress.is-indeterminate {
+  background-image: linear-gradient(45deg, hsl(var(--primary) / 0.6) 25%, transparent 25%, transparent 50%, hsl(var(--primary) / 0.6) 50%, hsl(var(--primary) / 0.6) 75%, transparent 75%, transparent) !important;
 }
-
-/* Per-file thumbnail tiles — slightly rounded to match our cards */
-.imagick-uppy-dashboard .uppy-Dashboard-Item {
-  border-radius: 10px !important;
-}
-
-/* "browse files" text link inside the empty drop zone — Uppy uses
- * its own blue here. Force it to our pink. Same for any other link
- * rendered by Dashboard / StatusBar plugins. */
+.imagick-uppy-dashboard .uppy-Dashboard-Item { border-radius: 12px !important; }
 .imagick-uppy-dashboard .uppy-Dashboard-browse,
 .imagick-uppy-dashboard .uppy-Dashboard-AddFiles a,
 .imagick-uppy-dashboard a.uppy-c-btn-link,
 .imagick-uppy-dashboard .uppy-StatusBar-actionBtn--retry,
 .imagick-uppy-dashboard .uppy-StatusBar-actionBtn--upload,
-.imagick-uppy-dashboard .uppy-c-btn-link {
-  color: hsl(var(--primary)) !important;
-}
+.imagick-uppy-dashboard .uppy-c-btn-link { color: hsl(var(--primary)) !important; }
 .imagick-uppy-dashboard .uppy-Dashboard-browse:hover,
 .imagick-uppy-dashboard .uppy-Dashboard-AddFiles a:hover,
-.imagick-uppy-dashboard .uppy-c-btn-link:hover {
-  color: hsl(var(--primary) / 0.85) !important;
-}
-
-/* Override Uppy's --uppy-c-blue (used in many internal accents) so
- * any element we didn't explicitly target still picks up our pink. */
+.imagick-uppy-dashboard .uppy-c-btn-link:hover { color: hsl(var(--primary) / 0.85) !important; }
 .imagick-uppy-dashboard {
   --uppy-c-blue: hsl(var(--primary));
   --uppy-c-cornflower-blue: hsl(var(--primary));
 }
-
-/* ── Light-mode contrast fixes ─────────────────────────────────────
- * The rules above were written when the app was dark-only. They
- * paint white-on-translucent for the status bar and let Uppy's own
- * "shy" / secondary text (the "Drop files here or" line, the file
- * count, the upload-speed readout) inherit Uppy's grey defaults.
- * On a white app background those become unreadable. Re-target the
- * same elements with dark ink when html.light is active. */
 .light .imagick-uppy-dashboard .uppy-StatusBar {
   background-color: hsl(0 0% 0% / 0.04) !important;
   color: hsl(240 10% 15%) !important;
   border-top-color: hsl(0 0% 0% / 0.08) !important;
 }
-.light .imagick-uppy-dashboard .uppy-StatusBar.is-uploading {
-  background-color: hsl(0 0% 0% / 0.04) !important;
-}
+.light .imagick-uppy-dashboard .uppy-StatusBar.is-uploading { background-color: hsl(0 0% 0% / 0.04) !important; }
 .light .imagick-uppy-dashboard .uppy-Dashboard-AddFiles-title,
 .light .imagick-uppy-dashboard .uppy-Dashboard-Item-name,
 .light .imagick-uppy-dashboard .uppy-Dashboard-Item-status,
 .light .imagick-uppy-dashboard .uppy-StatusBar-content,
 .light .imagick-uppy-dashboard .uppy-StatusBar-statusPrimary,
 .light .imagick-uppy-dashboard .uppy-StatusBar-statusSecondary,
-.light .imagick-uppy-dashboard .uppy-Dashboard-note {
-  color: hsl(240 10% 15%) !important;
-}
+.light .imagick-uppy-dashboard .uppy-Dashboard-note { color: hsl(240 10% 15%) !important; }
 
-/* ── Gallery thumbnail shimmer ────────────────────────────────────────
- * Subtle animated gradient on placeholder tiles so the user sees
- * "loading" motion while scrolling fast, instead of a dead grid of
- * gray squares. Cheap — one keyframe, runs on the GPU compositor.
- */
+/* ── Gallery thumbnail shimmer ──────────────────────────────────────── */
 .thumbnail-shimmer {
-  /* In dark mode the underlying card is near-black, so a faint white
-   * highlight reads as a shimmer. In light mode the underlying card
-   * is near-white, so the *same* white highlight is invisible — and
-   * stuck/empty tiles looked like blank squares. Re-targeted via
-   * html.light below. */
-  background-image: linear-gradient(
-    105deg,
-    hsl(0 0% 100% / 0.02) 0%,
-    hsl(0 0% 100% / 0.06) 50%,
-    hsl(0 0% 100% / 0.02) 100%
-  );
+  background-image: linear-gradient(105deg, hsl(0 0% 100% / 0.02) 0%, hsl(0 0% 100% / 0.06) 50%, hsl(0 0% 100% / 0.02) 100%);
   background-size: 200% 100%;
   animation: thumbnail-shimmer 1.4s ease-in-out infinite;
 }
 .light .thumbnail-shimmer {
-  background-image: linear-gradient(
-    105deg,
-    hsl(0 0% 0% / 0.04) 0%,
-    hsl(0 0% 0% / 0.10) 50%,
-    hsl(0 0% 0% / 0.04) 100%
-  );
+  background-image: linear-gradient(105deg, hsl(0 0% 0% / 0.04) 0%, hsl(0 0% 0% / 0.10) 50%, hsl(0 0% 0% / 0.04) 100%);
 }
-
 @keyframes thumbnail-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
-/* Three-dot "thinking" indicator used by ImageCard while an upload is
- * still being processed (queued, AI-scored, thumbnail being generated).
- * Cheap — opacity/scale on three spans, one keyframe, runs in compositor. */
+/* Three-dot "thinking" indicator (ImageCard processing state) */
 .thinking-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
+  width: 6px; height: 6px; border-radius: 9999px;
   background-color: hsl(var(--primary));
-  display: inline-block;
-  opacity: 0.3;
+  display: inline-block; opacity: 0.3;
   animation: thinking-dot 1.2s ease-in-out infinite;
 }
 .thinking-dot-1 { animation-delay: 0s; }
 .thinking-dot-2 { animation-delay: 0.16s; }
 .thinking-dot-3 { animation-delay: 0.32s; }
-
 @keyframes thinking-dot {
   0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40%          { opacity: 1;   transform: scale(1); }
+  40% { opacity: 1; transform: scale(1); }
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   AURA effect kit — global, token-driven. The "intelligence is light"
-   layer of the redesign: rotating iridescent borders for engine
-   actions, the living orb, telemetry chips and gauges. All hues come
-   from the theme tokens, so light/dark both work.
+   Aura intelligence kit — restyled to the Gemini spectral language.
+   Same class names (used across the app); the engine now reads as
+   blue→purple→pink "light", not violet/aqua neon. Telemetry type is
+   Roboto Mono. All hues come from theme tokens, so light/dark both work.
    ════════════════════════════════════════════════════════════════════ */
 
 @property --aura-angle {
@@ -582,24 +488,16 @@
   inherits: false;
 }
 
-:where(.aura-ai-border, .aura-orb, .aura-gauge, .aura-chip) {
-  position: relative;
-}
+:where(.aura-ai-border, .aura-orb, .aura-gauge, .aura-chip) { position: relative; }
 
-/* Rotating conic border + soft bloom. Reserved for the engine. */
+/* Rotating spectral border + soft bloom. Reserved for the engine. */
 .aura-ai-border::before {
   content: '';
   position: absolute;
   inset: -1px;
   border-radius: inherit;
   padding: 1.5px;
-  background: conic-gradient(
-    from var(--aura-angle),
-    hsl(var(--primary)),
-    hsl(var(--accent)),
-    hsl(var(--secondary)),
-    hsl(var(--primary))
-  );
+  background: conic-gradient(from var(--aura-angle), hsl(var(--neon-blue)), hsl(var(--neon-purple)), hsl(var(--neon-pink)), hsl(var(--neon-blue)));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -611,40 +509,27 @@
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: conic-gradient(
-    from 140deg,
-    hsl(var(--primary)),
-    hsl(var(--accent)),
-    hsl(var(--secondary)),
-    hsl(var(--primary))
-  );
+  background: conic-gradient(from 140deg, hsl(var(--neon-blue)), hsl(var(--neon-purple)), hsl(var(--neon-pink)), hsl(var(--neon-blue)));
   filter: blur(16px);
-  opacity: 0.18;
+  opacity: 0.20;
   z-index: -1;
   pointer-events: none;
 }
 
-/* The living AI core */
+/* The living AI core — spectral gem */
 .aura-orb { border-radius: 9999px; }
 .aura-orb-halo {
   position: absolute;
   inset: -35%;
   border-radius: 9999px;
-  background: radial-gradient(circle, hsl(var(--primary) / 0.4), hsl(var(--accent) / 0.12) 55%, transparent 72%);
+  background: radial-gradient(circle, hsl(var(--neon-blue) / 0.42), hsl(var(--neon-purple) / 0.14) 55%, transparent 72%);
   filter: blur(6px);
 }
 .aura-orb-ring {
   position: absolute;
   inset: 0;
   border-radius: 9999px;
-  background: conic-gradient(
-    from 0deg,
-    hsl(var(--secondary)),
-    hsl(var(--primary)),
-    hsl(var(--accent)),
-    transparent 78%,
-    hsl(var(--secondary))
-  );
+  background: conic-gradient(from 0deg, hsl(var(--neon-blue)), hsl(var(--neon-purple)), hsl(var(--neon-pink)), transparent 78%, hsl(var(--neon-blue)));
   -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3.5px), black calc(100% - 2.5px));
   mask: radial-gradient(closest-side, transparent calc(100% - 3.5px), black calc(100% - 2.5px));
 }
@@ -652,13 +537,7 @@
   position: absolute;
   inset: 24%;
   border-radius: 9999px;
-  background: radial-gradient(
-    circle at 36% 30%,
-    hsl(0 0% 100% / 0.9),
-    hsl(var(--secondary) / 0.85) 28%,
-    hsl(var(--primary) / 0.8) 62%,
-    hsl(var(--accent) / 0.55) 100%
-  );
+  background: radial-gradient(circle at 36% 30%, hsl(0 0% 100% / 0.92), hsl(var(--neon-blue) / 0.9) 30%, hsl(var(--neon-purple) / 0.8) 64%, hsl(var(--neon-pink) / 0.6) 100%);
 }
 
 /* Telemetry chip + status LEDs */
@@ -671,61 +550,48 @@
   border: 1px solid hsl(var(--border) / 0.9);
   background: hsl(var(--card) / 0.6);
   backdrop-filter: blur(10px);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.625rem;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
   color: hsl(var(--muted-foreground));
 }
-
 .aura-led {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  display: inline-block;
-  flex-shrink: 0;
+  width: 6px; height: 6px; border-radius: 9999px;
+  display: inline-block; flex-shrink: 0;
   background: hsl(var(--led, var(--primary)));
   box-shadow: 0 0 10px hsl(var(--led, var(--primary)) / 0.9);
 }
 
-/* Ring gauge (credits / storage at a glance) */
+/* Ring gauge (credits / storage) — spectral sweep */
 .aura-gauge {
   border-radius: 9999px;
-  background: conic-gradient(
-    from 230deg,
-    hsl(var(--accent)) 0deg,
-    hsl(var(--primary)) calc(var(--gauge, 70) * 1.3deg),
-    hsl(var(--secondary)) calc(var(--gauge, 70) * 2.6deg),
-    hsl(var(--border)) calc(var(--gauge, 70) * 2.6deg)
-  );
+  background: conic-gradient(from 230deg,
+    hsl(var(--neon-blue)) 0deg,
+    hsl(var(--neon-purple)) calc(var(--gauge, 70) * 1.3deg),
+    hsl(var(--neon-pink)) calc(var(--gauge, 70) * 2.6deg),
+    hsl(var(--border)) calc(var(--gauge, 70) * 2.6deg));
   -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 6px), black calc(100% - 5px));
   mask: radial-gradient(closest-side, transparent calc(100% - 6px), black calc(100% - 5px));
 }
 
-/* Mono micro-labels for telemetry */
+/* Mono micro-labels */
 .aura-microlabel {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.625rem;
   font-weight: 500;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: hsl(var(--muted-foreground) / 0.85);
 }
 
-/* Iridescent hairline divider */
+/* Spectral hairline divider */
 .aura-hairline {
   height: 1px;
   border: none;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    hsl(var(--primary) / 0.55) 20%,
-    hsl(var(--accent) / 0.55) 50%,
-    hsl(var(--secondary) / 0.55) 80%,
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, hsl(var(--neon-blue) / 0.6) 20%, hsl(var(--neon-purple) / 0.6) 50%, hsl(var(--neon-pink) / 0.6) 80%, transparent);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -736,17 +602,13 @@
   .aura-led-pulse { animation: aura-led 2.2s ease-in-out infinite; }
 }
 
-@keyframes aura-spin-angle {
-  to { --aura-angle: 360deg; }
-}
-@keyframes aura-rotate {
-  to { transform: rotate(360deg); }
-}
+@keyframes aura-spin-angle { to { --aura-angle: 360deg; } }
+@keyframes aura-rotate { to { transform: rotate(360deg); } }
 @keyframes aura-breathe {
   0%, 100% { opacity: 0.8; transform: scale(0.95); }
-  50%      { opacity: 1;   transform: scale(1.06); }
+  50% { opacity: 1; transform: scale(1.06); }
 }
 @keyframes aura-led {
   0%, 100% { opacity: 1; }
-  50%      { opacity: 0.35; }
+  50% { opacity: 0.35; }
 }

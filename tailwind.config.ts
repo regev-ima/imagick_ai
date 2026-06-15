@@ -14,9 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Sora', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['Unbounded', 'Sora', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Figtree', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['Roboto Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -90,8 +90,8 @@ export default {
           "50%": { transform: "translateY(-10px)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px hsl(330 100% 60% / 0.3)" },
-          "50%": { boxShadow: "0 0 40px hsl(330 100% 60% / 0.5)" },
+          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--glow-primary) / 0.3)" },
+          "50%": { boxShadow: "0 0 40px hsl(var(--glow-primary) / 0.5)" },
         },
         "gradient-shift": {
           "0%": { backgroundPosition: "0% 50%" },
