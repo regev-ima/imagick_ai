@@ -85,7 +85,7 @@ function SessionTrackerProvider({ children }: { children: React.ReactNode }) {
 }
 
 const App = () => (
-  <ThemeProvider defaultTheme="light" storageKey="imagick-ui-theme">
+  <ThemeProvider defaultTheme="dark" storageKey="imagick-ui-theme">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Sonner

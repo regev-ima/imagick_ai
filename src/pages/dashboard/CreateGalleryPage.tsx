@@ -61,6 +61,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// The AI mark — a 4-point sparkle (the logo star), royal blue.
+// Copied from the approved LIGHTROOM dashboard.
+function Sparkle({
+  size = 16,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 const galleryTypes: { value: string; label: string; icon: LucideIcon }[] = [
   { value: "wedding", label: "Wedding", icon: Heart },
   { value: "portrait", label: "Portrait", icon: UserIcon },
@@ -462,9 +488,9 @@ export default function CreateGalleryPage() {
   const busy = isUploading || isTransferring;
 
   return (
-    <div className="relative min-h-full px-4 py-8 lg:px-8 lg:py-12">
+    <div className="relative min-h-full bg-background px-4 py-8 lg:px-8 lg:py-12">
       <div className="relative mx-auto max-w-3xl">
-        {/* Folio header — back mark + running title */}
+        {/* Header — back mark + module index */}
         <div className="flex items-center justify-between gap-4">
           <Button
             variant="ghost"
@@ -476,10 +502,10 @@ export default function CreateGalleryPage() {
             <ArrowLeft className="h-4 w-4" />
             <span className="caption">Galleries</span>
           </Button>
-          <span className="caption hidden sm:inline">New gallery · No. {String(active.number).padStart(2, "0")} / 04</span>
+          <span className="caption hidden sm:inline">New collection · {String(active.number).padStart(2, "0")} / 04</span>
         </div>
 
-        {/* Editorial stepper — a mono numbered index on a hairline */}
+        {/* Stepper — mono module index on a hairline */}
         <div className="mt-6">
           <hr className="aura-hairline" />
           <div className="-mt-px flex flex-wrap items-stretch">
@@ -499,17 +525,17 @@ export default function CreateGalleryPage() {
                     reachable ? "cursor-pointer" : "cursor-default",
                   )}
                 >
-                  {/* active vermilion tick on the rule */}
+                  {/* active = royal-blue tick on the rule */}
                   <span
                     className={cn(
-                      "absolute left-0 top-0 h-px w-full -translate-y-px transition-colors",
-                      isActive ? "bg-accent" : "bg-transparent",
+                      "absolute left-0 top-0 h-0.5 w-full -translate-y-px transition-colors",
+                      isActive ? "bg-primary" : "bg-transparent",
                     )}
                   />
                   <span
                     className={cn(
-                      "folio text-sm transition-colors",
-                      isActive ? "text-accent" : isDone ? "text-foreground" : "text-muted-foreground/60",
+                      "caption text-xs transition-colors",
+                      isActive ? "text-primary" : isDone ? "text-foreground" : "text-muted-foreground/55",
                     )}
                   >
                     {String(step.number).padStart(2, "0")}
@@ -526,27 +552,28 @@ export default function CreateGalleryPage() {
                   >
                     {step.title}
                   </span>
-                  {isDone && !isActive && <Check className="h-3 w-3 text-accent" />}
+                  {isDone && !isActive && <Check className="h-3 w-3 text-primary" strokeWidth={2.5} />}
                 </button>
               );
             })}
           </div>
+          <hr className="aura-hairline" />
         </div>
 
-        {/* Masthead — Aura seal + Fraunces ask + helper line */}
+        {/* Masthead — Aura mark + step title + helper line */}
         <div className="mb-7 mt-9 flex items-start gap-4">
-          <Orb className="mt-1 h-10 w-10 shrink-0" />
+          <Orb className="mt-0.5 h-10 w-10 shrink-0" />
           <div className="min-w-0">
-            <span className="caption text-accent">Aura</span>
-            <h1 className="mt-1 font-display text-3xl font-semibold leading-[1.05] tracking-tight lg:text-4xl">
+            <span className="aura-microlabel text-accent">Aura</span>
+            <h1 className="mt-1 text-3xl font-bold leading-[1.05] tracking-tight text-foreground lg:text-4xl">
               {active.ask}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{active.say}</p>
           </div>
         </div>
 
-        {/* Step plate */}
-        <div className="plate rounded-md p-5 lg:p-8">
+        {/* Step panel */}
+        <div className="glass-card rounded-md p-5 lg:p-8">
           <AnimatePresence mode="wait">
             {/* Step 1: Details */}
             {currentStep === 1 && (
@@ -581,7 +608,7 @@ export default function CreateGalleryPage() {
                 <div>
                   <div className="mb-4 flex items-baseline justify-between border-b border-border pb-2">
                     <label className="aura-microlabel">What kind of shoot?</label>
-                    <span className="folio text-xs text-muted-foreground/70">{String(galleryTypes.length).padStart(2, "0")}</span>
+                    <span className="caption text-muted-foreground/70">{String(galleryTypes.length).padStart(2, "0")}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-4">
                     {galleryTypes.map((type) => {
@@ -593,12 +620,12 @@ export default function CreateGalleryPage() {
                           onClick={() => setGalleryType(type.value)}
                           className={cn(
                             "relative flex flex-col items-center gap-2.5 bg-card p-4 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
-                            selected ? "bg-accent/[0.06]" : "hover:bg-muted/60",
+                            selected ? "bg-primary/[0.1]" : "hover:bg-muted/60",
                           )}
                         >
-                          {/* active = vermilion keyline, NOT a glowing fill */}
-                          {selected && <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-accent" />}
-                          <type.icon className={cn("h-5 w-5 transition-colors", selected ? "text-accent" : "text-foreground/70")} strokeWidth={1.5} />
+                          {/* active = royal-blue keyline */}
+                          {selected && <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-primary" />}
+                          <type.icon className={cn("h-5 w-5 transition-colors", selected ? "text-primary" : "text-foreground/70")} strokeWidth={1.5} />
                           <span className={cn("text-xs font-medium transition-colors", selected ? "text-foreground" : "text-muted-foreground")}>
                             {type.label}
                           </span>
@@ -620,7 +647,7 @@ export default function CreateGalleryPage() {
                 transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
                 className="space-y-6"
               >
-                {/* Tabs — editorial segmented control */}
+                {/* Tabs — segmented control */}
                 <div className="inline-flex items-center rounded-md border border-border bg-card p-0.5">
                   {([["public", "Public looks", Globe], ["yours", "Your looks", Sparkles]] as const).map(([key, label, Icon]) => (
                     <button
@@ -641,7 +668,7 @@ export default function CreateGalleryPage() {
                 {/* Selected index — chips with cover + count */}
                 <div className="border-y border-border py-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="folio shrink-0 text-sm text-accent">{String(selectedStyles.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 03</span></span>
+                    <span className="caption shrink-0 text-primary">{String(selectedStyles.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 03</span></span>
                     {selectedStyles.length === 0 ? (
                       <span className="text-sm text-muted-foreground">Nothing picked yet. Choose a look below.</span>
                     ) : (
@@ -659,15 +686,15 @@ export default function CreateGalleryPage() {
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 0.9, opacity: 0 }}
                                 transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
-                                className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/[0.06] py-1 pl-1 pr-2"
+                                className="flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/[0.1] py-1 pl-1 pr-2"
                               >
                                 {chipCover ? (
                                   <img src={getThumbnailUrl(chipCover)} alt="" className="h-6 w-6 rounded-full object-cover" />
                                 ) : (
-                                  <div className="h-6 w-6 rounded-full bg-accent/20" />
+                                  <div className="h-6 w-6 rounded-full bg-primary/20" />
                                 )}
                                 <span className="max-w-[80px] truncate text-xs font-medium">{style.name}</span>
-                                <button onClick={() => toggleStyle(id)} className="grid h-4 w-4 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent/15 hover:text-accent">
+                                <button onClick={() => toggleStyle(id)} className="grid h-4 w-4 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-primary/15 hover:text-primary">
                                   <X className="h-3 w-3" />
                                 </button>
                               </motion.div>
@@ -688,7 +715,7 @@ export default function CreateGalleryPage() {
                   return filteredStyles.length === 0 ? (
                     <div className="border-t border-border py-14 text-center">
                       <Orb className="mx-auto mb-4 h-9 w-9" />
-                      <p className="font-display text-lg text-foreground">
+                      <p className="text-lg font-semibold text-foreground">
                         {styleTab === "yours" ? "You haven't trained a look yet." : "No public looks available."}
                       </p>
                       {styleTab === "yours" && (
@@ -722,13 +749,13 @@ export default function CreateGalleryPage() {
                                 }
                               }}
                               className={cn(
-                                "plate group relative flex cursor-pointer items-center gap-3.5 rounded-md p-2.5 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
-                                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent",
-                                isSelected ? "bg-accent/[0.04]" : "hover:bg-muted/50",
+                                "group relative flex cursor-pointer items-center gap-3.5 rounded-md border border-border bg-card p-2.5 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary",
+                                isSelected ? "bg-primary/[0.06]" : "hover:bg-muted/50",
                               )}
                             >
-                              {/* selected = vermilion keyline */}
-                              {isSelected && <span className="pointer-events-none absolute inset-0 rounded-md ring-1 ring-inset ring-accent" />}
+                              {/* selected = royal-blue ring */}
+                              {isSelected && <span className="pointer-events-none absolute inset-0 rounded-md ring-1 ring-inset ring-primary" />}
                               {coverUrl ? (
                                 <img src={getThumbnailUrl(coverUrl)} alt={style.name} className="plate-keyline h-16 w-16 shrink-0 rounded object-cover" />
                               ) : (
@@ -737,8 +764,8 @@ export default function CreateGalleryPage() {
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                  {style.is_preset ? <Palette className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.75} /> : <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.75} />}
-                                  <span className="truncate font-display text-base font-medium leading-tight">{style.name}</span>
+                                  {style.is_preset ? <Palette className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.75} /> : <Sparkle size={13} className="shrink-0 text-accent" />}
+                                  <span className="truncate text-base font-semibold leading-tight text-foreground">{style.name}</span>
                                 </div>
                                 {style.description && <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{style.description}</p>}
                                 <div className="mt-1.5 flex flex-wrap items-center gap-1">
@@ -760,8 +787,8 @@ export default function CreateGalleryPage() {
                                   <Eye className="h-4 w-4" />
                                 </button>
                                 {isSelected && (
-                                  <span className="grid h-7 w-7 place-items-center rounded-full bg-accent text-accent-foreground">
-                                    <Check className="h-4 w-4" />
+                                  <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground">
+                                    <Check className="h-4 w-4" strokeWidth={2.5} />
                                   </span>
                                 )}
                               </div>
@@ -789,7 +816,7 @@ export default function CreateGalleryPage() {
                   <div className="flex items-center gap-3.5">
                     <Orb className="h-10 w-10 shrink-0" />
                     <div>
-                      <p className="font-display text-lg font-medium leading-tight">Let me cull this gallery</p>
+                      <p className="text-lg font-semibold leading-tight text-foreground">Let me cull this gallery</p>
                       <p className="mt-0.5 text-sm text-muted-foreground">I rank every frame before any editing, so you only pay to edit the keepers.</p>
                     </div>
                   </div>
@@ -810,7 +837,7 @@ export default function CreateGalleryPage() {
                           <div className="flex items-center gap-2">
                             <Tag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                             <span className="text-sm font-medium">What should I look for?</span>
-                            <span className="folio text-xs text-accent">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
+                            <span className="caption text-primary">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Globe className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
@@ -868,12 +895,12 @@ export default function CreateGalleryPage() {
                                 className={cn(
                                   "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
                                   on
-                                    ? "border-accent/50 bg-accent/[0.06] text-foreground"
+                                    ? "border-primary/50 bg-primary/[0.1] text-foreground"
                                     : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground",
                                   locked && "cursor-not-allowed opacity-50",
                                 )}
                               >
-                                {on && <Check className="mr-1 inline h-3 w-3 text-accent" />}
+                                {on && <Check className="mr-1 inline h-3 w-3 text-primary" strokeWidth={2.5} />}
                                 {category}
                               </button>
                             );
@@ -969,7 +996,7 @@ export default function CreateGalleryPage() {
                         >
                           <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
                             <motion.div
-                              className="h-full rounded-full bg-accent"
+                              className="h-full rounded-full bg-primary"
                               initial={{ width: 0 }}
                               animate={{ width: `${percentage}%` }}
                               transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
@@ -979,7 +1006,7 @@ export default function CreateGalleryPage() {
                             <span className="truncate text-muted-foreground">
                               Receiving <span className="font-medium text-foreground">{uploadProgress.currentFile}</span>
                             </span>
-                            <span className="shrink-0 font-mono text-accent">
+                            <span className="shrink-0 font-mono text-primary">
                               {percentage}% · {formatMB(uploadedBytes)}/{formatMB(totalBytes)} MB
                             </span>
                           </div>
@@ -994,19 +1021,19 @@ export default function CreateGalleryPage() {
                   <div className={cn("rounded-md border p-4 text-sm", hasInsufficientEdits && !isUnlimited ? "border-destructive/40 bg-destructive/[0.06]" : "border-border bg-card")}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-muted-foreground">
-                        <span className="folio text-foreground">{imageCount}</span> photos
+                        <span className="font-mono font-semibold text-foreground">{imageCount}</span> photos
                         <span className="text-muted-foreground/50"> × </span>
-                        <span className="folio text-foreground">{stylesCount}</span> look{stylesCount > 1 ? "s" : ""}
+                        <span className="font-mono font-semibold text-foreground">{stylesCount}</span> look{stylesCount > 1 ? "s" : ""}
                         <span className="text-muted-foreground/50"> = </span>
-                        <strong className="folio text-accent">{editsNeeded} edits</strong>
+                        <strong className="font-mono text-primary">{editsNeeded} edits</strong>
                       </span>
                       {isUnlimited ? (
-                        <span className="inline-flex items-center gap-1.5 text-accent">
-                          <Check className="h-4 w-4" /> Covered by your plan
+                        <span className="inline-flex items-center gap-1.5 text-secondary">
+                          <Check className="h-4 w-4" strokeWidth={2.5} /> Covered by your plan
                         </span>
                       ) : (
                         <span className="text-muted-foreground">
-                          <strong className={cn("folio", hasInsufficientEdits ? "text-destructive" : "text-foreground")}>{availableEdits.toLocaleString()}</strong> available
+                          <strong className={cn("font-mono font-semibold", hasInsufficientEdits ? "text-destructive" : "text-foreground")}>{availableEdits.toLocaleString()}</strong> available
                           {editsReserved > 0 && <span className="ml-1 text-xs">({editsReserved.toLocaleString()} reserved)</span>}
                         </span>
                       )}
@@ -1077,7 +1104,7 @@ export default function CreateGalleryPage() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4" />
+                    <Sparkle size={15} />
                     Hand it to Aura
                   </>
                 )}

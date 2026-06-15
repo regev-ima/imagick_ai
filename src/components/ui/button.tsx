@@ -20,13 +20,13 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/90",
         ghost: "hover:bg-muted hover:text-foreground",
         link: "text-accent underline-offset-4 hover:underline",
-        // The engine / AI CTA — solid vermilion ink, the editor's mark.
-        // No gradient, no glow: intelligence reads as a confident accent.
-        glow: "bg-accent text-accent-foreground hover:bg-accent/90",
+        // The engine / AI CTA — royal-blue with a precise blue glow (the
+        // "our AI" sparkle accent). Confident, not neon-rainbow.
+        glow: "bg-accent text-accent-foreground shadow-[0_0_18px_-6px_hsl(var(--accent)/0.7)] hover:bg-accent/90 hover:shadow-[0_0_26px_-6px_hsl(var(--accent)/0.9)]",
         "glow-secondary":
           "bg-secondary text-secondary-foreground hover:bg-secondary/90",
         gradient:
-          "bg-accent text-accent-foreground hover:bg-accent/90",
+          "bg-[image:var(--gradient-primary)] text-white shadow-[0_0_18px_-6px_hsl(var(--glow-primary)/0.7)] hover:shadow-[0_0_26px_-6px_hsl(var(--glow-primary)/0.9)]",
         glass: "glass-card text-foreground hover:bg-muted border border-border",
       },
       size: {

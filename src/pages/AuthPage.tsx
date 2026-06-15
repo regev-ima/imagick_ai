@@ -9,10 +9,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
-import imagickLogo from "@/assets/imagick-logo-light.png";
+import imagickLogo from "@/assets/imagick-logo.png";
 import heroPlate from "@/assets/hero-gallery-1.jpg";
 
-// Editorial colophon — big folio numerals + tracked mono captions.
+// LIGHTROOM stats readout — mono caption labels + folio numerals.
 const colophon = [
   { stat: "10+", label: "Hours saved / week" },
   { stat: "90%", label: "Faster culling" },
@@ -20,6 +20,32 @@ const colophon = [
 ];
 
 const EASE = [0.22, 0.61, 0.36, 1] as const;
+
+// The AI mark: a royal-blue 4-point sparkle (the logo star).
+// Copied from the approved LightroomDashboard preview.
+function Sparkle({
+  size = 16,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -229,14 +255,15 @@ export default function AuthPage() {
           transition={{ duration: 0.5, ease: EASE }}
           className="w-full max-w-md"
         >
-          <div className="text-center mb-8">
-            <img src={imagickLogo} alt="Imagick.ai" className="h-7 mx-auto" />
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <Sparkle size={18} className="text-primary" />
+            <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
           </div>
 
-          <div className="plate rounded-md p-8 text-center">
+          <div className="glass-card rounded-md p-8 text-center">
             <div className="aura-microlabel mb-5">Verify · Account</div>
-            <MailCheck className="w-10 h-10 text-accent mx-auto mb-5" />
-            <h2 className="font-display text-3xl font-semibold mb-3 leading-tight">Check your email</h2>
+            <MailCheck className="w-10 h-10 text-primary mx-auto mb-5" />
+            <h2 className="font-sans text-3xl font-semibold tracking-tight mb-3 leading-tight">Check your email</h2>
             <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
               We sent a verification link to{" "}
               <span className="font-medium text-foreground">{pendingEmail}</span>.
@@ -271,7 +298,7 @@ export default function AuthPage() {
                 setPendingEmail("");
                 setIsLogin(true);
               }}
-              className="text-sm text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent font-medium inline-flex items-center gap-1.5"
+              className="text-sm text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary font-medium inline-flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Back to sign in
@@ -285,20 +312,29 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* ─────────────────────────────────────────────────────────────
-          LEFT — the title page. Ivory canvas, Fraunces headline,
-          editorial colophon. No glow, no gradient panel.
+          LEFT — the studio. Dark graphite, royal-blue accents, the
+          hero photo framed as a Lightroom cell, Inter headline,
+          stats as a mono readout row.
          ───────────────────────────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-3/5 relative border-r border-border">
-        <div className="flex flex-col justify-between w-full px-14 xl:px-20 py-14">
-          {/* Dateline / brand row */}
+      <div className="hidden lg:flex lg:w-3/5 relative bg-background border-r border-border overflow-hidden">
+        {/* subtle royal-blue accent glow */}
+        <div
+          className="pointer-events-none absolute -left-32 top-1/4 h-[28rem] w-[28rem] rounded-full blur-3xl"
+          style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.14) 0%, transparent 70%)" }}
+        />
+        <div className="relative flex flex-col justify-between w-full px-14 xl:px-20 py-14">
+          {/* Brand row — Ai mark + sparkle */}
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: EASE }}
             className="flex items-center justify-between"
           >
-            <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
-            <span className="caption">Imagick.ai · No. 01 · 2026</span>
+            <div className="flex items-center gap-2.5">
+              <Sparkle size={20} className="text-primary" />
+              <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
+            </div>
+            <span className="aura-microlabel">AI Workspace · 2026</span>
           </motion.div>
 
           {/* Title block */}
@@ -308,14 +344,17 @@ export default function AuthPage() {
             transition={{ duration: 0.6, ease: EASE, delay: 0.05 }}
             className="max-w-2xl"
           >
-            <div className="aura-microlabel mb-6">The AI editing studio</div>
+            <div className="aura-microlabel mb-6 flex items-center gap-2">
+              <Sparkle size={11} className="text-primary" />
+              The AI editing studio
+            </div>
 
-            <h1 className="font-display font-semibold leading-[0.98] tracking-[-0.02em] text-foreground text-6xl xl:text-7xl">
+            <h1 className="font-sans font-bold leading-[0.98] tracking-[-0.03em] text-foreground text-6xl xl:text-7xl">
               Your editing.
               <br />
               Your AI.
               <br />
-              <span className="text-accent">Zero presets.</span>
+              <span className="text-primary">Zero presets.</span>
             </h1>
 
             <div className="aura-hairline my-9 max-w-md" />
@@ -325,26 +364,36 @@ export default function AuthPage() {
               thousands of photos in seconds.
             </p>
 
-            {/* Optional matted hero plate */}
+            {/* Hero photo framed as a Lightroom cell */}
             <motion.figure
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: EASE, delay: 0.18 }}
-              className="plate plate-keyline rounded-md mt-10 p-2.5 max-w-md"
+              className="surface-2 plate-keyline rounded-md mt-10 p-2.5 max-w-md"
             >
-              <img
-                src={heroPlate}
-                alt="A photograph edited with a custom AI style"
-                className="w-full aspect-[16/9] object-cover rounded-[2px]"
-              />
+              <div className="relative overflow-hidden rounded-[2px] border border-border">
+                <img
+                  src={heroPlate}
+                  alt="A photograph edited with a custom AI style"
+                  className="w-full aspect-[16/9] object-cover"
+                />
+                {/* AI auto badge */}
+                <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground shadow-lg">
+                  <Sparkle size={12} className="text-primary-foreground" />
+                  Auto
+                </div>
+              </div>
               <figcaption className="caption flex items-center justify-between pt-2.5 px-0.5">
-                <span>Plate I — Your style, applied</span>
-                <span className="text-accent">●</span>
+                <span>Your style, applied</span>
+                <span className="flex items-center gap-1.5 text-primary">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  READY
+                </span>
               </figcaption>
             </motion.figure>
           </motion.div>
 
-          {/* Colophon — big folio numerals + tracked captions */}
+          {/* Stats — mono readout row (caption labels + folio numerals) */}
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
@@ -365,9 +414,9 @@ export default function AuthPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          RIGHT — the desk. Letterpress sign-in card on paper.
+          RIGHT — the dark sign-in panel.
          ───────────────────────────────────────────────────────────── */}
-      <div className="w-full lg:w-2/5 flex items-center justify-center p-6 lg:p-12 bg-surface-2/40">
+      <div className="w-full lg:w-2/5 flex items-center justify-center p-6 lg:p-12 bg-background">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -376,22 +425,26 @@ export default function AuthPage() {
         >
           {/* Mobile-only header */}
           <div className="text-center mb-8 lg:hidden">
-            <img src={imagickLogo} alt="Imagick.ai" className="h-7 mx-auto mb-4" />
+            <div className="flex items-center justify-center gap-2.5 mb-4">
+              <Sparkle size={18} className="text-primary" />
+              <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
+            </div>
             <div className="aura-microlabel mb-3">The AI editing studio</div>
-            <h1 className="font-display text-3xl font-semibold leading-tight">
+            <h1 className="font-sans text-3xl font-bold tracking-tight leading-tight">
               Your editing. Your AI.
               <br />
-              <span className="text-accent">Zero presets.</span>
+              <span className="text-primary">Zero presets.</span>
             </h1>
             <p className="caption mt-4">10,000+ photographers editing with AI</p>
           </div>
 
           {/* Desktop header */}
           <div className="hidden lg:block mb-8">
-            <div className="aura-microlabel mb-3">
-              {isForgotPassword ? "Recover · Access" : isLogin ? "The desk · Sign in" : "The desk · Register"}
+            <div className="aura-microlabel mb-3 flex items-center gap-2">
+              <Sparkle size={11} className="text-primary" />
+              {isForgotPassword ? "Recover · Access" : isLogin ? "AI Workspace · Sign in" : "AI Workspace · Register"}
             </div>
-            <h2 className="font-display text-4xl font-semibold leading-tight">
+            <h2 className="font-sans text-4xl font-bold tracking-tight leading-tight">
               {isForgotPassword ? "Reset password" : isLogin ? "Welcome back" : "Start editing"}
             </h2>
             <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
@@ -403,7 +456,7 @@ export default function AuthPage() {
             </p>
           </div>
 
-          <div className="plate rounded-md p-7">
+          <div className="glass-card rounded-md p-7">
             {/* Google Sign In — prominent at top, hidden in forgot mode */}
             {!isForgotPassword && (
               <>
@@ -411,7 +464,7 @@ export default function AuthPage() {
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={isLoading || isGoogleLoading}
-                  className="relative w-full h-11 rounded-md text-sm font-semibold flex items-center justify-center gap-3 border border-border bg-card text-foreground transition-[border-color,background-color] duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:border-foreground/30 hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+                  className="relative w-full h-11 rounded-md text-sm font-semibold flex items-center justify-center gap-3 border border-border bg-surface-2 text-foreground transition-[border-color,background-color] duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:border-primary/40 hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
                 >
                   {isGoogleLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -434,16 +487,16 @@ export default function AuthPage() {
                     <span className="w-full aura-hairline" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-card px-3 caption">or continue with email</span>
+                    <span className="glass-card px-3 caption !border-0 !shadow-none">or continue with email</span>
                   </div>
                 </div>
               </>
             )}
 
             {isForgotPassword && passwordResetSent && (
-              <div className="rounded-md border border-border bg-surface-2/60 p-6 text-center space-y-3">
-                <MailCheck className="w-10 h-10 mx-auto text-accent" />
-                <h3 className="font-display text-2xl font-semibold">Check your email</h3>
+              <div className="rounded-md border border-border bg-surface-2 p-6 text-center space-y-3">
+                <MailCheck className="w-10 h-10 mx-auto text-primary" />
+                <h3 className="font-sans text-2xl font-semibold tracking-tight">Check your email</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   If an account exists for <strong className="text-foreground">{formData.email}</strong>,
                   we've sent a reset link. It can take a minute to arrive — also check spam.
@@ -451,7 +504,7 @@ export default function AuthPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  className="text-accent hover:text-accent"
+                  className="text-primary hover:text-primary"
                   onClick={() => {
                     setIsForgotPassword(false);
                     setPasswordResetSent(false);
@@ -475,7 +528,7 @@ export default function AuthPage() {
                       placeholder="you@example.com"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="pl-10 rounded-md bg-background border-input focus-visible:border-accent focus-visible:ring-accent/25 focus-visible:shadow-none"
+                      className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                       required
                     />
                   </div>
@@ -494,7 +547,7 @@ export default function AuthPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, fullName: e.target.value })
                       }
-                      className="pl-10 rounded-md bg-background border-input focus-visible:border-accent focus-visible:ring-accent/25 focus-visible:shadow-none"
+                      className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                       required={!isLogin}
                     />
                   </div>
@@ -512,7 +565,7 @@ export default function AuthPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, email: e.target.value })
                     }
-                    className="pl-10 rounded-md bg-background border-input focus-visible:border-accent focus-visible:ring-accent/25 focus-visible:shadow-none"
+                    className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                     required
                   />
                 </div>
@@ -529,7 +582,7 @@ export default function AuthPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
                     }
-                    className="pl-10 pr-10 rounded-md bg-background border-input focus-visible:border-accent focus-visible:ring-accent/25 focus-visible:shadow-none"
+                    className="pl-10 pr-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                     required
                     minLength={8}
                   />
@@ -554,7 +607,7 @@ export default function AuthPage() {
                     <button
                       type="button"
                       onClick={() => setIsForgotPassword(true)}
-                      className="caption hover:text-accent transition-colors"
+                      className="caption hover:text-primary transition-colors"
                     >
                       Forgot password?
                     </button>
@@ -591,7 +644,7 @@ export default function AuthPage() {
                   <button
                     type="button"
                     onClick={() => setIsForgotPassword(false)}
-                    className="text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent font-medium inline-flex items-center gap-1.5"
+                    className="text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary font-medium inline-flex items-center gap-1.5"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     Back to sign in
@@ -602,7 +655,7 @@ export default function AuthPage() {
                     <button
                       type="button"
                       onClick={() => setIsLogin(!isLogin)}
-                      className="text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent font-medium"
+                      className="text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary font-medium"
                     >
                       {isLogin ? "Sign up" : "Sign in"}
                     </button>
@@ -612,8 +665,15 @@ export default function AuthPage() {
             </div>
           </div>
 
+          {!isForgotPassword && (
+            <div className="flex items-center justify-center gap-1.5 mt-5 caption text-primary">
+              <Sparkle size={11} className="text-primary" />
+              <span>The Imagick.ai workspace</span>
+            </div>
+          )}
+
           {!isLogin && !isForgotPassword && (
-            <div className="flex items-center justify-center gap-4 mt-5 caption">
+            <div className="flex items-center justify-center gap-4 mt-3 caption">
               <span className="flex items-center gap-1.5"><Lock className="w-3 h-3" /> Secure</span>
               <span className="w-px h-3 bg-border" />
               <span>No credit card</span>
