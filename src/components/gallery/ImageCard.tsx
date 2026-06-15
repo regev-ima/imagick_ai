@@ -533,13 +533,13 @@ function ImageCardImpl({
                     {processingInfo.sentAt && (
                       <p className="tabular-nums">
                         <span className="text-muted-foreground">Sent: </span>
-                        {new Date(processingInfo.sentAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        {new Date(processingInfo.sentAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                       </p>
                     )}
                     {processingInfo.completedAt && (
                       <p className="tabular-nums">
                         <span className="text-muted-foreground">Completed: </span>
-                        {new Date(processingInfo.completedAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        {new Date(processingInfo.completedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                       </p>
                     )}
                     {processingInfo.attempts > 0 && (

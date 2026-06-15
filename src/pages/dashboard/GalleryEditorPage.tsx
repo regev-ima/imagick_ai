@@ -5,29 +5,20 @@ import {
   ArrowLeft,
   Rows3,
   Grid3X3,
-  Filter,
   Download,
   Trash2,
   Star,
-  Share2,
-  Settings,
   Check,
   X,
   ChevronLeft,
   ChevronRight,
   Heart,
-  Copy,
-  ExternalLink,
-  ZoomIn,
   Loader2,
   Images,
-  Wand2,
   ImageIcon,
   RotateCcw,
   Info,
   Eye,
-  Layers,
-  
   ArrowUpDown,
   CheckSquare,
   MoreHorizontal,
@@ -65,15 +56,13 @@ import { AICullingModal } from "@/components/gallery/AICullingModal";
 import { GallerySettingsModal } from "@/components/gallery/GallerySettingsModal";
 import { FilterOptions, defaultFilters } from "@/components/gallery/filter-types";
 import { ShareGalleryModal } from "@/components/gallery/ShareGalleryModal";
-import { StyleSelector, StyleComparison } from "@/components/gallery/StyleSelector";
+import { StyleComparison } from "@/components/gallery/StyleSelector";
 import { ImageCard } from "@/components/gallery/ImageCard";
 import { FailedImagesProvider } from "@/components/gallery/FailedImagesContext";
 import { ProblemImagesSection } from "@/components/gallery/ProblemImagesSection";
 import { VirtualizedImageGrid } from "@/components/gallery/VirtualizedImageGrid";
 import { CullingStatusBanner } from "@/components/gallery/CullingStatusBanner";
-import { CatalogModeSelector, CatalogMode } from "@/components/gallery/CatalogModeSelector";
-import { CatalogSection } from "@/components/gallery/CatalogSection";
-import { GroupingView } from "@/components/gallery/GroupingView";
+import { type CatalogMode } from "@/components/gallery/CatalogModeSelector";
 import { FaceGallery } from "@/components/gallery/FaceGallery";
 import { FaceClusterImages } from "@/components/gallery/FaceClusterImages";
 import { useFaceSearch } from "@/hooks/useFaceSearch";
@@ -88,7 +77,7 @@ import { useEffectiveUser } from "@/hooks/useImpersonation";
 import { useImageProcessing } from "@/hooks/useImageProcessing";
 import { getThumbnailUrl, getPreviewUrl, getEditedThumbnailUrl, getEditedPreviewUrl } from "@/lib/imageUrls";
 import { stuckThresholdMs } from "@/lib/cullingEta";
-import { useJustifiedLayout, computeJustifiedLayout } from "@/hooks/useJustifiedLayout";
+import { useJustifiedLayout } from "@/hooks/useJustifiedLayout";
 import { useImageDimensions } from "@/hooks/useImageDimensions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
@@ -165,6 +154,12 @@ export default function GalleryEditorPage() {
   const [showTrash, setShowTrash] = useState(false);
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState<string | null>(null);
+
+  // Reset the bulk-delete confirm whenever the selection changes so a
+  // stale "Trash N?" prompt can never fire against a different set.
+  useEffect(() => { setConfirmBulkDelete(false); }, [selectedImages]);
 
   // Persist view preferences to localStorage
   useEffect(() => { localStorage.setItem("imagick-gallery-view-mode", viewMode); }, [viewMode]);
@@ -881,73 +876,6 @@ export default function GalleryEditorPage() {
     });
     return { loose: loose.size, medium: medium.size, strict: strict.size };
   }, [images]);
-  const groupedByStars = useMemo(() => {
-    if (catalogMode !== "stars") return null;
-    const groups: Record<number, typeof images> = {};
-    for (let stars = 5; stars >= 1; stars--) {
-      groups[stars] = filteredImages.filter(img => {
-        const rating = cullingScoreToStars((img as any).culling_score, cullingScoreMode) || 1;
-        return rating === stars;
-      });
-    }
-    return groups;
-  }, [filteredImages, catalogMode]);
-
-  // Normalize label for grouping
-  const normalizeLabel = useCallback((label: string): string => {
-    if (!label || label === "N/A" || label === "none") return "Uncategorized";
-    if (label.length > 40) {
-      const words = label.split(' ').slice(0, 4);
-      return words.join(' ') + '...';
-    }
-    return label.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  }, []);
-
-  // Group images by category (for catalog mode)
-  const groupedByCategory = useMemo(() => {
-    if (catalogMode !== "categories") return null;
-    const groups: Record<string, typeof images> = {};
-    filteredImages.forEach(img => {
-      const label = normalizeLabel((img as any).culling_label || "Uncategorized");
-      if (!groups[label]) groups[label] = [];
-      groups[label].push(img);
-    });
-    // Sort by count descending
-    return Object.fromEntries(
-      Object.entries(groups).sort((a, b) => b[1].length - a[1].length)
-    );
-  }, [filteredImages, catalogMode, normalizeLabel]);
-
-  // Justified layout per catalog group (stars/categories)
-  const catalogJustifiedSizes = useMemo(() => {
-    if (viewMode !== "masonry" || !containerWidth) return new Map<string, { width: number; height: number }>();
-
-    const enrichImage = (img: typeof images[0]) => {
-      if (img.width && img.height) return img;
-      const detected = detectedDimensions.get(img.id);
-      if (detected) return { ...img, width: detected.width, height: detected.height };
-      return img;
-    };
-
-    const combined = new Map<string, { width: number; height: number }>();
-
-    if (catalogMode === "stars" && groupedByStars) {
-      for (const stars of [5, 4, 3, 2, 1]) {
-        const group = (groupedByStars[stars] || []).map(enrichImage);
-        const sizes = computeJustifiedLayout(group, containerWidth, 160, 2);
-        sizes.forEach((v, k) => combined.set(k, v));
-      }
-    } else if (catalogMode === "categories" && groupedByCategory) {
-      for (const categoryImages of Object.values(groupedByCategory)) {
-        const group = categoryImages.map(enrichImage);
-        const sizes = computeJustifiedLayout(group, containerWidth, 160, 2);
-        sizes.forEach((v, k) => combined.set(k, v));
-      }
-    }
-
-    return combined;
-  }, [viewMode, containerWidth, catalogMode, groupedByStars, groupedByCategory, detectedDimensions]);
-
 
   const getSimilarImages = useCallback((imageId: string) => {
     const image = images.find(img => img.id === imageId);
@@ -1362,6 +1290,23 @@ export default function GalleryEditorPage() {
     setLastSelectedIndex(null);
   };
 
+  // Escape from a non-default catalog mode (e.g. Faces) back to the
+  // default gallery view, so a user is never stuck. The lightbox's own
+  // Escape handler takes priority when the loupe is open, so this only
+  // runs while the loupe is closed.
+  useEffect(() => {
+    if (catalogMode === "default" || lightboxImage) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+      setSelectedFaceCluster(null);
+      setCatalogMode("default");
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [catalogMode, lightboxImage]);
+
   const copyClientLink = () => {
     if (gallery?.client_link) {
       const url = `${window.location.origin}/gallery/${gallery.client_link}`;
@@ -1597,25 +1542,41 @@ export default function GalleryEditorPage() {
    <FailedImagesProvider>
     <div className="h-full flex flex-col overflow-hidden">
       {/* Compact Single-Row Header — module bar */}
-      <div
-        className="border-b border-border glass-card sticky top-0 z-20 cursor-pointer md:cursor-default"
-        onClick={() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
-      >
+      <div className="border-b border-border glass-card sticky top-0 z-20">
         <div className="px-3 py-2 flex items-center gap-2">
           {/* Left: Back + Name + Count */}
           <div className="flex items-center gap-2 min-w-0 shrink-0">
-            <Button variant="ghost" size="icon" className="w-8 h-8" asChild>
-              <Link to="/dashboard/galleries">
+            {catalogMode !== "default" ? (
+              // In a non-default catalog mode (e.g. Faces): the back arrow
+              // returns to the default gallery view rather than leaving the
+              // page, so the user is never stuck inside the mode.
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-8 h-8"
+                aria-label="Back to gallery"
+                onClick={(e) => { e.stopPropagation(); setSelectedFaceCluster(null); setCatalogMode("default"); }}
+              >
                 <ArrowLeft className="w-4 h-4" />
-              </Link>
-            </Button>
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" className="w-8 h-8" asChild>
+                <Link to="/dashboard/galleries">
+                  <ArrowLeft className="w-4 h-4" />
+                </Link>
+              </Button>
+            )}
             <Sparkle size={13} className="text-primary shrink-0" />
-            <h1 className="font-display text-sm font-semibold truncate max-w-[200px]">
+            {/* Title doubles as a scroll-to-top affordance — the gesture is
+                scoped here instead of the whole bar so the inner buttons
+                behave predictably. */}
+            <h1
+              className="font-display text-sm font-semibold truncate max-w-[200px] cursor-pointer"
+              onClick={() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+              title="Scroll to top"
+            >
               {gallery.name}
             </h1>
-            <span className="aura-chip">
-              <span className="folio text-foreground">{gallery.total_images}</span> frames
-            </span>
           </div>
 
           {/* Right: Sort, View Mode, Count */}
@@ -1878,18 +1839,29 @@ export default function GalleryEditorPage() {
                 <span className="aura-led aura-led-pulse" />
                 <span className="folio text-foreground">{selectedImages.length}</span> selected
               </span>
+
+              {/* High-frequency actions — always visible */}
+              <Button
+                variant="glow"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setShowReEditModal(true)}
+              >
+                <Sparkle size={14} className="text-current" />
+                Re-edit
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
                 className="gap-1.5"
-                onClick={selectAll}
+                onClick={handleDownload}
               >
-                <CheckSquare className="w-4 h-4" />
-                Select All
+                <Download className="w-4 h-4" />
+                Download
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="gap-1.5"
                 onClick={async () => {
                   const { error } = await supabase
@@ -1905,70 +1877,100 @@ export default function GalleryEditorPage() {
                 <Heart className="w-4 h-4" />
                 Like
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1.5"
-                disabled={selectedImages.length !== 1}
-                onClick={() => setHeroImage.mutate(selectedImages[0])}
-              >
-                <Star className="w-4 h-4" />
-                Hero
-              </Button>
-              <Button
-                variant="glow"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setShowReEditModal(true)}
-              >
-                <Sparkle size={14} className="text-current" />
-                Re-edit
-              </Button>
+
+              {/* Lower-frequency actions — overflow menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1.5">
-                    <Tag className="w-4 h-4" />
-                    Category
+                    <MoreHorizontal className="w-4 h-4" />
+                    More
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center">
+                  <DropdownMenuItem onClick={selectAll}>
+                    <CheckSquare className="w-4 h-4 mr-2" />
+                    Select All
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={selectedImages.length !== 1}
+                    onClick={() => setHeroImage.mutate(selectedImages[0])}
+                  >
+                    <Star className="w-4 h-4 mr-2" />
+                    Set Hero
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   {availableLabels.map((item) => (
                     <DropdownMenuItem
                       key={item.label}
                       onClick={() => updateImageCategory.mutate({ imageIds: selectedImages, label: item.label })}
                     >
+                      <Tag className="w-4 h-4 mr-2" />
                       {item.label}
                     </DropdownMenuItem>
                   ))}
-                  {availableLabels.length > 0 && <DropdownMenuSeparator />}
                   <DropdownMenuItem
-                    onClick={() => {
-                      const label = prompt("Enter new category name:");
-                      if (label?.trim()) {
-                        updateImageCategory.mutate({ imageIds: selectedImages, label: label.trim() });
-                      }
-                    }}
+                    onSelect={(e) => { e.preventDefault(); setNewCategoryInput(""); }}
                   >
+                    <Tag className="w-4 h-4 mr-2" />
                     + New Category
                   </DropdownMenuItem>
+                  {newCategoryInput !== null && (
+                    <div className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={newCategoryInput}
+                        onChange={(e) => setNewCategoryInput(e.target.value)}
+                        placeholder="New category name..."
+                        autoFocus
+                        className="w-full px-2 py-1 text-xs rounded-md bg-white/[0.03] border border-white/[0.08] outline-none focus:border-primary/50 transition-colors"
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter" && newCategoryInput.trim()) {
+                            updateImageCategory.mutate({ imageIds: selectedImages, label: newCategoryInput.trim() });
+                            setNewCategoryInput(null);
+                          }
+                          if (e.key === "Escape") setNewCategoryInput(null);
+                        }}
+                      />
+                    </div>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={handleDownload}
-              >
-                <Download className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1.5 text-destructive hover:text-destructive"
-                onClick={() => softDeleteImages.mutate(selectedImages)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+
+              {/* Destructive zone — visually separated, labelled, two-step confirm */}
+              <div className="h-6 w-px bg-border/60 mx-0.5" aria-hidden />
+              {confirmBulkDelete ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-destructive hover:text-destructive border-destructive/30"
+                    onClick={() => { softDeleteImages.mutate(selectedImages); setConfirmBulkDelete(false); }}
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Trash {selectedImages.length}?
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setConfirmBulkDelete(false)}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => setConfirmBulkDelete(true)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Trash
+                </Button>
+              )}
+
               <Button variant="ghost" size="icon" className="w-8 h-8" onClick={clearSelection}>
                 <X className="w-4 h-4" />
               </Button>
@@ -2220,138 +2222,6 @@ export default function GalleryEditorPage() {
               isStarting={isFaceDetectionRunning}
             />
           )
-        ) : catalogMode === "grouping" ? (
-          // Grouping View - Special layout for similarity groups
-          <GroupingView
-            images={filteredImages.map(img => ({
-              id: img.id,
-              original_url: img.original_url,
-              culling_score: (img as any).culling_score ?? null,
-              similarity_group_1: (img as any).similarity_group_1 ?? null,
-              similarity_group_2: (img as any).similarity_group_2 ?? null,
-              similarity_group_3: (img as any).similarity_group_3 ?? null,
-            }))}
-            onImageClick={openLightbox}
-            onSelectionToggle={handleSelectionToggle}
-            selectedImages={selectedImages}
-          />
-        ) : catalogMode === "stars" && groupedByStars ? (
-          // Stars catalog view
-          <div className="space-y-2">
-            {[5, 4, 3, 2, 1].map(stars => {
-              const starImages = groupedByStars[stars] || [];
-              if (starImages.length === 0) return null;
-              return (
-                <CatalogSection
-                  key={stars}
-                  title={`${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`}
-                  count={starImages.length}
-                  icon={<Star className={cn("w-4 h-4", stars >= 4 ? "text-rating fill-rating" : "text-muted-foreground")} />}
-                  defaultExpanded={stars >= 4}
-                >
-                  <div className={cn(
-                    "gap-0.5",
-                    viewMode === "masonry" 
-                      ? "flex flex-wrap" 
-                      : "grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
-                  )}>
-                    {starImages.map((image, index) => {
-                      const computed = catalogJustifiedSizes.get(image.id);
-                      return (
-                      <ImageCard
-                        key={image.id}
-                        image={{
-                          id: image.id,
-                          filename: image.filename,
-                          original_url: image.original_url,
-                          is_hero: image.is_hero,
-                          is_liked: image.is_liked,
-                          ai_rating: image.ai_rating,
-                          culling_score: (image as any).culling_score,
-                          width: image.width,
-                          height: image.height
-                        }}
-                        index={index}
-                        thumbnailUrl={getImageThumbnail(image)}
-                        viewMode={viewMode}
-                        isSelected={selectedImages.includes(image.id)}
-                        computedWidth={computed?.width}
-                        computedHeight={computed?.height}
-                        status={image.status}
-                        onImageClick={handleImageClick}
-                        onSelectionToggle={handleSelectionToggle}
-                        onOpenLightbox={openLightbox}
-                        onToggleLike={(id) => toggleLike.mutate(id)}
-                        processingInfo={canViewAnalytics ? {
-                          sentAt: image.last_processing_attempt_at || null,
-                          completedAt: image.processing_completed_at || null,
-                          attempts: image.processing_attempts || 0,
-                          error: image.status === "error" ? image.last_processing_error || null : null,
-                        } : undefined}
-                      />
-                      );
-                    })}
-                  </div>
-                </CatalogSection>
-              );
-            })}
-          </div>
-        ) : catalogMode === "categories" && groupedByCategory ? (
-          // Categories catalog view
-          <div className="space-y-2">
-            {Object.entries(groupedByCategory).map(([category, categoryImages]) => (
-              <CatalogSection
-                key={category}
-                title={category}
-                count={categoryImages.length}
-                defaultExpanded={categoryImages.length <= 20}
-              >
-                <div className={cn(
-                  "gap-0.5",
-                  viewMode === "masonry" 
-                    ? "flex flex-wrap" 
-                    : "grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
-                )}>
-                  {categoryImages.map((image, index) => {
-                    const computed = catalogJustifiedSizes.get(image.id);
-                    return (
-                    <ImageCard
-                      key={image.id}
-                      image={{
-                        id: image.id,
-                        filename: image.filename,
-                        original_url: image.original_url,
-                        is_hero: image.is_hero,
-                        is_liked: image.is_liked,
-                        ai_rating: image.ai_rating,
-                        culling_score: (image as any).culling_score,
-                        width: image.width,
-                        height: image.height
-                      }}
-                      index={index}
-                      thumbnailUrl={getImageThumbnail(image)}
-                      viewMode={viewMode}
-                      isSelected={selectedImages.includes(image.id)}
-                      computedWidth={computed?.width}
-                      computedHeight={computed?.height}
-                      status={image.status}
-                      onImageClick={handleImageClick}
-                      onSelectionToggle={handleSelectionToggle}
-                      onOpenLightbox={openLightbox}
-                      onToggleLike={(id) => toggleLike.mutate(id)}
-                      processingInfo={canViewAnalytics ? {
-                        sentAt: image.last_processing_attempt_at || null,
-                        completedAt: image.processing_completed_at || null,
-                        attempts: image.processing_attempts || 0,
-                        error: image.status === "error" ? image.last_processing_error || null : null,
-                      } : undefined}
-                    />
-                    );
-                  })}
-                </div>
-              </CatalogSection>
-            ))}
-          </div>
         ) : (
           // Default grid / masonry view
           (() => {
@@ -2583,6 +2453,29 @@ export default function GalleryEditorPage() {
                 >
                   <X className="w-6 h-6" />
                 </Button>
+
+                {/* Photo identity — minimal mono readout (filename · index/total · stars) */}
+                {currentDetailsImage && (() => {
+                  const stars = cullingScoreToStars((currentDetailsImage as any).culling_score, cullingScoreMode) || currentDetailsImage.ai_rating || 0;
+                  const total = filteredImages.length;
+                  const position = currentLightboxIndex >= 0 ? currentLightboxIndex + 1 : 1;
+                  return (
+                    <div className="hidden sm:flex items-center gap-2 min-w-0 ml-1 mr-2">
+                      <span className="caption truncate max-w-[200px]" title={currentDetailsImage.filename}>
+                        {currentDetailsImage.filename}
+                      </span>
+                      <span className="aura-chip tabular-nums">
+                        <span className="folio text-foreground">{position}</span>/{total}
+                      </span>
+                      {stars > 0 && (
+                        <span className="aura-chip tabular-nums">
+                          <Star className="w-3 h-3 text-rating fill-rating" />
+                          {stars}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Center: Compare Mode Toggle */}
                 {galleryStylesData.length > 0 && (
@@ -2823,7 +2716,7 @@ export default function GalleryEditorPage() {
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <span className="aura-chip absolute top-3 left-3 bg-black/70 text-white/90 backdrop-blur-sm">
+                          <span className="aura-chip absolute top-3 left-3 z-10 bg-background/85 backdrop-blur-sm">
                             Original
                           </span>
                         </div>
@@ -2837,7 +2730,7 @@ export default function GalleryEditorPage() {
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <span className="aura-chip absolute top-3 right-3 bg-black/70 text-primary backdrop-blur-sm">
+                          <span className="aura-chip absolute top-3 right-3 z-10 bg-background/85 backdrop-blur-sm text-primary">
                             <Sparkle size={10} className="text-primary" />
                             {selectedStyleData?.name || "Edited"}
                           </span>

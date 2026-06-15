@@ -508,51 +508,6 @@ function ActionButton({
   );
 }
 
-/* ── Toolbar Icon Button ── */
-function ToolbarIconButton({
-  icon,
-  label,
-  isActive,
-  onClick,
-  disabled,
-  badge,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  isActive?: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  badge?: number;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "w-8 h-8 relative",
-            isActive && "bg-primary/15 text-primary",
-            disabled && "opacity-40"
-          )}
-          onClick={onClick}
-          disabled={disabled}
-        >
-          {icon}
-          {badge !== undefined && (
-            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[9px] leading-none rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5">
-              {badge > 99 ? "99+" : badge}
-            </span>
-          )}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="left" className="text-xs">
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 /* ── Styles Panel ── */
 function StylesPanel({
   allStyles,
@@ -1012,13 +967,13 @@ function GalleryInfoPanel({
   const formatTime = (iso: string | null) => {
     if (!iso) return null;
     const d = new Date(iso);
-    return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   };
 
   const formatDate = (iso: string | null) => {
     if (!iso) return null;
     const d = new Date(iso);
-    return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+    return d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit" });
   };
 
   const duration = (start: string | null, end: string | null) => {
