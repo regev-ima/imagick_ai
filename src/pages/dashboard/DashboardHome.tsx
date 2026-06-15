@@ -42,15 +42,15 @@ const todayLabel = () =>
     .toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
     .toUpperCase();
 
-// One orchestrated reveal: each block fades up with a short cascade.
+// ATELIER motion — calm fades only, like turning a page. No bounce, no float.
+const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
 const deck = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
+  show: { transition: { staggerChildren: 0.07 } },
 };
-const EASE: [number, number, number, number] = [0.2, 0, 0, 1];
 const rise = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
 };
 
 const PROMPT_CHIPS = [
@@ -194,7 +194,7 @@ export default function DashboardHome() {
     mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 
   return (
-    <div className="relative min-h-full px-4 py-6 lg:px-8 lg:py-8">
+    <div className="relative min-h-full bg-background px-5 py-8 lg:px-12 lg:py-12">
       <OnboardingQuestionnaire
         isOpen={showQuestionnaire}
         questions={unansweredQuestions}
@@ -204,188 +204,185 @@ export default function DashboardHome() {
         isSaving={isSavingQuestionnaire}
       />
 
-      {/* Ambient spectral wash behind the hero — pure decoration, photo-first. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] opacity-70"
-        style={{
-          background:
-            "radial-gradient(120% 70% at 50% -20%, hsl(var(--neon-purple) / 0.10), transparent 60%)",
-        }}
-      />
-
-      <motion.div variants={deck} initial="hidden" animate="show" className="relative mx-auto w-full max-w-[1400px] space-y-10">
-        {/* ════ HERO COMMAND DECK ═══════════════════════════════════════
-            Greeting + Aura command bar + briefing share one spectral frame,
-            so the assistant reads as the hero of the whole screen. */}
-        <motion.section variants={rise} className="aura-ai-border overflow-hidden rounded-[32px]">
-          <div className="relative rounded-[32px] bg-card/60 px-5 py-7 backdrop-blur-2xl sm:px-8 sm:py-9">
-            {/* Greeting line */}
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-mono text-[11px] tracking-[0.22em] text-muted-foreground">{todayLabel()}</p>
-                <h1 className="mt-2.5 font-display text-3xl font-bold tracking-tight lg:text-[2.75rem] lg:leading-[1.05]">
-                  {getGreeting()}, <span className="text-gradient-primary">{userName}</span>
-                </h1>
-              </div>
-              {currentPlan && (
-                <span className="aura-chip shrink-0" style={{ "--led": "var(--rating)" } as CSSProperties}>
-                  <Zap className="h-3 w-3" style={{ color: "hsl(var(--rating))" }} /> {currentPlan.name}
-                </span>
-              )}
-            </div>
-
-            {/* Aura command bar — the centerpiece */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                openAuraCommand(promptText);
-                setPromptText("");
-              }}
-              className="mt-7"
-            >
-              <div className="relative flex items-center gap-3 rounded-full border border-border/70 bg-background/70 px-4 py-3 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.04)] backdrop-blur-xl sm:px-5 sm:py-4">
-                <Orb className="h-7 w-7 shrink-0" />
-                <input
-                  value={promptText}
-                  onChange={(e) => setPromptText(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/75 sm:text-base"
-                  placeholder="Ask Aura: find a collection, start one, train a style… (⌘K)"
-                  aria-label="Ask Aura"
-                />
-                <button
-                  type="submit"
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[image:var(--gradient-primary)] text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_22px_-6px_hsl(var(--glow-primary)/0.8)] transition-transform duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] active:scale-95"
-                  aria-label="Send to Aura"
-                >
-                  <Send className="h-4 w-4" />
-                </button>
-              </div>
-            </form>
-
-            {/* Quick-action chips */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {PROMPT_CHIPS.map((c) => (
-                <Link
-                  key={c.label}
-                  to={c.to}
-                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/50 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground backdrop-blur-md transition-colors duration-150 hover:border-primary/50 hover:text-foreground"
-                >
-                  <c.icon className="h-3 w-3 text-primary" /> {c.label}
-                </Link>
-              ))}
-            </div>
-
-            {/* Aura briefing — folded into the hero as Aura's own voice */}
-            {!isEmpty && briefing.length > 0 && (
-              <>
-                <hr className="aura-hairline my-6" />
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:gap-4">
-                  <div className="flex shrink-0 items-center gap-2.5 sm:pt-0.5">
-                    <Orb className="h-6 w-6" />
-                    <span className="aura-microlabel">Aura briefing</span>
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    {briefing.map((b) => (
-                      <p key={b.key} className="text-sm text-muted-foreground">
-                        {b.text}{" "}
-                        <Link to={b.to} className="whitespace-nowrap font-medium text-primary hover:underline">
-                          {b.label} →
-                        </Link>
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              </>
+      <motion.div
+        variants={deck}
+        initial="hidden"
+        animate="show"
+        className="relative mx-auto w-full max-w-[1280px]"
+      >
+        {/* ════ 1 · MASTHEAD ══════════════════════════════════════════════
+            A magazine cover head: a tracked-mono dateline + plan on one
+            hairline row, then a very large Fraunces greeting, then a rule. */}
+        <motion.header variants={rise}>
+          <div className="flex items-baseline justify-between gap-4 pb-3">
+            <span className="caption">{todayLabel()}</span>
+            {currentPlan && (
+              <span className="caption flex items-center gap-1.5 text-foreground">
+                <Zap className="h-3 w-3 text-accent" />
+                {currentPlan.name}
+              </span>
             )}
+          </div>
+          <hr className="aura-hairline" />
+          <h1 className="mt-7 font-display text-4xl font-semibold leading-[1.02] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+            {getGreeting()},{" "}
+            <span className="italic text-accent">{userName}</span>
+          </h1>
+          <hr className="aura-hairline mt-7" />
+        </motion.header>
+
+        {/* ════ 2 · THE EDITOR'S DESK (Aura command bar) ═════════════════
+            A quiet full-width input on a hairline, the Orb seal on the
+            left, a vermilion focus underline, quick actions as links. */}
+        <motion.section variants={rise} className="mt-7">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              openAuraCommand(promptText);
+              setPromptText("");
+            }}
+            className="group/desk relative"
+          >
+            <div className="flex items-center gap-4 pb-3">
+              <Orb className="h-7 w-7 shrink-0" />
+              <input
+                value={promptText}
+                onChange={(e) => setPromptText(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent font-sans text-base text-foreground outline-none placeholder:text-muted-foreground/80 sm:text-lg"
+                placeholder="Ask the editor — find a collection, start one, train a style…   (⌘K)"
+                aria-label="Ask Aura"
+              />
+              <button
+                type="submit"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-[--radius] bg-primary text-primary-foreground transition-opacity duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:opacity-90 active:opacity-100"
+                aria-label="Send to Aura"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+            {/* Hairline with a vermilion focus underline */}
+            <div className="relative h-px w-full bg-border">
+              <span className="absolute inset-y-0 left-0 w-0 bg-accent transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] group-focus-within/desk:w-full" />
+            </div>
+          </form>
+
+          {/* Quick actions — small underlined editorial links, not chips */}
+          <div className="mt-4 flex flex-wrap items-center gap-x-7 gap-y-2">
+            <span className="aura-microlabel">Quick marks</span>
+            {PROMPT_CHIPS.map((c) => (
+              <Link
+                key={c.label}
+                to={c.to}
+                className="group/link inline-flex items-center gap-1.5 font-sans text-sm text-foreground/80 transition-colors hover:text-accent"
+              >
+                <c.icon className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover/link:text-accent" />
+                <span className="underline decoration-border underline-offset-4 transition-colors group-hover/link:decoration-accent">
+                  {c.label}
+                </span>
+              </Link>
+            ))}
           </div>
         </motion.section>
 
         {galleriesLoading ? (
-          <div className="flex items-center justify-center py-24">
+          <div className="flex items-center justify-center py-32">
             <Orb className="h-12 w-12" />
           </div>
         ) : isEmpty ? (
-          /* ════ EMPTY — command-deck welcome ══════════════════════════ */
-          <motion.div variants={rise} className="overflow-hidden rounded-[28px] border border-border/60 bg-card/50 p-8 text-center backdrop-blur-xl lg:p-14">
-            <Orb className="mx-auto h-20 w-20" />
-            <h2 className="mt-7 font-display text-2xl font-bold tracking-tight lg:text-3xl">
-              Your studio is <span className="text-gradient-primary">ready</span>
+          /* ════ 7 · EMPTY STATE — an editorial title page ════════════════ */
+          <motion.div variants={rise} className="mt-16">
+            <span className="folio block text-6xl text-accent sm:text-7xl">01</span>
+            <h2 className="mt-4 max-w-2xl font-display text-3xl font-semibold leading-[1.05] tracking-tight sm:text-4xl">
+              Your studio is set. The first <span className="italic text-accent">plate</span> is yours to print.
             </h2>
-            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-              Upload a shoot and Aura culls it, retouches it in your style, and hands you a gallery
-              to deliver. It starts with one collection.
+            <p className="mt-5 max-w-lg font-sans text-base leading-relaxed text-muted-foreground">
+              Upload a shoot and the editor culls it, retouches it in your style, and hands you a
+              gallery to deliver. It starts with one collection.
             </p>
-            <div className="mx-auto mt-9 grid max-w-2xl gap-3 sm:grid-cols-3">
+
+            <hr className="aura-hairline mt-10" />
+            <ol className="grid gap-px overflow-hidden border-x border-b border-border sm:grid-cols-3">
               {[
                 { icon: Images, title: "Upload", body: "Drop a full shoot — RAW or JPEG." },
                 { icon: Sparkles, title: "Enhance", body: "Aura scores, culls and retouches." },
                 { icon: Share2, title: "Deliver", body: "Share a gallery, no account needed." },
               ].map((s, i) => (
-                <div key={s.title} className="rounded-2xl border border-border/60 bg-background/40 p-5 text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] text-primary">0{i + 1}</span>
-                    <s.icon className="h-4 w-4 text-primary" />
+                <li key={s.title} className="bg-card p-6">
+                  <div className="flex items-baseline gap-3">
+                    <span className="folio text-2xl text-accent">0{i + 1}</span>
+                    <s.icon className="h-4 w-4 text-foreground/70" />
                   </div>
-                  <p className="mt-3 font-semibold">{s.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{s.body}</p>
-                </div>
+                  <p className="mt-4 font-display text-xl font-semibold tracking-tight">{s.title}</p>
+                  <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted-foreground">
+                    {s.body}
+                  </p>
+                </li>
               ))}
-            </div>
+            </ol>
+
             <Link
               to="/dashboard/galleries/new"
-              className="mt-9 inline-flex items-center gap-2 rounded-full bg-[image:var(--gradient-primary)] px-7 py-3 font-semibold text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_30px_-8px_hsl(var(--glow-primary)/0.8)] transition-transform duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] active:scale-[0.97]"
+              className="mt-10 inline-flex items-center gap-2 rounded-[--radius] bg-primary px-7 py-3.5 font-sans text-sm font-semibold text-primary-foreground transition-opacity duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:opacity-90"
             >
-              <Plus className="h-4.5 w-4.5" /> Create your first collection
+              <Plus className="h-4 w-4" /> Create your first collection
             </Link>
           </motion.div>
         ) : (
           <>
-            {/* ════ TELEMETRY RAIL ════════════════════════════════════════
-                Instrument strip — the 4 live stats read as one panel. */}
-            <motion.section variants={rise}>
-              <p className="aura-microlabel mb-3">Studio telemetry</p>
-              <div className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-border/60 bg-border/40 xl:grid-cols-4">
-                {/* Edits gauge */}
-                <div className="relative overflow-hidden bg-card/80 p-5 backdrop-blur-xl">
-                  <p className="aura-microlabel flex items-center gap-2">
-                    {hasGiftCredits ? <Gift className="h-3 w-3" /> : <Zap className="h-3 w-3" />} AI edits left
-                  </p>
-                  <div className="mt-4 flex items-center gap-4">
-                    <div className="relative h-16 w-16 shrink-0">
-                      <div className="aura-gauge absolute inset-0" style={{ "--gauge": Math.round(editsPercent) } as CSSProperties} />
-                      {isUnlimited && (
-                        <span className="absolute inset-0 grid place-items-center font-display text-lg text-primary">∞</span>
-                      )}
-                    </div>
+            {/* ════ 3 · THE LEDGER (telemetry) ════════════════════════════
+                A single horizontal row of editorial stats, separated by
+                hairline dividers. Big Fraunces numerals over caption labels.
+                Not glowing cards. */}
+            <motion.section variants={rise} className="mt-14">
+              <div className="flex items-baseline justify-between pb-4">
+                <span className="aura-microlabel">The ledger</span>
+                <span className="caption">Studio telemetry</span>
+              </div>
+              <hr className="aura-hairline" />
+              <div className="grid grid-cols-2 divide-border md:grid-cols-4 md:divide-x">
+                {/* AI edits remaining */}
+                <div className="border-b border-border py-7 pr-6 md:border-b-0">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-display text-2xl font-semibold leading-none">
-                        {isUnlimited ? "Unlimited" : editsRemaining.toLocaleString()}
+                      <p className="font-display text-4xl font-semibold leading-none tracking-tight sm:text-5xl">
+                        {isUnlimited ? "∞" : editsRemaining.toLocaleString()}
                       </p>
-                      <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                      <p className="caption mt-3 flex items-center gap-1.5">
+                        {hasGiftCredits ? <Gift className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+                        AI edits left
+                      </p>
+                      <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
                         {isUnlimited ? "no cap" : `of ${editsTotal.toLocaleString()}`}
                       </p>
                       {hasGiftCredits && (
-                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[hsl(var(--rating)/0.3)] bg-[hsl(var(--rating)/0.12)] px-1.5 py-0.5 font-mono text-[10px] text-[hsl(var(--rating))]">
-                          <Gift className="h-2.5 w-2.5" /> +{giftCreditsTotal.toLocaleString()}
-                        </span>
+                        <p className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] text-accent">
+                          <Gift className="h-2.5 w-2.5" /> +{giftCreditsTotal.toLocaleString()} gift
+                        </p>
                       )}
+                    </div>
+                    <div className="relative h-11 w-11 shrink-0">
+                      <div
+                        className="aura-gauge absolute inset-0"
+                        style={{ "--gauge": Math.round(editsPercent) } as CSSProperties}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Storage */}
-                <div className="relative overflow-hidden bg-card/80 p-5 backdrop-blur-xl">
-                  <p className="aura-microlabel flex items-center gap-2">
-                    <HardDrive className="h-3 w-3" /> Storage
-                  </p>
-                  <p className="mt-4 font-display text-2xl font-semibold leading-none">
+                <div className="border-b border-border py-7 md:border-b-0 md:px-6">
+                  <p className="font-display text-4xl font-semibold leading-none tracking-tight sm:text-5xl">
                     {formatStorage(storageUsedMb)}
                   </p>
-                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">of {maxStorageGb} GB</p>
-                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <p className="caption mt-3 flex items-center gap-1.5">
+                    <HardDrive className="h-3 w-3" /> Storage
+                  </p>
+                  <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                    of {maxStorageGb} GB
+                  </p>
+                  <div className="mt-3 h-px w-full bg-border">
                     <div
-                      className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]"
+                      className="h-px bg-accent"
                       style={{ width: `${Math.min(100, storagePercent)}%` }}
                     />
                   </div>
@@ -394,220 +391,289 @@ export default function DashboardHome() {
                 {/* Collections */}
                 <Link
                   to="/dashboard/galleries"
-                  className="group relative overflow-hidden bg-card/80 p-5 backdrop-blur-xl transition-colors duration-200 hover:bg-card"
+                  className="group py-7 pr-6 md:px-6"
                 >
-                  <p className="aura-microlabel flex items-center gap-2">
-                    <Layers className="h-3 w-3" /> Collections
-                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/0 transition-colors group-hover:text-primary" />
+                  <p className="flex items-baseline gap-2 font-display text-4xl font-semibold leading-none tracking-tight sm:text-5xl">
+                    {totalCollections}
+                    <ArrowUpRight className="h-4 w-4 self-start text-muted-foreground/0 transition-colors group-hover:text-accent" />
                   </p>
-                  <p className="mt-4 font-display text-3xl font-semibold leading-none">{totalCollections}</p>
-                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                  <p className="caption mt-3 flex items-center gap-1.5 transition-colors group-hover:text-accent">
+                    <Layers className="h-3 w-3" /> Collections
+                  </p>
+                  <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
                     {totalImages.toLocaleString()} images total
                   </p>
                 </Link>
 
-                {/* Engine */}
-                <div className="relative overflow-hidden bg-card/80 p-5 backdrop-blur-xl">
-                  <p className="aura-microlabel">Aura engine</p>
-                  <div className="mt-4 flex items-center gap-4">
-                    <Orb className="h-12 w-12 shrink-0" />
-                    <div className="min-w-0">
-                      {engineQueue.length > 0 ? (
-                        <>
-                          <p className="font-display text-lg font-semibold leading-none text-primary">
-                            {engineQueue.length} {engineQueue.length === 1 ? "job" : "jobs"}
-                          </p>
-                          <p className="mt-1 font-mono text-[11px] text-muted-foreground">working now</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="inline-flex items-center gap-1.5 font-display text-base font-semibold leading-none">
-                            <span className="aura-led aura-led-pulse" style={{ "--led": "var(--secondary)" } as CSSProperties} /> Idle
-                          </p>
-                          <p className="mt-1 font-mono text-[11px] text-muted-foreground">ready when you are</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                {/* Aura engine */}
+                <div className="py-7 md:px-6">
+                  {engineQueue.length > 0 ? (
+                    <p className="font-display text-4xl font-semibold leading-none tracking-tight text-accent sm:text-5xl">
+                      {engineQueue.length}
+                    </p>
+                  ) : (
+                    <p className="font-display text-4xl font-semibold leading-none tracking-tight sm:text-5xl">
+                      Idle
+                    </p>
+                  )}
+                  <p className="caption mt-3 flex items-center gap-1.5">
+                    <span
+                      className="aura-led aura-led-pulse"
+                      style={
+                        {
+                          "--led": engineQueue.length > 0 ? "var(--accent)" : "var(--secondary)",
+                        } as CSSProperties
+                      }
+                    />
+                    Aura engine
+                  </p>
+                  <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                    {engineQueue.length > 0
+                      ? `${engineQueue.length === 1 ? "job" : "jobs"} working now`
+                      : "ready when you are"}
+                  </p>
                 </div>
+              </div>
+              <hr className="aura-hairline" />
+            </motion.section>
+
+            {/* ════ 4 · STUDIO NOTES (Aura briefing) ══════════════════════
+                Up to two italic-Fraunces notes, each prefixed by a small
+                vermilion tick, with its action link. */}
+            {briefing.length > 0 && (
+              <motion.section variants={rise} className="mt-12">
+                <div className="flex items-center gap-2.5 pb-5">
+                  <Orb className="h-5 w-5" />
+                  <span className="aura-microlabel">Studio notes — from the editor</span>
+                </div>
+                <div className="space-y-5">
+                  {briefing.map((b) => (
+                    <div key={b.key} className="flex items-start gap-4">
+                      <span className="mt-2.5 h-2 w-2 shrink-0 bg-accent" aria-hidden="true" />
+                      <p className="font-display text-xl italic leading-snug text-foreground sm:text-2xl">
+                        {b.text}{" "}
+                        <Link
+                          to={b.to}
+                          className="whitespace-nowrap font-sans text-sm not-italic text-accent underline decoration-accent/40 underline-offset-4 transition-colors hover:decoration-accent"
+                        >
+                          {b.label} →
+                        </Link>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </motion.section>
+            )}
+
+            {/* ════ 5 · IN THE PRESS (engine queue) ═══════════════════════
+                A tight list of in-progress galleries. */}
+            {engineQueue.length > 0 && (
+              <motion.section variants={rise} className="mt-14">
+                <div className="flex items-baseline justify-between pb-4">
+                  <span className="aura-microlabel">In the press</span>
+                  <span className="caption">Aura is working on</span>
+                </div>
+                <hr className="aura-hairline" />
+                <ul className="divide-y divide-border">
+                  {engineQueue.map((job) => (
+                    <li key={job.id}>
+                      <Link
+                        to={`/dashboard/galleries/${job.id}`}
+                        className="group flex items-center gap-4 py-4 transition-colors hover:bg-foreground/[0.02]"
+                      >
+                        <div className="h-12 w-16 shrink-0 overflow-hidden bg-muted plate-keyline">
+                          {job.heroUrl ? (
+                            <img
+                              src={getThumbnailUrl(job.heroUrl)}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="grid h-full w-full place-items-center">
+                              <Images className="h-4 w-4 text-muted-foreground/40" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-display text-lg font-medium tracking-tight transition-colors group-hover:text-accent">
+                            {job.name}
+                          </p>
+                          <p className="font-mono text-[11px] text-muted-foreground">{job.detail}</p>
+                        </div>
+                        <div className="hidden w-40 sm:block">
+                          <div className="h-px w-full bg-border">
+                            <div className="h-px bg-accent" style={{ width: `${job.pct}%` }} />
+                          </div>
+                        </div>
+                        <span className="w-12 text-right font-mono text-sm text-accent">
+                          {job.pct}%
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <hr className="aura-hairline" />
+              </motion.section>
+            )}
+
+            {/* ════ 6 · RECENT COLLECTIONS — the photo wall ═══════════════
+                A section folio + an editorial grid of matted PLATE cards. */}
+            <motion.section variants={rise} className="mt-14">
+              <div className="flex items-end justify-between pb-5">
+                <div className="flex items-baseline gap-4">
+                  <span className="folio text-3xl text-accent">01</span>
+                  <span className="aura-microlabel">Collections</span>
+                </div>
+                <Link
+                  to="/dashboard/galleries"
+                  className="group inline-flex items-center gap-1.5 font-sans text-sm text-foreground/80 transition-colors hover:text-accent"
+                >
+                  <span className="underline decoration-border underline-offset-4 transition-colors group-hover:decoration-accent">
+                    View all
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+              <hr className="aura-hairline mb-10" />
+
+              <div className="grid grid-cols-1 gap-x-10 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
+                {galleries.map((gallery, idx) => {
+                  const pct =
+                    gallery.total_images > 0
+                      ? Math.round((gallery.processed_images / gallery.total_images) * 100)
+                      : 0;
+                  const isReady = gallery.status === "ready";
+                  const isError = gallery.status === "error";
+                  const statusLabel = isReady ? "Ready" : isError ? "Error" : "Processing";
+                  // ready = botanical ink/secondary, error = destructive, processing = vermilion
+                  const statusToken = isReady
+                    ? "var(--secondary)"
+                    : isError
+                      ? "var(--destructive)"
+                      : "var(--accent)";
+                  return (
+                    <Link key={gallery.id} to={`/dashboard/galleries/${gallery.id}`} className="group block">
+                      {/* Matted plate */}
+                      <div className="plate p-3 transition-shadow duration-300 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] group-hover:shadow-[var(--elevation-3)]">
+                        <div className="relative aspect-[4/3] overflow-hidden bg-muted plate-keyline">
+                          {gallery.hero_image_url ? (
+                            <img
+                              src={getThumbnailUrl(gallery.hero_image_url)}
+                              alt={gallery.name}
+                              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                              onError={(e) => {
+                                const t = e.currentTarget;
+                                if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url!;
+                              }}
+                            />
+                          ) : (
+                            <div className="grid h-full w-full place-items-center">
+                              <Images className="h-8 w-8 text-muted-foreground/40" />
+                            </div>
+                          )}
+                          {!isReady && !isError && pct > 0 && (
+                            <span className="absolute right-2 top-2 bg-background/85 px-1.5 py-0.5 font-mono text-[10px] text-accent backdrop-blur-sm">
+                              {pct}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Gallery plate caption */}
+                      <div className="mt-3.5 flex items-baseline justify-between gap-3 pl-0.5">
+                        <span className="caption">Plate {String(idx + 1).padStart(2, "0")}</span>
+                        <span
+                          className="caption flex items-center gap-1.5"
+                          style={{ color: `hsl(${statusToken})` }}
+                        >
+                          <span
+                            className="aura-led"
+                            style={{ "--led": statusToken } as CSSProperties}
+                          />
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate font-display text-xl font-medium tracking-tight transition-colors group-hover:text-accent">
+                        {gallery.name}
+                      </p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                        {(gallery.total_images || 0).toLocaleString()} images
+                      </p>
+                    </Link>
+                  );
+                })}
               </div>
             </motion.section>
 
-            {/* ════ WORK AREA — photos left (hero), studio rail right ══════ */}
-            <div className="grid gap-6 xl:grid-cols-[1.7fr,1fr] xl:items-start">
-              {/* ── Left column: the engine queue + the photo wall ── */}
-              <div className="space-y-6">
-                {/* Engine queue (only when something is processing) */}
-                {engineQueue.length > 0 && (
-                  <motion.section variants={rise}>
-                    <p className="aura-microlabel mb-3">Aura is working on</p>
-                    <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl">
-                      {engineQueue.map((job, i) => (
-                        <Link
-                          key={job.id}
-                          to={`/dashboard/galleries/${job.id}`}
-                          className={cn(
-                            "flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-foreground/[0.03]",
-                            i !== engineQueue.length - 1 && "border-b border-border/40",
-                          )}
-                        >
-                          <div className="h-11 w-16 shrink-0 overflow-hidden rounded-xl bg-muted">
-                            {job.heroUrl ? (
-                              <img src={getThumbnailUrl(job.heroUrl)} alt="" className="h-full w-full object-cover opacity-90" />
-                            ) : (
-                              <div className="grid h-full w-full place-items-center">
-                                <Images className="h-4 w-4 text-muted-foreground/40" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{job.name}</p>
-                            <p className="font-mono text-[11px] text-muted-foreground">{job.detail}</p>
-                          </div>
-                          <div className="hidden w-40 sm:block">
-                            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]"
-                                style={{ width: `${job.pct}%` }}
-                              />
-                            </div>
-                          </div>
-                          <span className="w-11 text-right font-mono text-xs text-primary">{job.pct}%</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </motion.section>
-                )}
-
-                {/* Recent collections — the photo wall is the hero */}
-                <motion.section variants={rise}>
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="font-display text-lg font-semibold tracking-tight">Recent collections</h2>
-                    <Link
-                      to="/dashboard/galleries"
-                      className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary"
-                    >
-                      View all <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                    {galleries.map((gallery) => {
-                      const pct =
-                        gallery.total_images > 0
-                          ? Math.round((gallery.processed_images / gallery.total_images) * 100)
-                          : 0;
-                      const isReady = gallery.status === "ready";
-                      const isError = gallery.status === "error";
-                      const ledColor = isReady
-                        ? "var(--secondary)"
-                        : isError
-                          ? "var(--destructive)"
-                          : "var(--rating)";
-                      return (
-                        <Link key={gallery.id} to={`/dashboard/galleries/${gallery.id}`} className="group">
-                          <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 [transition-timing-function:cubic-bezier(0.2,0,0,1)] hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_0_44px_-12px_hsl(var(--glow-primary)/0.4)]">
-                            <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-                              {gallery.hero_image_url ? (
-                                <img
-                                  src={getThumbnailUrl(gallery.hero_image_url)}
-                                  alt={gallery.name}
-                                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                                  onError={(e) => {
-                                    const t = e.currentTarget;
-                                    if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url!;
-                                  }}
-                                />
-                              ) : (
-                                <div className="grid h-full w-full place-items-center">
-                                  <Images className="h-8 w-8 text-muted-foreground/40" />
-                                </div>
-                              )}
-                              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/10 to-transparent" />
-                              <span
-                                className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] backdrop-blur-md"
-                                style={{ color: `hsl(${ledColor})` }}
-                              >
-                                <span className="aura-led aura-led-pulse" style={{ "--led": ledColor } as CSSProperties} />
-                                {isReady ? "Ready" : isError ? "Error" : "Processing"}
-                              </span>
-                              {!isReady && !isError && pct > 0 && (
-                                <span className="absolute right-3 top-3 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] text-primary backdrop-blur-md">
-                                  {pct}%
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                              <p className="truncate text-sm font-medium transition-colors group-hover:text-primary">
-                                {gallery.name}
-                              </p>
-                              <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                                {(gallery.total_images || 0).toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </motion.section>
+            {/* ════ APPENDIX — usage chart + quick actions ════════════════
+                Kept (restyled context): editorial appendix below the wall. */}
+            <motion.section variants={rise} className="mt-16 grid gap-12 lg:grid-cols-[1.4fr,1fr] lg:items-start">
+              <div>
+                <div className="flex items-baseline gap-4 pb-5">
+                  <span className="folio text-3xl text-accent">02</span>
+                  <span className="aura-microlabel">Usage</span>
+                </div>
+                <hr className="aura-hairline mb-6" />
+                <Suspense
+                  fallback={<div className="h-64 border border-border bg-card" />}
+                >
+                  <CreditsUsageChart />
+                </Suspense>
               </div>
 
-              {/* ── Right column: the studio rail (usage + shortcuts) ── */}
-              <motion.aside variants={rise} className="space-y-6 xl:sticky xl:top-6">
-                <div>
-                  <p className="aura-microlabel mb-3">Usage</p>
-                  <Suspense fallback={<div className="h-64 rounded-3xl border border-border/60 bg-card/50" />}>
-                    <CreditsUsageChart />
-                  </Suspense>
+              <div>
+                <div className="flex items-baseline gap-4 pb-5">
+                  <span className="folio text-3xl text-accent">03</span>
+                  <span className="aura-microlabel">In the studio</span>
                 </div>
-
-                <div>
-                  <p className="aura-microlabel mb-3">Quick actions</p>
-                  <div className="space-y-3">
-                    {[
-                      {
-                        to: "/dashboard/styles",
-                        icon: Palette,
-                        title: "Train an AI style",
-                        body: "Teach Aura your editing look, then apply it to a whole collection.",
-                      },
-                      {
-                        to: "/dashboard/galleries",
-                        icon: Share2,
-                        title: "Share with clients",
-                        body: "Send a gallery link. Clients view, favorite and download, no account.",
-                      },
-                      ...(!isUnlimited
-                        ? [
-                            {
-                              to: "/dashboard/billing",
-                              icon: Zap,
-                              title: "Need more edits?",
-                              body: "Upgrade for unlimited edits, more storage and priority processing.",
-                            },
-                          ]
-                        : []),
-                    ].map((card) => (
+                <hr className="aura-hairline" />
+                <ul className="divide-y divide-border">
+                  {[
+                    {
+                      to: "/dashboard/styles",
+                      icon: Palette,
+                      title: "Train an AI style",
+                      body: "Teach Aura your editing look, then apply it to a whole collection.",
+                    },
+                    {
+                      to: "/dashboard/galleries",
+                      icon: Share2,
+                      title: "Share with clients",
+                      body: "Send a gallery link. Clients view, favorite and download, no account.",
+                    },
+                    ...(!isUnlimited
+                      ? [
+                          {
+                            to: "/dashboard/billing",
+                            icon: Zap,
+                            title: "Need more edits?",
+                            body: "Upgrade for unlimited edits, more storage and priority processing.",
+                          },
+                        ]
+                      : []),
+                  ].map((card) => (
+                    <li key={card.to + card.title}>
                       <Link
-                        key={card.to + card.title}
                         to={card.to}
-                        className="group flex items-start gap-3 rounded-2xl border border-border/60 bg-card/55 p-4 backdrop-blur-xl transition-[border-color,transform] duration-200 [transition-timing-function:cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 hover:border-primary/50"
+                        className="group flex items-start gap-4 py-5 transition-colors hover:bg-foreground/[0.02]"
                       >
-                        <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
-                          <card.icon className="h-4.5 w-4.5" />
-                        </span>
+                        <card.icon className="mt-1 h-4 w-4 shrink-0 text-foreground/70 transition-colors group-hover:text-accent" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold transition-colors group-hover:text-primary">{card.title}</p>
-                          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{card.body}</p>
+                          <p className="font-display text-lg font-medium tracking-tight transition-colors group-hover:text-accent">
+                            {card.title}
+                          </p>
+                          <p className="mt-1 font-sans text-sm leading-relaxed text-muted-foreground">
+                            {card.body}
+                          </p>
                         </div>
-                        <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
+                        <ArrowUpRight className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-accent" />
                       </Link>
-                    ))}
-                  </div>
-                </div>
-              </motion.aside>
-            </div>
+                    </li>
+                  ))}
+                </ul>
+                <hr className="aura-hairline" />
+              </div>
+            </motion.section>
           </>
         )}
       </motion.div>

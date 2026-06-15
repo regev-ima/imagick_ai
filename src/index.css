@@ -1,232 +1,219 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Figtree:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ════════════════════════════════════════════════════════════════════
-   PRISM — Imagick.ai design system (v1)
-   Direction: Google / Gemini — clean, futuristic, friendly. Dark-first.
-   - Neutral graphite surfaces (Material 3 tonal elevation), not glass-neon.
-   - Google blue primary; Gemini spectral (blue→purple→pink) reserved for AI.
-   - Dynamic color: surfaces can be tinted from a photo's dominant hue
-     via --dynamic-* vars (Material You "color from content").
-   - Type: Inter (UI), Figtree (display), Roboto Mono (telemetry).
-   Token *names* are kept stable so every existing screen inherits the new
-   language untouched; only the values + shared utilities change.
+   ATELIER — Imagick.ai design system (v2)
+   A gallery monograph, not an AI dashboard. Light-first.
+   - Warm ivory paper, warm ink type, ONE confident accent (vermilion).
+   - Photos are matted PLATES with wide margins, hairline keylines, and
+     editorial captions — like an Aperture book or a print on a wall.
+   - NO glow, NO gradients, NO "AI sparkle". The AI is "the editor": it
+     leaves precise vermilion marks (a seal, an underline, a margin note).
+   - Type carries the identity: Fraunces (expressive serif display),
+     Inter (quiet UI), Roboto Mono (tracked editorial captions).
+   Token *names* stay stable so the whole app inherits the language.
    ════════════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
-    /* PRISM dark — neutral graphite void */
-    --background: 225 7% 9%;
-    --foreground: 220 14% 96%;
+    /* Atelier light — warm ivory paper */
+    --background: 40 30% 95.5%;          /* #F6F2EA paper */
+    --foreground: 28 16% 12%;            /* #221D17 warm ink */
 
-    /* Surfaces — Material tonal elevation */
-    --card: 222 8% 13%;
-    --card-foreground: 220 14% 96%;
-    --popover: 222 9% 15%;
-    --popover-foreground: 220 14% 96%;
-    --surface-1: 222 8% 13%;
-    --surface-2: 222 8% 16%;
-    --surface-3: 222 9% 19%;
+    /* Surfaces — paper, raised a touch. Not boxes; framed plates. */
+    --card: 42 38% 98%;
+    --card-foreground: 28 16% 12%;
+    --popover: 42 40% 98.5%;
+    --popover-foreground: 28 16% 12%;
+    --surface-1: 42 38% 98%;
+    --surface-2: 40 26% 93%;
+    --surface-3: 38 20% 89%;
 
-    /* Primary — Google blue (#4285F4) */
-    --primary: 217 89% 61%;
-    --primary-foreground: 0 0% 100%;
+    /* Primary — INK. Actions are letterpress: ink on ivory. */
+    --primary: 28 18% 13%;
+    --primary-foreground: 42 40% 97%;
 
-    /* Secondary — Google green, also the "ready/success" semantic */
-    --secondary: 137 53% 45%;
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary — muted botanical green ("ready/success") */
+    --secondary: 128 22% 30%;
+    --secondary-foreground: 42 40% 97%;
 
     /* Muted */
-    --muted: 222 7% 18%;
-    --muted-foreground: 220 9% 65%;
+    --muted: 38 20% 90%;
+    --muted-foreground: 30 8% 38%;
 
-    /* Accent — Gemini purple (#9B72CB), spectral midpoint */
-    --accent: 280 44% 62%;
-    --accent-foreground: 0 0% 100%;
+    /* Accent — VERMILION. The single signature ink. Used sparingly. */
+    --accent: 13 78% 47%;               /* #D6451F */
+    --accent-foreground: 42 40% 97%;
 
-    --destructive: 4 80% 58%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 4 68% 44%;
+    --destructive-foreground: 42 40% 97%;
 
-    --border: 220 7% 21%;
-    --input: 220 7% 21%;
-    --ring: 217 89% 61%;
+    --border: 32 18% 83%;               /* warm hairline */
+    --input: 32 18% 85%;
+    --ring: 13 78% 47%;                 /* vermilion focus */
 
-    --radius: 1rem;
+    --radius: 0.375rem;                 /* crisp, editorial — not blobby */
 
-    /* Dynamic color (Material You) — overridden per-context from a hero
-       image's dominant hue; defaults to the brand blue. */
-    --dynamic-primary: 217 89% 61%;
-    --dynamic-soft: 217 60% 30%;
+    /* Dynamic color (Material You holdover) — kept but tamed to a paper
+       wash; defaults to vermilion. Per-context override still works. */
+    --dynamic-primary: 13 78% 47%;
+    --dynamic-soft: 13 50% 88%;
 
-    /* Spectral poles — legacy "neon" names remapped to Gemini hues */
-    --neon-pink: 354 62% 64%;     /* #D96570 pole */
-    --neon-purple: 280 44% 62%;   /* #9B72CB mid  */
-    --neon-blue: 217 89% 61%;     /* #4285F4 pole */
+    /* "neon" legacy names → editorial inks (ink / vermilion / terracotta) */
+    --neon-pink: 18 64% 52%;
+    --neon-purple: 13 78% 47%;
+    --neon-blue: 28 18% 13%;
 
-    /* Text-gradient endpoints */
-    --gradient-start: 217 89% 61%;
-    --gradient-end: 354 62% 64%;
+    /* Text rule endpoints — ink → vermilion */
+    --gradient-start: 28 18% 13%;
+    --gradient-end: 13 78% 47%;
 
-    /* Sidebar */
-    --sidebar-background: 224 8% 11%;
-    --sidebar-foreground: 220 14% 96%;
-    --sidebar-primary: 217 89% 61%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 8% 16%;
-    --sidebar-accent-foreground: 220 14% 96%;
-    --sidebar-border: 220 7% 18%;
-    --sidebar-ring: 217 89% 61%;
+    /* Sidebar — a light paper rail with ink marks (was a dark rail) */
+    --sidebar-background: 40 28% 93.5%;
+    --sidebar-foreground: 30 10% 30%;
+    --sidebar-primary: 13 78% 47%;
+    --sidebar-primary-foreground: 42 40% 97%;
+    --sidebar-accent: 38 22% 88%;
+    --sidebar-accent-foreground: 28 18% 13%;
+    --sidebar-border: 32 18% 82%;
+    --sidebar-ring: 13 78% 47%;
 
-    /* Glow tokens (spectral) */
-    --glow-primary: 217 89% 61%;
-    --glow-secondary: 280 44% 62%;
-    --glow-accent: 354 62% 64%;
+    /* Glow tokens kept for compat but desaturated to ink shadow */
+    --glow-primary: 28 18% 13%;
+    --glow-secondary: 13 78% 47%;
+    --glow-accent: 18 64% 52%;
 
-    /* Rating star — warm amber (Google), theme-invariant */
-    --rating: 42 96% 60%;
+    /* Rating star — editorial ink (no gold neon); vermilion mark */
+    --rating: 13 78% 47%;
 
-    /* Motion — Material emphasized easing; UI feedback stays under 250ms */
-    --ease-out-strong: cubic-bezier(0.2, 0, 0, 1);
-    --ease-in-out-strong: cubic-bezier(0.3, 0, 0, 1);
+    /* Motion — like turning a page: calm, no bounce */
+    --ease-out-strong: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-in-out-strong: cubic-bezier(0.65, 0, 0.35, 1);
 
-    /* The AI signature — Gemini spectral gradient. Reserved for engine
-       actions (Aura, processing, suggestions, generate). */
-    --gradient-primary: linear-gradient(115deg, hsl(217 89% 61%) 0%, hsl(280 44% 62%) 50%, hsl(354 62% 64%) 100%);
-    --gradient-secondary: linear-gradient(115deg, hsl(217 89% 61%) 0%, hsl(280 44% 62%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(280 44% 62%) 0%, hsl(217 89% 61%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(222 8% 13%) 0%, hsl(225 7% 9%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(217 89% 61% / 0.18) 0%, transparent 70%);
+    /* The AI signature is NOT a rainbow. It's the editor's vermilion ink.
+       Kept under the same var names so existing call-sites read as ink. */
+    --gradient-primary: linear-gradient(100deg, hsl(13 78% 47%) 0%, hsl(8 72% 41%) 100%);
+    --gradient-secondary: linear-gradient(100deg, hsl(28 18% 13%) 0%, hsl(13 78% 47%) 100%);
+    --gradient-accent: linear-gradient(100deg, hsl(13 78% 47%) 0%, hsl(18 64% 52%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(42 38% 98%) 0%, hsl(40 30% 95.5%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(13 78% 47% / 0.06) 0%, transparent 70%);
 
-    /* Surface fill (replaces heavy glass) — tonal + faint blur */
-    --glass-background: hsla(222, 8%, 14%, 0.72);
-    --glass-border: hsla(220, 14%, 96%, 0.08);
+    /* Plate fill (replaces glass) — flat paper, hairline, faint ink shadow */
+    --glass-background: hsl(42 38% 98%);
+    --glass-border: hsl(32 18% 83%);
 
-    /* Material elevation shadows */
-    --elevation-1: 0 1px 2px hsl(0 0% 0% / 0.30), 0 1px 3px 1px hsl(0 0% 0% / 0.15);
-    --elevation-2: 0 1px 2px hsl(0 0% 0% / 0.30), 0 2px 6px 2px hsl(0 0% 0% / 0.15);
-    --elevation-3: 0 4px 8px 3px hsl(0 0% 0% / 0.15), 0 1px 3px hsl(0 0% 0% / 0.30);
+    /* Editorial elevation — soft, warm, low. Print on a wall, not a popup. */
+    --elevation-1: 0 1px 0 hsl(32 18% 80% / 0.6);
+    --elevation-2: 0 1px 2px hsl(28 30% 20% / 0.06), 0 8px 24px -12px hsl(28 30% 20% / 0.18);
+    --elevation-3: 0 1px 2px hsl(28 30% 20% / 0.08), 0 18px 48px -18px hsl(28 30% 20% / 0.24);
   }
 
-  /* Light mode — Google daylight: porcelain + blue */
+  /* Light mode (explicit) mirrors :root */
   .light {
-    --background: 210 33% 99%;
-    --foreground: 222 18% 14%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 18% 14%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 18% 14%;
-    --surface-1: 0 0% 100%;
-    --surface-2: 220 22% 97%;
-    --surface-3: 220 20% 94%;
-
-    --primary: 214 82% 51%;        /* #1a73e8 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 137 60% 33%;      /* #188038 */
-    --secondary-foreground: 0 0% 100%;
-    --muted: 220 16% 95%;
-    --muted-foreground: 220 9% 43%;
-    --accent: 280 44% 52%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 4 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 16% 88%;
-    --input: 220 16% 90%;
-    --ring: 214 82% 51%;
-
-    --dynamic-primary: 214 82% 51%;
-    --dynamic-soft: 214 70% 90%;
-
-    --neon-pink: 354 58% 54%;
-    --neon-purple: 280 44% 52%;
-    --neon-blue: 214 82% 51%;
-    --gradient-start: 214 82% 51%;
-    --gradient-end: 354 58% 54%;
-
-    --sidebar-background: 210 33% 99%;
-    --sidebar-foreground: 220 12% 36%;
-    --sidebar-primary: 214 82% 51%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 22% 95%;
-    --sidebar-accent-foreground: 222 18% 14%;
-    --sidebar-border: 220 16% 88%;
-    --sidebar-ring: 214 82% 51%;
-
-    --glow-primary: 214 82% 51%;
-    --glow-secondary: 280 44% 52%;
-    --glow-accent: 354 58% 54%;
-
-    --glass-background: hsla(0, 0%, 100%, 0.78);
-    --glass-border: hsla(220, 16%, 80%, 0.5);
-
-    --elevation-1: 0 1px 2px hsl(220 40% 20% / 0.10), 0 1px 3px 1px hsl(220 40% 20% / 0.08);
-    --elevation-2: 0 1px 2px hsl(220 40% 20% / 0.10), 0 2px 6px 2px hsl(220 40% 20% / 0.08);
-    --elevation-3: 0 4px 8px 3px hsl(220 40% 20% / 0.10), 0 1px 3px hsl(220 40% 20% / 0.12);
-
-    --gradient-primary: linear-gradient(115deg, hsl(214 82% 51%) 0%, hsl(280 44% 52%) 50%, hsl(354 58% 54%) 100%);
-    --gradient-secondary: linear-gradient(115deg, hsl(214 82% 51%) 0%, hsl(280 44% 52%) 100%);
+    --background: 40 30% 95.5%;
+    --foreground: 28 16% 12%;
+    --card: 42 38% 98%;
+    --card-foreground: 28 16% 12%;
+    --popover: 42 40% 98.5%;
+    --popover-foreground: 28 16% 12%;
+    --surface-1: 42 38% 98%;
+    --surface-2: 40 26% 93%;
+    --surface-3: 38 20% 89%;
+    --primary: 28 18% 13%;
+    --primary-foreground: 42 40% 97%;
+    --secondary: 128 22% 30%;
+    --secondary-foreground: 42 40% 97%;
+    --muted: 38 20% 90%;
+    --muted-foreground: 30 8% 38%;
+    --accent: 13 78% 47%;
+    --accent-foreground: 42 40% 97%;
+    --destructive: 4 68% 44%;
+    --destructive-foreground: 42 40% 97%;
+    --border: 32 18% 83%;
+    --input: 32 18% 85%;
+    --ring: 13 78% 47%;
+    --dynamic-primary: 13 78% 47%;
+    --dynamic-soft: 13 50% 88%;
+    --neon-pink: 18 64% 52%;
+    --neon-purple: 13 78% 47%;
+    --neon-blue: 28 18% 13%;
+    --gradient-start: 28 18% 13%;
+    --gradient-end: 13 78% 47%;
+    --sidebar-background: 40 28% 93.5%;
+    --sidebar-foreground: 30 10% 30%;
+    --sidebar-primary: 13 78% 47%;
+    --sidebar-primary-foreground: 42 40% 97%;
+    --sidebar-accent: 38 22% 88%;
+    --sidebar-accent-foreground: 28 18% 13%;
+    --sidebar-border: 32 18% 82%;
+    --sidebar-ring: 13 78% 47%;
+    --glow-primary: 28 18% 13%;
+    --glow-secondary: 13 78% 47%;
+    --glow-accent: 18 64% 52%;
+    --rating: 13 78% 47%;
+    --gradient-primary: linear-gradient(100deg, hsl(13 78% 47%) 0%, hsl(8 72% 41%) 100%);
+    --gradient-secondary: linear-gradient(100deg, hsl(28 18% 13%) 0%, hsl(13 78% 47%) 100%);
+    --glass-background: hsl(42 38% 98%);
+    --glass-border: hsl(32 18% 83%);
+    --elevation-1: 0 1px 0 hsl(32 18% 80% / 0.6);
+    --elevation-2: 0 1px 2px hsl(28 30% 20% / 0.06), 0 8px 24px -12px hsl(28 30% 20% / 0.18);
+    --elevation-3: 0 1px 2px hsl(28 30% 20% / 0.08), 0 18px 48px -18px hsl(28 30% 20% / 0.24);
   }
 
-  /* Explicit dark (mirror of :root) */
+  /* Dark — an editorial "night reading" mode: warm charcoal paper, ivory
+     ink, the same vermilion. (Used by the immersive lightbox & opt-in.) */
   .dark {
-    --background: 225 7% 9%;
-    --foreground: 220 14% 96%;
-    --card: 222 8% 13%;
-    --card-foreground: 220 14% 96%;
-    --popover: 222 9% 15%;
-    --popover-foreground: 220 14% 96%;
-    --surface-1: 222 8% 13%;
-    --surface-2: 222 8% 16%;
-    --surface-3: 222 9% 19%;
-    --primary: 217 89% 61%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 137 53% 45%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 222 7% 18%;
-    --muted-foreground: 220 9% 65%;
-    --accent: 280 44% 62%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 4 80% 58%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 7% 21%;
-    --input: 220 7% 21%;
-    --ring: 217 89% 61%;
-
-    --dynamic-primary: 217 89% 61%;
-    --dynamic-soft: 217 60% 30%;
-    --neon-pink: 354 62% 64%;
-    --neon-purple: 280 44% 62%;
-    --neon-blue: 217 89% 61%;
-    --gradient-start: 217 89% 61%;
-    --gradient-end: 354 62% 64%;
-
-    --sidebar-background: 224 8% 11%;
-    --sidebar-foreground: 220 14% 96%;
-    --sidebar-primary: 217 89% 61%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 8% 16%;
-    --sidebar-accent-foreground: 220 14% 96%;
-    --sidebar-border: 220 7% 18%;
-    --sidebar-ring: 217 89% 61%;
-
-    --glow-primary: 217 89% 61%;
-    --glow-secondary: 280 44% 62%;
-    --glow-accent: 354 62% 64%;
-
-    --glass-background: hsla(222, 8%, 14%, 0.72);
-    --glass-border: hsla(220, 14%, 96%, 0.08);
-
-    --elevation-1: 0 1px 2px hsl(0 0% 0% / 0.30), 0 1px 3px 1px hsl(0 0% 0% / 0.15);
-    --elevation-2: 0 1px 2px hsl(0 0% 0% / 0.30), 0 2px 6px 2px hsl(0 0% 0% / 0.15);
-    --elevation-3: 0 4px 8px 3px hsl(0 0% 0% / 0.15), 0 1px 3px hsl(0 0% 0% / 0.30);
-
-    --gradient-primary: linear-gradient(115deg, hsl(217 89% 61%) 0%, hsl(280 44% 62%) 50%, hsl(354 62% 64%) 100%);
-    --gradient-secondary: linear-gradient(115deg, hsl(217 89% 61%) 0%, hsl(280 44% 62%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(280 44% 62%) 0%, hsl(217 89% 61%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(222 8% 13%) 0%, hsl(225 7% 9%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(217 89% 61% / 0.18) 0%, transparent 70%);
+    --background: 28 12% 10%;
+    --foreground: 40 26% 91%;
+    --card: 28 11% 13%;
+    --card-foreground: 40 26% 91%;
+    --popover: 28 11% 14%;
+    --popover-foreground: 40 26% 91%;
+    --surface-1: 28 11% 13%;
+    --surface-2: 28 10% 16%;
+    --surface-3: 28 10% 19%;
+    --primary: 40 26% 91%;             /* ink inverts to ivory on dark */
+    --primary-foreground: 28 16% 12%;
+    --secondary: 128 24% 44%;
+    --secondary-foreground: 28 16% 10%;
+    --muted: 28 9% 18%;
+    --muted-foreground: 36 12% 64%;
+    --accent: 13 80% 55%;
+    --accent-foreground: 28 16% 10%;
+    --destructive: 4 70% 52%;
+    --destructive-foreground: 40 26% 95%;
+    --border: 30 8% 22%;
+    --input: 30 8% 22%;
+    --ring: 13 80% 55%;
+    --dynamic-primary: 13 80% 55%;
+    --dynamic-soft: 13 40% 30%;
+    --neon-pink: 18 66% 58%;
+    --neon-purple: 13 80% 55%;
+    --neon-blue: 40 26% 91%;
+    --gradient-start: 40 26% 91%;
+    --gradient-end: 13 80% 55%;
+    --sidebar-background: 28 12% 11%;
+    --sidebar-foreground: 36 14% 66%;
+    --sidebar-primary: 13 80% 55%;
+    --sidebar-primary-foreground: 28 16% 10%;
+    --sidebar-accent: 28 10% 16%;
+    --sidebar-accent-foreground: 40 26% 91%;
+    --sidebar-border: 30 8% 20%;
+    --sidebar-ring: 13 80% 55%;
+    --glow-primary: 40 26% 91%;
+    --glow-secondary: 13 80% 55%;
+    --glow-accent: 18 66% 58%;
+    --rating: 13 80% 55%;
+    --gradient-primary: linear-gradient(100deg, hsl(13 80% 55%) 0%, hsl(10 74% 48%) 100%);
+    --gradient-secondary: linear-gradient(100deg, hsl(40 26% 91%) 0%, hsl(13 80% 55%) 100%);
+    --glass-background: hsl(28 11% 13%);
+    --glass-border: hsl(30 8% 22%);
+    --elevation-1: 0 1px 0 hsl(0 0% 0% / 0.4);
+    --elevation-2: 0 2px 8px hsl(0 0% 0% / 0.35), 0 16px 40px -20px hsl(0 0% 0% / 0.6);
+    --elevation-3: 0 4px 12px hsl(0 0% 0% / 0.4), 0 24px 60px -24px hsl(0 0% 0% / 0.7);
   }
 }
 
@@ -238,56 +225,58 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv05";
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  /* Headlines default to the serif display, editorial leading */
+  h1, h2, h3, .font-display {
+    font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+    letter-spacing: -0.01em;
   }
-  ::-webkit-scrollbar-track {
-    @apply bg-background;
-  }
+
+  /* Custom scrollbar — thin ink */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { @apply bg-background; }
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted rounded-full;
+    @apply bg-muted-foreground/30 rounded-full;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/30;
-  }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/50; }
 
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
 
 @layer components {
-  /* Surface card — Material tonal surface (replaces the old heavy glass).
-     Kept under the same class name so every screen updates at once. */
+  /* PLATE — a framed paper card. Flat, hairline keyline, faint ink shadow.
+     Replaces the old glass card under the same name. */
   .glass-card {
     background: var(--glass-background);
-    backdrop-filter: blur(16px) saturate(120%);
-    -webkit-backdrop-filter: blur(16px) saturate(120%);
     border: 1px solid var(--glass-border);
-    box-shadow: var(--elevation-1);
+    box-shadow: var(--elevation-2);
   }
 
-  /* Solid Material surfaces by elevation */
   .surface-1 { background: hsl(var(--surface-1)); box-shadow: var(--elevation-1); }
-  .surface-2 { background: hsl(var(--surface-2)); box-shadow: var(--elevation-2); }
-  .surface-3 { background: hsl(var(--surface-3)); box-shadow: var(--elevation-3); }
+  .surface-2 { background: hsl(var(--surface-2)); box-shadow: var(--elevation-1); }
+  .surface-3 { background: hsl(var(--surface-3)); box-shadow: var(--elevation-2); }
 
-  /* Glow effects */
-  .glow-primary { box-shadow: 0 0 30px -5px hsl(var(--glow-primary) / 0.4); }
-  .glow-secondary { box-shadow: 0 0 30px -5px hsl(var(--glow-secondary) / 0.4); }
-  .glow-accent { box-shadow: 0 0 30px -5px hsl(var(--glow-accent) / 0.4); }
+  /* A true gallery "plate" — matted image frame with a keyline */
+  .plate {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--elevation-2);
+  }
+  .plate-keyline {
+    box-shadow: inset 0 0 0 1px hsl(var(--foreground) / 0.08);
+  }
 
-  /* Text gradients (now Gemini spectral) */
+  /* Glow utilities neutralised to ink — kept so call-sites don't break */
+  .glow-primary { box-shadow: var(--elevation-2); }
+  .glow-secondary { box-shadow: var(--elevation-2); }
+  .glow-accent { box-shadow: var(--elevation-2); }
+
+  /* Editorial "ink" headings (ink → vermilion). No rainbow. */
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[hsl(var(--gradient-start))] to-[hsl(var(--gradient-end))];
   }
@@ -303,20 +292,22 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  /* Solid vermilion ink helper for AI marks */
+  .ink-accent { color: hsl(var(--accent)); }
 
-  /* Background patterns */
+  /* Background patterns — faint ink */
   .bg-grid-pattern {
     background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
     background-size: 40px 40px;
   }
   .bg-dots-pattern {
-    background-image: radial-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image: radial-gradient(hsl(var(--border) / 0.7) 1px, transparent 1px);
+    background-size: 22px 22px;
   }
 
-  /* Gradient (spectral) borders */
+  /* Vermilion keyline border (AI) */
   .gradient-border { position: relative; }
   .gradient-border::before {
     content: '';
@@ -324,7 +315,7 @@
     inset: 0;
     padding: 1px;
     border-radius: inherit;
-    background: var(--gradient-primary);
+    background: hsl(var(--accent));
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
@@ -332,283 +323,183 @@
     pointer-events: none;
   }
 
-  /* Dynamic-color tint helper — set --dynamic-primary inline (from a
-     photo's dominant hue) and this paints a soft Material You wash. */
   .dynamic-tint {
     background:
-      radial-gradient(120% 80% at 50% -10%, hsl(var(--dynamic-primary) / 0.16), transparent 60%),
+      linear-gradient(180deg, hsl(var(--dynamic-primary) / 0.05), transparent 40%),
       hsl(var(--card));
+  }
+
+  /* Editorial caption — tracked small-caps mono. The gallery plate label. */
+  .caption {
+    font-family: 'Roboto Mono', ui-monospace, monospace;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+  /* Big editorial section numeral (e.g. "01") */
+  .folio {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: -0.02em;
   }
 }
 
 @layer utilities {
-  .animate-gradient { background-size: 200% 200%; animation: gradient-shift 3s ease infinite; }
-  .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-  .animate-float { animation: float 3s ease-in-out infinite; }
-
-  .glow-pink { box-shadow: 0 4px 20px hsl(var(--glow-primary) / 0.2), 0 8px 40px hsl(var(--glow-primary) / 0.1); }
-  .dark .glow-pink { box-shadow: 0 0 40px hsl(var(--glow-primary) / 0.3), 0 0 80px hsl(var(--glow-primary) / 0.1); }
-  .glow-text { text-shadow: 0 2px 10px hsl(var(--glow-primary) / 0.3); }
-  .dark .glow-text { text-shadow: 0 0 30px hsl(var(--glow-primary) / 0.5); }
+  .animate-gradient { animation: none; }
+  .animate-pulse-glow { animation: none; }
+  .animate-float { animation: float 6s ease-in-out infinite; }
+  .glow-pink { box-shadow: var(--elevation-2); }
+  .dark .glow-pink { box-shadow: var(--elevation-2); }
+  .glow-text { text-shadow: none; }
+  .dark .glow-text { text-shadow: none; }
 }
 
-/* Keyframes */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.3); }
-  50% { box-shadow: 0 0 40px hsl(var(--glow-primary) / 0.5); }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
-  20%, 40%, 60%, 80% { transform: translateX(2px); }
-}
-@keyframes neon-pulse {
-  0%, 100% { box-shadow: 0 0 6px hsl(var(--primary) / 0.6); }
-  50% { box-shadow: 0 0 20px hsl(var(--primary) / 0.9), 0 0 40px hsl(var(--primary) / 0.3); }
-}
-.animate-neon-pulse { animation: neon-pulse 1.5s ease-in-out infinite; }
+/* Keyframes (kept for compat; most motion is now calm) */
+@keyframes pulse-glow { 0%,100% { box-shadow: var(--elevation-1); } 50% { box-shadow: var(--elevation-2); } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes gradient-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes shake { 0%,100%{transform:translateX(0)} 10%,30%,50%,70%,90%{transform:translateX(-2px)} 20%,40%,60%,80%{transform:translateX(2px)} }
+@keyframes neon-pulse { 0%,100%{box-shadow:none} 50%{box-shadow:none} }
+.animate-neon-pulse { animation: none; }
 
-/* ── Uppy Dashboard — PRISM theming (drives off --primary, so it follows
- * the new blue automatically) ──────────────────────────────────────── */
+/* ── Uppy Dashboard — Atelier theming (drives off --primary = ink) ───── */
 .imagick-uppy-dashboard .uppy-Dashboard { width: 100% !important; }
 .imagick-uppy-dashboard .uppy-Dashboard-inner {
   max-width: 100% !important;
   width: 100% !important;
-  border-radius: 16px !important;
-  border: 2px dashed hsl(var(--primary) / 0.30) !important;
-  background: hsl(var(--primary) / 0.04) !important;
+  border-radius: 6px !important;
+  border: 1px dashed hsl(var(--foreground) / 0.28) !important;
+  background: hsl(var(--card)) !important;
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 .imagick-uppy-dashboard .uppy-Dashboard-inner:hover,
 .imagick-uppy-dashboard .uppy-Dashboard--isDraggingOver .uppy-Dashboard-inner {
-  border-color: hsl(var(--primary) / 0.60) !important;
-  background: hsl(var(--primary) / 0.08) !important;
+  border-color: hsl(var(--accent) / 0.7) !important;
+  background: hsl(var(--accent) / 0.04) !important;
 }
 .imagick-uppy-dashboard .uppy-c-btn-primary,
 .imagick-uppy-dashboard .uppy-DashboardContent-addMore {
   background-color: hsl(var(--primary)) !important;
-  color: white !important;
-  border-radius: 9999px !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-radius: 6px !important;
 }
 .imagick-uppy-dashboard .uppy-c-btn-primary:hover,
-.imagick-uppy-dashboard .uppy-DashboardContent-addMore:hover {
-  background-color: hsl(var(--primary) / 0.9) !important;
-}
-.imagick-uppy-dashboard *:focus-visible { outline-color: hsl(var(--primary)) !important; }
+.imagick-uppy-dashboard .uppy-DashboardContent-addMore:hover { background-color: hsl(var(--primary) / 0.88) !important; }
+.imagick-uppy-dashboard *:focus-visible { outline-color: hsl(var(--accent)) !important; }
 .imagick-uppy-dashboard .uppy-StatusBar {
-  background-color: hsl(0 0% 100% / 0.04) !important;
-  color: hsl(0 0% 100% / 0.85) !important;
-  border-top: 1px solid hsl(0 0% 100% / 0.06) !important;
+  background-color: hsl(var(--muted)) !important;
+  color: hsl(var(--foreground) / 0.85) !important;
+  border-top: 1px solid hsl(var(--border)) !important;
 }
-.imagick-uppy-dashboard .uppy-StatusBar.is-uploading { background-color: hsl(0 0% 100% / 0.04) !important; }
-.imagick-uppy-dashboard .uppy-StatusBar-progress {
-  background-color: hsl(var(--primary)) !important;
-  height: 3px !important;
-  opacity: 1 !important;
-}
-.imagick-uppy-dashboard .uppy-StatusBar:not(.is-error) .uppy-StatusBar-progress.is-indeterminate {
-  background-image: linear-gradient(45deg, hsl(var(--primary) / 0.6) 25%, transparent 25%, transparent 50%, hsl(var(--primary) / 0.6) 50%, hsl(var(--primary) / 0.6) 75%, transparent 75%, transparent) !important;
-}
-.imagick-uppy-dashboard .uppy-Dashboard-Item { border-radius: 12px !important; }
+.imagick-uppy-dashboard .uppy-StatusBar.is-uploading { background-color: hsl(var(--muted)) !important; }
+.imagick-uppy-dashboard .uppy-StatusBar-progress { background-color: hsl(var(--accent)) !important; height: 3px !important; opacity: 1 !important; }
+.imagick-uppy-dashboard .uppy-Dashboard-Item { border-radius: 4px !important; }
 .imagick-uppy-dashboard .uppy-Dashboard-browse,
 .imagick-uppy-dashboard .uppy-Dashboard-AddFiles a,
 .imagick-uppy-dashboard a.uppy-c-btn-link,
 .imagick-uppy-dashboard .uppy-StatusBar-actionBtn--retry,
 .imagick-uppy-dashboard .uppy-StatusBar-actionBtn--upload,
-.imagick-uppy-dashboard .uppy-c-btn-link { color: hsl(var(--primary)) !important; }
-.imagick-uppy-dashboard .uppy-Dashboard-browse:hover,
-.imagick-uppy-dashboard .uppy-Dashboard-AddFiles a:hover,
-.imagick-uppy-dashboard .uppy-c-btn-link:hover { color: hsl(var(--primary) / 0.85) !important; }
-.imagick-uppy-dashboard {
-  --uppy-c-blue: hsl(var(--primary));
-  --uppy-c-cornflower-blue: hsl(var(--primary));
-}
-.light .imagick-uppy-dashboard .uppy-StatusBar {
-  background-color: hsl(0 0% 0% / 0.04) !important;
-  color: hsl(240 10% 15%) !important;
-  border-top-color: hsl(0 0% 0% / 0.08) !important;
-}
-.light .imagick-uppy-dashboard .uppy-StatusBar.is-uploading { background-color: hsl(0 0% 0% / 0.04) !important; }
-.light .imagick-uppy-dashboard .uppy-Dashboard-AddFiles-title,
-.light .imagick-uppy-dashboard .uppy-Dashboard-Item-name,
-.light .imagick-uppy-dashboard .uppy-Dashboard-Item-status,
-.light .imagick-uppy-dashboard .uppy-StatusBar-content,
-.light .imagick-uppy-dashboard .uppy-StatusBar-statusPrimary,
-.light .imagick-uppy-dashboard .uppy-StatusBar-statusSecondary,
-.light .imagick-uppy-dashboard .uppy-Dashboard-note { color: hsl(240 10% 15%) !important; }
+.imagick-uppy-dashboard .uppy-c-btn-link { color: hsl(var(--accent)) !important; }
+.imagick-uppy-dashboard { --uppy-c-blue: hsl(var(--accent)); --uppy-c-cornflower-blue: hsl(var(--accent)); }
 
-/* ── Gallery thumbnail shimmer ──────────────────────────────────────── */
+/* ── Gallery thumbnail shimmer — faint paper ─────────────────────────── */
 .thumbnail-shimmer {
-  background-image: linear-gradient(105deg, hsl(0 0% 100% / 0.02) 0%, hsl(0 0% 100% / 0.06) 50%, hsl(0 0% 100% / 0.02) 100%);
+  background-image: linear-gradient(105deg, hsl(28 16% 12% / 0.03) 0%, hsl(28 16% 12% / 0.07) 50%, hsl(28 16% 12% / 0.03) 100%);
   background-size: 200% 100%;
   animation: thumbnail-shimmer 1.4s ease-in-out infinite;
 }
-.light .thumbnail-shimmer {
-  background-image: linear-gradient(105deg, hsl(0 0% 0% / 0.04) 0%, hsl(0 0% 0% / 0.10) 50%, hsl(0 0% 0% / 0.04) 100%);
+.dark .thumbnail-shimmer {
+  background-image: linear-gradient(105deg, hsl(0 0% 100% / 0.02) 0%, hsl(0 0% 100% / 0.06) 50%, hsl(0 0% 100% / 0.02) 100%);
 }
-@keyframes thumbnail-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
+@keyframes thumbnail-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-/* Three-dot "thinking" indicator (ImageCard processing state) */
+/* Three-dot "thinking" — vermilion ink */
 .thinking-dot {
   width: 6px; height: 6px; border-radius: 9999px;
-  background-color: hsl(var(--primary));
+  background-color: hsl(var(--accent));
   display: inline-block; opacity: 0.3;
   animation: thinking-dot 1.2s ease-in-out infinite;
 }
 .thinking-dot-1 { animation-delay: 0s; }
 .thinking-dot-2 { animation-delay: 0.16s; }
 .thinking-dot-3 { animation-delay: 0.32s; }
-@keyframes thinking-dot {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1); }
-}
+@keyframes thinking-dot { 0%,80%,100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
 
 /* ════════════════════════════════════════════════════════════════════
-   Aura intelligence kit — restyled to the Gemini spectral language.
-   Same class names (used across the app); the engine now reads as
-   blue→purple→pink "light", not violet/aqua neon. Telemetry type is
-   Roboto Mono. All hues come from theme tokens, so light/dark both work.
+   Aura "editor" kit — restyled to editorial vermilion ink. The engine no
+   longer glows; it leaves a master printer's marks. Same class names so
+   every call-site inherits it.
    ════════════════════════════════════════════════════════════════════ */
-
-@property --aura-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
 
 :where(.aura-ai-border, .aura-orb, .aura-gauge, .aura-chip) { position: relative; }
 
-/* Rotating spectral border + soft bloom. Reserved for the engine. */
+/* AI frame — a quiet vermilion keyline, no rotation, no bloom */
 .aura-ai-border::before {
   content: '';
   position: absolute;
-  inset: -1px;
+  inset: 0;
   border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(from var(--aura-angle), hsl(var(--neon-blue)), hsl(var(--neon-purple)), hsl(var(--neon-pink)), hsl(var(--neon-blue)));
+  padding: 1px;
+  background: hsl(var(--accent) / 0.9);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
 }
-.aura-ai-border::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: conic-gradient(from 140deg, hsl(var(--neon-blue)), hsl(var(--neon-purple)), hsl(var(--neon-pink)), hsl(var(--neon-blue)));
-  filter: blur(16px);
-  opacity: 0.20;
-  z-index: -1;
-  pointer-events: none;
-}
 
-/* The living AI core — spectral gem */
-.aura-orb { border-radius: 9999px; }
-.aura-orb-halo {
-  position: absolute;
-  inset: -35%;
-  border-radius: 9999px;
-  background: radial-gradient(circle, hsl(var(--neon-blue) / 0.42), hsl(var(--neon-purple) / 0.14) 55%, transparent 72%);
-  filter: blur(6px);
-}
-.aura-orb-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  background: conic-gradient(from 0deg, hsl(var(--neon-blue)), hsl(var(--neon-purple)), hsl(var(--neon-pink)), transparent 78%, hsl(var(--neon-blue)));
-  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3.5px), black calc(100% - 2.5px));
-  mask: radial-gradient(closest-side, transparent calc(100% - 3.5px), black calc(100% - 2.5px));
-}
+/* The Aura mark — a vermilion ink "seal" (flat, crafted), not a glowing orb */
+.aura-orb { border-radius: 9999px; background: hsl(var(--card)); }
+.aura-orb-halo { position: absolute; inset: 0; border-radius: 9999px; box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.35); }
+.aura-orb-ring { position: absolute; inset: 14%; border-radius: 9999px; border: 1.5px solid hsl(var(--accent)); }
 .aura-orb-core {
-  position: absolute;
-  inset: 24%;
-  border-radius: 9999px;
-  background: radial-gradient(circle at 36% 30%, hsl(0 0% 100% / 0.92), hsl(var(--neon-blue) / 0.9) 30%, hsl(var(--neon-purple) / 0.8) 64%, hsl(var(--neon-pink) / 0.6) 100%);
+  position: absolute; inset: 34%; border-radius: 9999px;
+  background: hsl(var(--accent));
 }
 
-/* Telemetry chip + status LEDs */
+/* Telemetry chip → editorial tag (tracked small-caps mono) */
 .aura-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.3rem 0.75rem;
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.25rem 0.6rem;
   border-radius: 9999px;
-  border: 1px solid hsl(var(--border) / 0.9);
-  background: hsl(var(--card) / 0.6);
-  backdrop-filter: blur(10px);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
   font-family: 'Roboto Mono', ui-monospace, monospace;
-  font-size: 0.625rem;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: hsl(var(--muted-foreground));
+  font-size: 0.625rem; font-weight: 500;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  white-space: nowrap; color: hsl(var(--muted-foreground));
 }
 .aura-led {
-  width: 6px; height: 6px; border-radius: 9999px;
-  display: inline-block; flex-shrink: 0;
-  background: hsl(var(--led, var(--primary)));
-  box-shadow: 0 0 10px hsl(var(--led, var(--primary)) / 0.9);
+  width: 6px; height: 6px; border-radius: 9999px; display: inline-block; flex-shrink: 0;
+  background: hsl(var(--led, var(--accent)));
 }
 
-/* Ring gauge (credits / storage) — spectral sweep */
+/* Ring gauge → ink arc with a vermilion fill */
 .aura-gauge {
   border-radius: 9999px;
-  background: conic-gradient(from 230deg,
-    hsl(var(--neon-blue)) 0deg,
-    hsl(var(--neon-purple)) calc(var(--gauge, 70) * 1.3deg),
-    hsl(var(--neon-pink)) calc(var(--gauge, 70) * 2.6deg),
-    hsl(var(--border)) calc(var(--gauge, 70) * 2.6deg));
-  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 6px), black calc(100% - 5px));
-  mask: radial-gradient(closest-side, transparent calc(100% - 6px), black calc(100% - 5px));
+  background: conic-gradient(from -90deg, hsl(var(--accent)) calc(var(--gauge, 70) * 3.6deg), hsl(var(--border)) calc(var(--gauge, 70) * 3.6deg));
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 5px), black calc(100% - 4px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 5px), black calc(100% - 4px));
 }
 
-/* Mono micro-labels */
+/* Editorial micro-label */
 .aura-microlabel {
   font-family: 'Roboto Mono', ui-monospace, monospace;
-  font-size: 0.625rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground) / 0.85);
+  font-size: 0.625rem; font-weight: 500;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
 }
 
-/* Spectral hairline divider */
-.aura-hairline {
-  height: 1px;
-  border: none;
-  background: linear-gradient(90deg, transparent, hsl(var(--neon-blue) / 0.6) 20%, hsl(var(--neon-purple) / 0.6) 50%, hsl(var(--neon-pink) / 0.6) 80%, transparent);
-}
+/* Hairline rule — a thin ink line, optionally a vermilion tick */
+.aura-hairline { height: 1px; border: none; background: hsl(var(--border)); }
 
+/* Calm: the engine breathes slowly, doesn't pulse neon */
 @media (prefers-reduced-motion: no-preference) {
-  .aura-ai-border::before { animation: aura-spin-angle 5s linear infinite; }
-  .aura-orb-ring { animation: aura-rotate 7s linear infinite; }
-  .aura-orb-core { animation: aura-breathe 3.4s ease-in-out infinite; }
-  .aura-orb-halo { animation: aura-breathe 3.4s ease-in-out infinite reverse; }
-  .aura-led-pulse { animation: aura-led 2.2s ease-in-out infinite; }
+  .aura-orb-core { animation: aura-breathe 4.5s ease-in-out infinite; }
+  .aura-led-pulse { animation: aura-led 2.6s ease-in-out infinite; }
 }
-
-@keyframes aura-spin-angle { to { --aura-angle: 360deg; } }
-@keyframes aura-rotate { to { transform: rotate(360deg); } }
-@keyframes aura-breathe {
-  0%, 100% { opacity: 0.8; transform: scale(0.95); }
-  50% { opacity: 1; transform: scale(1.06); }
-}
-@keyframes aura-led {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
+@keyframes aura-breathe { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
+@keyframes aura-led { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
