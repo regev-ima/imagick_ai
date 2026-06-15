@@ -31,6 +31,7 @@ import {
   MapPin,
   Trophy,
   Globe,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { useOnboardingQuestionnaire } from "@/hooks/useOnboardingQuestionnaire";
 
 // The AI mark — a 4-point sparkle (the logo star), royal blue.
 // Copied from the approved LIGHTROOM dashboard.
@@ -104,10 +121,10 @@ const galleryTypes: { value: string; label: string; icon: LucideIcon }[] = [
 
 // Aura speaks each step — clean, confident, first-person.
 const steps = [
-  { number: 1, title: "Details", icon: FolderOpen, ask: "What are we working on?", say: "Name the shoot and tell me its type, so I can tailor everything that follows." },
-  { number: 2, title: "Styles", icon: Palette, ask: "How should I edit them?", say: "Pick up to three looks. I learn each one and apply it to every photo." },
-  { number: 3, title: "Culling", icon: Sparkles, ask: "Want me to cull first?", say: "I score every frame for focus, eyes and expression, then surface the keepers." },
-  { number: 4, title: "Upload", icon: Upload, ask: "Send me the photos.", say: "Drop them from your device or point me at a Drive folder. I start the moment they land." },
+  { number: 1, title: "Details", icon: FolderOpen, ask: "What are we working on?", say: "Name the shoot." },
+  { number: 2, title: "Styles", icon: Palette, ask: "How should I edit them?", say: "Pick up to three looks — or skip." },
+  { number: 3, title: "Culling", icon: Sparkles, ask: "Want me to cull first?", say: "I surface the keepers before you edit." },
+  { number: 4, title: "Upload", icon: Upload, ask: "Send me the photos.", say: "From your device or a Drive folder." },
 ];
 
 export default function CreateGalleryPage() {
@@ -118,6 +135,8 @@ export default function CreateGalleryPage() {
   const { uppy, uploadImages, uploadProgress, isUploading: hookIsUploading } = useImageUpload();
   const uppyFileCount = useUppyState(uppy, (state) => Object.keys(state.files).length);
   const { availableEdits, editsReserved, isUnlimited, isFreePlan } = useSubscription();
+  // FIX 5 — onboarding answers (shoot types) can prefill the gallery type
+  const { answers: onboardingAnswers, allQuestions: onboardingQuestions } = useOnboardingQuestionnaire();
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
@@ -129,6 +148,7 @@ export default function CreateGalleryPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [customLabels, setCustomLabels] = useState<string[]>([]);
   const [aiCulling, setAiCulling] = useState(false);
+  const [cullingAdvancedOpen, setCullingAdvancedOpen] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -142,6 +162,9 @@ export default function CreateGalleryPage() {
   const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
   const [languageLoaded, setLanguageLoaded] = useState(false);
   const [styleTab, setStyleTab] = useState<"public" | "yours">("public");
+
+  // FIX 3 — guard leaving mid-upload (staged files or active transfer)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   // Edit calculations
   const imageCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : uppyFileCount;
@@ -164,6 +187,38 @@ export default function CreateGalleryPage() {
   useEffect(() => {
     if (prefillName) setGalleryName((prev) => prev || prefillName);
   }, [prefillName]);
+
+  // FIX 5 — default the gallery type from the onboarding questionnaire's
+  // "What do you shoot?" answer (question_key === "photography_types").
+  // Onboarding option ids are plural (e.g. "weddings") and a few don't map
+  // to a wizard galleryType; we only prefill on a clean match and never
+  // override an existing pick (manual choice or ?styleId/?name flows).
+  useEffect(() => {
+    if (galleryType) return;
+    const shootQuestion = onboardingQuestions.find((q) => q.question_key === "photography_types");
+    if (!shootQuestion) return;
+    const answer = onboardingAnswers.find((a) => a.question_id === shootQuestion.id);
+    const picked: string[] = Array.isArray(answer?.answer) ? answer.answer : [];
+    if (picked.length === 0) return;
+    // Map onboarding shoot-type ids -> wizard galleryType values.
+    const ONBOARDING_TO_GALLERY_TYPE: Record<string, string> = {
+      weddings: "wedding",
+      portraits: "portrait",
+      events: "event",
+      commercial: "commercial",
+      landscape: "landscape",
+      real_estate: "real_estate",
+      fashion: "fashion",
+      food: "food",
+      sports: "sports",
+      newborn: "newborn",
+      // "wildlife" and "other" have no clean wizard equivalent — left unmapped.
+    };
+    const validTypes = new Set(galleryTypes.map((t) => t.value));
+    const match = picked.map((id) => ONBOARDING_TO_GALLERY_TYPE[id]).find((v) => v && validTypes.has(v));
+    if (match) setGalleryType(match);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingQuestions, onboardingAnswers]);
 
   // Fetch user's preferred language
   useEffect(() => {
@@ -471,7 +526,7 @@ export default function CreateGalleryPage() {
       case 1:
         return galleryName.trim().length > 0 && galleryType.length > 0;
       case 2:
-        return selectedStyles.length > 0;
+        return true; // Styles are optional — gallery can be host & share only
       case 3:
         return true; // Culling is optional
       case 4:
@@ -487,6 +542,28 @@ export default function CreateGalleryPage() {
   const active = steps[currentStep - 1];
   const busy = isUploading || isTransferring;
 
+  // FIX 3 — the back button abandons staged photos / an active transfer.
+  // Intercept with a confirm when there's something to lose; otherwise leave.
+  const hasUnsavedWork = uppyFileCount > 0 || busy;
+  const handleLeave = () => {
+    if (hasUnsavedWork) {
+      setShowLeaveConfirm(true);
+    } else {
+      navigate("/dashboard/galleries");
+    }
+  };
+
+  // FIX 3 — warn on tab close / reload ONLY while an upload/transfer is active.
+  useEffect(() => {
+    if (!busy) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [busy]);
+
   return (
     <div className="relative min-h-full bg-background px-4 py-8 lg:px-8 lg:py-12">
       <div className="relative mx-auto max-w-3xl">
@@ -495,7 +572,7 @@ export default function CreateGalleryPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/dashboard/galleries")}
+            onClick={handleLeave}
             aria-label="Back to galleries"
             className="-ml-2 gap-2 text-muted-foreground hover:text-foreground"
           >
@@ -665,12 +742,29 @@ export default function CreateGalleryPage() {
                   ))}
                 </div>
 
+                {/* Optional — host & share without AI editing */}
+                <p className="text-sm text-muted-foreground">
+                  Optional — skip to host &amp; share your photos as-is, with no AI editing.
+                </p>
+
                 {/* Selected index — chips with cover + count */}
                 <div className="border-y border-border py-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="caption shrink-0 text-primary">{String(selectedStyles.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 03</span></span>
                     {selectedStyles.length === 0 ? (
-                      <span className="text-sm text-muted-foreground">Nothing picked yet. Choose a look below.</span>
+                      <>
+                        <span className="text-sm text-muted-foreground">Nothing picked yet. Choose a look below — or</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCompletedSteps((prev) => new Set([...prev, 2]));
+                            setCurrentStep(3);
+                          }}
+                          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          Skip — no AI editing
+                        </button>
+                      </>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
                         <AnimatePresence mode="popLayout">
@@ -833,93 +927,120 @@ export default function CreateGalleryPage() {
                       className="overflow-hidden"
                     >
                       <div className="space-y-4 rounded-md border border-border bg-card p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <Tag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                            <span className="text-sm font-medium">What should I look for?</span>
-                            <span className="caption text-primary">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Globe className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                            <Select value={cullingLanguage} onValueChange={(v) => handleLanguageChange(v as LanguageCode)}>
-                              <SelectTrigger className="h-8 w-[140px] text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {supportedLanguages.map((lang) => (
-                                  <SelectItem key={lang.code} value={lang.code} className="text-xs">
-                                    {lang.name} ({lang.englishName})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">
-                            {galleryType
-                              ? "I suggested labels for this shoot type. Keep the ones you want or add your own."
-                              : "Pick a shoot type in step one and I'll suggest labels."}
+                        {/* Calm default — Aura handles it automatically */}
+                        <div className="flex items-center gap-2.5">
+                          <Sparkle size={14} className="shrink-0 text-accent" />
+                          <p className="text-sm text-muted-foreground">
+                            Aura will tag and rank your best shots automatically.
                           </p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 shrink-0 px-2 text-xs"
-                            onClick={() => {
-                              const currentLabels = getCullingLabels(galleryType || "wedding", cullingLanguage);
-                              const allSelected = currentLabels.every((l) => selectedCategories.includes(l));
-                              if (allSelected) {
-                                setSelectedCategories((prev) => prev.filter((c) => !currentLabels.includes(c)));
-                              } else {
-                                setSelectedCategories((prev) => {
-                                  const custom = prev.filter((c) => !currentLabels.includes(c));
-                                  const remaining = 20 - custom.length;
-                                  return [...custom, ...currentLabels.slice(0, remaining)];
-                                });
-                              }
-                            }}
-                          >
-                            {getCullingLabels(galleryType || "wedding", cullingLanguage).every((l) => selectedCategories.includes(l)) ? "Clear all" : "Select all"}
-                          </Button>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          {[...getCullingLabels(galleryType || "wedding", cullingLanguage), ...customLabels.filter((cl) => !getCullingLabels(galleryType || "wedding", cullingLanguage).includes(cl))].map((category) => {
-                            const on = selectedCategories.includes(category);
-                            const locked = selectedCategories.length >= 20 && !on;
-                            return (
-                              <button
-                                key={category}
-                                onClick={() => toggleCategory(category)}
-                                disabled={locked}
-                                className={cn(
-                                  "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
-                                  on
-                                    ? "border-primary/50 bg-primary/[0.1] text-foreground"
-                                    : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground",
-                                  locked && "cursor-not-allowed opacity-50",
-                                )}
+                        {/* Advanced (optional) — detailed label controls, collapsed by default */}
+                        <Collapsible open={cullingAdvancedOpen} onOpenChange={setCullingAdvancedOpen}>
+                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-left transition-colors hover:bg-muted/50">
+                            <span className="flex items-center gap-2">
+                              <Tag className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+                              <span className="text-sm font-medium">Advanced (optional)</span>
+                              {selectedCategories.length > 0 && (
+                                <span className="caption text-primary">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
+                              )}
+                            </span>
+                            <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", cullingAdvancedOpen && "rotate-180")} />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="space-y-4 pt-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <Tag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                                <span className="text-sm font-medium">What should I look for?</span>
+                                <span className="caption text-primary">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Globe className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+                                <Select value={cullingLanguage} onValueChange={(v) => handleLanguageChange(v as LanguageCode)}>
+                                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {supportedLanguages.map((lang) => (
+                                      <SelectItem key={lang.code} value={lang.code} className="text-xs">
+                                        {lang.name} ({lang.englishName})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground">
+                                {galleryType
+                                  ? "I suggested labels for this shoot type. Keep the ones you want or add your own."
+                                  : "Pick a shoot type in step one and I'll suggest labels."}
+                              </p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 shrink-0 px-2 text-xs"
+                                onClick={() => {
+                                  const currentLabels = getCullingLabels(galleryType || "wedding", cullingLanguage);
+                                  const allSelected = currentLabels.every((l) => selectedCategories.includes(l));
+                                  if (allSelected) {
+                                    setSelectedCategories((prev) => prev.filter((c) => !currentLabels.includes(c)));
+                                  } else {
+                                    setSelectedCategories((prev) => {
+                                      const custom = prev.filter((c) => !currentLabels.includes(c));
+                                      const remaining = 20 - custom.length;
+                                      return [...custom, ...currentLabels.slice(0, remaining)];
+                                    });
+                                  }
+                                }}
                               >
-                                {on && <Check className="mr-1 inline h-3 w-3 text-primary" strokeWidth={2.5} />}
-                                {category}
-                              </button>
-                            );
-                          })}
-                        </div>
+                                {getCullingLabels(galleryType || "wedding", cullingLanguage).every((l) => selectedCategories.includes(l)) ? "Clear all" : "Select all"}
+                              </Button>
+                            </div>
 
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Add your own label..."
-                            value={customCategory}
-                            onChange={(e) => setCustomCategory(e.target.value)}
-                            onKeyPress={handleCategoryKeyPress}
-                            className="h-9 text-sm"
-                            disabled={selectedCategories.length >= 20}
-                          />
-                          <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={addCustomCategory} disabled={!customCategory.trim() || selectedCategories.length >= 20}>
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
+                            <div className="flex flex-wrap gap-2">
+                              {[...getCullingLabels(galleryType || "wedding", cullingLanguage), ...customLabels.filter((cl) => !getCullingLabels(galleryType || "wedding", cullingLanguage).includes(cl))].map((category) => {
+                                const on = selectedCategories.includes(category);
+                                const locked = selectedCategories.length >= 20 && !on;
+                                return (
+                                  <button
+                                    key={category}
+                                    onClick={() => toggleCategory(category)}
+                                    disabled={locked}
+                                    className={cn(
+                                      "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                                      on
+                                        ? "border-primary/50 bg-primary/[0.1] text-foreground"
+                                        : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                                      locked && "cursor-not-allowed opacity-50",
+                                    )}
+                                  >
+                                    {on && <Check className="mr-1 inline h-3 w-3 text-primary" strokeWidth={2.5} />}
+                                    {category}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Add your own label..."
+                                value={customCategory}
+                                onChange={(e) => setCustomCategory(e.target.value)}
+                                onKeyPress={handleCategoryKeyPress}
+                                className="h-9 text-sm"
+                                disabled={selectedCategories.length >= 20}
+                              />
+                              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={addCustomCategory} disabled={!customCategory.trim() || selectedCategories.length >= 20}>
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+
+                        <p className="text-xs text-muted-foreground">
+                          You can also do this later in the editor.
+                        </p>
                       </div>
                     </motion.div>
                   )}
@@ -1016,6 +1137,20 @@ export default function CreateGalleryPage() {
                   </AnimatePresence>
                 )}
 
+                {/* Hosting-only summary — no styles selected */}
+                {imageCount > 0 && stylesCount === 0 && (
+                  <div className="rounded-md border border-border bg-card p-4 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-muted-foreground">
+                        <span className="font-mono font-semibold text-foreground">{imageCount}</span> photos
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                        <FolderOpen className="h-4 w-4" strokeWidth={1.75} /> Hosting only — no AI edits
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Edit cost summary */}
                 {imageCount > 0 && stylesCount > 0 && (
                   <div className={cn("rounded-md border p-4 text-sm", hasInsufficientEdits && !isUnlimited ? "border-destructive/40 bg-destructive/[0.06]" : "border-border bg-card")}>
@@ -1100,12 +1235,17 @@ export default function CreateGalleryPage() {
                 ) : uploadSource === "drive" ? (
                   <>
                     <CloudIcon className="h-4 w-4" />
-                    Import & hand to Aura
+                    {selectedStyles.length > 0 ? "Import & hand to Aura" : "Import & share"}
                   </>
-                ) : (
+                ) : selectedStyles.length > 0 ? (
                   <>
                     <Sparkle size={15} />
                     Hand it to Aura
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Upload & share
                   </>
                 )}
               </Button>
@@ -1113,6 +1253,24 @@ export default function CreateGalleryPage() {
           </div>
         </div>
       </div>
+
+      {/* FIX 3 — confirm before abandoning staged photos / an active transfer */}
+      <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without creating?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your selected photos won't be uploaded.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/dashboard/galleries")}>
+              Leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
