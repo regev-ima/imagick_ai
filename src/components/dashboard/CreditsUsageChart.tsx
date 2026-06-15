@@ -32,8 +32,8 @@ function buildLast30Days(dailyUsage: { date: string; edits: number }[]) {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border/50 bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg text-sm">
-      <p className="text-muted-foreground mb-1">{label}</p>
+    <div className="rounded-xl border border-border/60 bg-card/95 px-3 py-2 text-sm shadow-lg backdrop-blur-sm">
+      <p className="mb-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
       <p className="font-semibold text-primary">{payload[0].value} edits</p>
     </div>
   );
@@ -53,24 +53,24 @@ export default function CreditsUsageChart() {
     : "This billing period";
 
   return (
-    <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
-      <CardHeader className="pb-2 px-5 pt-5">
+    <Card className="glass-card rounded-3xl border-border/60 transition-colors hover:border-primary/30">
+      <CardHeader className="px-5 pb-2 pt-5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-primary" />
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary/12 text-primary">
+              <Zap className="h-4 w-4" />
             </div>
-            <CardTitle className="text-base font-semibold">Edits Usage</CardTitle>
+            <CardTitle className="font-display text-base font-semibold tracking-tight">Edits usage</CardTitle>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-gradient-primary">{editsUsed}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="font-display text-xl font-bold text-gradient-primary">{editsUsed}</p>
+            <p className="font-mono text-[11px] text-muted-foreground">
               {isUnlimited ? "edits this period" : `of ${editsTotal} used`}
             </p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-          <TrendingUp className="w-3 h-3" />
+        <p className="mt-1 flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+          <TrendingUp className="h-3 w-3" />
           {periodLabel}
         </p>
       </CardHeader>
@@ -109,9 +109,9 @@ export default function CreditsUsageChart() {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-[180px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Zap className="w-8 h-8 opacity-20" />
-            <p className="text-xs">No edits used yet this period</p>
+          <div className="flex h-[180px] flex-col items-center justify-center gap-2 text-muted-foreground">
+            <Zap className="h-8 w-8 opacity-20" />
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em]">No edits used yet this period</p>
           </div>
         )}
       </CardContent>

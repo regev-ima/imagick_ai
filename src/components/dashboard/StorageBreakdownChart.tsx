@@ -21,9 +21,9 @@ function formatMb(mb: number) {
 const CustomTooltip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border/50 bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg text-sm">
+    <div className="rounded-xl border border-border/60 bg-card/95 px-3 py-2 text-sm shadow-lg backdrop-blur-sm">
       <p className="font-semibold">{payload[0].name}</p>
-      <p className="text-muted-foreground">{formatMb(payload[0].value)}</p>
+      <p className="font-mono text-[11px] text-muted-foreground">{formatMb(payload[0].value)}</p>
     </div>
   );
 };
@@ -46,18 +46,18 @@ export default function StorageBreakdownChart() {
   const usedPercent = maxStorageGb > 0 ? ((storageUsedMb / (maxStorageGb * 1024)) * 100).toFixed(1) : "0";
 
   return (
-    <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
-      <CardHeader className="pb-2 px-5 pt-5">
+    <Card className="glass-card rounded-3xl border-border/60 transition-colors hover:border-primary/30">
+      <CardHeader className="px-5 pb-2 pt-5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-secondary/15 flex items-center justify-center">
-              <HardDrive className="w-4 h-4 text-secondary" />
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-secondary/15 text-secondary">
+              <HardDrive className="h-4 w-4" />
             </div>
-            <CardTitle className="text-base font-semibold">Storage</CardTitle>
+            <CardTitle className="font-display text-base font-semibold tracking-tight">Storage</CardTitle>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold">{formatMb(storageUsedMb)}</p>
-            <p className="text-xs text-muted-foreground">{usedPercent}% of {maxStorageGb} GB</p>
+            <p className="font-display text-xl font-bold">{formatMb(storageUsedMb)}</p>
+            <p className="font-mono text-[11px] text-muted-foreground">{usedPercent}% of {maxStorageGb} GB</p>
           </div>
         </div>
       </CardHeader>
@@ -87,20 +87,20 @@ export default function StorageBreakdownChart() {
                 <div key={entry.name} className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <span
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                       style={{ backgroundColor: COLORS[index % COLORS.length] }}
                     />
-                    <span className="text-xs text-muted-foreground">{entry.name}</span>
+                    <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground">{entry.name}</span>
                   </div>
-                  <span className="text-xs font-medium">{formatMb(entry.value)}</span>
+                  <span className="font-mono text-[11px] font-medium">{formatMb(entry.value)}</span>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div className="h-[140px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <HardDrive className="w-8 h-8 opacity-20" />
-            <p className="text-xs">No storage data available</p>
+          <div className="flex h-[140px] flex-col items-center justify-center gap-2 text-muted-foreground">
+            <HardDrive className="h-8 w-8 opacity-20" />
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em]">No storage data available</p>
           </div>
         )}
       </CardContent>

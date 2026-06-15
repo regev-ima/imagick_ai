@@ -49,7 +49,7 @@ const deck = {
 };
 const rise = {
   hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.23, 1, 0.32, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.2, 0, 0, 1] } },
 };
 
 const PROMPT_CHIPS = [
@@ -203,90 +203,109 @@ export default function DashboardHome() {
         isSaving={isSavingQuestionnaire}
       />
 
-      <motion.div variants={deck} initial="hidden" animate="show" className="relative w-full space-y-8">
-        {/* ── Greeting ───────────────────────────────────────────── */}
-        <motion.div variants={rise} className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-[11px] tracking-[0.22em] text-muted-foreground">{todayLabel()}</p>
-            <h1 className="mt-2 font-display text-3xl font-bold tracking-tight lg:text-5xl">
-              {getGreeting()}, <span className="text-gradient-primary">{userName}</span>
-            </h1>
-          </div>
-          {currentPlan && (
-            <span className="aura-chip" style={{ "--led": "var(--rating)" } as CSSProperties}>
-              <Zap className="h-3 w-3" style={{ color: "hsl(var(--rating))" }} /> {currentPlan.name}
-            </span>
-          )}
-        </motion.div>
+      {/* Ambient spectral wash behind the hero — pure decoration, photo-first. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] opacity-70"
+        style={{
+          background:
+            "radial-gradient(120% 70% at 50% -20%, hsl(var(--neon-purple) / 0.10), transparent 60%)",
+        }}
+      />
 
-        {/* ── Aura command bar — the centerpiece ─────────────────── */}
-        <motion.div variants={rise}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              openAuraCommand(promptText);
-              setPromptText("");
-            }}
-            className="aura-ai-border rounded-full"
-          >
-            <div className="relative flex items-center gap-3 rounded-full bg-background/70 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4">
-              <Orb className="h-7 w-7 shrink-0" />
-              <input
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/75 sm:text-base"
-                placeholder="Ask Aura: find a collection, start one, train a style… (⌘K)"
-                aria-label="Ask Aura"
-              />
-              <button
-                type="submit"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[image:var(--gradient-primary)] text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_22px_-6px_hsl(var(--glow-primary)/0.8)] transition-transform duration-150 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] active:scale-95"
-                aria-label="Send to Aura"
-              >
-                <Send className="h-4 w-4" />
-              </button>
+      <motion.div variants={deck} initial="hidden" animate="show" className="relative mx-auto w-full max-w-[1400px] space-y-10">
+        {/* ════ HERO COMMAND DECK ═══════════════════════════════════════
+            Greeting + Aura command bar + briefing share one spectral frame,
+            so the assistant reads as the hero of the whole screen. */}
+        <motion.section variants={rise} className="aura-ai-border overflow-hidden rounded-[32px]">
+          <div className="relative rounded-[32px] bg-card/60 px-5 py-7 backdrop-blur-2xl sm:px-8 sm:py-9">
+            {/* Greeting line */}
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-mono text-[11px] tracking-[0.22em] text-muted-foreground">{todayLabel()}</p>
+                <h1 className="mt-2.5 font-display text-3xl font-bold tracking-tight lg:text-[2.75rem] lg:leading-[1.05]">
+                  {getGreeting()}, <span className="text-gradient-primary">{userName}</span>
+                </h1>
+              </div>
+              {currentPlan && (
+                <span className="aura-chip shrink-0" style={{ "--led": "var(--rating)" } as CSSProperties}>
+                  <Zap className="h-3 w-3" style={{ color: "hsl(var(--rating))" }} /> {currentPlan.name}
+                </span>
+              )}
             </div>
-          </form>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {PROMPT_CHIPS.map((c) => (
-              <Link
-                key={c.label}
-                to={c.to}
-                className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/50 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground backdrop-blur-md transition-colors duration-150 hover:border-primary/50 hover:text-foreground"
-              >
-                <c.icon className="h-3 w-3 text-primary" /> {c.label}
-              </Link>
-            ))}
-          </div>
-        </motion.div>
 
-        {!isEmpty && briefing.length > 0 && (
-          <motion.div variants={rise}>
-            <div className="flex flex-col gap-2.5 rounded-3xl border border-border/60 bg-card/55 p-4 backdrop-blur-xl sm:flex-row sm:items-center sm:gap-4 sm:p-5">
-              <div className="flex shrink-0 items-center gap-2.5">
-                <Orb className="h-6 w-6" />
-                <span className="aura-microlabel">Aura briefing</span>
+            {/* Aura command bar — the centerpiece */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                openAuraCommand(promptText);
+                setPromptText("");
+              }}
+              className="mt-7"
+            >
+              <div className="relative flex items-center gap-3 rounded-full border border-border/70 bg-background/70 px-4 py-3 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.04)] backdrop-blur-xl sm:px-5 sm:py-4">
+                <Orb className="h-7 w-7 shrink-0" />
+                <input
+                  value={promptText}
+                  onChange={(e) => setPromptText(e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/75 sm:text-base"
+                  placeholder="Ask Aura: find a collection, start one, train a style… (⌘K)"
+                  aria-label="Ask Aura"
+                />
+                <button
+                  type="submit"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[image:var(--gradient-primary)] text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_22px_-6px_hsl(var(--glow-primary)/0.8)] transition-transform duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] active:scale-95"
+                  aria-label="Send to Aura"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
               </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                {briefing.map((b) => (
-                  <p key={b.key} className="text-sm text-muted-foreground">
-                    {b.text}{" "}
-                    <Link to={b.to} className="whitespace-nowrap font-medium text-primary hover:underline">
-                      {b.label} →
-                    </Link>
-                  </p>
-                ))}
-              </div>
+            </form>
+
+            {/* Quick-action chips */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {PROMPT_CHIPS.map((c) => (
+                <Link
+                  key={c.label}
+                  to={c.to}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/50 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground backdrop-blur-md transition-colors duration-150 hover:border-primary/50 hover:text-foreground"
+                >
+                  <c.icon className="h-3 w-3 text-primary" /> {c.label}
+                </Link>
+              ))}
             </div>
-          </motion.div>
-        )}
+
+            {/* Aura briefing — folded into the hero as Aura's own voice */}
+            {!isEmpty && briefing.length > 0 && (
+              <>
+                <hr className="aura-hairline my-6" />
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:gap-4">
+                  <div className="flex shrink-0 items-center gap-2.5 sm:pt-0.5">
+                    <Orb className="h-6 w-6" />
+                    <span className="aura-microlabel">Aura briefing</span>
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    {briefing.map((b) => (
+                      <p key={b.key} className="text-sm text-muted-foreground">
+                        {b.text}{" "}
+                        <Link to={b.to} className="whitespace-nowrap font-medium text-primary hover:underline">
+                          {b.label} →
+                        </Link>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </motion.section>
 
         {galleriesLoading ? (
           <div className="flex items-center justify-center py-24">
             <Orb className="h-12 w-12" />
           </div>
         ) : isEmpty ? (
-          /* ── Empty — command-deck welcome ─────────────────────── */
+          /* ════ EMPTY — command-deck welcome ══════════════════════════ */
           <motion.div variants={rise} className="overflow-hidden rounded-[28px] border border-border/60 bg-card/50 p-8 text-center backdrop-blur-xl lg:p-14">
             <Orb className="mx-auto h-20 w-20" />
             <h2 className="mt-7 font-display text-2xl font-bold tracking-tight lg:text-3xl">
@@ -314,264 +333,280 @@ export default function DashboardHome() {
             </div>
             <Link
               to="/dashboard/galleries/new"
-              className="mt-9 inline-flex items-center gap-2 rounded-full bg-[image:var(--gradient-primary)] px-7 py-3 font-semibold text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_30px_-8px_hsl(var(--glow-primary)/0.8)] transition-transform duration-150 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
+              className="mt-9 inline-flex items-center gap-2 rounded-full bg-[image:var(--gradient-primary)] px-7 py-3 font-semibold text-white shadow-[inset_0_1px_0_hsl(0_0%_100%/0.3),0_0_30px_-8px_hsl(var(--glow-primary)/0.8)] transition-transform duration-150 [transition-timing-function:cubic-bezier(0.2,0,0,1)] active:scale-[0.97]"
             >
               <Plus className="h-4.5 w-4.5" /> Create your first collection
             </Link>
           </motion.div>
         ) : (
           <>
-            {/* ── Bento telemetry ──────────────────────────────── */}
-            <motion.div variants={rise} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-              {/* Edits gauge */}
-              <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 p-5 backdrop-blur-xl">
-                <p className="aura-microlabel flex items-center gap-2">
-                  {hasGiftCredits ? <Gift className="h-3 w-3" /> : <Zap className="h-3 w-3" />} AI edits left
-                </p>
-                <div className="mt-4 flex items-center gap-4">
-                  <div className="relative h-16 w-16 shrink-0">
-                    <div className="aura-gauge absolute inset-0" style={{ "--gauge": Math.round(editsPercent) } as CSSProperties} />
-                    {isUnlimited && (
-                      <span className="absolute inset-0 grid place-items-center font-display text-lg text-primary">∞</span>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-display text-2xl font-semibold leading-none">
-                      {isUnlimited ? "Unlimited" : editsRemaining.toLocaleString()}
-                    </p>
-                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                      {isUnlimited ? "no cap" : `of ${editsTotal.toLocaleString()}`}
-                    </p>
-                    {hasGiftCredits && (
-                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[hsl(var(--rating)/0.3)] bg-[hsl(var(--rating)/0.12)] px-1.5 py-0.5 font-mono text-[10px] text-[hsl(var(--rating))]">
-                        <Gift className="h-2.5 w-2.5" /> +{giftCreditsTotal.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Storage */}
-              <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 p-5 backdrop-blur-xl">
-                <p className="aura-microlabel flex items-center gap-2">
-                  <HardDrive className="h-3 w-3" /> Storage
-                </p>
-                <p className="mt-4 font-display text-2xl font-semibold leading-none">
-                  {formatStorage(storageUsedMb)}
-                </p>
-                <p className="mt-1 font-mono text-[11px] text-muted-foreground">of {maxStorageGb} GB</p>
-                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]"
-                    style={{ width: `${Math.min(100, storagePercent)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Collections */}
-              <Link
-                to="/dashboard/galleries"
-                className="group relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 p-5 backdrop-blur-xl transition-[transform,border-color] duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:border-primary/50"
-              >
-                <p className="aura-microlabel flex items-center gap-2">
-                  <Layers className="h-3 w-3" /> Collections
-                  <ArrowUpRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/0 transition-colors group-hover:text-primary" />
-                </p>
-                <p className="mt-4 font-display text-3xl font-semibold leading-none">{totalCollections}</p>
-                <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                  {totalImages.toLocaleString()} images total
-                </p>
-              </Link>
-
-              {/* Engine */}
-              <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 p-5 backdrop-blur-xl">
-                <p className="aura-microlabel">Aura engine</p>
-                <div className="mt-4 flex items-center gap-4">
-                  <Orb className="h-12 w-12 shrink-0" />
-                  <div className="min-w-0">
-                    {engineQueue.length > 0 ? (
-                      <>
-                        <p className="font-display text-lg font-semibold leading-none text-primary">
-                          {engineQueue.length} {engineQueue.length === 1 ? "job" : "jobs"}
-                        </p>
-                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">working now</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="inline-flex items-center gap-1.5 font-display text-base font-semibold leading-none">
-                          <span className="aura-led aura-led-pulse" style={{ "--led": "var(--secondary)" } as CSSProperties} /> Idle
-                        </p>
-                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">ready when you are</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* ── Engine queue (only when something is processing) ─ */}
-            {engineQueue.length > 0 && (
-              <motion.div variants={rise}>
-                <p className="aura-microlabel mb-3">Aura is working on</p>
-                <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl">
-                  {engineQueue.map((job, i) => (
-                    <Link
-                      key={job.id}
-                      to={`/dashboard/galleries/${job.id}`}
-                      className={cn(
-                        "flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-foreground/[0.03]",
-                        i !== engineQueue.length - 1 && "border-b border-border/40",
+            {/* ════ TELEMETRY RAIL ════════════════════════════════════════
+                Instrument strip — the 4 live stats read as one panel. */}
+            <motion.section variants={rise}>
+              <p className="aura-microlabel mb-3">Studio telemetry</p>
+              <div className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-border/60 bg-border/40 xl:grid-cols-4">
+                {/* Edits gauge */}
+                <div className="relative overflow-hidden bg-card/80 p-5 backdrop-blur-xl">
+                  <p className="aura-microlabel flex items-center gap-2">
+                    {hasGiftCredits ? <Gift className="h-3 w-3" /> : <Zap className="h-3 w-3" />} AI edits left
+                  </p>
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="relative h-16 w-16 shrink-0">
+                      <div className="aura-gauge absolute inset-0" style={{ "--gauge": Math.round(editsPercent) } as CSSProperties} />
+                      {isUnlimited && (
+                        <span className="absolute inset-0 grid place-items-center font-display text-lg text-primary">∞</span>
                       )}
-                    >
-                      <div className="h-11 w-16 shrink-0 overflow-hidden rounded-xl bg-muted">
-                        {job.heroUrl ? (
-                          <img src={getThumbnailUrl(job.heroUrl)} alt="" className="h-full w-full object-cover opacity-90" />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center">
-                            <Images className="h-4 w-4 text-muted-foreground/40" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{job.name}</p>
-                        <p className="font-mono text-[11px] text-muted-foreground">{job.detail}</p>
-                      </div>
-                      <div className="hidden w-40 sm:block">
-                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]"
-                            style={{ width: `${job.pct}%` }}
-                          />
-                        </div>
-                      </div>
-                      <span className="w-11 text-right font-mono text-xs text-primary">{job.pct}%</span>
-                    </Link>
-                  ))}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-display text-2xl font-semibold leading-none">
+                        {isUnlimited ? "Unlimited" : editsRemaining.toLocaleString()}
+                      </p>
+                      <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                        {isUnlimited ? "no cap" : `of ${editsTotal.toLocaleString()}`}
+                      </p>
+                      {hasGiftCredits && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[hsl(var(--rating)/0.3)] bg-[hsl(var(--rating)/0.12)] px-1.5 py-0.5 font-mono text-[10px] text-[hsl(var(--rating))]">
+                          <Gift className="h-2.5 w-2.5" /> +{giftCreditsTotal.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </motion.div>
-            )}
 
-            {/* ── Recent collections ───────────────────────────── */}
-            <motion.div variants={rise}>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display text-lg font-semibold tracking-tight">Recent collections</h2>
+                {/* Storage */}
+                <div className="relative overflow-hidden bg-card/80 p-5 backdrop-blur-xl">
+                  <p className="aura-microlabel flex items-center gap-2">
+                    <HardDrive className="h-3 w-3" /> Storage
+                  </p>
+                  <p className="mt-4 font-display text-2xl font-semibold leading-none">
+                    {formatStorage(storageUsedMb)}
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">of {maxStorageGb} GB</p>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]"
+                      style={{ width: `${Math.min(100, storagePercent)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Collections */}
                 <Link
                   to="/dashboard/galleries"
-                  className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary"
+                  className="group relative overflow-hidden bg-card/80 p-5 backdrop-blur-xl transition-colors duration-200 hover:bg-card"
                 >
-                  View all <ArrowRight className="h-3 w-3" />
+                  <p className="aura-microlabel flex items-center gap-2">
+                    <Layers className="h-3 w-3" /> Collections
+                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/0 transition-colors group-hover:text-primary" />
+                  </p>
+                  <p className="mt-4 font-display text-3xl font-semibold leading-none">{totalCollections}</p>
+                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    {totalImages.toLocaleString()} images total
+                  </p>
                 </Link>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                {galleries.map((gallery) => {
-                  const pct =
-                    gallery.total_images > 0
-                      ? Math.round((gallery.processed_images / gallery.total_images) * 100)
-                      : 0;
-                  const isReady = gallery.status === "ready";
-                  const isError = gallery.status === "error";
-                  const ledColor = isReady
-                    ? "var(--secondary)"
-                    : isError
-                      ? "var(--destructive)"
-                      : "var(--rating)";
-                  return (
-                    <Link key={gallery.id} to={`/dashboard/galleries/${gallery.id}`} className="group">
-                      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_0_44px_-12px_hsl(var(--glow-primary)/0.4)]">
-                        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-                          {gallery.hero_image_url ? (
-                            <img
-                              src={getThumbnailUrl(gallery.hero_image_url)}
-                              alt={gallery.name}
-                              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                              onError={(e) => {
-                                const t = e.currentTarget;
-                                if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url!;
-                              }}
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center">
-                              <Images className="h-8 w-8 text-muted-foreground/40" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/10 to-transparent" />
-                          <span
-                            className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] backdrop-blur-md"
-                            style={{ color: `hsl(${ledColor})` }}
-                          >
-                            <span className="aura-led aura-led-pulse" style={{ "--led": ledColor } as CSSProperties} />
-                            {isReady ? "Ready" : isError ? "Error" : "Processing"}
-                          </span>
-                          {!isReady && !isError && pct > 0 && (
-                            <span className="absolute right-3 top-3 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] text-primary backdrop-blur-md">
-                              {pct}%
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                          <p className="truncate text-sm font-medium transition-colors group-hover:text-primary">
-                            {gallery.name}
+                {/* Engine */}
+                <div className="relative overflow-hidden bg-card/80 p-5 backdrop-blur-xl">
+                  <p className="aura-microlabel">Aura engine</p>
+                  <div className="mt-4 flex items-center gap-4">
+                    <Orb className="h-12 w-12 shrink-0" />
+                    <div className="min-w-0">
+                      {engineQueue.length > 0 ? (
+                        <>
+                          <p className="font-display text-lg font-semibold leading-none text-primary">
+                            {engineQueue.length} {engineQueue.length === 1 ? "job" : "jobs"}
                           </p>
-                          <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                            {(gallery.total_images || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </motion.div>
-
-            {/* ── Usage + shortcuts ────────────────────────────── */}
-            <motion.div variants={rise} className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
-              <Suspense fallback={<div className="h-64 rounded-3xl border border-border/60 bg-card/50" />}>
-                <CreditsUsageChart />
-              </Suspense>
-
-              <div className="space-y-3">
-                {[
-                  {
-                    to: "/dashboard/styles",
-                    icon: Palette,
-                    title: "Train an AI style",
-                    body: "Teach Aura your editing look, then apply it to a whole collection.",
-                  },
-                  {
-                    to: "/dashboard/galleries",
-                    icon: Share2,
-                    title: "Share with clients",
-                    body: "Send a gallery link. Clients view, favorite and download, no account.",
-                  },
-                  ...(!isUnlimited
-                    ? [
-                        {
-                          to: "/dashboard/billing",
-                          icon: Zap,
-                          title: "Need more edits?",
-                          body: "Upgrade for unlimited edits, more storage and priority processing.",
-                        },
-                      ]
-                    : []),
-                ].map((card) => (
-                  <Link
-                    key={card.to + card.title}
-                    to={card.to}
-                    className="group flex items-start gap-3 rounded-2xl border border-border/60 bg-card/55 p-4 backdrop-blur-xl transition-[border-color,transform] duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:border-primary/50"
-                  >
-                    <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
-                      <card.icon className="h-4.5 w-4.5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold transition-colors group-hover:text-primary">{card.title}</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{card.body}</p>
+                          <p className="mt-1 font-mono text-[11px] text-muted-foreground">working now</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="inline-flex items-center gap-1.5 font-display text-base font-semibold leading-none">
+                            <span className="aura-led aura-led-pulse" style={{ "--led": "var(--secondary)" } as CSSProperties} /> Idle
+                          </p>
+                          <p className="mt-1 font-mono text-[11px] text-muted-foreground">ready when you are</p>
+                        </>
+                      )}
                     </div>
-                    <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
-                  </Link>
-                ))}
+                  </div>
+                </div>
               </div>
-            </motion.div>
+            </motion.section>
+
+            {/* ════ WORK AREA — photos left (hero), studio rail right ══════ */}
+            <div className="grid gap-6 xl:grid-cols-[1.7fr,1fr] xl:items-start">
+              {/* ── Left column: the engine queue + the photo wall ── */}
+              <div className="space-y-6">
+                {/* Engine queue (only when something is processing) */}
+                {engineQueue.length > 0 && (
+                  <motion.section variants={rise}>
+                    <p className="aura-microlabel mb-3">Aura is working on</p>
+                    <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl">
+                      {engineQueue.map((job, i) => (
+                        <Link
+                          key={job.id}
+                          to={`/dashboard/galleries/${job.id}`}
+                          className={cn(
+                            "flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-foreground/[0.03]",
+                            i !== engineQueue.length - 1 && "border-b border-border/40",
+                          )}
+                        >
+                          <div className="h-11 w-16 shrink-0 overflow-hidden rounded-xl bg-muted">
+                            {job.heroUrl ? (
+                              <img src={getThumbnailUrl(job.heroUrl)} alt="" className="h-full w-full object-cover opacity-90" />
+                            ) : (
+                              <div className="grid h-full w-full place-items-center">
+                                <Images className="h-4 w-4 text-muted-foreground/40" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{job.name}</p>
+                            <p className="font-mono text-[11px] text-muted-foreground">{job.detail}</p>
+                          </div>
+                          <div className="hidden w-40 sm:block">
+                            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]"
+                                style={{ width: `${job.pct}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="w-11 text-right font-mono text-xs text-primary">{job.pct}%</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </motion.section>
+                )}
+
+                {/* Recent collections — the photo wall is the hero */}
+                <motion.section variants={rise}>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="font-display text-lg font-semibold tracking-tight">Recent collections</h2>
+                    <Link
+                      to="/dashboard/galleries"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary"
+                    >
+                      View all <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                    {galleries.map((gallery) => {
+                      const pct =
+                        gallery.total_images > 0
+                          ? Math.round((gallery.processed_images / gallery.total_images) * 100)
+                          : 0;
+                      const isReady = gallery.status === "ready";
+                      const isError = gallery.status === "error";
+                      const ledColor = isReady
+                        ? "var(--secondary)"
+                        : isError
+                          ? "var(--destructive)"
+                          : "var(--rating)";
+                      return (
+                        <Link key={gallery.id} to={`/dashboard/galleries/${gallery.id}`} className="group">
+                          <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 [transition-timing-function:cubic-bezier(0.2,0,0,1)] hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_0_44px_-12px_hsl(var(--glow-primary)/0.4)]">
+                            <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+                              {gallery.hero_image_url ? (
+                                <img
+                                  src={getThumbnailUrl(gallery.hero_image_url)}
+                                  alt={gallery.name}
+                                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                                  onError={(e) => {
+                                    const t = e.currentTarget;
+                                    if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url!;
+                                  }}
+                                />
+                              ) : (
+                                <div className="grid h-full w-full place-items-center">
+                                  <Images className="h-8 w-8 text-muted-foreground/40" />
+                                </div>
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/10 to-transparent" />
+                              <span
+                                className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] backdrop-blur-md"
+                                style={{ color: `hsl(${ledColor})` }}
+                              >
+                                <span className="aura-led aura-led-pulse" style={{ "--led": ledColor } as CSSProperties} />
+                                {isReady ? "Ready" : isError ? "Error" : "Processing"}
+                              </span>
+                              {!isReady && !isError && pct > 0 && (
+                                <span className="absolute right-3 top-3 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] text-primary backdrop-blur-md">
+                                  {pct}%
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                              <p className="truncate text-sm font-medium transition-colors group-hover:text-primary">
+                                {gallery.name}
+                              </p>
+                              <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                                {(gallery.total_images || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </motion.section>
+              </div>
+
+              {/* ── Right column: the studio rail (usage + shortcuts) ── */}
+              <motion.aside variants={rise} className="space-y-6 xl:sticky xl:top-6">
+                <div>
+                  <p className="aura-microlabel mb-3">Usage</p>
+                  <Suspense fallback={<div className="h-64 rounded-3xl border border-border/60 bg-card/50" />}>
+                    <CreditsUsageChart />
+                  </Suspense>
+                </div>
+
+                <div>
+                  <p className="aura-microlabel mb-3">Quick actions</p>
+                  <div className="space-y-3">
+                    {[
+                      {
+                        to: "/dashboard/styles",
+                        icon: Palette,
+                        title: "Train an AI style",
+                        body: "Teach Aura your editing look, then apply it to a whole collection.",
+                      },
+                      {
+                        to: "/dashboard/galleries",
+                        icon: Share2,
+                        title: "Share with clients",
+                        body: "Send a gallery link. Clients view, favorite and download, no account.",
+                      },
+                      ...(!isUnlimited
+                        ? [
+                            {
+                              to: "/dashboard/billing",
+                              icon: Zap,
+                              title: "Need more edits?",
+                              body: "Upgrade for unlimited edits, more storage and priority processing.",
+                            },
+                          ]
+                        : []),
+                    ].map((card) => (
+                      <Link
+                        key={card.to + card.title}
+                        to={card.to}
+                        className="group flex items-start gap-3 rounded-2xl border border-border/60 bg-card/55 p-4 backdrop-blur-xl transition-[border-color,transform] duration-200 [transition-timing-function:cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 hover:border-primary/50"
+                      >
+                        <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
+                          <card.icon className="h-4.5 w-4.5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold transition-colors group-hover:text-primary">{card.title}</p>
+                          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{card.body}</p>
+                        </div>
+                        <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </motion.aside>
+            </div>
           </>
         )}
       </motion.div>

@@ -37,6 +37,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEffectiveUser } from "@/hooks/useImpersonation";
+import { useDominantColor } from "@/hooks/useDominantColor";
 import { Orb } from "@/components/aura/Orb";
 
 type ViewMode = "grid" | "list";
@@ -44,11 +45,21 @@ type StatusFilter = "all" | "working" | "ready" | "error";
 
 const WORKING_STATUSES = ["uploading", "processing", "culling", "transferring"];
 
+const EASE = [0.2, 0, 0, 1] as const;
+
 const statusLed = (status: string) =>
   status === "ready" ? "var(--secondary)" : status === "error" ? "var(--destructive)" : "var(--rating)";
 
 const statusLabel = (status: string) =>
   status === "ready" ? "Ready" : status === "error" ? "Error" : "Processing";
+
+/**
+ * Inline style helper: a card's accent vars resolve to the photo's dominant
+ * hue when available, otherwise the brand `--primary`. Utilities then read
+ * `hsl(var(--dynamic-primary))` so glow/accents pick up the image's color.
+ */
+const dynamicVars = (color: string | null): CSSProperties =>
+  color ? ({ "--dynamic-primary": color } as CSSProperties) : {};
 
 export default function GalleriesPage() {
   const { effectiveUserId } = useEffectiveUser();
@@ -146,36 +157,59 @@ export default function GalleriesPage() {
 
   return (
     <div className="relative min-h-full px-4 py-6 lg:px-8 lg:py-8">
-      <div className="relative w-full space-y-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-          className="flex flex-wrap items-end justify-between gap-4"
-        >
-          <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight">Collections</h1>
-            <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              {counts.all} collections · {totalImages.toLocaleString()} images
-            </p>
-          </div>
-          <Button variant="glow" asChild>
-            <Link to="/dashboard/galleries/new" className="gap-2">
-              <Plus className="h-4 w-4" />
-              New collection
-            </Link>
-          </Button>
-        </motion.div>
+      {/* Ambient spectral wash behind the masthead — an AI moment, kept faint */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 opacity-[0.5]"
+        style={{ background: "radial-gradient(80% 100% at 18% 0%, hsl(var(--accent) / 0.10), transparent 70%)" }}
+      />
 
-        {/* Toolbar: search + status chips + view toggle */}
+      <div className="relative mx-auto w-full max-w-[1600px] space-y-8">
+        {/* ── Masthead: engine mark + title + live telemetry + CTA ───────── */}
+        <motion.header
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: EASE }}
+          className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-center gap-4">
+            <Orb className="hidden h-11 w-11 shrink-0 sm:block" />
+            <div className="min-w-0">
+              <p className="aura-microlabel">Library</p>
+              <h1 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+                Collections
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Live telemetry strip */}
+            <div className="hidden items-stretch gap-2 md:flex">
+              <Stat label="Collections" value={counts.all.toLocaleString()} />
+              <Stat label="Images" value={totalImages.toLocaleString()} />
+              {counts.working > 0 && (
+                <Stat label="Processing" value={counts.working.toLocaleString()} led="var(--rating)" pulse />
+              )}
+            </div>
+            <Button variant="glow" asChild>
+              <Link to="/dashboard/galleries/new" className="gap-2">
+                <Plus className="h-4 w-4" />
+                New collection
+              </Link>
+            </Button>
+          </div>
+        </motion.header>
+
+        <hr className="aura-hairline" />
+
+        {/* ── Toolbar: search · status chips · view toggle ───────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.06, duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+          transition={{ delay: 0.06, duration: 0.45, ease: EASE }}
           className="flex flex-col gap-3 lg:flex-row lg:items-center"
         >
-          <div className="flex flex-1 items-center gap-2 rounded-full border border-border/70 bg-card/50 px-4 py-2 backdrop-blur-md transition-[border-color,box-shadow] duration-150 focus-within:border-primary/60 focus-within:shadow-[0_0_24px_-10px_hsl(var(--glow-primary)/0.6)]">
+          <div className="flex flex-1 items-center gap-2 rounded-2xl border border-border/70 bg-card/60 px-4 py-2.5 backdrop-blur-md transition-[border-color,box-shadow] duration-150 focus-within:border-primary/60 focus-within:shadow-[0_0_24px_-10px_hsl(var(--glow-primary)/0.6)]">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               type="text"
@@ -187,36 +221,38 @@ export default function GalleriesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {filterChips.map((chip) => {
-              const active = statusFilter === chip.key;
-              return (
-                <button
-                  key={chip.key}
-                  type="button"
-                  onClick={() => setStatusFilter(chip.key)}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-[border-color,color,background-color] duration-150",
-                    active
-                      ? "border-primary/60 bg-primary/10 text-foreground"
-                      : "border-border/70 bg-card/40 text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                  )}
-                >
-                  {chip.led && <span className="aura-led" style={{ "--led": chip.led } as CSSProperties} />}
-                  {chip.label}
-                  <span className={cn("font-mono", active ? "text-primary" : "text-muted-foreground/70")}>
-                    {counts[chip.key]}
-                  </span>
-                </button>
-              );
-            })}
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/60 bg-card/40 p-1 backdrop-blur-md">
+              {filterChips.map((chip) => {
+                const active = statusFilter === chip.key;
+                return (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={() => setStatusFilter(chip.key)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-xl px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-[color,background-color] duration-150",
+                      active
+                        ? "bg-primary/15 text-foreground"
+                        : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
+                    )}
+                  >
+                    {chip.led && <span className="aura-led" style={{ "--led": chip.led } as CSSProperties} />}
+                    {chip.label}
+                    <span className={cn("font-mono", active ? "text-primary" : "text-muted-foreground/70")}>
+                      {counts[chip.key]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-            <div className="ml-auto flex items-center gap-1 rounded-full border border-border/70 bg-card/40 p-1 lg:ml-2">
+            <div className="ml-auto flex items-center gap-1 rounded-2xl border border-border/60 bg-card/40 p-1 backdrop-blur-md lg:ml-1">
               <button
                 type="button"
                 aria-label="Grid view"
                 onClick={() => setViewMode("grid")}
                 className={cn(
-                  "grid h-8 w-8 place-items-center rounded-full transition-colors",
+                  "grid h-8 w-8 place-items-center rounded-xl transition-colors",
                   viewMode === "grid" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -227,7 +263,7 @@ export default function GalleriesPage() {
                 aria-label="List view"
                 onClick={() => setViewMode("list")}
                 className={cn(
-                  "grid h-8 w-8 place-items-center rounded-full transition-colors",
+                  "grid h-8 w-8 place-items-center rounded-xl transition-colors",
                   viewMode === "list" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -237,42 +273,49 @@ export default function GalleriesPage() {
           </div>
         </motion.div>
 
-        {/* Grid / list */}
-        {viewMode === "grid" ? (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {filteredGalleries.map((gallery) => (
-              <GalleryCard
-                key={gallery.id}
-                gallery={gallery}
-                onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
-                onShare={() => share(gallery.id)}
-                onDelete={() => requestDelete(gallery)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl">
-            {filteredGalleries.map((gallery, i) => (
-              <GalleryRow
-                key={gallery.id}
-                gallery={gallery}
-                last={i === filteredGalleries.length - 1}
-                onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
-                onShare={() => share(gallery.id)}
-                onDelete={() => requestDelete(gallery)}
-              />
-            ))}
-          </div>
-        )}
+        {/* ── Grid / list ────────────────────────────────────────────────── */}
+        {filteredGalleries.length > 0 &&
+          (viewMode === "grid" ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              {filteredGalleries.map((gallery, i) => (
+                <GalleryCard
+                  key={gallery.id}
+                  gallery={gallery}
+                  index={i}
+                  onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
+                  onShare={() => share(gallery.id)}
+                  onDelete={() => requestDelete(gallery)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl">
+              {filteredGalleries.map((gallery, i) => (
+                <GalleryRow
+                  key={gallery.id}
+                  gallery={gallery}
+                  last={i === filteredGalleries.length - 1}
+                  onEdit={() => navigate(`/dashboard/galleries/${gallery.id}`)}
+                  onShare={() => share(gallery.id)}
+                  onDelete={() => requestDelete(gallery)}
+                />
+              ))}
+            </div>
+          ))}
 
-        {/* Empty state */}
+        {/* ── Empty state (no-results vs no-collections) ─────────────────── */}
         {filteredGalleries.length === 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-20 text-center">
-            <Orb className="mx-auto h-14 w-14" />
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: EASE }}
+            className="grid place-items-center rounded-3xl border border-border/60 bg-card/40 px-6 py-24 text-center backdrop-blur-md"
+          >
+            <Orb className="h-14 w-14" />
             <h3 className="mt-6 font-display text-lg font-semibold">
               {searchQuery || statusFilter !== "all" ? "Nothing matches" : "No collections yet"}
             </h3>
-            <p className="mt-1.5 text-sm text-muted-foreground">
+            <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
               {searchQuery || statusFilter !== "all"
                 ? "Try a different search or filter."
                 : "Hand me a shoot and I'll take it from there."}
@@ -338,6 +381,19 @@ export default function GalleriesPage() {
   );
 }
 
+/** Compact masthead telemetry tile (Roboto Mono labels, semantic LED). */
+function Stat({ label, value, led, pulse }: { label: string; value: string; led?: string; pulse?: boolean }) {
+  return (
+    <div className="flex flex-col justify-center rounded-2xl border border-border/60 bg-card/45 px-3.5 py-1.5 backdrop-blur-md">
+      <span className="flex items-center gap-1.5 font-display text-lg font-bold leading-none tabular-nums">
+        {led && <span className={cn("aura-led", pulse && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />}
+        {value}
+      </span>
+      <span className="aura-microlabel mt-1 leading-none">{label}</span>
+    </div>
+  );
+}
+
 interface GalleryItemProps {
   gallery: any;
   onDelete: () => void;
@@ -378,73 +434,93 @@ function ActionsMenu({ onEdit, onShare, onDelete, className }: Omit<GalleryItemP
   );
 }
 
-function GalleryCard({ gallery, onDelete, onEdit, onShare }: GalleryItemProps) {
+function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryItemProps & { index: number }) {
   const isReady = gallery.status === "ready";
   const isError = gallery.status === "error";
   const isWorking = !isReady && !isError;
   const progress = gallery.total_images > 0 ? Math.round((gallery.processed_images / gallery.total_images) * 100) : 0;
   const led = statusLed(gallery.status);
 
+  const thumb = gallery.hero_image_url ? getThumbnailUrl(gallery.hero_image_url) : null;
+  // Material You: tint this card from its own hero image (falls back to brand).
+  const dynamic = useDominantColor(thumb);
+
   return (
-    <Link to={`/dashboard/galleries/${gallery.id}`} className="group block">
-      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_0_44px_-12px_hsl(var(--glow-primary)/0.4)]">
-        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-          {gallery.hero_image_url ? (
-            <img
-              src={getThumbnailUrl(gallery.hero_image_url)}
-              alt={gallery.name}
-              loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-              onError={(e) => {
-                const t = e.currentTarget;
-                if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url;
-              }}
-            />
-          ) : (
-            <div className="grid h-full w-full place-items-center">
-              <Images className="h-8 w-8 text-muted-foreground/40" />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/10 to-transparent" />
-
-          <span
-            className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] backdrop-blur-md"
-            style={{ color: `hsl(${led})` }}
-          >
-            <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
-            {statusLabel(gallery.status)}
-          </span>
-
-          <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-            <ActionsMenu onEdit={onEdit} onShare={onShare} onDelete={onDelete} className="bg-background/60 backdrop-blur-md" />
-          </div>
-
-          {isWorking && (
-            <div className="absolute inset-x-0 bottom-0 h-1 bg-background/40">
-              <div
-                className="h-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.6)]"
-                style={{ width: `${progress}%` }}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index, 12) * 0.025, duration: 0.4, ease: EASE }}
+      style={dynamicVars(dynamic)}
+    >
+      <Link to={`/dashboard/galleries/${gallery.id}`} className="group block">
+        <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/55 backdrop-blur-xl transition-[transform,border-color,box-shadow] duration-200 [transition-timing-function:cubic-bezier(0.2,0,0,1)] hover:-translate-y-1 hover:border-[hsl(var(--dynamic-primary)/0.55)] hover:shadow-[0_18px_50px_-18px_hsl(var(--dynamic-primary)/0.55)]">
+          <div className="relative aspect-[4/5] overflow-hidden bg-muted">
+            {thumb ? (
+              <img
+                src={thumb}
+                alt={gallery.name}
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                onError={(e) => {
+                  const t = e.currentTarget;
+                  if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url;
+                }}
               />
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="grid h-full w-full place-items-center">
+                <Images className="h-8 w-8 text-muted-foreground/40" />
+              </div>
+            )}
 
-        <div className="space-y-1 px-4 py-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="truncate text-sm font-medium transition-colors group-hover:text-primary">{gallery.name}</h3>
-            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-              {(gallery.total_images || 0).toLocaleString()}
+            {/* Legibility scrim grading into the card */}
+            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/35 to-transparent" />
+            {/* Dynamic-color hover wash, sourced from the photo's own hue */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_120%,hsl(var(--dynamic-primary)/0.22),transparent_60%)] opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+
+            <span
+              className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] backdrop-blur-md"
+              style={{ color: `hsl(${led})` }}
+            >
+              <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
+              {statusLabel(gallery.status)}
             </span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="truncate text-xs text-muted-foreground">
-              {gallery.description || new Date(gallery.created_at).toLocaleDateString()}
-            </p>
-            {isWorking && <span className="shrink-0 font-mono text-[11px] text-primary">{progress}%</span>}
+
+            <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+              <ActionsMenu onEdit={onEdit} onShare={onShare} onDelete={onDelete} className="bg-background/60 backdrop-blur-md" />
+            </div>
+
+            {/* Title + meta sit over the image foot */}
+            <div className="absolute inset-x-0 bottom-0 space-y-1 p-4">
+              <div className="flex items-end justify-between gap-3">
+                <h3 className="truncate text-sm font-medium text-foreground drop-shadow-sm transition-colors group-hover:text-[hsl(var(--dynamic-primary))]">
+                  {gallery.name}
+                </h3>
+                <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                  {(gallery.total_images || 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="truncate text-xs text-muted-foreground">
+                  {gallery.description || new Date(gallery.created_at).toLocaleDateString()}
+                </p>
+                {isWorking && (
+                  <span className="shrink-0 font-mono text-[11px] text-[hsl(var(--dynamic-primary))]">{progress}%</span>
+                )}
+              </div>
+            </div>
+
+            {isWorking && (
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-background/40">
+                <div
+                  className="h-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.6)]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            )}
           </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </motion.div>
   );
 }
 
@@ -455,18 +531,26 @@ function GalleryRow({ gallery, last, onDelete, onEdit, onShare }: GalleryItemPro
   const progress = gallery.total_images > 0 ? Math.round((gallery.processed_images / gallery.total_images) * 100) : 0;
   const led = statusLed(gallery.status);
 
+  const thumb = gallery.hero_image_url ? getThumbnailUrl(gallery.hero_image_url) : null;
+  // Material You: each row picks up its hero image's hue too.
+  const dynamic = useDominantColor(thumb);
+
   return (
     <Link
       to={`/dashboard/galleries/${gallery.id}`}
+      style={dynamicVars(dynamic)}
       className={cn(
-        "group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-foreground/[0.03]",
+        "group relative flex items-center gap-4 px-4 py-3 transition-colors hover:bg-[hsl(var(--dynamic-primary)/0.06)]",
         !last && "border-b border-border/40",
       )}
     >
+      {/* Dynamic-color accent bar (appears on hover) */}
+      <span className="pointer-events-none absolute inset-y-2 left-0 w-[3px] rounded-full bg-[hsl(var(--dynamic-primary))] opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
+
       <div className="h-12 w-[72px] shrink-0 overflow-hidden rounded-xl bg-muted">
-        {gallery.hero_image_url ? (
+        {thumb ? (
           <img
-            src={getThumbnailUrl(gallery.hero_image_url)}
+            src={thumb}
             alt=""
             loading="lazy"
             className="h-full w-full object-cover"
@@ -485,7 +569,9 @@ function GalleryRow({ gallery, last, onDelete, onEdit, onShare }: GalleryItemPro
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
-          <h3 className="truncate text-sm font-medium transition-colors group-hover:text-primary">{gallery.name}</h3>
+          <h3 className="truncate text-sm font-medium transition-colors group-hover:text-[hsl(var(--dynamic-primary))]">
+            {gallery.name}
+          </h3>
         </div>
         <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
           {(gallery.total_images || 0).toLocaleString()} images · {new Date(gallery.created_at).toLocaleDateString()}
