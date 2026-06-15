@@ -146,12 +146,6 @@ export default function GalleriesPage() {
 
   return (
     <div className="relative min-h-full px-4 py-6 lg:px-8 lg:py-8">
-      {/* Ambient wash */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-[16vh] left-1/3 h-[42vh] w-[50vw] rounded-full bg-primary/[0.08] blur-[140px]" />
-        <div className="absolute bottom-0 -right-[8vw] h-[32vh] w-[28vw] rounded-full bg-secondary/[0.06] blur-[120px]" />
-      </div>
-
       <div className="relative w-full space-y-6">
         {/* Header */}
         <motion.div

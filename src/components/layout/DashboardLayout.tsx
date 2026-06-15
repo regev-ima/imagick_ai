@@ -28,6 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { BuildVersionBadge } from "@/components/layout/BuildVersionBadge";
 import { Orb } from "@/components/aura/Orb";
+import { AuraBackground } from "@/components/aura/AuraBackground";
 import { AuraCommand, openAuraCommand } from "@/components/aura/AuraCommand";
 import imagickLogoDark from "@/assets/imagick-logo.png";
 import imagickIconDark from "@/assets/imagick-icon.png";
@@ -91,6 +92,10 @@ export default function DashboardLayout() {
 
   return (
     <div className="relative h-screen overflow-hidden bg-background">
+      {/* Single full-bleed ambient wash for the whole app — edge to edge,
+          behind every screen, so the background is uniform and never clipped
+          to the centered content column. */}
+      <AuraBackground />
       <AuraCommand />
       {/* ── Desktop floating pill rail ─────────────────────────────── */}
       <TooltipProvider delayDuration={0}>
@@ -278,8 +283,8 @@ export default function DashboardLayout() {
 
       {/* ── Main column — full-bleed; the top bar and background span
           edge to edge, the rail floats over the left, and only the inner
-          content is inset to clear it. ─────────────────────────────── */}
-      <div className="flex h-screen flex-col">
+          content is inset to clear it. Sits above the ambient wash. ─── */}
+      <div className="relative z-10 flex h-screen flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 px-4 glass-card lg:pl-[92px] lg:pr-6">
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileMenuOpen(true)}>

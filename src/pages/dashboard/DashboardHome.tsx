@@ -203,13 +203,6 @@ export default function DashboardHome() {
         isSaving={isSavingQuestionnaire}
       />
 
-      {/* Ambient deep-space wash — sits behind everything, never interactive */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-[18vh] left-1/2 h-[52vh] w-[60vw] -translate-x-1/2 rounded-full bg-primary/[0.10] blur-[140px]" />
-        <div className="absolute top-[30vh] -right-[10vw] h-[40vh] w-[36vw] rounded-full bg-secondary/[0.08] blur-[130px]" />
-        <div className="absolute bottom-0 -left-[8vw] h-[36vh] w-[32vw] rounded-full bg-accent/[0.07] blur-[120px]" />
-      </div>
-
       <motion.div variants={deck} initial="hidden" animate="show" className="relative w-full space-y-8">
         {/* ── Greeting ───────────────────────────────────────────── */}
         <motion.div variants={rise} className="flex flex-wrap items-end justify-between gap-4">
