@@ -10,7 +10,6 @@ import {
   Shield,
   Plus,
   Wand2,
-  Share2,
   ArrowRight,
 } from "lucide-react";
 import {
@@ -123,7 +122,7 @@ export function AuraCommand() {
         </span>
       </div>
       <CommandInput
-        placeholder="Type a collection, an action, or a place to go…"
+        placeholder="Search or jump to…"
         value={query}
         onValueChange={setQuery}
       />
@@ -140,10 +139,6 @@ export function AuraCommand() {
           <CommandItem className={itemCls} onSelect={() => go("/dashboard/styles/new")}>
             <Wand2 className="text-primary" />
             Train an AI style
-          </CommandItem>
-          <CommandItem className={itemCls} onSelect={() => go("/dashboard/galleries")}>
-            <Share2 className="text-primary" />
-            Share a gallery
           </CommandItem>
         </CommandGroup>
 

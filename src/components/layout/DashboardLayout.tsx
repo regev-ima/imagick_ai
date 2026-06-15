@@ -114,10 +114,11 @@ export default function DashboardLayout() {
                     <Link
                       to={item.href}
                       aria-label={item.label}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "grid h-11 w-11 place-items-center rounded-2xl transition-[background-color,color,box-shadow] duration-200",
+                        "relative grid h-11 w-11 place-items-center rounded-2xl transition-[background-color,color,box-shadow] duration-200",
                         active
-                          ? "bg-sidebar-accent text-accent"
+                          ? "border-l-2 border-primary bg-primary/15 text-accent"
                           : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                       )}
                     >
@@ -218,10 +219,11 @@ export default function DashboardLayout() {
                     key={item.href}
                     to={item.href}
                     onClick={() => setMobileMenuOpen(false)}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
                       "flex items-center gap-3 rounded-full px-3.5 py-2.5 transition-all",
                       active
-                        ? "bg-sidebar-accent text-accent"
+                        ? "border-l-2 border-primary bg-primary/15 text-accent"
                         : "text-sidebar-foreground hover:bg-sidebar-accent",
                     )}
                   >

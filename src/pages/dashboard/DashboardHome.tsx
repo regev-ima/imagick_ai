@@ -59,7 +59,6 @@ const rise = {
 const PROMPT_CHIPS = [
   { label: "New collection", icon: Plus, to: "/dashboard/galleries/new" },
   { label: "Train an AI style", icon: Wand2, to: "/dashboard/styles/new" },
-  { label: "Share a gallery", icon: Share2, to: "/dashboard/galleries" },
 ];
 
 /**
@@ -232,24 +231,10 @@ export default function DashboardHome() {
         label: "Open it",
       });
     }
-    if (storagePercent >= 80) {
-      items.push({
-        key: "storage",
-        text: `Storage is at ${Math.round(storagePercent)}% — worth a look before the next big shoot.`,
-        to: "/dashboard/billing",
-        label: "Review storage",
-      });
-    }
-    if (!isUnlimited && editsTotal > 0 && editsRemaining / editsTotal <= 0.1) {
-      items.push({
-        key: "edits",
-        text: `Only ${editsRemaining.toLocaleString()} edits left this cycle.`,
-        to: "/dashboard/billing",
-        label: "Top up",
-      });
-    }
+    // Storage and edits are reported once each in the ledger cells below —
+    // they are intentionally not duplicated here.
     return items.slice(0, 2);
-  }, [galleries, storagePercent, isUnlimited, editsRemaining, editsTotal]);
+  }, [galleries]);
 
   const formatStorage = (mb: number) =>
     mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
@@ -328,8 +313,8 @@ export default function DashboardHome() {
                     value={promptText}
                     onChange={(e) => setPromptText(e.target.value)}
                     className="min-w-0 flex-1 bg-transparent font-sans text-sm text-foreground outline-none placeholder:text-muted-foreground/80 sm:text-base"
-                    placeholder="Ask Aura to cull, edit, or prep…   (⌘K)"
-                    aria-label="Ask Aura"
+                    placeholder="Search or jump to…   (⌘K)"
+                    aria-label="Search or jump to"
                   />
                   <button
                     type="submit"
@@ -438,14 +423,18 @@ export default function DashboardHome() {
               <Panel>
                 <PanelHeader icon={<Cpu className="h-3.5 w-3.5" />} label="Library — catalog info" trailing={<span className="caption">Studio telemetry</span>} />
                 <div className="grid grid-cols-2 divide-border md:grid-cols-4 md:divide-x">
-                  {/* AI edits remaining */}
-                  <div className="border-b border-border p-5 md:border-b-0">
+                  {/* AI edits remaining → billing */}
+                  <Link
+                    to="/dashboard/billing"
+                    className="group border-b border-border p-5 transition-colors hover:bg-foreground/[0.03] md:border-b-0"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="folio text-4xl leading-none text-foreground sm:text-[2.75rem]">
+                        <p className="folio flex items-baseline gap-2 text-4xl leading-none text-foreground sm:text-[2.75rem]">
                           {isUnlimited ? "∞" : editsRemaining.toLocaleString()}
+                          <ArrowUpRight className="h-4 w-4 self-start text-muted-foreground/0 transition-colors group-hover:text-accent" />
                         </p>
-                        <p className="caption mt-3 flex items-center gap-1.5">
+                        <p className="caption mt-3 flex items-center gap-1.5 transition-colors group-hover:text-accent">
                           {hasGiftCredits ? <Gift className="h-3 w-3" /> : <Sparkle size={11} className="text-accent" />}
                           AI edits left
                         </p>
@@ -465,14 +454,18 @@ export default function DashboardHome() {
                         />
                       </div>
                     </div>
-                  </div>
+                  </Link>
 
-                  {/* Storage */}
-                  <div className="border-b border-border p-5 md:border-b-0">
-                    <p className="folio text-4xl leading-none text-foreground sm:text-[2.75rem]">
+                  {/* Storage → billing */}
+                  <Link
+                    to="/dashboard/billing"
+                    className="group border-b border-border p-5 transition-colors hover:bg-foreground/[0.03] md:border-b-0"
+                  >
+                    <p className="folio flex items-baseline gap-2 text-4xl leading-none text-foreground sm:text-[2.75rem]">
                       {formatStorage(storageUsedMb)}
+                      <ArrowUpRight className="h-4 w-4 self-start text-muted-foreground/0 transition-colors group-hover:text-accent" />
                     </p>
-                    <p className="caption mt-3 flex items-center gap-1.5">
+                    <p className="caption mt-3 flex items-center gap-1.5 transition-colors group-hover:text-accent">
                       <HardDrive className="h-3 w-3" /> Storage
                     </p>
                     <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">of {maxStorageGb} GB</p>
@@ -482,10 +475,13 @@ export default function DashboardHome() {
                         style={{ width: `${Math.min(100, storagePercent)}%` }}
                       />
                     </div>
-                  </div>
+                  </Link>
 
-                  {/* Collections */}
-                  <Link to="/dashboard/galleries" className="group p-5">
+                  {/* Collections → galleries */}
+                  <Link
+                    to="/dashboard/galleries"
+                    className="group p-5 transition-colors hover:bg-foreground/[0.03]"
+                  >
                     <p className="folio flex items-baseline gap-2 text-4xl leading-none text-foreground sm:text-[2.75rem]">
                       {totalCollections}
                       <ArrowUpRight className="h-4 w-4 self-start text-muted-foreground/0 transition-colors group-hover:text-accent" />
@@ -583,32 +579,43 @@ export default function DashboardHome() {
               </motion.section>
             )}
 
-            {/* ════ 5 · COLLECTIONS — filmstrip + grid ════════════════════
+            {/* ════ 5 · COLLECTIONS — the recents filmstrip ═══════════════
                 Signature Lightroom element: a horizontal filmstrip of recent
-                collection thumbnails (keyline cells, selected ring royal-blue,
-                status dots), above a larger grid. */}
+                collection thumbnails (keyline cells, status dots). A single
+                "View all" leads to the full Collections page. */}
             <motion.section variants={rise} className="mt-6">
               <Panel>
                 <PanelHeader
                   icon={<Film className="h-3.5 w-3.5" />}
                   label="Filmstrip — recent collections"
                   trailing={
-                    <span className="flex items-center gap-3">
-                      <span className="caption flex items-center gap-1.5">
-                        <span className="aura-led" style={{ "--led": "var(--secondary)" } as CSSProperties} /> Ready
+                    <Link
+                      to="/dashboard/galleries"
+                      className="group inline-flex items-center gap-1.5 font-sans text-sm text-foreground/80 transition-colors hover:text-accent"
+                    >
+                      <span className="underline decoration-border underline-offset-4 transition-colors group-hover:decoration-accent">
+                        View all
                       </span>
-                      <span className="caption flex items-center gap-1.5">
-                        <span className="aura-led" style={{ "--led": "var(--rating)" } as CSSProperties} /> Proc
-                      </span>
-                      <span className="caption flex items-center gap-1.5">
-                        <span className="aura-led" style={{ "--led": "var(--destructive)" } as CSSProperties} /> Error
-                      </span>
-                    </span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
                   }
                 />
 
+                {/* Status legend row */}
+                <div className="flex items-center gap-3 border-b border-border bg-background/40 px-4 py-2">
+                  <span className="caption flex items-center gap-1.5">
+                    <span className="aura-led" style={{ "--led": "var(--secondary)" } as CSSProperties} /> Ready
+                  </span>
+                  <span className="caption flex items-center gap-1.5">
+                    <span className="aura-led" style={{ "--led": "var(--rating)" } as CSSProperties} /> Proc
+                  </span>
+                  <span className="caption flex items-center gap-1.5">
+                    <span className="aura-led" style={{ "--led": "var(--destructive)" } as CSSProperties} /> Error
+                  </span>
+                </div>
+
                 {/* FILMSTRIP */}
-                <div className="flex items-stretch gap-2.5 overflow-x-auto border-b border-border p-3">
+                <div className="flex items-stretch gap-2.5 overflow-x-auto p-3">
                   {galleries.map((gallery, idx) => {
                     const pct =
                       gallery.total_images > 0
@@ -622,15 +629,14 @@ export default function DashboardHome() {
                       : isError
                         ? "var(--destructive)"
                         : "var(--rating)";
-                    const selected = idx === 0;
+                    // The newest collection gets a quiet "Latest" tag — not a
+                    // full selection ring (there is no selection to make here).
+                    const isLatest = idx === 0;
                     return (
                       <Link
                         key={gallery.id}
                         to={`/dashboard/galleries/${gallery.id}`}
-                        className={cn(
-                          "group relative w-[140px] shrink-0 overflow-hidden rounded-sm bg-popover transition-shadow",
-                          selected ? "ring-2 ring-primary" : "border border-border hover:border-muted-foreground/40",
-                        )}
+                        className="group relative w-[140px] shrink-0 overflow-hidden rounded-sm border border-border bg-popover transition-colors hover:border-muted-foreground/40"
                       >
                         <div className="relative">
                           <div className="aspect-[5/4] w-full overflow-hidden bg-muted plate-keyline">
@@ -653,16 +659,15 @@ export default function DashboardHome() {
                           {isProcessing && pct > 0 && (
                             <div className="absolute inset-x-0 bottom-0 h-1 bg-black/40">
                               <motion.div
-                                className="h-full"
-                                style={{ background: "hsl(var(--rating))" }}
+                                className="h-full bg-rating"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${pct}%` }}
                                 transition={{ duration: 0.8, ease: EASE }}
                               />
                             </div>
                           )}
-                          {selected && (
-                            <span className="absolute right-1.5 top-1.5 rounded-sm bg-primary px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-primary-foreground">
+                          {isLatest && (
+                            <span className="absolute right-1.5 top-1.5 rounded-sm border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
                               Latest
                             </span>
                           )}
@@ -679,87 +684,9 @@ export default function DashboardHome() {
                           </div>
                           <div className="mt-0.5 flex items-center justify-between font-mono text-[9px] text-muted-foreground">
                             <span>{(gallery.total_images || 0).toLocaleString()} IMG</span>
-                            <span style={{ color: `hsl(${statusToken})` }}>
-                              {isProcessing ? `${pct}%` : isError ? "ERROR" : "READY"}
-                            </span>
+                            <span>{isProcessing ? `${pct}%` : isError ? "ERROR" : "READY"}</span>
                           </div>
                         </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-
-                {/* GRID — the larger photo wall */}
-                <div className="flex items-baseline justify-between px-4 pt-4">
-                  <span className="aura-microlabel">Develop — collections</span>
-                  <Link
-                    to="/dashboard/galleries"
-                    className="group inline-flex items-center gap-1.5 font-sans text-sm text-foreground/80 transition-colors hover:text-accent"
-                  >
-                    <span className="underline decoration-border underline-offset-4 transition-colors group-hover:decoration-accent">
-                      View all
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </div>
-                <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4">
-                  {galleries.map((gallery, idx) => {
-                    const pct =
-                      gallery.total_images > 0
-                        ? Math.round((gallery.processed_images / gallery.total_images) * 100)
-                        : 0;
-                    const isReady = gallery.status === "ready";
-                    const isError = gallery.status === "error";
-                    const isProcessing = !isReady && !isError;
-                    const statusLabel = isReady ? "Ready" : isError ? "Error" : "Processing";
-                    const statusToken = isReady
-                      ? "var(--secondary)"
-                      : isError
-                        ? "var(--destructive)"
-                        : "var(--rating)";
-                    return (
-                      <Link key={gallery.id} to={`/dashboard/galleries/${gallery.id}`} className="group block">
-                        <div className="relative aspect-[4/3] overflow-hidden rounded-sm bg-muted plate-keyline transition-shadow duration-300 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] group-hover:shadow-[var(--elevation-2)]">
-                          {gallery.hero_image_url ? (
-                            <img
-                              src={getThumbnailUrl(gallery.hero_image_url)}
-                              alt={gallery.name}
-                              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-                              onError={(e) => {
-                                const t = e.currentTarget;
-                                if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url!;
-                              }}
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center">
-                              <Images className="h-7 w-7 text-muted-foreground/40" />
-                            </div>
-                          )}
-                          {isProcessing && pct > 0 && (
-                            <span className="absolute right-2 top-2 rounded-sm bg-background/85 px-1.5 py-0.5 font-mono text-[10px] text-accent backdrop-blur-sm">
-                              {pct}%
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-2 flex items-baseline justify-between gap-3">
-                          <span className="caption">Plate {String(idx + 1).padStart(2, "0")}</span>
-                          <span
-                            className="caption flex items-center gap-1.5"
-                            style={{ color: `hsl(${statusToken})` }}
-                          >
-                            <span
-                              className={cn("aura-led", isProcessing && "aura-led-pulse")}
-                              style={{ "--led": statusToken } as CSSProperties}
-                            />
-                            {statusLabel}
-                          </span>
-                        </div>
-                        <p className="mt-1 truncate text-base font-medium tracking-tight transition-colors group-hover:text-accent">
-                          {gallery.name}
-                        </p>
-                        <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                          {(gallery.total_images || 0).toLocaleString()} images
-                        </p>
                       </Link>
                     );
                   })}
@@ -802,8 +729,8 @@ export default function DashboardHome() {
                           {
                             to: "/dashboard/billing",
                             icon: Zap,
-                            title: "Need more edits?",
-                            body: "Upgrade for unlimited edits, more storage and priority processing.",
+                            title: "Upgrade your plan",
+                            body: "Move up for unlimited edits, more storage and priority processing.",
                           },
                         ]
                       : []),
