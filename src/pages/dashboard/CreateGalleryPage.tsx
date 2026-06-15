@@ -317,6 +317,17 @@ export default function CreateGalleryPage() {
       return;
     }
 
+    // When AI culling is on, the labels that actually drive the first automatic
+    // culling live in `culling_labels` (the backend's image-webhook reads that
+    // column, not `categories`). If the photographer didn't pick any, fall back
+    // to the curated label set for the shoot type, so simply toggling culling on
+    // still tags sensibly instead of sending Aura an empty list.
+    const effectiveCullingLabels = aiCulling
+      ? (selectedCategories.length > 0
+          ? selectedCategories
+          : getCullingLabels(galleryType || "wedding", cullingLanguage))
+      : [];
+
     // Handle Google Drive upload
     if (uploadSource === "drive") {
       if (!driveFolderInfo || driveLinks.length === 0) {
@@ -336,6 +347,7 @@ export default function CreateGalleryPage() {
             gallery_type: galleryType,
             description: description || null,
             categories: selectedCategories,
+            culling_labels: effectiveCullingLabels,
             ai_culling_enabled: aiCulling,
             total_images: driveFolderInfo.totalImageCount,
             status: "transferring",
@@ -400,6 +412,7 @@ export default function CreateGalleryPage() {
           gallery_type: galleryType,
           description: description || null,
           categories: selectedCategories,
+          culling_labels: effectiveCullingLabels,
           ai_culling_enabled: aiCulling,
           total_images: uppyFileCount,
           status: "uploading",
