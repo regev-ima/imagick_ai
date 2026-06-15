@@ -44,6 +44,8 @@ const DesignPreview = lazy(() => import("./pages/DesignPreview"));
 // Design-direction comparison prototypes (static mocks, unlinked from nav).
 const DarkroomDashboard = lazy(() => import("./pages/preview/DarkroomDashboard"));
 const ExpressiveDashboard = lazy(() => import("./pages/preview/ExpressiveDashboard"));
+const LightroomDashboard = lazy(() => import("./pages/preview/LightroomDashboard"));
+const StudioDashboard = lazy(() => import("./pages/preview/StudioDashboard"));
 const PrivacyPage = lazy(() => import("./pages/legal/PrivacyPage"));
 const TermsPage = lazy(() => import("./pages/legal/TermsPage"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/admin/AdminDashboard"));
@@ -119,6 +121,8 @@ const App = () => (
                 <Route path="/design-preview" element={<DesignPreview />} />
                 <Route path="/preview/darkroom" element={<DarkroomDashboard />} />
                 <Route path="/preview/expressive" element={<ExpressiveDashboard />} />
+                <Route path="/preview/lightroom" element={<LightroomDashboard />} />
+                <Route path="/preview/studio" element={<StudioDashboard />} />
                 <Route path="/gallery/:galleryId" element={<ClientGalleryPage />} />
                 <Route
                   path="/dashboard"
