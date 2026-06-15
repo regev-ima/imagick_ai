@@ -41,6 +41,9 @@ const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
 // nav. See docs/design/aura-concept.md. Safe to remove once a direction
 // is approved and the real theme work starts.
 const DesignPreview = lazy(() => import("./pages/DesignPreview"));
+// Design-direction comparison prototypes (static mocks, unlinked from nav).
+const DarkroomDashboard = lazy(() => import("./pages/preview/DarkroomDashboard"));
+const ExpressiveDashboard = lazy(() => import("./pages/preview/ExpressiveDashboard"));
 const PrivacyPage = lazy(() => import("./pages/legal/PrivacyPage"));
 const TermsPage = lazy(() => import("./pages/legal/TermsPage"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/admin/AdminDashboard"));
@@ -114,6 +117,8 @@ const App = () => (
                 <Route path="/legal/terms" element={<TermsPage />} />
                 <Route path="/g/:shortId" element={<ShortLinkRedirect />} />
                 <Route path="/design-preview" element={<DesignPreview />} />
+                <Route path="/preview/darkroom" element={<DarkroomDashboard />} />
+                <Route path="/preview/expressive" element={<ExpressiveDashboard />} />
                 <Route path="/gallery/:galleryId" element={<ClientGalleryPage />} />
                 <Route
                   path="/dashboard"
