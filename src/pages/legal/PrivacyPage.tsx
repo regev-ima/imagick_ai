@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <LegalPageLayout title="Privacy Policy" lastUpdated="May 2026">
       <section>
-        <h2 className="text-xl font-semibold text-foreground">Who we are</h2>
+        <h2 className="aura-microlabel mb-3 text-foreground/80">Who we are</h2>
         <p>
           imagick.ai (&quot;we&quot;, &quot;us&quot;) provides AI-assisted photo editing tools
           to photographers. This page describes what personal data we collect,
@@ -13,14 +13,14 @@ export default function PrivacyPage() {
         </p>
         <p>
           For privacy-related questions, contact{" "}
-          <a href="mailto:contact@imagick.ai" className="text-primary hover:underline">
+          <a href="mailto:contact@imagick.ai" className="text-primary underline-offset-4 hover:underline">
             contact@imagick.ai
           </a>.
         </p>
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-foreground">What we collect</h2>
+        <h2 className="aura-microlabel mb-3 text-foreground/80">What we collect</h2>
         <ul className="list-disc pl-6 space-y-1">
           <li><strong>Account data</strong>: email, display name, password hash (managed by Supabase Auth).</li>
           <li><strong>Usage data</strong>: galleries you create, images you upload, AI styles you apply, edit counts.</li>
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-foreground">How we use your data</h2>
+        <h2 className="aura-microlabel mb-3 text-foreground/80">How we use your data</h2>
         <ul className="list-disc pl-6 space-y-1">
           <li>To provide the service: rendering AI edits, hosting your galleries, sharing them with your clients.</li>
           <li>To bill you and to send transactional notifications (welcome, payment receipts, gallery-ready, etc.).</li>
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-foreground">Sub-processors</h2>
+        <h2 className="aura-microlabel mb-3 text-foreground/80">Sub-processors</h2>
         <ul className="list-disc pl-6 space-y-1">
           <li><strong>Supabase</strong> — authentication, database hosting.</li>
           <li><strong>Backblaze B2</strong> — image storage.</li>
@@ -57,22 +57,22 @@ export default function PrivacyPage() {
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-foreground">Your rights</h2>
+        <h2 className="aura-microlabel mb-3 text-foreground/80">Your rights</h2>
         <p>You can:</p>
         <ul className="list-disc pl-6 space-y-1">
           <li><strong>Access / correct</strong> your account data from{" "}
-            <a href="/dashboard/settings" className="text-primary hover:underline">Settings</a>.
+            <a href="/dashboard/settings" className="text-primary underline-offset-4 hover:underline">Settings</a>.
           </li>
           <li><strong>Export</strong> a copy of your data — contact us and we will send a JSON archive within 30 days.</li>
           <li><strong>Delete</strong> your account and all associated data from{" "}
-            <a href="/dashboard/settings" className="text-primary hover:underline">Settings → Delete account</a>. We will email a confirmation.
+            <a href="/dashboard/settings" className="text-primary underline-offset-4 hover:underline">Settings → Delete account</a>. We will email a confirmation.
           </li>
           <li><strong>Opt out</strong> of non-essential emails from Settings.</li>
         </ul>
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-foreground">Retention</h2>
+        <h2 className="aura-microlabel mb-3 text-foreground/80">Retention</h2>
         <p>
           We keep your account and gallery data for as long as your account is
           active. When you delete your account, all associated data is removed
@@ -82,7 +82,7 @@ export default function PrivacyPage() {
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-foreground">Changes to this policy</h2>
+        <h2 className="aura-microlabel mb-3 text-foreground/80">Changes to this policy</h2>
         <p>
           We will notify users by email of any material change to this policy
           before it takes effect.

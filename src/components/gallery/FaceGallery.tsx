@@ -1,8 +1,21 @@
 import { useState } from "react";
-import { ScanFace, Loader2, AlertCircle, RotateCcw, Trash2, Users, Camera, MousePointerClick, Sparkles, Check, ChevronRight, ArrowLeft, StopCircle } from "lucide-react";
+import { ScanFace, Loader2, AlertCircle, RotateCcw, Trash2, Users, Camera, MousePointerClick, Check, ChevronRight, ArrowLeft, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Orb } from "@/components/aura/Orb";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 import {
   AlertDialog,
   AlertDialogAction,
@@ -104,10 +117,11 @@ export function FaceGallery({
         {backButton}
         <div className="flex flex-col items-center py-12 px-4">
           {/* Hero */}
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
-            <ScanFace className="w-10 h-10 text-primary" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Face Search</h2>
+          <Orb className="w-20 h-20 mb-6" />
+          <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+            <Sparkle size={20} className="text-primary" />
+            Face Search
+          </h2>
           <p className="text-muted-foreground text-center max-w-lg mb-8">
             Let your clients find themselves in seconds. Our AI detects every face in your gallery, groups them by person, and creates a beautiful face-based navigation for your clients.
           </p>
@@ -115,8 +129,8 @@ export function FaceGallery({
           {/* Feature cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl w-full mb-8">
             {FEATURES.map((feature) => (
-              <Card key={feature.title} className="p-4 text-center space-y-2 bg-muted/30 border-border/50">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mx-auto">
+              <Card key={feature.title} className="p-4 text-center space-y-2 surface-2 border-border/60 rounded-sm">
+                <div className="w-10 h-10 rounded-sm bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
                   <feature.icon className="w-5 h-5 text-primary" />
                 </div>
                 <h3 className="text-sm font-semibold">{feature.title}</h3>
@@ -127,7 +141,7 @@ export function FaceGallery({
 
           {/* How it works */}
           <div className="max-w-lg w-full mb-8">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 text-center">How it works</h3>
+            <h3 className="aura-microlabel mb-3 text-center">How it works</h3>
             <div className="space-y-2">
               {[
                 "AI scans all photos in your gallery",
@@ -136,8 +150,8 @@ export function FaceGallery({
                 "Clients click their face to see all their photos",
               ].map((step, i) => (
                 <div key={i} className="flex items-center gap-3 text-sm">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-primary">{i + 1}</span>
+                  <div className="w-6 h-6 rounded-sm bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                    <span className="font-mono text-xs font-bold text-primary folio">{i + 1}</span>
                   </div>
                   <span className="text-muted-foreground">{step}</span>
                 </div>
@@ -147,12 +161,13 @@ export function FaceGallery({
 
           {/* CTA */}
           <Button
+            variant="glow"
             size="lg"
             onClick={() => setShowConfirm(true)}
             disabled={isStarting}
             className="gap-2 px-8"
           >
-            <Sparkles className="w-4 h-4" />
+            <Sparkle size={15} className="text-current" />
             Start Face Detection
           </Button>
           <p className="text-xs text-muted-foreground mt-2">
@@ -204,11 +219,7 @@ export function FaceGallery({
       <div>
         {backButton}
         <div className="flex flex-col items-center justify-center py-16 gap-6">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full border-4 border-primary/20 flex items-center justify-center">
-              <Loader2 className="w-10 h-10 text-primary animate-spin" />
-            </div>
-          </div>
+          <Orb className="w-20 h-20" />
           <div className="text-center space-y-2">
             <h3 className="text-lg font-semibold">{phaseLabel}</h3>
             <p className="text-sm text-muted-foreground max-w-sm">
