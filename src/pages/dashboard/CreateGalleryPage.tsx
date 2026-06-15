@@ -463,12 +463,6 @@ export default function CreateGalleryPage() {
 
   return (
     <div className="relative min-h-full px-4 py-6 lg:px-8 lg:py-10">
-      {/* Ambient wash */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-[16vh] left-1/2 h-[46vh] w-[52vw] -translate-x-1/2 rounded-full bg-primary/[0.09] blur-[140px]" />
-        <div className="absolute top-[40vh] -right-[8vw] h-[34vh] w-[30vw] rounded-full bg-secondary/[0.07] blur-[130px]" />
-      </div>
-
       <div className="relative mx-auto max-w-3xl">
         {/* Header */}
         <div className="flex items-center gap-4">
