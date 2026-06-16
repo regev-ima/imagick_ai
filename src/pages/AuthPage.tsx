@@ -321,10 +321,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-    {/* Cap the split so it doesn't stretch into a sparse band on 4K/5K
-        displays — centered with matching dark gutters. */}
-    <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
+    <div className="min-h-screen bg-background flex">
       {/* ─────────────────────────────────────────────────────────────
           LEFT — the studio. Dark graphite, royal-blue accents, the
           hero photo framed as a Lightroom cell, Inter headline,
@@ -336,7 +333,7 @@ export default function AuthPage() {
           className="pointer-events-none absolute -left-32 top-1/4 h-[28rem] w-[28rem] rounded-full blur-3xl"
           style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.14) 0%, transparent 70%)" }}
         />
-        <div className="relative flex flex-col justify-between w-full px-14 xl:px-20 py-14">
+        <div className="relative mx-auto flex w-full max-w-5xl flex-col justify-between px-14 xl:px-20 py-14">
           {/* Brand row — Ai mark + sparkle */}
           <motion.div
             initial={{ opacity: 0, y: -8 }}
@@ -356,7 +353,7 @@ export default function AuthPage() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: EASE, delay: 0.05 }}
-            className="max-w-2xl"
+            className="max-w-3xl"
           >
             <div className="aura-microlabel mb-6 flex items-center gap-2">
               <Sparkle size={11} className="text-primary" />
@@ -736,7 +733,6 @@ export default function AuthPage() {
           </p>
         </motion.div>
       </div>
-    </div>
     </div>
   );
 }
