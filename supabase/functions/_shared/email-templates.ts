@@ -1,7 +1,7 @@
 /**
  * Imagick.ai — Branded email HTML templates.
  *
- * Dark Neon aesthetic: deep dark backgrounds, Pink→Violet gradient, neon glow.
+ * LIGHTROOM aesthetic: deep graphite backgrounds, royal-blue accent, subtle glow.
  * Sender identity
  *   Display name : no-reply@imagick.ai
  *   Reply-To     : contact@imagick.ai
@@ -21,20 +21,20 @@ const APP_URL = (() => {
 })();
 
 const LOGO_URL        = "https://zfcltfqgrhytpvgqkkfo.supabase.co/storage/v1/object/public/brand/imagick-logo.png";
-const BRAND_PRIMARY   = "#e85c9b"; // Pink-Magenta  hsl(330,85%,60%)
-const BRAND_SECONDARY = "#9b5ad4"; // Electric Violet hsl(270,75%,60%)
+const BRAND_PRIMARY   = "#2C57F2"; // Royal Blue   hsl(227,88%,56%) — LIGHTROOM --primary
+const BRAND_SECONDARY = "#3D67FF"; // Bright Blue  hsl(227,100%,62%) — LIGHTROOM --accent
 const BRAND_GRADIENT  = `linear-gradient(135deg, ${BRAND_PRIMARY} 0%, ${BRAND_SECONDARY} 100%)`;
-const HEADER_BG       = `linear-gradient(135deg, #1a0a2e 0%, #0e0e17 100%)`;
-const LIGHT_BG        = "#f0eef5";
+const HEADER_BG       = `linear-gradient(135deg, #1F2024 0%, #16171A 100%)`;
+const LIGHT_BG        = "#F5F7FC";
 const LIGHT_CARD      = "#ffffff";
-const LIGHT_BORDER    = "#e4e0ef";
+const LIGHT_BORDER    = "#E1E6F0";
 const LIGHT_TEXT      = "#18181b";
 const LIGHT_MUTED     = "#52525b";
-const DARK_BG         = "#08080f";
-const DARK_CARD       = "#0f0f1a";
-const DARK_BORDER     = "rgba(232,92,155,0.15)";
-const DARK_TEXT       = "#eeeaf4";
-const DARK_MUTED      = "#888098";
+const DARK_BG         = "#16171A";
+const DARK_CARD       = "#1F2024";
+const DARK_BORDER     = "rgba(44,87,242,0.15)";
+const DARK_TEXT       = "#E8E9ED";
+const DARK_MUTED      = "#8A8C94";
 
 // ─── Shared base CSS (inlined for email clients) ─────────────────────────────
 
@@ -42,12 +42,12 @@ const BASE_CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.6; color: ${LIGHT_TEXT}; background-color: ${LIGHT_BG}; -webkit-font-smoothing: antialiased; }
   .wrapper { background-color: ${LIGHT_BG}; padding: 40px 16px; }
-  .card { background: ${LIGHT_CARD}; border: 1px solid ${LIGHT_BORDER}; border-radius: 20px; max-width: 600px; margin: 0 auto; overflow: hidden; box-shadow: 0 8px 40px rgba(155,90,212,0.12), 0 2px 8px rgba(0,0,0,0.06); }
+  .card { background: ${LIGHT_CARD}; border: 1px solid ${LIGHT_BORDER}; border-radius: 20px; max-width: 600px; margin: 0 auto; overflow: hidden; box-shadow: 0 8px 40px rgba(61,103,255,0.12), 0 2px 8px rgba(0,0,0,0.06); }
 
   /* Header */
   .header { background: ${HEADER_BG}; padding: 32px 32px 28px; text-align: center; position: relative; }
-  .header::after { content: ''; display: block; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: ${BRAND_GRADIENT}; box-shadow: 0 0 12px rgba(232,92,155,0.6), 0 0 24px rgba(155,90,212,0.4); }
-  .logo-text { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; background: ${BRAND_GRADIENT}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: none; filter: drop-shadow(0 0 10px rgba(232,92,155,0.5)); }
+  .header::after { content: ''; display: block; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: ${BRAND_GRADIENT}; box-shadow: 0 0 12px rgba(44,87,242,0.6), 0 0 24px rgba(61,103,255,0.4); }
+  .logo-text { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; background: ${BRAND_GRADIENT}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: none; filter: drop-shadow(0 0 10px rgba(44,87,242,0.5)); }
   .logo-dot { -webkit-text-fill-color: transparent; }
 
   /* Body */
@@ -64,10 +64,10 @@ const BASE_CSS = `
 
   /* CTA Button */
   .cta-wrap { margin: 28px 0; text-align: left; }
-  .cta-btn { display: inline-block; background: ${BRAND_GRADIENT}; color: #ffffff !important; text-decoration: none !important; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; letter-spacing: 0.2px; box-shadow: 0 4px 20px rgba(232,92,155,0.4), 0 2px 8px rgba(155,90,212,0.3); }
+  .cta-btn { display: inline-block; background: ${BRAND_GRADIENT}; color: #ffffff !important; text-decoration: none !important; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; letter-spacing: 0.2px; box-shadow: 0 4px 20px rgba(44,87,242,0.4), 0 2px 8px rgba(61,103,255,0.3); }
 
   /* Info Box */
-  .info-box { background: rgba(155,90,212,0.06); border: 1px solid rgba(232,92,155,0.2); border-radius: 12px; padding: 18px 20px; margin: 18px 0; }
+  .info-box { background: rgba(61,103,255,0.06); border: 1px solid rgba(44,87,242,0.2); border-radius: 12px; padding: 18px 20px; margin: 18px 0; }
   .info-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
   .info-row:last-child { margin-bottom: 0; }
   .info-label { color: ${LIGHT_MUTED}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; min-width: 90px; }
@@ -77,7 +77,7 @@ const BASE_CSS = `
   .divider { border: none; border-top: 1px solid ${LIGHT_BORDER}; margin: 22px 0; }
 
   /* Footer */
-  .footer { background: #f5f3fa; border-top: 1px solid ${LIGHT_BORDER}; padding: 20px 32px; text-align: center; }
+  .footer { background: #F0F3FA; border-top: 1px solid ${LIGHT_BORDER}; padding: 20px 32px; text-align: center; }
   .footer-text { color: #a0a0b0; font-size: 12px; line-height: 1.7; }
   .footer-link { color: ${BRAND_PRIMARY}; text-decoration: none; font-weight: 500; }
 
@@ -85,12 +85,12 @@ const BASE_CSS = `
   @media (prefers-color-scheme: dark) {
     body { background-color: ${DARK_BG} !important; color: ${DARK_TEXT} !important; }
     .wrapper { background-color: ${DARK_BG} !important; }
-    .card { background: ${DARK_CARD} !important; border-color: ${DARK_BORDER} !important; box-shadow: 0 8px 40px rgba(232,92,155,0.1), 0 2px 8px rgba(0,0,0,0.5) !important; }
+    .card { background: ${DARK_CARD} !important; border-color: ${DARK_BORDER} !important; box-shadow: 0 8px 40px rgba(44,87,242,0.1), 0 2px 8px rgba(0,0,0,0.5) !important; }
     .badge { background: linear-gradient(${DARK_CARD}, ${DARK_CARD}) padding-box, linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY}) border-box !important; color: ${BRAND_PRIMARY} !important; }
     .title { color: ${DARK_TEXT} !important; }
     .text { color: ${DARK_MUTED} !important; }
     .text strong { color: ${DARK_TEXT} !important; }
-    .info-box { background: rgba(232,92,155,0.06) !important; border-color: rgba(232,92,155,0.18) !important; }
+    .info-box { background: rgba(44,87,242,0.06) !important; border-color: rgba(44,87,242,0.18) !important; }
     .info-label { color: ${DARK_MUTED} !important; }
     .info-value { color: ${DARK_TEXT} !important; }
     .divider { border-color: ${DARK_BORDER} !important; }
@@ -118,7 +118,7 @@ function wrapTemplate(subject: string, bodyHtml: string): string {
     <div class="card">
       <div class="header">
         <a href="https://imagick.ai" style="display:inline-block; text-decoration:none;">
-          <img src="${LOGO_URL}" alt="Imagick.ai" width="140" height="auto" style="display:block; height:auto; max-height:40px; filter:drop-shadow(0 0 8px rgba(232,92,155,0.5));" />
+          <img src="${LOGO_URL}" alt="Imagick.ai" width="140" height="auto" style="display:block; height:auto; max-height:40px; filter:drop-shadow(0 0 8px rgba(44,87,242,0.5));" />
         </a>
       </div>
       <div class="body">
@@ -493,7 +493,7 @@ export function journeyEmailTemplate(
     body += `
     <hr class="divider" />
     <p class="text" style="font-size:12px; color:#a0a0b0; text-align:center;">
-      <a href="${escHtml(unsubscribeUrl)}" style="color:#e85c9b; text-decoration:underline;">Unsubscribe</a> from marketing emails
+      <a href="${escHtml(unsubscribeUrl)}" style="color:#2C57F2; text-decoration:underline;">Unsubscribe</a> from marketing emails
     </p>`;
   }
   const html = wrapTemplate(subject, body);
