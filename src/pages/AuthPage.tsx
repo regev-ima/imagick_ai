@@ -321,7 +321,10 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background">
+    {/* Cap the split so it doesn't stretch into a sparse band on 4K/5K
+        displays — centered with matching dark gutters. */}
+    <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
       {/* ─────────────────────────────────────────────────────────────
           LEFT — the studio. Dark graphite, royal-blue accents, the
           hero photo framed as a Lightroom cell, Inter headline,
@@ -368,9 +371,9 @@ export default function AuthPage() {
               <span className="text-primary">Zero presets.</span>
             </h1>
 
-            <div className="aura-hairline my-9 max-w-md" />
+            <div className="aura-hairline my-9 max-w-lg" />
 
-            <p className="text-lg text-muted-foreground max-w-md leading-relaxed">
+            <p className="text-lg text-muted-foreground max-w-lg leading-relaxed">
               Train an AI model on your unique editing style. Apply it to
               thousands of photos in seconds.
             </p>
@@ -380,7 +383,7 @@ export default function AuthPage() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: EASE, delay: 0.18 }}
-              className="surface-2 plate-keyline rounded-md mt-10 p-2.5 max-w-md"
+              className="surface-2 plate-keyline rounded-md mt-10 p-2.5 max-w-lg"
             >
               <div className="relative overflow-hidden rounded-[2px] border border-border">
                 <img
@@ -733,6 +736,7 @@ export default function AuthPage() {
           </p>
         </motion.div>
       </div>
+    </div>
     </div>
   );
 }
