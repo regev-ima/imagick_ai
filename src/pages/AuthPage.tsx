@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Loader2, MailCheck, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Loader2, MailCheck, ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordStrength } from "@/components/ui/password-strength";
@@ -95,11 +95,20 @@ export default function AuthPage() {
   const [loginFailures, setLoginFailures] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [, setTick] = useState(0);
+  // Form-level auth error shown inline (announced via role="alert") instead of
+  // a transient toast the user can miss right where they're acting.
+  const [authError, setAuthError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     fullName: "",
   });
+
+  // Update a field and clear any standing error so it doesn't linger.
+  const updateField = (patch: Partial<typeof formData>) => {
+    setFormData((prev) => ({ ...prev, ...patch }));
+    if (authError) setAuthError(null);
+  };
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -152,8 +161,9 @@ export default function AuthPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!formData.email) {
-      toast.error("Please enter your email address");
+      setAuthError("Please enter your email address.");
       return;
     }
     setIsLoading(true);
@@ -171,7 +181,7 @@ export default function AuthPage() {
       // transient toast that the user might miss.
       setPasswordResetSent(true);
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      setAuthError("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -179,14 +189,15 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
 
     if (isLockedOut()) {
-      toast.error(`Too many failed attempts. Try again in ${lockoutSecondsLeft()} seconds.`);
+      setAuthError(`Too many failed attempts. Try again in ${lockoutSecondsLeft()} seconds.`);
       return;
     }
 
     if (!isLogin && !isPasswordStrong(formData.password)) {
-      toast.error("Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.");
+      setAuthError("Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.");
       return;
     }
 
@@ -230,8 +241,8 @@ export default function AuthPage() {
 
         // Supabase returns success with empty identities when email already exists
         if (!data.user?.identities?.length) {
-          toast.error("An account with this email already exists. Try signing in instead.");
           setIsLogin(true);
+          setAuthError("An account with this email already exists. Try signing in instead.");
           return;
         }
 
@@ -240,7 +251,7 @@ export default function AuthPage() {
         setIsAwaitingVerification(true);
       }
     } catch (error: any) {
-      toast.error(error.message || "Something went wrong");
+      setAuthError(error.message || "Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -506,6 +517,7 @@ export default function AuthPage() {
                   variant="ghost"
                   className="text-primary hover:text-primary"
                   onClick={() => {
+                    setAuthError(null);
                     setIsForgotPassword(false);
                     setPasswordResetSent(false);
                   }}
@@ -520,14 +532,19 @@ export default function AuthPage() {
             <form onSubmit={isForgotPassword ? handleForgotPassword : handleSubmit} className="space-y-4">
               {isForgotPassword ? (
                 <div>
-                  <label className="caption mb-2 block">Email</label>
+                  <label htmlFor="reset-email" className="caption mb-2 block">Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
+                      id="reset-email"
                       type="email"
                       placeholder="you@example.com"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => updateField({ email: e.target.value })}
+                      autoComplete="email"
+                      inputMode="email"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                       required
                     />
@@ -537,16 +554,16 @@ export default function AuthPage() {
               <>
               {!isLogin && (
                 <div>
-                  <label className="caption mb-2 block">Full Name</label>
+                  <label htmlFor="fullName" className="caption mb-2 block">Full Name</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
+                      id="fullName"
                       type="text"
                       placeholder="John Doe"
                       value={formData.fullName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, fullName: e.target.value })
-                      }
+                      onChange={(e) => updateField({ fullName: e.target.value })}
+                      autoComplete="name"
                       className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                       required={!isLogin}
                     />
@@ -555,16 +572,19 @@ export default function AuthPage() {
               )}
 
               <div>
-                <label className="caption mb-2 block">Email</label>
+                <label htmlFor="email" className="caption mb-2 block">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
+                    id="email"
                     type="email"
                     placeholder="you@example.com"
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
+                    onChange={(e) => updateField({ email: e.target.value })}
+                    autoComplete="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                     required
                   />
@@ -572,16 +592,16 @@ export default function AuthPage() {
               </div>
 
               <div>
-                <label className="caption mb-2 block">Password</label>
+                <label htmlFor="password" className="caption mb-2 block">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
+                    id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
+                    onChange={(e) => updateField({ password: e.target.value })}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
                     className="pl-10 pr-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                     required
                     minLength={8}
@@ -589,7 +609,9 @@ export default function AuthPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -606,7 +628,7 @@ export default function AuthPage() {
                   <div className="text-right mt-2">
                     <button
                       type="button"
-                      onClick={() => setIsForgotPassword(true)}
+                      onClick={() => { setAuthError(null); setIsForgotPassword(true); }}
                       className="caption hover:text-primary transition-colors"
                     >
                       Forgot password?
@@ -615,6 +637,16 @@ export default function AuthPage() {
                 )}
               </div>
               </>
+              )}
+
+              {authError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2.5 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5"
+                >
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <p className="text-sm leading-snug text-destructive">{authError}</p>
+                </div>
               )}
 
               <Button
@@ -643,7 +675,7 @@ export default function AuthPage() {
                 {isForgotPassword ? (
                   <button
                     type="button"
-                    onClick={() => setIsForgotPassword(false)}
+                    onClick={() => { setAuthError(null); setIsForgotPassword(false); }}
                     className="text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary font-medium inline-flex items-center gap-1.5"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
@@ -654,7 +686,7 @@ export default function AuthPage() {
                     {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
                     <button
                       type="button"
-                      onClick={() => setIsLogin(!isLogin)}
+                      onClick={() => { setAuthError(null); setIsLogin(!isLogin); }}
                       className="text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary font-medium"
                     >
                       {isLogin ? "Sign up" : "Sign in"}
