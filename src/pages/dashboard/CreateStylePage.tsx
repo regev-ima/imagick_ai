@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo, useRef, type CSSProperties } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,6 +23,7 @@ import {
   Mountain,
   MapPin,
   Trophy,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -170,6 +171,8 @@ interface LocalFile {
 export default function CreateStylePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Respect the OS "reduce motion" setting — gates all ambient/looping motion.
+  const prefersReducedMotion = useReducedMotion();
   const [currentStep, setCurrentStep] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
@@ -177,6 +180,7 @@ export default function CreateStylePage() {
   const [shimmerZone, setShimmerZone] = useState<"before" | "after" | null>(null);
   const [hoveringCreate, setHoveringCreate] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   // Step 1: Details + Model Types
   const [name, setName] = useState("");
@@ -524,9 +528,48 @@ export default function CreateStylePage() {
     setCurrentStep(step);
   };
 
+  // Leaving mid-flow throws away typed details, staged files, and Drive links.
+  // Intercept Cancel / back with a confirm when there's something to lose.
+  const hasUnsavedWork =
+    name.trim().length > 0 ||
+    description.trim().length > 0 ||
+    selectedModelTypes.length > 0 ||
+    beforeFiles.length > 0 ||
+    afterFiles.length > 0 ||
+    beforeDriveLinks.length > 0 ||
+    afterDriveLinks.length > 0 ||
+    isCreating;
+
+  const handleLeave = () => {
+    if (hasUnsavedWork) {
+      setShowLeaveConfirm(true);
+    } else {
+      navigate("/dashboard/styles");
+    }
+  };
+
+  // Warn on tab close / reload only while an upload is actually in flight.
+  useEffect(() => {
+    if (!isCreating) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isCreating]);
+
+  // Local before/after should be matched pairs — surface a non-blocking nudge.
+  const localCountMismatch =
+    uploadSource === "local" &&
+    beforeFiles.length > 0 &&
+    afterFiles.length > 0 &&
+    beforeFiles.length !== afterFiles.length;
+
   return (
     <div className="relative min-h-full overflow-hidden bg-background px-5 py-7 lg:px-10 lg:py-10">
       {/* === AI Ambient Animations (Background) — royal-blue dust === */}
+      {!prefersReducedMotion && (
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {/* Floating particles */}
         {PARTICLES.map((p) => (
@@ -565,6 +608,7 @@ export default function CreateStylePage() {
           />
         ))}
       </div>
+      )}
 
       <div className="relative mx-auto w-full max-w-[1320px]">
         {/* ════ MASTHEAD ═══════════════════════════════════════════════ */}
@@ -581,7 +625,7 @@ export default function CreateStylePage() {
         <hr className="aura-hairline" />
 
         <div className="mt-6 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/styles")}>
+          <Button variant="ghost" size="icon" onClick={handleLeave} aria-label="Back to styles">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
@@ -613,14 +657,14 @@ export default function CreateStylePage() {
                         isCompleted && "border-primary/40 bg-primary/15",
                         isUpcoming && "border-border bg-card",
                       )}
-                      animate={isActive ? {
+                      animate={isActive && !prefersReducedMotion ? {
                         boxShadow: [
                           "0 0 12px -4px hsl(var(--primary) / 0.4)",
                           "0 0 24px -4px hsl(var(--primary) / 0.7)",
                           "0 0 12px -4px hsl(var(--primary) / 0.4)",
                         ],
                       } : {}}
-                      transition={isActive ? { duration: 2.2, repeat: Infinity, ease: "easeInOut" } : {}}
+                      transition={isActive && !prefersReducedMotion ? { duration: 2.2, repeat: Infinity, ease: "easeInOut" } : {}}
                     >
                       {isCompleted ? (
                         <motion.div
@@ -638,7 +682,7 @@ export default function CreateStylePage() {
                       )}
                     </motion.div>
                     {/* Sparkle burst on completion */}
-                    <SparkleBurst active={isCompleted && completedSteps.has(step.number)} />
+                    <SparkleBurst active={isCompleted && completedSteps.has(step.number) && !prefersReducedMotion} />
                   </div>
                   <span className={cn(
                     "mt-2 text-sm font-semibold tracking-tight",
@@ -742,8 +786,11 @@ export default function CreateStylePage() {
                             key={type.value}
                             type="button"
                             onClick={() => toggleModelType(type.value)}
+                            aria-pressed={isSelected}
+                            aria-label={type.label}
                             className={cn(
                               "relative flex flex-col items-center gap-1 rounded-[--radius] border p-2 text-center transition-all",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
                               isSelected
                                 ? "border-primary bg-primary/10"
                                 : "border-border bg-card hover:border-primary/50",
@@ -765,7 +812,7 @@ export default function CreateStylePage() {
                               <Check className="absolute right-1 top-1 h-3 w-3 text-accent" />
                             )}
                             {/* Sparkle micro-interaction on select */}
-                            <SparkleBurst active={sparkleTarget === type.value} />
+                            <SparkleBurst active={sparkleTarget === type.value && !prefersReducedMotion} />
                           </button>
                         );
                       })}
@@ -889,7 +936,8 @@ export default function CreateStylePage() {
                                   {!uploadProgress && (
                                     <button
                                       onClick={() => removeFile(file.id, "before")}
-                                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                                      aria-label="Remove before image"
+                                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                       <X className="h-3 w-3" />
                                     </button>
@@ -994,7 +1042,8 @@ export default function CreateStylePage() {
                                   {!uploadProgress && (
                                     <button
                                       onClick={() => removeFile(file.id, "after")}
-                                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                                      aria-label="Remove after image"
+                                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                       <X className="h-3 w-3" />
                                     </button>
@@ -1044,6 +1093,21 @@ export default function CreateStylePage() {
                     </div>
                   )}
 
+                  {localCountMismatch && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-3 rounded-[--radius] border border-amber-500/30 bg-amber-500/10 p-4"
+                    >
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                      <p className="font-sans text-sm leading-snug text-muted-foreground">
+                        <span className="font-medium text-amber-500">
+                          Counts don't match — {beforeFiles.length} before vs {afterFiles.length} after.
+                        </span>{" "}
+                        Training works best with the same number of matched before/after pairs.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex items-start gap-3 rounded-[--radius] border border-primary/25 bg-primary/[0.06] p-4">
                     <Sparkle size={14} className="mt-0.5 shrink-0 text-accent" />
                     <p className="font-sans text-sm leading-snug text-muted-foreground">
@@ -1070,7 +1134,7 @@ export default function CreateStylePage() {
               </Button>
 
               <div className="flex items-center gap-3">
-                <Button variant="outline" onClick={() => navigate("/dashboard/styles")}>
+                <Button variant="outline" onClick={handleLeave}>
                   Cancel
                 </Button>
                 {currentStep < 2 ? (
@@ -1093,7 +1157,7 @@ export default function CreateStylePage() {
                   >
                     {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkle size={14} className="text-accent-foreground" />}
                     {isCreating ? "Uploading..." : "Create Style"}
-                    <ButtonSparkles active={hoveringCreate && !isCreating} />
+                    <ButtonSparkles active={hoveringCreate && !isCreating && !prefersReducedMotion} />
                   </Button>
                 )}
               </div>
@@ -1127,6 +1191,28 @@ export default function CreateStylePage() {
             >
               <Sparkle size={14} className="mr-2 text-accent-foreground" />
               Confirm & Train
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ════ LEAVE GUARD — protect typed details + staged uploads ══════ */}
+      <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isCreating ? "Leave while training is starting?" : "Leave without training?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isCreating
+                ? "Your images are still uploading. Leaving now may interrupt the upload and training won't start."
+                : "Your style details and uploaded images haven't been saved yet. Leaving will discard them."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/dashboard/styles")}>
+              Leave
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
