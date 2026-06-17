@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Home, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import imagickLogo from "@/assets/imagick-logo.png";
+import { useBrandLogo } from "@/hooks/useBrandLogo";
 
 const EASE = [0.22, 0.61, 0.36, 1] as const;
 
@@ -28,6 +28,7 @@ function Sparkle({ size = 16, className = "" }: { size?: number; className?: str
 
 const NotFound = () => {
   const location = useLocation();
+  const { logo: imagickLogo } = useBrandLogo();
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);

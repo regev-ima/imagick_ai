@@ -20,7 +20,9 @@ const APP_URL = (() => {
   }
 })();
 
-const LOGO_URL        = "https://zfcltfqgrhytpvgqkkfo.supabase.co/storage/v1/object/public/brand/imagick-logo.png";
+// Served from the app's own /public (white wordmark for the dark email header),
+// so updating the brand logo is a repo change, not a Storage upload.
+const LOGO_URL        = `${APP_URL}/email-logo.png`;
 const BRAND_PRIMARY   = "#2C57F2"; // Royal Blue   hsl(227,88%,56%) — LIGHTROOM --primary
 const BRAND_SECONDARY = "#3D67FF"; // Bright Blue  hsl(227,100%,62%) — LIGHTROOM --accent
 const BRAND_GRADIENT  = `linear-gradient(135deg, ${BRAND_PRIMARY} 0%, ${BRAND_SECONDARY} 100%)`;

@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
-import imagickLogo from "@/assets/imagick-logo.png";
+import { useBrandLogo } from "@/hooks/useBrandLogo";
 import heroPlate from "@/assets/hero-gallery-1.jpg";
 
 // LIGHTROOM stats readout — mono caption labels + folio numerals.
@@ -51,6 +51,7 @@ export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { logo: imagickLogo } = useBrandLogo();
   const { user, isAuthenticated, isEmailVerified, isLoading: authLoading } = useAuth();
 
   const [isAwaitingVerification, setIsAwaitingVerification] = useState(false);

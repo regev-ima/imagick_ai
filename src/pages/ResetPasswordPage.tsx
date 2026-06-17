@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordStrength } from "@/components/ui/password-strength";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import imagickLogo from "@/assets/imagick-logo.png";
+import { useBrandLogo } from "@/hooks/useBrandLogo";
 
 const EASE = [0.22, 0.61, 0.36, 1] as const;
 
@@ -32,6 +32,7 @@ function Sparkle({ size = 16, className = "" }: { size?: number; className?: str
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
+  const { logo: imagickLogo } = useBrandLogo();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

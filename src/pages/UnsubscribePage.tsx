@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CheckCircle, XCircle, Loader2, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import imagickLogo from "@/assets/imagick-logo.png";
+import { useBrandLogo } from "@/hooks/useBrandLogo";
 
 type ViewState = "loading" | "retain" | "success" | "error";
 type UnsubscribeKind = "lead" | "journey";
@@ -48,6 +48,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = REQUEST_TIMEOUT_MS): Pr
 }
 
 export default function UnsubscribePage() {
+  const { logo: imagickLogo } = useBrandLogo();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<ViewState>("loading");
   const [errorMessage, setErrorMessage] = useState<string>("This link is invalid or has expired.");
