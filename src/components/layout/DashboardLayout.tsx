@@ -289,10 +289,13 @@ export default function DashboardLayout() {
       <div className="relative z-10 flex h-screen flex-col">
         {!isGalleryEditor && (
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 px-4 glass-card lg:pl-[92px] lg:pr-6">
-          <div className="flex min-w-0 flex-1 items-center gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileMenuOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
+            <Link to="/dashboard" aria-label="Imagick.ai home" className="shrink-0">
+              <img src={imagickLogo} alt="Imagick.ai" className="h-8 w-auto object-contain" />
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
