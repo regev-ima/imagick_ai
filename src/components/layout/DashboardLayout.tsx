@@ -116,9 +116,9 @@ export default function DashboardLayout() {
                       aria-label={item.label}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "relative grid h-11 w-11 place-items-center rounded-2xl transition-[background-color,color,box-shadow] duration-200",
+                        "relative grid h-11 w-11 place-items-center rounded-2xl transition-[background-color,color,box-shadow,transform] duration-200 active:scale-95",
                         active
-                          ? "border-l-2 border-primary bg-primary/15 text-accent"
+                          ? "bg-primary text-primary-foreground shadow-[0_2px_10px_-2px_hsl(var(--primary)/0.55)]"
                           : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                       )}
                     >
