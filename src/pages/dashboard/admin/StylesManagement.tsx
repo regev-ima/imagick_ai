@@ -56,6 +56,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import ShowcaseManager from "./ShowcaseManager";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { AdminLoading } from "@/components/admin/AdminLoading";
 
 interface Style {
    id: string;
@@ -172,7 +174,7 @@ export default function StylesManagement() {
       <div className="mx-auto w-full max-w-[1320px] space-y-5">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/dashboard/admin">
+          <Link to="/dashboard/admin" aria-label="Back to admin">
             <ArrowLeft className="w-5 h-5" />
           </Link>
         </Button>
@@ -221,10 +223,15 @@ export default function StylesManagement() {
             </div>
             <div>
               {isLoading ? (
-                <div className="caption py-12 text-center">Loading styles…</div>
+                <AdminLoading rows={6} label="Loading styles" />
               ) : styles?.length === 0 ? (
-                <div className="caption py-12 text-center">No styles found</div>
+                <AdminEmptyState
+                  icon={Sparkles}
+                  title="No styles found"
+                  hint={searchQuery || visibilityFilter !== "all" ? "Try adjusting your search or filter." : "Trained styles will appear here."}
+                />
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                      <TableRow className="hover:bg-transparent">
@@ -277,7 +284,7 @@ export default function StylesManagement() {
                          <TableCell className="text-right">
                            <DropdownMenu>
                              <DropdownMenuTrigger asChild>
-                               <Button variant="ghost" size="icon">
+                               <Button variant="ghost" size="icon" aria-label="Style actions">
                                  <MoreHorizontal className="w-4 h-4" />
                                </Button>
                              </DropdownMenuTrigger>
@@ -347,6 +354,7 @@ export default function StylesManagement() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </div>
           </div>

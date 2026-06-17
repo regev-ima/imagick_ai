@@ -45,6 +45,8 @@ import {
 import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
  import { toast } from "sonner";
  import { format } from "date-fns";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { AdminLoading } from "@/components/admin/AdminLoading";
  
 interface Gallery {
   id: string;
@@ -180,7 +182,7 @@ export default function GalleriesManagement() {
        <div className="mx-auto w-full max-w-[1320px] space-y-5">
        <div className="flex items-center gap-3">
          <Button variant="ghost" size="icon" asChild>
-           <Link to="/dashboard/admin">
+           <Link to="/dashboard/admin" aria-label="Back to admin">
              <ArrowLeft className="w-5 h-5" />
            </Link>
          </Button>
@@ -207,10 +209,15 @@ export default function GalleriesManagement() {
          </div>
          <div>
            {isLoading ? (
-             <div className="caption py-12 text-center">Loading galleries…</div>
+             <AdminLoading rows={6} label="Loading galleries" />
            ) : galleries?.length === 0 ? (
-             <div className="caption py-12 text-center">No galleries found</div>
+             <AdminEmptyState
+               icon={Images}
+               title="No galleries found"
+               hint={searchQuery ? "Try a different search term." : "Galleries created by users will appear here."}
+             />
            ) : (
+             <div className="overflow-x-auto">
              <Table>
                <TableHeader>
                  <TableRow className="hover:bg-transparent">
@@ -249,7 +256,7 @@ export default function GalleriesManagement() {
                      <TableCell className="text-right">
                        <DropdownMenu>
                          <DropdownMenuTrigger asChild>
-                           <Button variant="ghost" size="icon">
+                           <Button variant="ghost" size="icon" aria-label="Gallery actions">
                              <MoreHorizontal className="w-4 h-4" />
                            </Button>
                          </DropdownMenuTrigger>
@@ -305,6 +312,7 @@ export default function GalleriesManagement() {
                  ))}
                </TableBody>
              </Table>
+             </div>
            )}
          </div>
        </div>

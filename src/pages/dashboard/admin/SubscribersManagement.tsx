@@ -29,6 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { AdminLoading } from "@/components/admin/AdminLoading";
 
 interface SubscriberUser {
   id: string;
@@ -241,6 +243,16 @@ export default function SubscribersManagement() {
         transition={{ duration: 0.35, delay: 0.3 }}
       >
         <div className="glass-card overflow-hidden rounded-[--radius]">
+          {isLoading ? (
+            <AdminLoading rows={8} label="Loading subscribers" />
+          ) : filtered.length === 0 ? (
+            <AdminEmptyState
+              icon={Users}
+              title="No subscribers yet"
+              hint={search || planFilter !== "all" || statusFilter !== "all" || cycleFilter !== "all" ? "Try adjusting your search or filters." : "Paid subscribers will appear here."}
+            />
+          ) : (
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -255,16 +267,7 @@ export default function SubscribersManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Loading...</TableCell>
-                </TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No subscribers found</TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((u) => (
+              {filtered.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell>
                       <div>
@@ -302,10 +305,11 @@ export default function SubscribersManagement() {
                       )}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
+          </div>
+          )}
         </div>
       </motion.div>
     </div>

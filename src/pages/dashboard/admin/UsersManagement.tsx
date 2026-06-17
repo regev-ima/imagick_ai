@@ -43,6 +43,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { GrantCreditsModal } from "@/components/admin/GrantCreditsModal";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { AdminLoading } from "@/components/admin/AdminLoading";
 import { useAuth } from "@/hooks/useAuth";
 import { useImpersonation } from "@/hooks/useImpersonation";
 
@@ -189,7 +191,7 @@ export default function UsersManagement() {
       <div className="mx-auto w-full max-w-[1320px] space-y-5">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
-            <Link to="/dashboard/admin">
+            <Link to="/dashboard/admin" aria-label="Back to admin">
               <ArrowLeft className="w-5 h-5" />
             </Link>
           </Button>
@@ -241,9 +243,13 @@ export default function UsersManagement() {
           </div>
 
           {isLoading ? (
-            <div className="caption py-12 text-center">Loading users…</div>
+            <AdminLoading rows={6} label="Loading users" />
           ) : filtered.length === 0 ? (
-            <div className="caption py-12 text-center">No users found</div>
+            <AdminEmptyState
+              icon={Users}
+              title="No users found"
+              hint={searchQuery || roleFilter !== "all" ? "Try adjusting your search or filter." : "Users appear here once people sign up."}
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -293,12 +299,12 @@ export default function UsersManagement() {
                       <TableCell className="folio text-center">{user.edits_count}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openDetail(user.id)}>
+                          <Button variant="ghost" size="icon" aria-label="View user" onClick={() => openDetail(user.id)}>
                             <Eye className="w-4 h-4" />
                           </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" aria-label="More actions">
                                 <MoreHorizontal className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
