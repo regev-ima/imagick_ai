@@ -48,9 +48,8 @@ const NotFound = () => {
         transition={{ duration: 0.5, ease: EASE }}
         className="relative z-10 w-full max-w-md"
       >
-        {/* Brand row — sparkle + logo */}
-        <div className="mb-8 flex items-center justify-center gap-2.5">
-          <Sparkle size={18} className="text-primary" />
+        {/* Brand row — logo lockup (already includes the sparkle mark) */}
+        <div className="mb-8 flex items-center justify-center">
           <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
         </div>
 

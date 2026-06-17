@@ -137,8 +137,7 @@ export default function UnsubscribePage() {
       <div className="w-full max-w-2xl glass-card rounded-md overflow-hidden">
         {/* Header — brand row over a hairline */}
         <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-8 py-5">
-          <div className="flex items-center gap-2.5">
-            <Sparkle size={16} className="text-primary" />
+          <div className="flex items-center">
             <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
           </div>
           <span className="aura-microlabel">Email · Preferences</span>

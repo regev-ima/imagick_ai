@@ -127,8 +127,7 @@ export default function ResetPasswordPage() {
             transition={{ duration: 0.5, ease: EASE }}
             className="flex items-center justify-between"
           >
-            <div className="flex items-center gap-2.5">
-              <Sparkle size={20} className="text-primary" />
+            <div className="flex items-center">
               <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
             </div>
             <span className="aura-microlabel">Recover · Access</span>
@@ -183,8 +182,7 @@ export default function ResetPasswordPage() {
         >
           {/* Mobile-only header */}
           <div className="text-center mb-8 lg:hidden">
-            <div className="flex items-center justify-center gap-2.5 mb-4">
-              <Sparkle size={18} className="text-primary" />
+            <div className="flex items-center justify-center mb-4">
               <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
             </div>
           </div>

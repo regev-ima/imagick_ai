@@ -267,8 +267,7 @@ export default function AuthPage() {
           transition={{ duration: 0.5, ease: EASE }}
           className="w-full max-w-md"
         >
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <Sparkle size={18} className="text-primary" />
+          <div className="flex items-center justify-center mb-8">
             <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
           </div>
 
@@ -342,8 +341,7 @@ export default function AuthPage() {
             transition={{ duration: 0.5, ease: EASE }}
             className="flex items-center justify-between"
           >
-            <div className="flex items-center gap-2.5">
-              <Sparkle size={20} className="text-primary" />
+            <div className="flex items-center">
               <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
             </div>
             <span className="aura-microlabel">AI Workspace · 2026</span>
@@ -437,8 +435,7 @@ export default function AuthPage() {
         >
           {/* Mobile-only header */}
           <div className="text-center mb-8 lg:hidden">
-            <div className="flex items-center justify-center gap-2.5 mb-4">
-              <Sparkle size={18} className="text-primary" />
+            <div className="flex items-center justify-center mb-4">
               <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
             </div>
             <div className="aura-microlabel mb-3">The AI editing studio</div>
