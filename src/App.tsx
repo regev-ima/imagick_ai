@@ -37,15 +37,6 @@ const ShortLinkRedirect = lazy(() => import("./pages/ShortLinkRedirect"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
-// Internal design concept (AURA) — static mock screens, unlinked from any
-// nav. See docs/design/aura-concept.md. Safe to remove once a direction
-// is approved and the real theme work starts.
-const DesignPreview = lazy(() => import("./pages/DesignPreview"));
-// Design-direction comparison prototypes (static mocks, unlinked from nav).
-const DarkroomDashboard = lazy(() => import("./pages/preview/DarkroomDashboard"));
-const ExpressiveDashboard = lazy(() => import("./pages/preview/ExpressiveDashboard"));
-const LightroomDashboard = lazy(() => import("./pages/preview/LightroomDashboard"));
-const StudioDashboard = lazy(() => import("./pages/preview/StudioDashboard"));
 const PrivacyPage = lazy(() => import("./pages/legal/PrivacyPage"));
 const TermsPage = lazy(() => import("./pages/legal/TermsPage"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/admin/AdminDashboard"));
@@ -118,11 +109,6 @@ const App = () => (
                 <Route path="/legal/privacy" element={<PrivacyPage />} />
                 <Route path="/legal/terms" element={<TermsPage />} />
                 <Route path="/g/:shortId" element={<ShortLinkRedirect />} />
-                <Route path="/design-preview" element={<DesignPreview />} />
-                <Route path="/preview/darkroom" element={<DarkroomDashboard />} />
-                <Route path="/preview/expressive" element={<ExpressiveDashboard />} />
-                <Route path="/preview/lightroom" element={<LightroomDashboard />} />
-                <Route path="/preview/studio" element={<StudioDashboard />} />
                 <Route path="/gallery/:galleryId" element={<ClientGalleryPage />} />
                 <Route
                   path="/dashboard"
