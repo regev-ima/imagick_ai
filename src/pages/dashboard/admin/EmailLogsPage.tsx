@@ -394,7 +394,7 @@ export default function EmailLogsPage() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center gap-3 mb-1">
           <Button variant="ghost" size="icon" asChild className="w-8 h-8">
-            <Link to="/dashboard/admin"><ArrowLeft className="w-4 h-4" /></Link>
+            <Link to="/dashboard/admin" aria-label="Back to admin"><ArrowLeft className="w-4 h-4" /></Link>
           </Button>
           <div>
             <span className="caption">Delivery via Resend</span>

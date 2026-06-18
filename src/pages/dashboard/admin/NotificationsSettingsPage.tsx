@@ -105,7 +105,7 @@ export default function NotificationsSettingsPage() {
     <div className="min-h-full bg-background p-6 lg:p-8 space-y-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/dashboard/admin"><ArrowLeft className="w-5 h-5" /></Link>
+          <Link to="/dashboard/admin" aria-label="Back to admin"><ArrowLeft className="w-5 h-5" /></Link>
         </Button>
         <div>
           <span className="caption">WhatsApp alerts</span>
