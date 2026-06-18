@@ -20,7 +20,6 @@ import {
   Workflow,
   type LucideIcon,
   Megaphone,
-  Settings2,
   TrendingDown,
   Zap,
 } from "lucide-react";
@@ -45,16 +44,17 @@ interface AdminGroup {
 
 const adminGroups: AdminGroup[] = [
   {
-    title: "People & Access",
+    title: "People & Billing",
     icon: Users,
     sections: [
       { title: "Users", description: "Manage users, roles and permissions", icon: Users, href: "/dashboard/admin/users" },
-      { title: "Subscription Plans", description: "Manage pricing and plan features", icon: CreditCard, href: "/dashboard/admin/plans" },
       { title: "Subscribers", description: "Paying subscribers, MRR, and subscription details", icon: DollarSign, href: "/dashboard/admin/subscribers" },
+      { title: "Subscription Plans", description: "Manage pricing and plan features", icon: CreditCard, href: "/dashboard/admin/plans" },
+      { title: "PayPal Settings", description: "Toggle sandbox/live and manage billing plans", icon: Wallet, href: "/dashboard/admin/paypal" },
     ],
   },
   {
-    title: "Content & Product",
+    title: "Content",
     icon: Sparkles,
     sections: [
       { title: "Styles & Showcase", description: "Manage styles, presets, and before/after previews", icon: Sparkles, href: "/dashboard/admin/styles" },
@@ -63,14 +63,13 @@ const adminGroups: AdminGroup[] = [
     ],
   },
   {
-    title: "Communications",
+    title: "Email & Notifications",
     icon: Mail,
     sections: [
       { title: "Email Logs", description: "Sent emails, delivery status, and Resend IDs", icon: Mail, href: "/dashboard/admin/email-logs" },
-      { title: "Email Templates", description: "Preview and send test emails for all template types", icon: Mail, href: "/dashboard/admin/email-templates" },
-      { title: "Notifications", description: "Manage WhatsApp notification recipients", icon: Bell, href: "/dashboard/admin/notifications" },
+      { title: "Email Templates", description: "Preview and send test emails for all template types", icon: MailCheck, href: "/dashboard/admin/email-templates" },
       { title: "Email Sequences", description: "Automated lifecycle email campaigns", icon: MailOpen, href: "/dashboard/admin/email-sequences" },
-      { title: "Customer Journey", description: "Lifecycle stages, conversion scores, and segments", icon: TrendingUp, href: "/dashboard/admin/customer-journey" },
+      { title: "Notifications", description: "Manage WhatsApp notification recipients", icon: Bell, href: "/dashboard/admin/notifications" },
     ],
   },
   {
@@ -84,11 +83,11 @@ const adminGroups: AdminGroup[] = [
     ],
   },
   {
-    title: "Settings & Insights",
-    icon: Settings2,
+    title: "Insights",
+    icon: BarChart3,
     sections: [
-      { title: "Onboarding Insights", description: "Questionnaire responses and segment data", icon: BarChart3, href: "/dashboard/admin/onboarding-insights" },
-      { title: "PayPal Settings", description: "Toggle sandbox/live and manage billing plans", icon: Wallet, href: "/dashboard/admin/paypal" },
+      { title: "Customer Journey", description: "Lifecycle stages, conversion scores, and segments", icon: TrendingUp, href: "/dashboard/admin/customer-journey" },
+      { title: "Onboarding Insights", description: "Questionnaire responses and segment data", icon: Activity, href: "/dashboard/admin/onboarding-insights" },
     ],
   },
 ];
