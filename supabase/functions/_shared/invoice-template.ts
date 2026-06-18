@@ -1,5 +1,5 @@
-const BRAND_PRIMARY = "#e85c9b";
-const BRAND_SECONDARY = "#9b5ad4";
+const BRAND_PRIMARY = "#2C57F2";
+const BRAND_SECONDARY = "#3D67FF";
 
 export interface InvoiceData {
   invoiceNumber: string;
@@ -51,7 +51,7 @@ export function generateInvoiceHtml(data: InvoiceData): string {
 
     /* ── Header ── */
     .header {
-      background: #0e0e17;
+      background: #16171A;
       padding: 24px 48px 20px;
     }
     .gradient-line {

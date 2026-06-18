@@ -21,13 +21,13 @@ import {
   BookOpen,
   CalendarClock,
   Shield,
+  Filter,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -907,10 +907,11 @@ export default function LeadImportsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Lead Imports</h1>
-        <p className="text-muted-foreground mt-1">
+        <span className="caption">Admin · Lead generation</span>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Lead Imports</h1>
+        <p className="mt-1 font-sans text-sm text-muted-foreground">
           Admin-only lead center: import files, review import jobs, and monitor lead campaign progress.
         </p>
       </div>
@@ -940,34 +941,35 @@ export default function LeadImportsPage() {
         </TabsList>
 
         <TabsContent value="upload" className="space-y-6">
-          <Card className="glass-card border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="w-4 h-4 text-primary" />
+          <div className="glass-card overflow-hidden rounded-[--radius]">
+            <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+              <span className="aura-microlabel flex items-center gap-2">
+                <Upload className="h-3.5 w-3.5" />
                 Upload + Mapping
-              </CardTitle>
-              <CardDescription>
-                Supported: CSV/XLSX. Choose columns for email, first name, last name, IP, time zone, country, city.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
+              </span>
+              <span className="caption">CSV / XLSX</span>
+            </div>
+            <div className="space-y-5 p-4">
+              <p className="font-sans text-sm text-muted-foreground">
+                Choose columns for email, first name, last name, IP, time zone, country, city.
+              </p>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Source label</Label>
+                  <Label className="aura-microlabel">Source label</Label>
                   <Input value={sourceLabel} onChange={(e) => setSourceLabel(e.target.value)} placeholder="bubble_io_export" />
                 </div>
                 <div className="space-y-2">
-                  <Label>File</Label>
+                  <Label className="aura-microlabel">File</Label>
                   <Input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)} />
                 </div>
               </div>
 
               {file && (
-                <div className="rounded-lg border border-border/60 p-3 bg-muted/20 flex items-center gap-3">
-                  <FileSpreadsheet className="w-4 h-4 text-primary" />
+                <div className="flex items-center gap-3 rounded-[--radius] border border-border bg-surface-2 p-3">
+                  <FileSpreadsheet className="w-4 h-4 text-accent" />
                   <div className="text-sm">
-                    <div className="font-medium">{file.name}</div>
-                    <div className="text-muted-foreground">{rows.length} parsed rows</div>
+                    <div className="font-medium text-foreground">{file.name}</div>
+                    <div className="font-mono text-xs text-muted-foreground">{rows.length} parsed rows</div>
                   </div>
                 </div>
               )}
@@ -975,7 +977,7 @@ export default function LeadImportsPage() {
               {headers.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Email column *</Label>
+                    <Label className="aura-microlabel">Email column *</Label>
                     <Select value={mapping.email} onValueChange={(value) => setMapping((prev) => ({ ...prev, email: value }))}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select email column" />
@@ -990,7 +992,7 @@ export default function LeadImportsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>First name column</Label>
+                    <Label className="aura-microlabel">First name column</Label>
                     <Select
                       value={mapping.firstName || "__none__"}
                       onValueChange={(value) =>
@@ -1014,7 +1016,7 @@ export default function LeadImportsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Last name column</Label>
+                    <Label className="aura-microlabel">Last name column</Label>
                     <Select
                       value={mapping.lastName || "__none__"}
                       onValueChange={(value) =>
@@ -1038,7 +1040,7 @@ export default function LeadImportsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>IP column</Label>
+                    <Label className="aura-microlabel">IP column</Label>
                     <Select
                       value={mapping.ip || "__none__"}
                       onValueChange={(value) =>
@@ -1062,7 +1064,7 @@ export default function LeadImportsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Time zone column</Label>
+                    <Label className="aura-microlabel">Time zone column</Label>
                     <Select
                       value={mapping.timeZone || "__none__"}
                       onValueChange={(value) =>
@@ -1086,7 +1088,7 @@ export default function LeadImportsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Country column</Label>
+                    <Label className="aura-microlabel">Country column</Label>
                     <Select
                       value={mapping.country || "__none__"}
                       onValueChange={(value) =>
@@ -1110,7 +1112,7 @@ export default function LeadImportsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>City column</Label>
+                    <Label className="aura-microlabel">City column</Label>
                     <Select
                       value={mapping.city || "__none__"}
                       onValueChange={(value) =>
@@ -1138,13 +1140,13 @@ export default function LeadImportsPage() {
 
               {previewRows.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Preview (first 5 rows)</Label>
-                  <div className="rounded-lg border border-border/60 overflow-x-auto">
+                  <Label className="aura-microlabel">Preview (first 5 rows)</Label>
+                  <div className="overflow-x-auto rounded-[--radius] border border-border">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           {headers.slice(0, 6).map((header) => (
-                            <TableHead key={header}>{header}</TableHead>
+                            <TableHead key={header} className="caption">{header}</TableHead>
                           ))}
                         </TableRow>
                       </TableHeader>
@@ -1152,7 +1154,7 @@ export default function LeadImportsPage() {
                         {previewRows.map((row, idx) => (
                           <TableRow key={idx}>
                             {headers.slice(0, 6).map((header) => (
-                              <TableCell key={header} className="max-w-[220px] truncate">
+                              <TableCell key={header} className="max-w-[220px] truncate font-mono text-xs text-muted-foreground">
                                 {String(row[header] ?? "")}
                               </TableCell>
                             ))}
@@ -1170,7 +1172,7 @@ export default function LeadImportsPage() {
                     <span className="text-muted-foreground">
                       Importing {progress.processed} / {progress.total}
                     </span>
-                    <span className="font-medium">{progressPercent}%</span>
+                    <span className="folio text-foreground">{progressPercent}%</span>
                   </div>
                   <Progress value={progressPercent} />
                 </div>
@@ -1194,40 +1196,44 @@ export default function LeadImportsPage() {
                   Reset
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {lastSummary && (
-            <Card className="glass-card border-border/50">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <div className="glass-card overflow-hidden rounded-[--radius]">
+              <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                <span className="aura-microlabel flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-secondary" />
                   Import Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-sm">
-                <div><span className="text-muted-foreground">Processed:</span> {lastSummary.processed}</div>
-                <div><span className="text-muted-foreground">Imported:</span> {lastSummary.imported}</div>
-                <div><span className="text-muted-foreground">Duplicates:</span> {lastSummary.duplicates}</div>
-                <div><span className="text-muted-foreground">Invalid:</span> {lastSummary.invalid}</div>
-                <div><span className="text-muted-foreground">Registered:</span> {lastSummary.registered}</div>
-                <div><span className="text-muted-foreground">Suppressed:</span> {lastSummary.suppressed}</div>
-                <div><span className="text-muted-foreground">Scheduled:</span> {lastSummary.scheduled ?? 0}</div>
-              </CardContent>
-            </Card>
+                </span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 p-4 text-sm">
+                {[
+                  { label: "Processed", value: lastSummary.processed },
+                  { label: "Imported", value: lastSummary.imported },
+                  { label: "Duplicates", value: lastSummary.duplicates },
+                  { label: "Invalid", value: lastSummary.invalid },
+                  { label: "Registered", value: lastSummary.registered },
+                  { label: "Suppressed", value: lastSummary.suppressed },
+                  { label: "Scheduled", value: lastSummary.scheduled ?? 0 },
+                ].map((item) => (
+                  <div key={item.label}>
+                    <p className="caption">{item.label}</p>
+                    <p className="folio mt-1 text-lg text-foreground">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </TabsContent>
 
         <TabsContent value="jobs">
-          <Card className="glass-card border-border/50">
-            <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-primary" />
-                  Import Jobs
-                </CardTitle>
-                <CardDescription>Full import history with counters and per-row drill-down.</CardDescription>
-              </div>
+          <div className="glass-card overflow-hidden rounded-[--radius]">
+            <div className="flex flex-row items-center justify-between gap-3 border-b border-border bg-background/40 px-4 py-2.5">
+              <span className="aura-microlabel flex items-center gap-2">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Import Jobs
+              </span>
               <div className="flex items-center gap-2">
                 {selectedJobIds.size > 0 && (
                   <Button
@@ -1245,8 +1251,8 @@ export default function LeadImportsPage() {
                   Refresh
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
+            </div>
+            <div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1256,11 +1262,11 @@ export default function LeadImportsPage() {
                         onCheckedChange={toggleAllJobs}
                       />
                     </TableHead>
-                    <TableHead>File / Source</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Counts</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="caption">File / Source</TableHead>
+                    <TableHead className="caption">Status</TableHead>
+                    <TableHead className="caption">Total</TableHead>
+                    <TableHead className="caption">Counts</TableHead>
+                    <TableHead className="caption text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1273,15 +1279,15 @@ export default function LeadImportsPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium truncate max-w-[200px] text-sm">{job.file_name || "Unknown file"}</div>
-                        <div className="text-xs text-muted-foreground">{job.source || "manual_upload"}</div>
-                        <div className="text-xs text-muted-foreground">{formatDateTime(job.created_at)}</div>
+                        <div className="font-medium truncate max-w-[200px] text-sm text-foreground">{job.file_name || "Unknown file"}</div>
+                        <div className="font-mono text-xs text-muted-foreground">{job.source || "manual_upload"}</div>
+                        <div className="font-mono text-xs text-muted-foreground">{formatDateTime(job.created_at)}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={job.status === "completed" ? "default" : "secondary"}>{job.status}</Badge>
+                        <Badge variant={job.status === "completed" ? "secondary" : "outline"}>{job.status}</Badge>
                       </TableCell>
-                      <TableCell className="font-medium">{job.total_rows}</TableCell>
-                      <TableCell className="text-xs leading-relaxed">
+                      <TableCell className="folio text-foreground">{job.total_rows}</TableCell>
+                      <TableCell className="font-mono text-xs leading-relaxed">
                         <span title="Imported">{job.imported_count} imp</span>
                         {job.duplicates_count > 0 && <span className="text-muted-foreground"> · {job.duplicates_count} dup</span>}
                         {job.registered_count > 0 && <span className="text-muted-foreground"> · {job.registered_count} reg</span>}
@@ -1343,7 +1349,7 @@ export default function LeadImportsPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="text-green-600 hover:text-green-700"
+                                className="text-secondary hover:text-secondary"
                                 onClick={() => setConfirmReleaseJobId(job.id)}
                                 disabled={!!releasingJobId}
                                 title="Release held emails for delivery"
@@ -1399,17 +1405,20 @@ export default function LeadImportsPage() {
                   )}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="leads" className="space-y-4">
-          <Card className="glass-card border-border/50">
-            <CardHeader>
-              <CardTitle className="text-base">Leads Filters</CardTitle>
-              <CardDescription>Track lead status, stage, import source, and timeline logs.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="glass-card overflow-hidden rounded-[--radius]">
+            <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+              <span className="aura-microlabel flex items-center gap-2">
+                <Filter className="h-3.5 w-3.5" />
+                Leads Filters
+              </span>
+              <span className="caption">Status · stage · source</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 p-4">
               <Input
                 placeholder="Search email or name..."
                 value={leadSearch}
@@ -1504,19 +1513,19 @@ export default function LeadImportsPage() {
                   setLeadDateTo(e.target.value);
                 }}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card className="glass-card border-border/50">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Leads ({totalLeads.toLocaleString()})</CardTitle>
+          <div className="glass-card overflow-hidden rounded-[--radius]">
+            <div className="flex flex-row items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+              <span className="aura-microlabel">Leads · {totalLeads.toLocaleString()}</span>
               <div className="flex items-center gap-2">
                 {selectedLeadIds.size > 0 && (
                   <Button
+                    variant="secondary"
                     size="sm"
                     disabled={releasingLeads}
                     onClick={() => setShowReleaseDialog(true)}
-                    className="bg-green-600 hover:bg-green-700 text-white"
                   >
                     {releasingLeads ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Play className="w-4 h-4 mr-1" />}
                     Release {selectedLeadIds.size}
@@ -1564,8 +1573,8 @@ export default function LeadImportsPage() {
                   Refresh
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
+            </div>
+            <div>
               {leadsLoading && leadRows.length === 0 ? (
                 <div className="py-14 flex items-center justify-center text-muted-foreground gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1581,23 +1590,23 @@ export default function LeadImportsPage() {
                           onCheckedChange={toggleAllLeads}
                         />
                       </TableHead>
-                      <TableHead className="w-10 text-center">#</TableHead>
-                      <TableHead>Email / Name</TableHead>
-                      <TableHead>Import</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Current Stage</TableHead>
-                      <TableHead>Next Send</TableHead>
-                      <TableHead>Last Sent</TableHead>
-                      <TableHead>Opens</TableHead>
-                      <TableHead>Unsubscribed</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="caption w-10 text-center">#</TableHead>
+                      <TableHead className="caption">Email / Name</TableHead>
+                      <TableHead className="caption">Import</TableHead>
+                      <TableHead className="caption">Status</TableHead>
+                      <TableHead className="caption">Current Stage</TableHead>
+                      <TableHead className="caption">Next Send</TableHead>
+                      <TableHead className="caption">Last Sent</TableHead>
+                      <TableHead className="caption">Opens</TableHead>
+                      <TableHead className="caption">Unsubscribed</TableHead>
+                      <TableHead className="caption text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {leadRows.map((lead, idx) => (
                       <TableRow
                         key={lead.id}
-                        className="cursor-pointer hover:bg-muted/40"
+                        className="cursor-pointer hover:bg-foreground/[0.03]"
                         onClick={() => setTimelineLeadId(lead.id)}
                       >
                         <TableCell onClick={(e) => e.stopPropagation()}>
@@ -1606,15 +1615,15 @@ export default function LeadImportsPage() {
                             onCheckedChange={() => toggleLeadSelection(lead.id)}
                           />
                         </TableCell>
-                        <TableCell className="text-center text-xs text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="text-center font-mono text-xs text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell>
-                          <div className="font-medium truncate max-w-[260px]">{lead.email_raw || lead.email_normalized}</div>
+                          <div className="font-medium truncate max-w-[260px] text-foreground">{lead.email_raw || lead.email_normalized}</div>
                           <div className="text-xs text-muted-foreground">{formatLeadName(lead)}</div>
                         </TableCell>
                         <TableCell className="text-xs">
-                          <div className="max-w-[220px] truncate">{lead.import_file_name || "—"}</div>
-                          <div className="text-muted-foreground">{lead.import_source || lead.source || "—"}</div>
-                          <div className="text-muted-foreground">{formatDateTime(lead.imported_at || lead.created_at)}</div>
+                          <div className="max-w-[220px] truncate text-foreground">{lead.import_file_name || "—"}</div>
+                          <div className="font-mono text-muted-foreground">{lead.import_source || lead.source || "—"}</div>
+                          <div className="font-mono text-muted-foreground">{formatDateTime(lead.imported_at || lead.created_at)}</div>
                         </TableCell>
                         <TableCell>
                           <Badge variant={lead.status === "active" ? "default" : "secondary"}>{lead.status}</Badge>
@@ -1623,10 +1632,10 @@ export default function LeadImportsPage() {
                           {lead.current_stage_label}
                           {lead.current_stage_step ? <span className="text-muted-foreground"> (#{lead.current_stage_step})</span> : null}
                         </TableCell>
-                        <TableCell className="text-xs">{formatDateTime(lead.next_scheduled_at)}</TableCell>
-                        <TableCell className="text-xs">{formatDateTime(lead.last_sent_at)}</TableCell>
-                        <TableCell>{lead.opened_count}</TableCell>
-                        <TableCell className="text-xs">{formatDateTime(lead.unsubscribed_at)}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{formatDateTime(lead.next_scheduled_at)}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{formatDateTime(lead.last_sent_at)}</TableCell>
+                        <TableCell className="folio text-foreground">{lead.opened_count}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{formatDateTime(lead.unsubscribed_at)}</TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
@@ -1657,8 +1666,8 @@ export default function LeadImportsPage() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Infinite scroll sentinel */}
           {hasMoreLeads && (
@@ -1676,21 +1685,18 @@ export default function LeadImportsPage() {
 
         {/* Releases Tab */}
         <TabsContent value="releases" className="space-y-4">
-          <Card className="glass-card border-border/50">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Play className="w-4 h-4 text-green-400" />
-                  Release Batches
-                </CardTitle>
-                <CardDescription>Track performance of each lead release batch.</CardDescription>
-              </div>
+          <div className="glass-card overflow-hidden rounded-[--radius]">
+            <div className="flex flex-row items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+              <span className="aura-microlabel flex items-center gap-2">
+                <Play className="h-3.5 w-3.5 text-secondary" />
+                Release Batches
+              </span>
               <Button variant="outline" size="sm" onClick={() => refetchReleases()} disabled={releasesLoading}>
                 {releasesLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
                 Refresh
               </Button>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="p-4">
               {releasesLoading ? (
                 <div className="py-14 flex items-center justify-center text-muted-foreground gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1711,7 +1717,7 @@ export default function LeadImportsPage() {
                     return (
                       <div
                         key={rel.id}
-                        className="p-4 rounded-lg bg-muted/30 border border-border/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer rounded-[--radius] border border-border bg-surface-2 p-4 transition-colors hover:bg-surface-3"
                         onClick={() => {
                           setExpandedReleaseId(expandedReleaseId === rel.id ? null : rel.id);
                           setReleaseDetailPage(0);
@@ -1720,35 +1726,45 @@ export default function LeadImportsPage() {
                         <div className="flex items-center gap-4 flex-wrap">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm">{rel.label || "Release"}</span>
+                              <span className="font-medium text-sm text-foreground">{rel.label || "Release"}</span>
                               <Badge variant="outline" className="text-xs">{rel.campaign_name}</Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="font-mono text-xs text-muted-foreground mt-0.5">
                               {formatDateTime(rel.created_at)} · {rel.lead_count} leads
                             </p>
                           </div>
                           <div className="flex items-center gap-4 text-center">
                             <div>
-                              <p className="text-lg font-bold">{stats.sent}</p>
-                              <p className="text-[10px] text-muted-foreground">Sent</p>
+                              <p className="folio text-lg text-foreground">{stats.sent}</p>
+                              <p className="caption">Sent</p>
                             </div>
                             <div>
-                              <p className="text-lg font-bold">{stats.pending}</p>
-                              <p className="text-[10px] text-muted-foreground">Pending</p>
+                              <p className="folio text-lg text-foreground">{stats.pending}</p>
+                              <p className="caption">Pending</p>
                             </div>
                             <div>
-                              <p className={`text-lg font-bold ${openRate > 20 ? "text-green-400" : openRate > 10 ? "text-yellow-400" : "text-muted-foreground"}`}>{openRate}%</p>
-                              <p className="text-[10px] text-muted-foreground">Open Rate</p>
+                              <p
+                                className="folio text-lg"
+                                style={{ color: `hsl(${openRate > 20 ? "var(--secondary)" : openRate > 10 ? "var(--rating)" : "var(--muted-foreground)"})` }}
+                              >
+                                {openRate}%
+                              </p>
+                              <p className="caption">Open Rate</p>
                             </div>
                             <div>
-                              <p className={`text-lg font-bold ${convRate > 5 ? "text-green-400" : convRate > 0 ? "text-yellow-400" : "text-muted-foreground"}`}>{convRate}%</p>
-                              <p className="text-[10px] text-muted-foreground">Converted</p>
+                              <p
+                                className="folio text-lg"
+                                style={{ color: `hsl(${convRate > 5 ? "var(--secondary)" : convRate > 0 ? "var(--rating)" : "var(--muted-foreground)"})` }}
+                              >
+                                {convRate}%
+                              </p>
+                              <p className="caption">Converted</p>
                             </div>
                           </div>
                         </div>
 
                         {expandedReleaseId === rel.id && (
-                          <div className="mt-4 border-t border-border/30 pt-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="mt-4 border-t border-border pt-4" onClick={(e) => e.stopPropagation()}>
                             {releaseDetailLoading ? (
                               <div className="py-6 flex items-center justify-center text-muted-foreground gap-2">
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -1759,26 +1775,26 @@ export default function LeadImportsPage() {
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
-                                      <TableHead>Email</TableHead>
-                                      <TableHead>Status</TableHead>
-                                      <TableHead>Enrolled</TableHead>
-                                      <TableHead>Sent</TableHead>
-                                      <TableHead>Opened</TableHead>
+                                      <TableHead className="caption">Email</TableHead>
+                                      <TableHead className="caption">Status</TableHead>
+                                      <TableHead className="caption">Enrolled</TableHead>
+                                      <TableHead className="caption">Sent</TableHead>
+                                      <TableHead className="caption">Opened</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
                                     {(releaseDetailData?.leads ?? []).map((lead) => (
                                       <TableRow key={lead.lead_id}>
                                         <TableCell>
-                                          <div className="text-sm font-medium">{lead.email}</div>
+                                          <div className="text-sm font-medium text-foreground">{lead.email}</div>
                                           <div className="text-xs text-muted-foreground">{lead.name}</div>
                                         </TableCell>
                                         <TableCell>
                                           <Badge variant={lead.status === "active" ? "default" : "secondary"}>{lead.status}</Badge>
                                         </TableCell>
-                                        <TableCell className="text-xs">{formatDateTime(lead.enrolled_at)}</TableCell>
-                                        <TableCell>{lead.emails_sent}</TableCell>
-                                        <TableCell>{lead.emails_opened}</TableCell>
+                                        <TableCell className="font-mono text-xs text-muted-foreground">{formatDateTime(lead.enrolled_at)}</TableCell>
+                                        <TableCell className="folio text-foreground">{lead.emails_sent}</TableCell>
+                                        <TableCell className="folio text-foreground">{lead.emails_opened}</TableCell>
                                       </TableRow>
                                     ))}
                                   </TableBody>
@@ -1810,8 +1826,8 @@ export default function LeadImportsPage() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -1820,8 +1836,8 @@ export default function LeadImportsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <Play className="w-5 h-5 text-green-500" />
+              <div className="grid h-9 w-9 place-items-center rounded-[--radius] border border-secondary/30 bg-secondary/10">
+                <Play className="w-5 h-5 text-secondary" />
               </div>
               Release {selectedLeadIds.size} Leads
             </AlertDialogTitle>
@@ -1844,7 +1860,7 @@ export default function LeadImportsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleReleaseLeads}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
             >
               <Play className="w-4 h-4 mr-1" />
               Release
@@ -1874,25 +1890,25 @@ export default function LeadImportsPage() {
                 Refresh
               </Button>
             </div>
-            <div className="rounded-lg border border-border/50 overflow-hidden">
+            <div className="overflow-hidden rounded-[--radius] border border-border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Row</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Result</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Lead Status</TableHead>
+                    <TableHead className="caption">Row</TableHead>
+                    <TableHead className="caption">Email</TableHead>
+                    <TableHead className="caption">Result</TableHead>
+                    <TableHead className="caption">Reason</TableHead>
+                    <TableHead className="caption">Lead Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {importRows.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell>{row.row_number}</TableCell>
-                      <TableCell className="max-w-[260px] truncate">{row.email_raw || row.email_normalized || "—"}</TableCell>
-                      <TableCell>{row.result}</TableCell>
-                      <TableCell className="max-w-[320px] truncate">{row.reason || "—"}</TableCell>
-                      <TableCell>{row.lead?.status || "—"}</TableCell>
+                      <TableCell className="folio text-foreground">{row.row_number}</TableCell>
+                      <TableCell className="max-w-[260px] truncate font-mono text-xs text-foreground">{row.email_raw || row.email_normalized || "—"}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{row.result}</TableCell>
+                      <TableCell className="max-w-[320px] truncate text-xs text-muted-foreground">{row.reason || "—"}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{row.lead?.status || "—"}</TableCell>
                     </TableRow>
                   ))}
                   {importRows.length === 0 && (
@@ -1944,7 +1960,7 @@ export default function LeadImportsPage() {
         <SheetContent side="right" className="w-full sm:max-w-3xl overflow-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-primary/10">
+              <div className="grid h-9 w-9 place-items-center rounded-[--radius] border border-primary/30 bg-primary/10">
                 <User className="w-5 h-5 text-primary" />
               </div>
               Lead Timeline
@@ -1969,88 +1985,80 @@ export default function LeadImportsPage() {
               <>
                 {/* Lead Overview — card grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Card className="glass-card border-border/50">
-                    <CardContent className="pt-4 pb-3 flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-blue-500/10 shrink-0"><Mail className="w-4 h-4 text-blue-400" /></div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] text-muted-foreground">Email</p>
-                        <p className="text-sm font-medium truncate">{timelineData.lead.email_raw || timelineData.lead.email_normalized}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="glass-card border-border/50">
-                    <CardContent className="pt-4 pb-3 flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-violet-500/10 shrink-0"><User className="w-4 h-4 text-violet-400" /></div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] text-muted-foreground">Name</p>
-                        <p className="text-sm font-medium truncate">{`${timelineData.lead.first_name || ""} ${timelineData.lead.last_name || ""}`.trim() || "—"}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="glass-card border-border/50">
-                    <CardContent className="pt-4 pb-3 flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-emerald-500/10 shrink-0"><Shield className="w-4 h-4 text-emerald-400" /></div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] text-muted-foreground">Status</p>
-                        <Badge variant={timelineData.lead.status === "active" ? "default" : "secondary"} className="mt-0.5">{timelineData.lead.status}</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="glass-card border-border/50">
-                    <CardContent className="pt-4 pb-3 flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-pink-500/10 shrink-0"><Clock className="w-4 h-4 text-pink-400" /></div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] text-muted-foreground">Unsubscribed</p>
-                        <p className="text-sm font-medium">{formatDateTime(timelineData.lead.unsubscribed_at)}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="glass-card flex items-start gap-3 rounded-[--radius] p-3">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[--radius] border border-border bg-primary/10"><Mail className="w-4 h-4 text-primary" /></div>
+                    <div className="min-w-0">
+                      <p className="caption">Email</p>
+                      <p className="mt-0.5 truncate text-sm font-medium text-foreground">{timelineData.lead.email_raw || timelineData.lead.email_normalized}</p>
+                    </div>
+                  </div>
+                  <div className="glass-card flex items-start gap-3 rounded-[--radius] p-3">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[--radius] border border-border bg-accent/10"><User className="w-4 h-4 text-accent" /></div>
+                    <div className="min-w-0">
+                      <p className="caption">Name</p>
+                      <p className="mt-0.5 truncate text-sm font-medium text-foreground">{`${timelineData.lead.first_name || ""} ${timelineData.lead.last_name || ""}`.trim() || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="glass-card flex items-start gap-3 rounded-[--radius] p-3">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[--radius] border border-border bg-secondary/10"><Shield className="w-4 h-4 text-secondary" /></div>
+                    <div className="min-w-0">
+                      <p className="caption">Status</p>
+                      <Badge variant={timelineData.lead.status === "active" ? "default" : "secondary"} className="mt-0.5">{timelineData.lead.status}</Badge>
+                    </div>
+                  </div>
+                  <div className="glass-card flex items-start gap-3 rounded-[--radius] p-3">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[--radius] border border-border bg-muted"><Clock className="w-4 h-4 text-muted-foreground" /></div>
+                    <div className="min-w-0">
+                      <p className="caption">Unsubscribed</p>
+                      <p className="mt-0.5 font-mono text-xs text-foreground">{formatDateTime(timelineData.lead.unsubscribed_at)}</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Import Events */}
-                <Card className="glass-card border-border/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <FileDown className="w-4 h-4 text-cyan-400" />
+                <div className="glass-card overflow-hidden rounded-[--radius]">
+                  <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                    <span className="aura-microlabel flex items-center gap-2">
+                      <FileDown className="h-3.5 w-3.5" />
                       Import Events
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 pt-0">
+                    </span>
+                  </div>
+                  <div className="space-y-2 p-4">
                     {timelineData.importEvents.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">No import events found.</p>
                     ) : (
                       timelineData.importEvents.map((event) => (
-                        <div key={event.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
-                          <div className="p-1.5 rounded-md bg-cyan-500/10 shrink-0"><FileSpreadsheet className="w-3.5 h-3.5 text-cyan-400" /></div>
+                        <div key={event.id} className="flex items-center gap-3 rounded-[--radius] border border-border bg-surface-2 p-3">
+                          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[--radius] border border-border bg-accent/10"><FileSpreadsheet className="w-3.5 h-3.5 text-accent" /></div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{event.job?.file_name || "—"}</p>
-                            <p className="text-xs text-muted-foreground">{event.job?.source || "—"} · {formatDateTime(event.created_at)}</p>
+                            <p className="text-sm font-medium truncate text-foreground">{event.job?.file_name || "—"}</p>
+                            <p className="font-mono text-xs text-muted-foreground">{event.job?.source || "—"} · {formatDateTime(event.created_at)}</p>
                           </div>
                           <Badge variant="outline" className="shrink-0">{event.result}</Badge>
                         </div>
                       ))
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 {/* Enrollments */}
-                <Card className="glass-card border-border/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-amber-400" />
+                <div className="glass-card overflow-hidden rounded-[--radius]">
+                  <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                    <span className="aura-microlabel flex items-center gap-2">
+                      <BookOpen className="h-3.5 w-3.5" />
                       Enrollments
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 pt-0">
+                    </span>
+                  </div>
+                  <div className="space-y-2 p-4">
                     {timelineData.enrollments.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">No enrollments found.</p>
                     ) : (
                       timelineData.enrollments.map((enrollment) => (
-                        <div key={enrollment.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
-                          <div className="p-1.5 rounded-md bg-amber-500/10 shrink-0"><Send className="w-3.5 h-3.5 text-amber-400" /></div>
+                        <div key={enrollment.id} className="flex items-center gap-3 rounded-[--radius] border border-border bg-surface-2 p-3">
+                          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[--radius] border border-border bg-primary/10"><Send className="w-3.5 h-3.5 text-primary" /></div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{enrollment.campaign_name || enrollment.campaign_id}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-sm font-medium truncate text-foreground">{enrollment.campaign_name || enrollment.campaign_id}</p>
+                            <p className="font-mono text-xs text-muted-foreground">
                               Enrolled {formatDateTime(enrollment.enrolled_at)}
                               {enrollment.last_sent_step ? ` · Last step: ${enrollment.last_sent_step}` : ""}
                             </p>
@@ -2064,46 +2072,46 @@ export default function LeadImportsPage() {
                         </div>
                       ))
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 {/* Scheduled Emails — visual step cards */}
-                <Card className="glass-card border-border/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <CalendarClock className="w-4 h-4 text-green-400" />
+                <div className="glass-card overflow-hidden rounded-[--radius]">
+                  <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                    <span className="aura-microlabel flex items-center gap-2">
+                      <CalendarClock className="h-3.5 w-3.5" />
                       Scheduled Emails
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 pt-0">
+                    </span>
+                  </div>
+                  <div className="space-y-2 p-4">
                     {timelineData.scheduledEmails.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">No scheduled emails found.</p>
                     ) : (
                       timelineData.scheduledEmails.map((item) => {
                         const statusColor =
-                          item.status === "sent" ? "bg-green-500/10 text-green-500 border-green-500/50" :
-                          item.status === "held" ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/50" :
-                          item.status === "pending" ? "bg-blue-500/10 text-blue-500 border-blue-500/50" :
-                          item.status === "failed" ? "bg-red-500/10 text-red-500 border-red-500/50" : "";
+                          item.status === "sent" ? "border-secondary/40 bg-secondary/15 text-secondary" :
+                          item.status === "held" ? "border-[hsl(var(--rating))]/40 bg-[hsl(var(--rating))]/15 text-[hsl(var(--rating))]" :
+                          item.status === "pending" ? "border-primary/40 bg-primary/15 text-primary" :
+                          item.status === "failed" ? "border-destructive/40 bg-destructive/15 text-destructive" : "";
                         return (
-                          <div key={item.id} className="p-3 rounded-lg bg-muted/30 border border-border/30">
+                          <div key={item.id} className="rounded-[--radius] border border-border bg-surface-2 p-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-bold text-primary">
+                              <div className="folio grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm text-primary">
                                 {item.step_order}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <Badge className={statusColor}>{item.status}</Badge>
-                                  <span className="text-xs text-muted-foreground">{item.sender_profile}</span>
+                                  <span className="font-mono text-xs text-muted-foreground">{item.sender_profile}</span>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <p className="font-mono text-xs text-muted-foreground mt-1">
                                   Scheduled: {formatDateTime(item.scheduled_at)}
                                   {item.sent_at ? ` · Sent: ${formatDateTime(item.sent_at)}` : ""}
                                 </p>
                               </div>
                               <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
                                 {item.opened_count > 0 && (
-                                  <span className="flex items-center gap-1 text-green-400">
+                                  <span className="flex items-center gap-1 text-secondary">
                                     <MousePointerClick className="w-3.5 h-3.5" /> {item.opened_count}
                                   </span>
                                 )}
@@ -2115,7 +2123,7 @@ export default function LeadImportsPage() {
                               </div>
                             </div>
                             {item.last_error && (
-                              <div className="mt-2 text-xs text-red-400 bg-red-500/5 rounded px-2 py-1 truncate">
+                              <div className="mt-2 truncate rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">
                                 {item.last_error}
                               </div>
                             )}
@@ -2123,60 +2131,60 @@ export default function LeadImportsPage() {
                         );
                       })
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 {/* Open Events */}
-                <Card className="glass-card border-border/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <MousePointerClick className="w-4 h-4 text-orange-400" />
+                <div className="glass-card overflow-hidden rounded-[--radius]">
+                  <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                    <span className="aura-microlabel flex items-center gap-2">
+                      <MousePointerClick className="h-3.5 w-3.5" />
                       Open Events
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 pt-0">
+                    </span>
+                  </div>
+                  <div className="space-y-2 p-4">
                     {timelineData.openEvents.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">No open events yet.</p>
                     ) : (
                       timelineData.openEvents.map((event) => (
-                        <div key={event.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
-                          <div className="p-1.5 rounded-md bg-orange-500/10 shrink-0"><Eye className="w-3.5 h-3.5 text-orange-400" /></div>
+                        <div key={event.id} className="flex items-center gap-3 rounded-[--radius] border border-border bg-surface-2 p-3">
+                          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[--radius] border border-border bg-secondary/10"><Eye className="w-3.5 h-3.5 text-secondary" /></div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium">{formatDateTime(event.opened_at)}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="font-mono text-xs text-foreground">{formatDateTime(event.opened_at)}</p>
+                            <p className="font-mono text-xs text-muted-foreground">
                               {event.ip_address || "—"} · {event.device_type || "Unknown device"}
                             </p>
                           </div>
                         </div>
                       ))
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                <Card className="glass-card border-border/50">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-base">Email Logs</CardTitle>
+                <div className="glass-card overflow-hidden rounded-[--radius]">
+                  <div className="flex flex-row items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                    <span className="aura-microlabel">Email Logs</span>
                     <Button variant="outline" size="sm" asChild>
                       <Link to={`/dashboard/admin/email-logs?leadId=${timelineData.lead.id}`}>Open Email Logs</Link>
                     </Button>
-                  </CardHeader>
-                  <CardContent className="p-0">
+                  </div>
+                  <div>
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Time</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Subject</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead className="caption">Time</TableHead>
+                          <TableHead className="caption">Type</TableHead>
+                          <TableHead className="caption">Subject</TableHead>
+                          <TableHead className="caption">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {timelineData.emailLogs.map((log) => (
                           <TableRow key={log.id}>
-                            <TableCell className="text-xs">{formatDateTime(log.created_at)}</TableCell>
-                            <TableCell>{log.email_type}</TableCell>
-                            <TableCell className="max-w-[340px] truncate">{log.subject}</TableCell>
-                            <TableCell>{log.status}</TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{formatDateTime(log.created_at)}</TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{log.email_type}</TableCell>
+                            <TableCell className="max-w-[340px] truncate text-sm">{log.subject}</TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{log.status}</TableCell>
                           </TableRow>
                         ))}
                         {timelineData.emailLogs.length === 0 && (
@@ -2188,8 +2196,8 @@ export default function LeadImportsPage() {
                         )}
                       </TableBody>
                     </Table>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </>
             ) : (
               <div className="py-12 text-center text-muted-foreground">No timeline data found.</div>

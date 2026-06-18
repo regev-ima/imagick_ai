@@ -40,11 +40,11 @@ export function SimilarImagesGrid({
             onImageClick(img.id);
           }}
           className={cn(
-            "relative aspect-square rounded-md overflow-hidden transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+            "relative aspect-square rounded-sm overflow-hidden transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
             img.id === currentImageId
-              ? "ring-1 ring-primary/60 shadow-[0_0_8px_-1px_hsl(var(--primary)/0.4)] opacity-60"
-              : "border border-transparent hover:border-primary/40"
+              ? "ring-2 ring-primary shadow-[0_0_8px_-1px_hsl(var(--primary)/0.45)] opacity-60"
+              : "border border-border/40 hover:border-primary/40"
           )}
         >
           <img
@@ -55,14 +55,14 @@ export function SimilarImagesGrid({
           />
           {/* Score badge */}
           {img.culling_score !== null && (
-            <div className="absolute bottom-0.5 right-0.5 text-[10px] bg-background/80 backdrop-blur-sm px-1 rounded">
+            <div className="absolute bottom-0.5 right-0.5 font-mono text-[10px] bg-black/70 backdrop-blur-sm px-1 rounded-sm tabular-nums text-white/90">
               {Math.round(img.culling_score * 100)}%
             </div>
           )}
         </button>
       ))}
       {remaining > 0 && (
-        <div className="aspect-square rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground">
+        <div className="aspect-square rounded-sm surface-2 border border-border/60 flex items-center justify-center font-mono text-xs text-muted-foreground folio">
           +{remaining}
         </div>
       )}

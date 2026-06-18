@@ -28,7 +28,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { BuildVersionBadge } from "@/components/layout/BuildVersionBadge";
 import { Orb } from "@/components/aura/Orb";
-import { AuraBackground } from "@/components/aura/AuraBackground";
 import { AuraCommand, openAuraCommand } from "@/components/aura/AuraCommand";
 import imagickLogoDark from "@/assets/imagick-logo.png";
 import imagickIconDark from "@/assets/imagick-icon.png";
@@ -92,15 +91,15 @@ export default function DashboardLayout() {
 
   return (
     <div className="relative h-screen overflow-hidden bg-background">
-      {/* Single full-bleed ambient wash for the whole app — edge to edge,
-          behind every screen, so the background is uniform and never clipped
-          to the centered content column. */}
-      <AuraBackground />
+      {/* Lightroom: neutral graphite canvas, no ambient glow. */}
       <AuraCommand />
-      {/* ── Desktop floating pill rail ─────────────────────────────── */}
+      {/* ── Desktop floating pill rail — hidden inside the gallery editor so
+          the workspace becomes a true focus mode (no global nav to slip out
+          through, and nothing floating over the loupe). ───────────────── */}
+      {!isGalleryEditor && (
       <TooltipProvider delayDuration={0}>
         <aside className="fixed left-3 top-1/2 z-40 hidden -translate-y-1/2 lg:flex">
-          <div className="flex max-h-[calc(100vh-1.5rem)] flex-col items-center gap-1.5 rounded-[28px] border border-border/60 bg-sidebar/80 px-2 py-3 backdrop-blur-xl shadow-[inset_0_1px_0_hsl(0_0%_100%/0.06),0_30px_70px_-30px_hsl(var(--background))]">
+          <div className="flex max-h-[calc(100vh-1.5rem)] flex-col items-center gap-1.5 rounded-[22px] border border-sidebar-border bg-sidebar px-2 py-3 shadow-[var(--elevation-2)]">
             {/* Brand */}
             <Link to="/dashboard" className="mb-1 grid h-11 w-11 place-items-center rounded-2xl transition-colors hover:bg-sidebar-accent" aria-label="Dashboard home">
               <img src={imagickIcon} alt="Imagick.ai" className="h-7 w-7 object-contain" />
@@ -115,10 +114,11 @@ export default function DashboardLayout() {
                     <Link
                       to={item.href}
                       aria-label={item.label}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "grid h-11 w-11 place-items-center rounded-2xl transition-[background-color,color,box-shadow] duration-200",
+                        "relative grid h-11 w-11 place-items-center rounded-2xl transition-[background-color,color,box-shadow,transform] duration-200 active:scale-95",
                         active
-                          ? "bg-primary/15 text-primary shadow-[0_0_22px_-6px_hsl(var(--glow-primary)/0.8)]"
+                          ? "bg-primary text-primary-foreground shadow-[0_2px_10px_-2px_hsl(var(--primary)/0.55)]"
                           : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                       )}
                     >
@@ -178,6 +178,7 @@ export default function DashboardLayout() {
           </div>
         </aside>
       </TooltipProvider>
+      )}
 
       {/* ── Mobile overlay + sheet ─────────────────────────────────── */}
       <AnimatePresence>
@@ -218,10 +219,11 @@ export default function DashboardLayout() {
                     key={item.href}
                     to={item.href}
                     onClick={() => setMobileMenuOpen(false)}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
                       "flex items-center gap-3 rounded-full px-3.5 py-2.5 transition-all",
                       active
-                        ? "bg-primary/10 text-primary shadow-[inset_0_1px_0_hsl(0_0%_100%/0.06),0_0_24px_-8px_hsl(var(--glow-primary)/0.6)]"
+                        ? "border-l-2 border-primary bg-primary/15 text-accent"
                         : "text-sidebar-foreground hover:bg-sidebar-accent",
                     )}
                   >
@@ -241,7 +243,7 @@ export default function DashboardLayout() {
                 </div>
                 {!isUnlimited && (
                   <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]" style={{ width: `${editsTotal > 0 ? Math.min(100, (editsRemaining / editsTotal) * 100) : 0}%` }} />
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${editsTotal > 0 ? Math.min(100, (editsRemaining / editsTotal) * 100) : 0}%` }} />
                   </div>
                 )}
               </div>
@@ -251,7 +253,7 @@ export default function DashboardLayout() {
                   <span className="font-medium text-foreground">{(storageUsedMb / 1024).toFixed(1)} GB / {maxStorageGb} GB</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-[image:var(--gradient-primary)] shadow-[0_0_10px_hsl(var(--glow-primary)/0.5)]" style={{ width: `${maxStorageGb > 0 ? Math.min(100, (storageUsedMb / 1024 / maxStorageGb) * 100) : 0}%` }} />
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${maxStorageGb > 0 ? Math.min(100, (storageUsedMb / 1024 / maxStorageGb) * 100) : 0}%` }} />
                 </div>
               </div>
               {isFreePlan && (
@@ -285,11 +287,15 @@ export default function DashboardLayout() {
           edge to edge, the rail floats over the left, and only the inner
           content is inset to clear it. Sits above the ambient wash. ─── */}
       <div className="relative z-10 flex h-screen flex-col">
+        {!isGalleryEditor && (
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 px-4 glass-card lg:pl-[92px] lg:pr-6">
-          <div className="flex min-w-0 flex-1 items-center gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileMenuOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
+            <Link to="/dashboard" aria-label="Imagick.ai home" className="shrink-0">
+              <img src={imagickLogo} alt="Imagick.ai" className="h-8 w-auto object-contain" />
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -321,6 +327,7 @@ export default function DashboardLayout() {
             </DropdownMenu>
           </div>
         </header>
+        )}
 
         {isImpersonating && targetUser && (
           <div className="border-b border-amber-500/30 bg-amber-500/10">

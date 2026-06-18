@@ -99,13 +99,14 @@ export default function BrandingManagement() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/dashboard/admin"><ArrowLeft className="w-5 h-5" /></Link>
+          <Link to="/dashboard/admin" aria-label="Back to admin"><ArrowLeft className="w-5 h-5" /></Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Branding</h1>
+          <span className="caption">Brand assets</span>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Branding</h1>
           <p className="text-muted-foreground mt-1">
             Upload custom logos for dark and light modes
           </p>
@@ -118,17 +119,17 @@ export default function BrandingManagement() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className="glass-card border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {theme === "dark" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+          <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
+            <CardHeader className="border-b border-border bg-background/40 px-4 py-2.5">
+              <CardTitle className="aura-microlabel flex items-center gap-2 text-muted-foreground">
+                {theme === "dark" ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
                 {theme === "dark" ? "Dark Mode Logos" : "Light Mode Logos"}
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs">
                 These logos appear in the sidebar navigation
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-5">
               <div className="grid sm:grid-cols-2 gap-6">
                 {logoSlots.filter(s => s.theme === theme).map((slot) => {
                   const currentUrl = settings[slot.key];
@@ -142,8 +143,8 @@ export default function BrandingManagement() {
                       </div>
 
                       <div className={`
-                        relative flex items-center justify-center rounded-xl border-2 border-dashed border-border/50
-                        ${theme === "dark" ? "bg-[#0a0a0a]" : "bg-white"}
+                        relative flex items-center justify-center rounded-[--radius] border border-dashed border-border
+                        ${theme === "dark" ? "bg-[hsl(228_8%_7%)]" : "bg-white"}
                         ${slot.variant === "full" ? "h-24 px-6" : "h-24 w-24"}
                         overflow-hidden
                       `}>

@@ -5,30 +5,20 @@ import {
   ArrowLeft,
   Rows3,
   Grid3X3,
-  Filter,
   Download,
   Trash2,
   Star,
-  Sparkles,
-  Share2,
-  Settings,
   Check,
   X,
   ChevronLeft,
   ChevronRight,
   Heart,
-  Copy,
-  ExternalLink,
-  ZoomIn,
   Loader2,
   Images,
-  Wand2,
   ImageIcon,
   RotateCcw,
   Info,
   Eye,
-  Layers,
-  
   ArrowUpDown,
   CheckSquare,
   MoreHorizontal,
@@ -42,7 +32,6 @@ import { cullingScoreToStars } from "@/lib/cullingScore";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
 import { CullingScoreModeToggle } from "@/components/gallery/CullingScoreModeToggle";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -67,15 +56,13 @@ import { AICullingModal } from "@/components/gallery/AICullingModal";
 import { GallerySettingsModal } from "@/components/gallery/GallerySettingsModal";
 import { FilterOptions, defaultFilters } from "@/components/gallery/filter-types";
 import { ShareGalleryModal } from "@/components/gallery/ShareGalleryModal";
-import { StyleSelector, StyleComparison } from "@/components/gallery/StyleSelector";
+import { StyleComparison } from "@/components/gallery/StyleSelector";
 import { ImageCard } from "@/components/gallery/ImageCard";
 import { FailedImagesProvider } from "@/components/gallery/FailedImagesContext";
 import { ProblemImagesSection } from "@/components/gallery/ProblemImagesSection";
 import { VirtualizedImageGrid } from "@/components/gallery/VirtualizedImageGrid";
 import { CullingStatusBanner } from "@/components/gallery/CullingStatusBanner";
-import { CatalogModeSelector, CatalogMode } from "@/components/gallery/CatalogModeSelector";
-import { CatalogSection } from "@/components/gallery/CatalogSection";
-import { GroupingView } from "@/components/gallery/GroupingView";
+import { type CatalogMode } from "@/components/gallery/CatalogModeSelector";
 import { FaceGallery } from "@/components/gallery/FaceGallery";
 import { FaceClusterImages } from "@/components/gallery/FaceClusterImages";
 import { useFaceSearch } from "@/hooks/useFaceSearch";
@@ -90,11 +77,23 @@ import { useEffectiveUser } from "@/hooks/useImpersonation";
 import { useImageProcessing } from "@/hooks/useImageProcessing";
 import { getThumbnailUrl, getPreviewUrl, getEditedThumbnailUrl, getEditedPreviewUrl } from "@/lib/imageUrls";
 import { stuckThresholdMs } from "@/lib/cullingEta";
-import { useJustifiedLayout, computeJustifiedLayout } from "@/hooks/useJustifiedLayout";
+import { useJustifiedLayout } from "@/hooks/useJustifiedLayout";
 import { useImageDimensions } from "@/hooks/useImageDimensions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
+import { Orb } from "@/components/aura/Orb";
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 export default function GalleryEditorPage() {
   const { id } = useParams();
@@ -155,6 +154,12 @@ export default function GalleryEditorPage() {
   const [showTrash, setShowTrash] = useState(false);
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState<string | null>(null);
+
+  // Reset the bulk-delete confirm whenever the selection changes so a
+  // stale "Trash N?" prompt can never fire against a different set.
+  useEffect(() => { setConfirmBulkDelete(false); }, [selectedImages]);
 
   // Persist view preferences to localStorage
   useEffect(() => { localStorage.setItem("imagick-gallery-view-mode", viewMode); }, [viewMode]);
@@ -871,73 +876,6 @@ export default function GalleryEditorPage() {
     });
     return { loose: loose.size, medium: medium.size, strict: strict.size };
   }, [images]);
-  const groupedByStars = useMemo(() => {
-    if (catalogMode !== "stars") return null;
-    const groups: Record<number, typeof images> = {};
-    for (let stars = 5; stars >= 1; stars--) {
-      groups[stars] = filteredImages.filter(img => {
-        const rating = cullingScoreToStars((img as any).culling_score, cullingScoreMode) || 1;
-        return rating === stars;
-      });
-    }
-    return groups;
-  }, [filteredImages, catalogMode]);
-
-  // Normalize label for grouping
-  const normalizeLabel = useCallback((label: string): string => {
-    if (!label || label === "N/A" || label === "none") return "Uncategorized";
-    if (label.length > 40) {
-      const words = label.split(' ').slice(0, 4);
-      return words.join(' ') + '...';
-    }
-    return label.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  }, []);
-
-  // Group images by category (for catalog mode)
-  const groupedByCategory = useMemo(() => {
-    if (catalogMode !== "categories") return null;
-    const groups: Record<string, typeof images> = {};
-    filteredImages.forEach(img => {
-      const label = normalizeLabel((img as any).culling_label || "Uncategorized");
-      if (!groups[label]) groups[label] = [];
-      groups[label].push(img);
-    });
-    // Sort by count descending
-    return Object.fromEntries(
-      Object.entries(groups).sort((a, b) => b[1].length - a[1].length)
-    );
-  }, [filteredImages, catalogMode, normalizeLabel]);
-
-  // Justified layout per catalog group (stars/categories)
-  const catalogJustifiedSizes = useMemo(() => {
-    if (viewMode !== "masonry" || !containerWidth) return new Map<string, { width: number; height: number }>();
-
-    const enrichImage = (img: typeof images[0]) => {
-      if (img.width && img.height) return img;
-      const detected = detectedDimensions.get(img.id);
-      if (detected) return { ...img, width: detected.width, height: detected.height };
-      return img;
-    };
-
-    const combined = new Map<string, { width: number; height: number }>();
-
-    if (catalogMode === "stars" && groupedByStars) {
-      for (const stars of [5, 4, 3, 2, 1]) {
-        const group = (groupedByStars[stars] || []).map(enrichImage);
-        const sizes = computeJustifiedLayout(group, containerWidth, 160, 2);
-        sizes.forEach((v, k) => combined.set(k, v));
-      }
-    } else if (catalogMode === "categories" && groupedByCategory) {
-      for (const categoryImages of Object.values(groupedByCategory)) {
-        const group = categoryImages.map(enrichImage);
-        const sizes = computeJustifiedLayout(group, containerWidth, 160, 2);
-        sizes.forEach((v, k) => combined.set(k, v));
-      }
-    }
-
-    return combined;
-  }, [viewMode, containerWidth, catalogMode, groupedByStars, groupedByCategory, detectedDimensions]);
-
 
   const getSimilarImages = useCallback((imageId: string) => {
     const image = images.find(img => img.id === imageId);
@@ -1352,6 +1290,23 @@ export default function GalleryEditorPage() {
     setLastSelectedIndex(null);
   };
 
+  // Escape from a non-default catalog mode (e.g. Faces) back to the
+  // default gallery view, so a user is never stuck. The lightbox's own
+  // Escape handler takes priority when the loupe is open, so this only
+  // runs while the loupe is closed.
+  useEffect(() => {
+    if (catalogMode === "default" || lightboxImage) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+      setSelectedFaceCluster(null);
+      setCatalogMode("default");
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [catalogMode, lightboxImage]);
+
   const copyClientLink = () => {
     if (gallery?.client_link) {
       const url = `${window.location.origin}/gallery/${gallery.client_link}`;
@@ -1586,25 +1541,42 @@ export default function GalleryEditorPage() {
   return (
    <FailedImagesProvider>
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Compact Single-Row Header */}
-      <div 
-        className="border-b border-border/50 glass-card sticky top-0 z-20 cursor-pointer md:cursor-default"
-        onClick={() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
-      >
+      {/* Compact Single-Row Header — module bar */}
+      <div className="border-b border-border glass-card sticky top-0 z-20">
         <div className="px-3 py-2 flex items-center gap-2">
           {/* Left: Back + Name + Count */}
           <div className="flex items-center gap-2 min-w-0 shrink-0">
-            <Button variant="ghost" size="icon" className="w-8 h-8" asChild>
-              <Link to="/dashboard/galleries">
+            {catalogMode !== "default" ? (
+              // In a non-default catalog mode (e.g. Faces): the back arrow
+              // returns to the default gallery view rather than leaving the
+              // page, so the user is never stuck inside the mode.
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-8 h-8"
+                aria-label="Back to gallery"
+                onClick={(e) => { e.stopPropagation(); setSelectedFaceCluster(null); setCatalogMode("default"); }}
+              >
                 <ArrowLeft className="w-4 h-4" />
-              </Link>
-            </Button>
-            <h1 className="font-display text-sm font-semibold truncate max-w-[200px]">
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" className="w-8 h-8" asChild>
+                <Link to="/dashboard/galleries">
+                  <ArrowLeft className="w-4 h-4" />
+                </Link>
+              </Button>
+            )}
+            <Sparkle size={13} className="text-primary shrink-0" />
+            {/* Title doubles as a scroll-to-top affordance — the gesture is
+                scoped here instead of the whole bar so the inner buttons
+                behave predictably. */}
+            <h1
+              className="font-display text-sm font-semibold truncate max-w-[200px] cursor-pointer"
+              onClick={() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+              title="Scroll to top"
+            >
               {gallery.name}
             </h1>
-            <span className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
-              {gallery.total_images}
-            </span>
           </div>
 
           {/* Right: Sort, View Mode, Count */}
@@ -1674,13 +1646,13 @@ export default function GalleryEditorPage() {
               </Tooltip>
             )}
 
-            {/* View Mode */}
-            <div className="flex items-center rounded-full border border-border/60 bg-card/40 p-0.5 ml-0.5 gap-0.5">
+            {/* View Mode — density toggle */}
+            <div className="flex items-center rounded-sm border border-border bg-surface-2 p-0.5 ml-0.5 gap-0.5">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     className={cn(
-                      "w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150",
+                      "w-7 h-7 rounded-sm flex items-center justify-center transition-colors duration-150",
                       viewMode === "masonry"
                         ? "bg-primary/20 text-primary ring-1 ring-primary/60"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -1696,7 +1668,7 @@ export default function GalleryEditorPage() {
                 <TooltipTrigger asChild>
                   <button
                     className={cn(
-                      "w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150",
+                      "w-7 h-7 rounded-sm flex items-center justify-center transition-colors duration-150",
                       viewMode === "grid"
                         ? "bg-primary/20 text-primary ring-1 ring-primary/60"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -1711,9 +1683,13 @@ export default function GalleryEditorPage() {
             </div>
             </TooltipProvider>
 
-            {/* Image count */}
-            <span className="text-[11px] text-muted-foreground hidden sm:inline ml-1">
-              {hasActiveFilters ? `${filteredImages.length.toLocaleString()}/${(gallery?.total_images || images.length).toLocaleString()}` : `${(gallery?.total_images || images.length).toLocaleString()}`}
+            {/* Image count — mono readout */}
+            <span className="font-mono text-[11px] text-muted-foreground hidden sm:inline ml-1 tabular-nums">
+              {hasActiveFilters ? (
+                <><span className="text-foreground folio">{filteredImages.length.toLocaleString()}</span>/{(gallery?.total_images || images.length).toLocaleString()}</>
+              ) : (
+                <span className="text-foreground folio">{(gallery?.total_images || images.length).toLocaleString()}</span>
+              )}
             </span>
 
             {/* Trash toggle */}
@@ -1763,7 +1739,7 @@ export default function GalleryEditorPage() {
             exit={{ y: 50, opacity: 0 }}
             className="fixed bottom-20 left-0 right-0 z-30 flex justify-center px-4 pointer-events-none"
           >
-            <div className="pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-2xl glass-card border border-primary/20 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.3)] text-sm max-w-lg w-full">
+            <div className="pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-[--radius] glass-card border border-primary/25 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.3)] text-sm max-w-lg w-full">
               {gallery.status === "transferring" && (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
@@ -1813,7 +1789,7 @@ export default function GalleryEditorPage() {
                 return (
                   <>
                     {processingStalled ? (
-                      <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
+                      <AlertTriangle className="w-4 h-4 text-rating shrink-0" />
                     ) : isAutoRetrying ? (
                       <RotateCcw className="w-4 h-4 animate-spin text-rating shrink-0" />
                     ) : (
@@ -1858,20 +1834,34 @@ export default function GalleryEditorPage() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-6 left-0 right-0 z-30 flex justify-center px-4"
           >
-            <div className="flex items-center gap-2 px-4 py-3 rounded-2xl glass-card border border-border/50 shadow-xl">
-              <span className="text-sm font-medium mr-2">{selectedImages.length} selected</span>
-              <Button 
-                variant="outline" 
-                size="sm" 
+            <div className="flex items-center gap-2 px-4 py-3 rounded-[--radius] glass-card border border-border shadow-[var(--elevation-3)]">
+              <span className="aura-chip">
+                <span className="aura-led aura-led-pulse" />
+                <span className="folio text-foreground">{selectedImages.length}</span> selected
+              </span>
+
+              {/* High-frequency actions — always visible */}
+              <Button
+                variant="glow"
+                size="sm"
                 className="gap-1.5"
-                onClick={selectAll}
+                onClick={() => setShowReEditModal(true)}
               >
-                <CheckSquare className="w-4 h-4" />
-                Select All
+                <Sparkle size={14} className="text-current" />
+                Re-edit
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleDownload}
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 className="gap-1.5"
                 onClick={async () => {
                   const { error } = await supabase
@@ -1887,70 +1877,100 @@ export default function GalleryEditorPage() {
                 <Heart className="w-4 h-4" />
                 Like
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1.5"
-                disabled={selectedImages.length !== 1}
-                onClick={() => setHeroImage.mutate(selectedImages[0])}
-              >
-                <Star className="w-4 h-4" />
-                Hero
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1.5"
-                onClick={() => setShowReEditModal(true)}
-              >
-                <Sparkles className="w-4 h-4" />
-                Re-edit
-              </Button>
+
+              {/* Lower-frequency actions — overflow menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1.5">
-                    <Tag className="w-4 h-4" />
-                    Category
+                    <MoreHorizontal className="w-4 h-4" />
+                    More
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center">
+                  <DropdownMenuItem onClick={selectAll}>
+                    <CheckSquare className="w-4 h-4 mr-2" />
+                    Select All
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={selectedImages.length !== 1}
+                    onClick={() => setHeroImage.mutate(selectedImages[0])}
+                  >
+                    <Star className="w-4 h-4 mr-2" />
+                    Set Hero
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   {availableLabels.map((item) => (
                     <DropdownMenuItem
                       key={item.label}
                       onClick={() => updateImageCategory.mutate({ imageIds: selectedImages, label: item.label })}
                     >
+                      <Tag className="w-4 h-4 mr-2" />
                       {item.label}
                     </DropdownMenuItem>
                   ))}
-                  {availableLabels.length > 0 && <DropdownMenuSeparator />}
                   <DropdownMenuItem
-                    onClick={() => {
-                      const label = prompt("Enter new category name:");
-                      if (label?.trim()) {
-                        updateImageCategory.mutate({ imageIds: selectedImages, label: label.trim() });
-                      }
-                    }}
+                    onSelect={(e) => { e.preventDefault(); setNewCategoryInput(""); }}
                   >
+                    <Tag className="w-4 h-4 mr-2" />
                     + New Category
                   </DropdownMenuItem>
+                  {newCategoryInput !== null && (
+                    <div className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={newCategoryInput}
+                        onChange={(e) => setNewCategoryInput(e.target.value)}
+                        placeholder="New category name..."
+                        autoFocus
+                        className="w-full px-2 py-1 text-xs rounded-md bg-white/[0.03] border border-white/[0.08] outline-none focus:border-primary/50 transition-colors"
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter" && newCategoryInput.trim()) {
+                            updateImageCategory.mutate({ imageIds: selectedImages, label: newCategoryInput.trim() });
+                            setNewCategoryInput(null);
+                          }
+                          if (e.key === "Escape") setNewCategoryInput(null);
+                        }}
+                      />
+                    </div>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={handleDownload}
-              >
-                <Download className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1.5 text-destructive hover:text-destructive"
-                onClick={() => softDeleteImages.mutate(selectedImages)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+
+              {/* Destructive zone — visually separated, labelled, two-step confirm */}
+              <div className="h-6 w-px bg-border/60 mx-0.5" aria-hidden />
+              {confirmBulkDelete ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-destructive hover:text-destructive border-destructive/30"
+                    onClick={() => { softDeleteImages.mutate(selectedImages); setConfirmBulkDelete(false); }}
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Trash {selectedImages.length}?
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setConfirmBulkDelete(false)}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => setConfirmBulkDelete(true)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Trash
+                </Button>
+              )}
+
               <Button variant="ghost" size="icon" className="w-8 h-8" onClick={clearSelection}>
                 <X className="w-4 h-4" />
               </Button>
@@ -1985,13 +2005,13 @@ export default function GalleryEditorPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-sm bg-destructive/10 border border-destructive/20 flex items-center justify-center">
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Recycle Bin</h3>
                   <p className="text-xs text-muted-foreground">
-                    {trashedImages.length} image{trashedImages.length !== 1 ? "s" : ""} — auto-deleted after 30 days
+                    <span className="folio">{trashedImages.length}</span> image{trashedImages.length !== 1 ? "s" : ""} — auto-deleted after 30 days
                   </p>
                 </div>
               </div>
@@ -2057,14 +2077,14 @@ export default function GalleryEditorPage() {
                     ? Math.max(0, 30 - Math.floor((Date.now() - new Date(img.deleted_at).getTime()) / (1000 * 60 * 60 * 24)))
                     : 30;
                   return (
-                    <div key={img.id} className="relative group rounded-lg overflow-hidden border border-border/50 aspect-square">
+                    <div key={img.id} className="relative group rounded-sm overflow-hidden border border-border/60 aspect-square plate-keyline">
                       <img
                         src={img.original_url}
                         alt={img.filename}
                         className="w-full h-full object-cover opacity-60 grayscale"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <span className="absolute top-1 left-1 text-[9px] bg-black/60 text-white/70 px-1.5 py-0.5 rounded-full tabular-nums">
+                      <span className="absolute top-1 left-1 font-mono text-[9px] bg-black/60 text-white/70 px-1.5 py-0.5 rounded-sm tabular-nums">
                         {daysLeft}d
                       </span>
                       <div className="absolute bottom-0 inset-x-0 flex gap-0.5 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2109,7 +2129,7 @@ export default function GalleryEditorPage() {
               </div>
             )}
 
-            <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-400 flex items-start gap-2">
+            <div className="rounded-sm bg-rating/10 border border-rating/20 px-3 py-2 text-xs text-rating flex items-start gap-2">
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
               <span>Images in the recycle bin still count toward your storage quota. Empty the trash to free up space.</span>
             </div>
@@ -2124,25 +2144,14 @@ export default function GalleryEditorPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.4 }}
-              className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center gap-4"
+              className="mb-4 rounded-[--radius] border border-primary/25 bg-primary/[0.06] aura-ai-border p-4 flex items-center gap-4"
             >
-              <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0">
-                <BackgroundGradientAnimation
-                  gradientBackgroundStart="rgb(15, 5, 25)"
-                  gradientBackgroundEnd="rgb(5, 10, 40)"
-                  firstColor="232, 92, 155"
-                  secondColor="155, 90, 212"
-                  thirdColor="100, 180, 255"
-                  fourthColor="200, 50, 120"
-                  fifthColor="120, 80, 200"
-                  pointerColor="232, 92, 155"
-                  size="150%"
-                  interactive={false}
-                  containerClassName="w-full h-full"
-                />
-              </div>
+              <Orb className="w-10 h-10 shrink-0" />
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">AI is editing your images</h3>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Sparkle size={14} className="text-primary" />
+                  Aura is editing your images
+                </h3>
                 <p className="text-muted-foreground text-xs">
                   This usually takes a minute or two — your originals are shown below
                 </p>
@@ -2213,138 +2222,6 @@ export default function GalleryEditorPage() {
               isStarting={isFaceDetectionRunning}
             />
           )
-        ) : catalogMode === "grouping" ? (
-          // Grouping View - Special layout for similarity groups
-          <GroupingView
-            images={filteredImages.map(img => ({
-              id: img.id,
-              original_url: img.original_url,
-              culling_score: (img as any).culling_score ?? null,
-              similarity_group_1: (img as any).similarity_group_1 ?? null,
-              similarity_group_2: (img as any).similarity_group_2 ?? null,
-              similarity_group_3: (img as any).similarity_group_3 ?? null,
-            }))}
-            onImageClick={openLightbox}
-            onSelectionToggle={handleSelectionToggle}
-            selectedImages={selectedImages}
-          />
-        ) : catalogMode === "stars" && groupedByStars ? (
-          // Stars catalog view
-          <div className="space-y-2">
-            {[5, 4, 3, 2, 1].map(stars => {
-              const starImages = groupedByStars[stars] || [];
-              if (starImages.length === 0) return null;
-              return (
-                <CatalogSection
-                  key={stars}
-                  title={`${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`}
-                  count={starImages.length}
-                  icon={<Star className={cn("w-4 h-4", stars >= 4 ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} />}
-                  defaultExpanded={stars >= 4}
-                >
-                  <div className={cn(
-                    "gap-0.5",
-                    viewMode === "masonry" 
-                      ? "flex flex-wrap" 
-                      : "grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
-                  )}>
-                    {starImages.map((image, index) => {
-                      const computed = catalogJustifiedSizes.get(image.id);
-                      return (
-                      <ImageCard
-                        key={image.id}
-                        image={{
-                          id: image.id,
-                          filename: image.filename,
-                          original_url: image.original_url,
-                          is_hero: image.is_hero,
-                          is_liked: image.is_liked,
-                          ai_rating: image.ai_rating,
-                          culling_score: (image as any).culling_score,
-                          width: image.width,
-                          height: image.height
-                        }}
-                        index={index}
-                        thumbnailUrl={getImageThumbnail(image)}
-                        viewMode={viewMode}
-                        isSelected={selectedImages.includes(image.id)}
-                        computedWidth={computed?.width}
-                        computedHeight={computed?.height}
-                        status={image.status}
-                        onImageClick={handleImageClick}
-                        onSelectionToggle={handleSelectionToggle}
-                        onOpenLightbox={openLightbox}
-                        onToggleLike={(id) => toggleLike.mutate(id)}
-                        processingInfo={canViewAnalytics ? {
-                          sentAt: image.last_processing_attempt_at || null,
-                          completedAt: image.processing_completed_at || null,
-                          attempts: image.processing_attempts || 0,
-                          error: image.status === "error" ? image.last_processing_error || null : null,
-                        } : undefined}
-                      />
-                      );
-                    })}
-                  </div>
-                </CatalogSection>
-              );
-            })}
-          </div>
-        ) : catalogMode === "categories" && groupedByCategory ? (
-          // Categories catalog view
-          <div className="space-y-2">
-            {Object.entries(groupedByCategory).map(([category, categoryImages]) => (
-              <CatalogSection
-                key={category}
-                title={category}
-                count={categoryImages.length}
-                defaultExpanded={categoryImages.length <= 20}
-              >
-                <div className={cn(
-                  "gap-0.5",
-                  viewMode === "masonry" 
-                    ? "flex flex-wrap" 
-                    : "grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
-                )}>
-                  {categoryImages.map((image, index) => {
-                    const computed = catalogJustifiedSizes.get(image.id);
-                    return (
-                    <ImageCard
-                      key={image.id}
-                      image={{
-                        id: image.id,
-                        filename: image.filename,
-                        original_url: image.original_url,
-                        is_hero: image.is_hero,
-                        is_liked: image.is_liked,
-                        ai_rating: image.ai_rating,
-                        culling_score: (image as any).culling_score,
-                        width: image.width,
-                        height: image.height
-                      }}
-                      index={index}
-                      thumbnailUrl={getImageThumbnail(image)}
-                      viewMode={viewMode}
-                      isSelected={selectedImages.includes(image.id)}
-                      computedWidth={computed?.width}
-                      computedHeight={computed?.height}
-                      status={image.status}
-                      onImageClick={handleImageClick}
-                      onSelectionToggle={handleSelectionToggle}
-                      onOpenLightbox={openLightbox}
-                      onToggleLike={(id) => toggleLike.mutate(id)}
-                      processingInfo={canViewAnalytics ? {
-                        sentAt: image.last_processing_attempt_at || null,
-                        completedAt: image.processing_completed_at || null,
-                        attempts: image.processing_attempts || 0,
-                        error: image.status === "error" ? image.last_processing_error || null : null,
-                      } : undefined}
-                    />
-                    );
-                  })}
-                </div>
-              </CatalogSection>
-            ))}
-          </div>
         ) : (
           // Default grid / masonry view
           (() => {
@@ -2565,21 +2442,29 @@ export default function GalleryEditorPage() {
             <div className="flex-1 flex flex-col relative min-w-0">
               {/* Top Bar - static, above image */}
               <div
-                className="relative z-20 flex items-center justify-between px-4 h-14 shrink-0 bg-background/60 backdrop-blur-sm border-b border-border/30"
+                className="relative z-20 flex items-center gap-2 px-3 sm:px-4 h-14 shrink-0 bg-background/60 backdrop-blur-sm border-b border-border/30"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Left: Close */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={closeLightbox}
-                >
-                  <X className="w-6 h-6" />
-                </Button>
+                {/* Left zone: Close + filename (truncates; can't collide with the centered toggle) */}
+                <div className="flex flex-1 items-center gap-2 min-w-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={closeLightbox}
+                    className="shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                  {currentDetailsImage && (
+                    <span dir="ltr" className="caption truncate min-w-0 text-left" title={currentDetailsImage.filename}>
+                      {currentDetailsImage.filename}
+                    </span>
+                  )}
+                </div>
 
-                {/* Center: Compare Mode Toggle */}
+                {/* Center zone: Compare Mode Toggle (shrink-0; the two flex-1 side zones keep it centered) */}
                 {galleryStylesData.length > 0 && (
-                  <div className="absolute left-1/2 -translate-x-1/2 flex items-center bg-muted/50 rounded-lg p-0.5 gap-0.5">
+                  <div className="shrink-0 flex items-center surface-2 border border-border rounded-sm p-0.5 gap-0.5">
                     <TooltipProvider>
                       {!isMobile && (
                       <Tooltip>
@@ -2587,7 +2472,7 @@ export default function GalleryEditorPage() {
                           <button
                             onClick={() => setCompareMode("slider")}
                             className={cn(
-                              "p-1.5 rounded-md transition-colors text-xs font-medium",
+                              "p-1.5 rounded-sm transition-colors text-xs font-medium",
                               compareMode === "slider" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                             )}
                           >
@@ -2602,7 +2487,7 @@ export default function GalleryEditorPage() {
                           <button
                             onClick={() => setCompareMode("edited")}
                             className={cn(
-                              "p-1.5 rounded-md transition-colors text-xs font-medium",
+                              "p-1.5 rounded-sm transition-colors text-xs font-medium",
                               compareMode === "edited" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                             )}
                           >
@@ -2616,7 +2501,7 @@ export default function GalleryEditorPage() {
                           <button
                             onClick={() => setCompareMode("side-by-side")}
                             className={cn(
-                              "p-1.5 rounded-md transition-colors text-xs font-medium",
+                              "p-1.5 rounded-sm transition-colors text-xs font-medium",
                               compareMode === "side-by-side" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                             )}
                           >
@@ -2629,12 +2514,31 @@ export default function GalleryEditorPage() {
                   </div>
                 )}
 
-                {/* Right: Info */}
-                <div className="flex items-center gap-2">
+                {/* Right zone: position · rating · info */}
+                <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
+                  {currentDetailsImage && (() => {
+                    const stars = cullingScoreToStars((currentDetailsImage as any).culling_score, cullingScoreMode) || currentDetailsImage.ai_rating || 0;
+                    const total = filteredImages.length;
+                    const position = currentLightboxIndex >= 0 ? currentLightboxIndex + 1 : 1;
+                    return (
+                      <div className="hidden sm:flex items-center gap-2 shrink-0">
+                        <span className="aura-chip tabular-nums">
+                          <span className="folio text-foreground">{position}</span>/{total}
+                        </span>
+                        {stars > 0 && (
+                          <span className="aura-chip tabular-nums">
+                            <Star className="w-3 h-3 text-rating fill-rating" />
+                            {stars}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setShowDetailsPanel(!showDetailsPanel)}
+                    className="shrink-0"
                   >
                     <Info className="w-5 h-5" />
                   </Button>
@@ -2762,10 +2666,10 @@ export default function GalleryEditorPage() {
                                 <button
                                   key={style.id}
                                   className={cn(
-                                    "flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors pointer-events-auto",
+                                    "flex-shrink-0 px-3 py-1.5 rounded-sm text-xs font-medium transition-colors pointer-events-auto border",
                                     isActive
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-muted/60 backdrop-blur-sm text-muted-foreground hover:bg-muted"
+                                      ? "bg-primary text-primary-foreground border-primary"
+                                      : "surface-2 backdrop-blur-sm text-muted-foreground border-border/60 hover:text-foreground"
                                   )}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2816,9 +2720,9 @@ export default function GalleryEditorPage() {
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <Badge variant="secondary" className="absolute top-3 left-3 bg-black/70 text-white border-transparent backdrop-blur-sm">
+                          <span className="aura-chip absolute top-3 left-3 z-10 bg-background/85 backdrop-blur-sm">
                             Original
-                          </Badge>
+                          </span>
                         </div>
                         <div className="relative flex-1 flex items-center justify-start min-w-0 overflow-hidden">
                           <img
@@ -2830,9 +2734,10 @@ export default function GalleryEditorPage() {
                               if (target.src !== currentImage.original_url) target.src = currentImage.original_url;
                             }}
                           />
-                          <Badge variant="secondary" className="absolute top-3 right-3 bg-black/70 text-white border-transparent backdrop-blur-sm">
+                          <span className="aura-chip absolute top-3 right-3 z-10 bg-background/85 backdrop-blur-sm text-primary">
+                            <Sparkle size={10} className="text-primary" />
                             {selectedStyleData?.name || "Edited"}
-                          </Badge>
+                          </span>
                         </div>
                       </motion.div>
                     );

@@ -32,9 +32,9 @@ function buildLast30Days(dailyUsage: { date: string; edits: number }[]) {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border/50 bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg text-sm">
-      <p className="text-muted-foreground mb-1">{label}</p>
-      <p className="font-semibold text-primary">{payload[0].value} edits</p>
+    <div className="border border-border bg-card px-3 py-2 text-sm shadow-[var(--elevation-2)]">
+      <p className="caption mb-1">{label}</p>
+      <p className="font-display font-semibold text-accent">{payload[0].value} edits</p>
     </div>
   );
 };
@@ -53,26 +53,28 @@ export default function CreditsUsageChart() {
     : "This billing period";
 
   return (
-    <Card className="glass-card border-border/50 hover:border-primary/30 transition-all">
-      <CardHeader className="pb-2 px-5 pt-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-primary" />
-            </div>
-            <CardTitle className="text-base font-semibold">Edits Usage</CardTitle>
+    <Card className="rounded-[--radius] border border-border bg-card shadow-none transition-colors">
+      <CardHeader className="px-5 pb-3 pt-5">
+        <div className="flex items-end justify-between">
+          <div>
+            <CardTitle className="caption flex items-center gap-1.5 normal-case">
+              <Zap className="h-3 w-3 text-accent" />
+              <span className="caption">Edits usage</span>
+            </CardTitle>
+            <p className="mt-2.5 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              <TrendingUp className="h-3 w-3" />
+              {periodLabel}
+            </p>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-gradient-primary">{editsUsed}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="font-display text-3xl font-semibold leading-none tracking-tight text-accent">
+              {editsUsed}
+            </p>
+            <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
               {isUnlimited ? "edits this period" : `of ${editsTotal} used`}
             </p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-          <TrendingUp className="w-3 h-3" />
-          {periodLabel}
-        </p>
       </CardHeader>
       <CardContent className="px-2 pb-4">
         {hasActivity ? (
@@ -80,11 +82,11 @@ export default function CreditsUsageChart() {
             <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="editsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+              <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.6} />
               <XAxis
                 dataKey="label"
                 tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
@@ -102,16 +104,16 @@ export default function CreditsUsageChart() {
               <Area
                 type="monotone"
                 dataKey="edits"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
+                stroke="hsl(var(--accent))"
+                strokeWidth={1.5}
                 fill="url(#editsGradient)"
               />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-[180px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Zap className="w-8 h-8 opacity-20" />
-            <p className="text-xs">No edits used yet this period</p>
+          <div className="flex h-[180px] flex-col items-center justify-center gap-2.5 text-muted-foreground">
+            <Zap className="h-7 w-7 opacity-20" />
+            <p className="caption">No edits used yet this period</p>
           </div>
         )}
       </CardContent>

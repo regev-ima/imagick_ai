@@ -1,9 +1,22 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { X, Sparkles, Check, Lock, Eye, AlertTriangle } from "lucide-react";
+import { X, Check, Lock, Eye, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Orb } from "@/components/aura/Orb";
 import { Card } from "@/components/ui/card";
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -95,16 +108,17 @@ export function ReEditModal({
         className="w-full max-w-3xl max-h-[85vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <Card className="glass-card border-border/50 flex flex-col max-h-[85vh]">
+        <Card className="glass-card border-border rounded-[--radius] flex flex-col max-h-[85vh]">
           <div className="flex items-center justify-between p-6 border-b border-border/50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary" />
-              </div>
+              <Orb className="w-10 h-10 shrink-0" />
               <div>
-                <h2 className="text-xl font-bold">Re-Edit Images</h2>
-                <p className="text-sm text-muted-foreground">
-                  {selectedImageCount} image{selectedImageCount > 1 ? 's' : ''} selected
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Sparkle size={16} className="text-primary" />
+                  Re-Edit Images
+                </h2>
+                <p className="aura-microlabel mt-0.5">
+                  <span className="folio text-foreground">{selectedImageCount}</span> image{selectedImageCount > 1 ? 's' : ''} selected
                 </p>
               </div>
             </div>
@@ -149,10 +163,10 @@ export function ReEditModal({
                 <p className="text-sm text-muted-foreground">Choose up to 3 styles to apply</p>
               </div>
               <div className={cn(
-                "px-3 py-1.5 rounded-full text-sm font-semibold",
+                "px-3 py-1.5 rounded-sm font-mono text-sm font-semibold tabular-nums folio border",
                 selectedStyles.length > 0
-                  ? "bg-primary/15 text-primary"
-                  : "bg-muted text-muted-foreground"
+                  ? "bg-primary/15 text-primary border-primary/30"
+                  : "surface-2 text-muted-foreground border-border/60"
               )}>
                 {selectedStyles.length}/3
               </div>
@@ -180,11 +194,11 @@ export function ReEditModal({
                         }
                       }}
                       className={cn(
-                        "relative rounded-xl overflow-hidden cursor-pointer transition-all h-36 flex flex-col justify-end group",
+                        "relative rounded-sm overflow-hidden cursor-pointer transition-all h-36 flex flex-col justify-end group",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         isSelected
                           ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20"
-                          : "ring-1 ring-border/50 hover:ring-primary/40"
+                          : "ring-1 ring-border/60 hover:ring-primary/40"
                       )}
                     >
                       <img
@@ -207,7 +221,7 @@ export function ReEditModal({
 
                       <div className="relative z-10 p-3">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-primary" />
+                          <Sparkle size={14} className="text-primary" />
                           <span className="font-semibold text-sm text-white truncate">{style.name}</span>
                         </div>
                         {style.category && (
@@ -228,15 +242,15 @@ export function ReEditModal({
               {/* Already Used Styles (disabled) */}
               {usedStyles.length > 0 && (
                 <>
-                  <h4 className="font-medium mt-6 mb-3 text-muted-foreground flex items-center gap-2">
-                    <Lock className="w-4 h-4" />
+                  <h4 className="aura-microlabel mt-6 mb-3 flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5" />
                     Already Applied
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {usedStyles.map((style) => (
                       <div
                         key={style.id}
-                        className="relative rounded-xl overflow-hidden ring-1 ring-border/30 opacity-50 cursor-not-allowed h-36 flex flex-col justify-end"
+                        className="relative rounded-sm overflow-hidden ring-1 ring-border/40 opacity-50 cursor-not-allowed h-36 flex flex-col justify-end"
                       >
                         <img
                           src={getStyleCover(style)}
@@ -249,7 +263,7 @@ export function ReEditModal({
                         </div>
                         <div className="relative z-10 p-3">
                           <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-muted-foreground" />
+                            <Sparkle size={14} className="text-muted-foreground" />
                             <span className="font-semibold text-sm text-white/70 truncate">{style.name}</span>
                           </div>
                         </div>
@@ -261,7 +275,7 @@ export function ReEditModal({
 
               {styles.length === 0 && (
                 <div className="text-center py-8">
-                  <Sparkles className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <Sparkle size={48} className="text-muted-foreground mx-auto mb-3" />
                   <p className="text-muted-foreground">No styles available</p>
                   <p className="text-sm text-muted-foreground">Create a custom style first</p>
                 </div>

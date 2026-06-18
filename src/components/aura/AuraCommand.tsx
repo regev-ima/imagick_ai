@@ -10,7 +10,6 @@ import {
   Shield,
   Plus,
   Wand2,
-  Share2,
   ArrowRight,
 } from "lucide-react";
 import {
@@ -101,43 +100,56 @@ export function AuraCommand() {
 
   const trimmed = query.trim();
 
+  // Royal-blue active row + crisp Lightroom item chrome. The cmdk
+  // primitive marks the focused row with data-[selected=true]; we
+  // override its default accent fill with a brand-blue tint + keyline.
+  const itemCls =
+    "rounded-[--radius] text-foreground transition-colors " +
+    "data-[selected=true]:bg-primary/[0.14] data-[selected=true]:text-foreground " +
+    "data-[selected=true]:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.45)]";
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <div className="flex items-center gap-2 px-3 pt-3">
-        <Orb className="h-6 w-6 shrink-0" />
-        <span className="aura-microlabel">Aura</span>
+      {/* Aura header — the sparkle/Orb mark over a hairline */}
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-primary/[0.06] px-4 py-2.5">
+        <span className="aura-microlabel flex items-center gap-2 text-accent" style={{ color: "inherit" }}>
+          <Orb className="h-5 w-5 shrink-0" />
+          Aura
+        </span>
+        <span className="aura-chip" aria-hidden="true">
+          <span className="aura-led" />
+          Command
+        </span>
       </div>
       <CommandInput
-        placeholder="Type a collection, an action, or a place to go…"
+        placeholder="Search or jump to…"
         value={query}
         onValueChange={setQuery}
       />
-      <CommandList>
-        <CommandEmpty>Nothing matches. Try the create action below.</CommandEmpty>
+      <CommandList className="px-1 py-1">
+        <CommandEmpty className="py-8 text-center text-sm text-muted-foreground">
+          Nothing matches. Try the create action below.
+        </CommandEmpty>
 
         <CommandGroup heading="Actions">
-          <CommandItem onSelect={() => go("/dashboard/galleries/new")}>
+          <CommandItem className={itemCls} onSelect={() => go("/dashboard/galleries/new")}>
             <Plus className="text-primary" />
             New collection
           </CommandItem>
-          <CommandItem onSelect={() => go("/dashboard/styles/new")}>
+          <CommandItem className={itemCls} onSelect={() => go("/dashboard/styles/new")}>
             <Wand2 className="text-primary" />
             Train an AI style
-          </CommandItem>
-          <CommandItem onSelect={() => go("/dashboard/galleries")}>
-            <Share2 className="text-primary" />
-            Share a gallery
           </CommandItem>
         </CommandGroup>
 
         {galleries.length > 0 && (
           <>
-            <CommandSeparator />
+            <CommandSeparator className="my-1 bg-border" />
             <CommandGroup heading="Collections">
               {galleries.map((g) => (
-                <CommandItem key={g.id} value={`collection ${g.name}`} onSelect={() => go(`/dashboard/galleries/${g.id}`)}>
+                <CommandItem key={g.id} className={itemCls} value={`collection ${g.name}`} onSelect={() => go(`/dashboard/galleries/${g.id}`)}>
                   {g.hero_image_url ? (
-                    <img src={getThumbnailUrl(g.hero_image_url)} alt="" className="h-6 w-9 rounded-md object-cover" />
+                    <img src={getThumbnailUrl(g.hero_image_url)} alt="" className="h-6 w-9 rounded-[--radius] border border-border object-cover" />
                   ) : (
                     <Images className="text-muted-foreground" />
                   )}
@@ -151,25 +163,25 @@ export function AuraCommand() {
           </>
         )}
 
-        <CommandSeparator />
+        <CommandSeparator className="my-1 bg-border" />
         <CommandGroup heading="Go to">
-          <CommandItem onSelect={() => go("/dashboard")}>
+          <CommandItem className={itemCls} onSelect={() => go("/dashboard")}>
             <LayoutDashboard /> Dashboard
           </CommandItem>
-          <CommandItem onSelect={() => go("/dashboard/galleries")}>
+          <CommandItem className={itemCls} onSelect={() => go("/dashboard/galleries")}>
             <Images /> Collections
           </CommandItem>
-          <CommandItem onSelect={() => go("/dashboard/styles")}>
+          <CommandItem className={itemCls} onSelect={() => go("/dashboard/styles")}>
             <Sparkles /> AI Styles
           </CommandItem>
-          <CommandItem onSelect={() => go("/dashboard/billing")}>
+          <CommandItem className={itemCls} onSelect={() => go("/dashboard/billing")}>
             <CreditCard /> Billing
           </CommandItem>
-          <CommandItem onSelect={() => go("/dashboard/settings")}>
+          <CommandItem className={itemCls} onSelect={() => go("/dashboard/settings")}>
             <Settings /> Settings
           </CommandItem>
           {isAdmin && (
-            <CommandItem onSelect={() => go("/dashboard/admin")}>
+            <CommandItem className={itemCls} onSelect={() => go("/dashboard/admin")}>
               <Shield /> Admin
             </CommandItem>
           )}
@@ -177,9 +189,10 @@ export function AuraCommand() {
 
         {trimmed.length > 1 && (
           <>
-            <CommandSeparator />
+            <CommandSeparator className="my-1 bg-border" />
             <CommandGroup heading="Ask Aura">
               <CommandItem
+                className={itemCls}
                 value={`create ${trimmed}`}
                 onSelect={() => go(`/dashboard/galleries/new?name=${encodeURIComponent(trimmed)}`)}
               >

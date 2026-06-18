@@ -4,7 +4,7 @@ import { useUppyState } from "@uppy/react";
 import { UppyUploadArea } from "@/components/upload/UppyUploadArea";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Sparkles, Check, Upload, Images, ChevronLeft, Loader2,
+  X, Check, Upload, Images, ChevronLeft, Loader2,
   CloudIcon, AlertTriangle, Plus, FileImage, Eye, Palette, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,25 @@ import { GoogleDriveInput, type DriveFolderInfo } from "./GoogleDriveInput";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 import { getThumbnailUrl } from "@/lib/imageUrls";
+
+/** The AI mark — 4-point sparkle (the logo star), royal blue via currentColor. */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 interface AddImagesModalProps {
   isOpen: boolean;
@@ -320,11 +339,11 @@ export function AddImagesModal({
         className="w-full max-w-3xl max-h-[85vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <Card className="glass-card border-border/50 flex flex-col max-h-[85vh]">
+        <Card className="glass-card border-border rounded-[--radius] flex flex-col max-h-[85vh]">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border/50">
+          <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-[--radius] border border-border bg-primary/10 flex items-center justify-center">
                 <Images className="w-4 h-4 text-primary" />
               </div>
               <div>
@@ -347,20 +366,20 @@ export function AddImagesModal({
                 <motion.div
                   className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center transition-all relative z-10",
-                    step === "styles" && "bg-primary shadow-[0_0_20px_rgba(236,72,153,0.4)]",
+                    step === "styles" && "bg-primary shadow-[0_0_20px_hsl(var(--primary)/0.4)]",
                     step === "upload" && "bg-primary/20"
                   )}
                   animate={step === "styles" ? { boxShadow: [
-                    "0 0 12px rgba(236,72,153,0.3)",
-                    "0 0 24px rgba(236,72,153,0.5)",
-                    "0 0 12px rgba(236,72,153,0.3)",
+                    "0 0 12px hsl(var(--primary) / 0.3)",
+                    "0 0 24px hsl(var(--primary) / 0.5)",
+                    "0 0 12px hsl(var(--primary) / 0.3)",
                   ] } : {}}
                   transition={step === "styles" ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
                 >
                   {step === "upload" ? (
                     <Check className="w-3.5 h-3.5 text-primary" />
                   ) : (
-                    <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
+                    <Sparkle size={13} className="text-primary-foreground" />
                   )}
                 </motion.div>
                 <span className={cn("text-[11px] font-semibold mt-1", step === "styles" ? "text-foreground" : "text-primary")}>
@@ -370,7 +389,7 @@ export function AddImagesModal({
               {/* Connector */}
               <div className="relative w-16 sm:w-24 h-0.5 mt-[-14px] mx-2 bg-muted overflow-hidden rounded-full">
                 <motion.div
-                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-secondary rounded-full"
+                  className="absolute inset-y-0 left-0 bg-primary rounded-full"
                   initial={{ width: "0%" }}
                   animate={{ width: step === "upload" ? "100%" : "0%" }}
                   transition={{ duration: 0.5, ease: "easeInOut" }}
@@ -381,13 +400,13 @@ export function AddImagesModal({
                 <motion.div
                   className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center transition-all relative z-10",
-                    step === "upload" && "bg-primary shadow-[0_0_20px_rgba(236,72,153,0.4)]",
+                    step === "upload" && "bg-primary shadow-[0_0_20px_hsl(var(--primary)/0.4)]",
                     step === "styles" && "bg-muted"
                   )}
                   animate={step === "upload" ? { boxShadow: [
-                    "0 0 12px rgba(236,72,153,0.3)",
-                    "0 0 24px rgba(236,72,153,0.5)",
-                    "0 0 12px rgba(236,72,153,0.3)",
+                    "0 0 12px hsl(var(--primary) / 0.3)",
+                    "0 0 24px hsl(var(--primary) / 0.5)",
+                    "0 0 12px hsl(var(--primary) / 0.3)",
                   ] } : {}}
                   transition={step === "upload" ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
                 >
@@ -413,11 +432,14 @@ export function AddImagesModal({
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-bold mb-1">Select AI Styles</h3>
+                      <h3 className="flex items-center gap-2 text-lg font-bold mb-1">
+                        <Sparkle size={15} className="text-accent" />
+                        Select AI Styles
+                      </h3>
                       <p className="text-sm text-muted-foreground">Choose up to 3 styles to apply</p>
                     </div>
                     <div className={cn(
-                      "px-3 py-1.5 rounded-full text-sm font-semibold",
+                      "px-3 py-1.5 rounded-[--radius] font-mono text-sm font-semibold",
                       selectedStyles.length > 0
                         ? "bg-primary/15 text-primary"
                         : "bg-muted text-muted-foreground"
@@ -455,11 +477,11 @@ export function AddImagesModal({
                                 }
                               }}
                               className={cn(
-                                "relative rounded-xl overflow-hidden cursor-pointer transition-all h-36 flex flex-col justify-end group",
+                                "relative rounded-[--radius] overflow-hidden cursor-pointer transition-all h-36 flex flex-col justify-end group",
                                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                 isSelected
                                   ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20"
-                                  : "ring-1 ring-border/50 hover:ring-primary/40"
+                                  : "ring-1 ring-border hover:ring-primary/40"
                               )}
                             >
                               {coverUrl ? (
@@ -489,7 +511,7 @@ export function AddImagesModal({
                                   {style.is_preset ? (
                                     <Palette className="w-4 h-4 text-primary" />
                                   ) : (
-                                    <Sparkles className="w-4 h-4 text-primary" />
+                                    <Sparkle size={14} className="text-accent" />
                                   )}
                                   <span className="font-semibold text-sm text-white">{style.name}</span>
                                 </div>

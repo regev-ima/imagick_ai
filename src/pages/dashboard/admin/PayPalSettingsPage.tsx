@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Loader2, AlertTriangle, RefreshCw, ShieldCheck } from "lucide-react";
@@ -116,57 +115,55 @@ export default function PayPalSettingsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/dashboard/admin">
+          <Link to="/dashboard/admin" aria-label="Back to admin">
             <ArrowLeft className="w-5 h-5" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">
-            PayPal <span className="text-gradient-primary">Settings</span>
-          </h1>
-          <p className="text-muted-foreground mt-1">
+          <span className="caption">Admin · Billing</span>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">PayPal Settings</h1>
+          <p className="mt-1 font-sans text-sm text-muted-foreground">
             Manage PayPal integration mode and billing plan mappings
           </p>
         </div>
       </div>
 
       {/* Mode Toggle Card */}
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>PayPal Environment</CardTitle>
-              <CardDescription>Switch between sandbox (testing) and live (production) modes</CardDescription>
-            </div>
-            {modeLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Badge variant={mode === "live" ? "default" : "secondary"} className={
-                mode === "live"
-                  ? "bg-green-500/10 text-green-500 border-green-500/30"
-                  : "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
-              }>
-                {mode === "live" ? "LIVE" : "SANDBOX"}
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="glass-card overflow-hidden rounded-[--radius]">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+          <span className="aura-microlabel flex items-center gap-2">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            PayPal Environment
+          </span>
+          {modeLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          ) : mode === "live" ? (
+            <Badge variant="secondary" className="font-mono">LIVE</Badge>
+          ) : (
+            <Badge variant="outline" className="border-[hsl(var(--rating))]/40 font-mono text-[hsl(var(--rating))]">
+              SANDBOX
+            </Badge>
+          )}
+        </div>
+        <div className="space-y-4 p-4">
+          <p className="font-sans text-sm text-muted-foreground">
+            Switch between sandbox (testing) and live (production) modes.
+          </p>
           {mode === "live" && (
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-              <ShieldCheck className="w-5 h-5 text-green-500 flex-shrink-0" />
-              <p className="text-sm text-green-400">
+            <div className="flex items-center gap-3 rounded-[--radius] border border-secondary/30 bg-secondary/10 p-3">
+              <ShieldCheck className="w-5 h-5 text-secondary flex-shrink-0" />
+              <p className="text-sm text-secondary">
                 Live mode is active. All transactions will process real payments.
               </p>
             </div>
           )}
           {mode === "sandbox" && (
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-              <p className="text-sm text-yellow-400">
+            <div className="flex items-center gap-3 rounded-[--radius] border border-[hsl(var(--rating))]/25 bg-[hsl(var(--rating))]/10 p-3">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 text-[hsl(var(--rating))]" />
+              <p className="text-sm text-[hsl(var(--rating))]">
                 Sandbox mode is active. Transactions use PayPal test accounts.
               </p>
             </div>
@@ -179,36 +176,34 @@ export default function PayPalSettingsPage() {
             {modeMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Switch to {mode === "sandbox" ? "Live" : "Sandbox"} Mode
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Plan Mappings Card */}
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>PayPal Plan Mappings ({mode})</CardTitle>
-              <CardDescription>
-                Links between your subscription plans and PayPal billing plan IDs
-              </CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowSetupConfirm(true)}
-              disabled={isSettingUpPlans}
-              className="gap-2"
-            >
-              {isSettingUpPlans ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-              {isSettingUpPlans ? "Creating..." : "Setup Plans"}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
+      <div className="glass-card overflow-hidden rounded-[--radius]">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+          <span className="aura-microlabel flex items-center gap-2">
+            PayPal Plan Mappings · {mode}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSetupConfirm(true)}
+            disabled={isSettingUpPlans}
+            className="gap-2"
+          >
+            {isSettingUpPlans ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            {isSettingUpPlans ? "Creating..." : "Setup Plans"}
+          </Button>
+        </div>
+        <div className="p-4">
+          <p className="mb-4 font-sans text-sm text-muted-foreground">
+            Links between your subscription plans and PayPal billing plan IDs.
+          </p>
           {mappingsLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -227,25 +222,25 @@ export default function PayPalSettingsPage() {
               {planMappings.map((mapping: any) => (
                 <div
                   key={mapping.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 text-sm"
+                  className="flex items-center justify-between rounded-[--radius] border border-border bg-surface-2 p-3 text-sm"
                 >
                   <div>
-                    <p className="font-medium">
+                    <p className="font-medium text-foreground">
                       {(mapping as any).subscription_plans?.name || "Unknown Plan"}
                     </p>
                     <p className="text-xs text-muted-foreground capitalize">
                       {mapping.billing_cycle} billing
                     </p>
                   </div>
-                  <code className="text-xs bg-background px-2 py-1 rounded border border-border/50">
+                  <code className="rounded border border-border bg-background px-2 py-1 font-mono text-xs text-foreground">
                     {mapping.paypal_plan_id}
                   </code>
                 </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Live Mode Confirmation Dialog */}
       <AlertDialog open={showLiveConfirm} onOpenChange={setShowLiveConfirm}>
@@ -262,7 +257,7 @@ export default function PayPalSettingsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => modeMutation.mutate("live")}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
             >
               Switch to Live
             </AlertDialogAction>
@@ -280,7 +275,7 @@ export default function PayPalSettingsPage() {
                 <p>
                   This will create new PayPal billing plans in <strong className="text-foreground">{mode}</strong> mode for all active subscription tiers (Starter, Pro, Studio) with both monthly and yearly billing cycles.
                 </p>
-                <div className="rounded-lg bg-muted/60 border border-border/50 p-3 text-xs space-y-1.5">
+                <div className="rounded-[--radius] border border-border bg-surface-2 p-3 text-xs space-y-1.5">
                   <p>What happens:</p>
                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                     <li>New PayPal plans are created via the PayPal API</li>
@@ -289,9 +284,9 @@ export default function PayPalSettingsPage() {
                   </ul>
                 </div>
                 {mode === "live" && (
-                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-400">
+                  <div className="flex items-start gap-2 rounded-[--radius] border border-[hsl(var(--rating))]/25 bg-[hsl(var(--rating))]/10 p-2.5">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-[hsl(var(--rating))]" />
+                    <p className="text-xs text-[hsl(var(--rating))]">
                       You are in <strong>live mode</strong>. These plans will be created in PayPal's production environment.
                     </p>
                   </div>

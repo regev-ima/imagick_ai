@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { estimateCullingMs, formatDuration } from "@/lib/cullingEta";
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 interface CullingStatusBannerProps {
   /** Database-backed status — "processing" / "ready" / "idle" / null. */
@@ -81,22 +93,23 @@ export function CullingStatusBanner({
       role="status"
       aria-live="polite"
     >
-      <div className="relative shrink-0">
+      <div className="relative shrink-0 flex items-center justify-center">
         {isStuck ? (
-          <Sparkles className="w-4 h-4 text-rating" />
+          <Sparkle size={16} className="text-rating" />
         ) : (
           <>
-            <Loader2 className="w-4 h-4 text-primary animate-spin" />
+            <Sparkle size={16} className="text-primary animate-pulse" />
             <span className="absolute inset-0 rounded-full bg-primary/30 blur-md -z-10" aria-hidden />
           </>
         )}
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">
+        <p className="text-sm font-medium flex items-center gap-2">
+          <span className="aura-microlabel text-current">{isStuck ? "AI Culling" : "Aura Culling"}</span>
           {isStuck
-            ? "AI Culling looks stuck — you can retry from the sidebar."
-            : `AI Culling in progress · ${remainingText}`}
+            ? "looks stuck — you can retry from the sidebar."
+            : `in progress · ${remainingText}`}
         </p>
         <p className="text-xs text-muted-foreground">
           {isStuck ? (

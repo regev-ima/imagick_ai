@@ -82,12 +82,24 @@ interface ImageDetailsPanelProps {
   availableLabels?: string[];
 }
 
-// Reusable section card wrapper
+// Reusable section card wrapper — a Lightroom develop sub-panel
 function SectionCard({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-lg bg-white/[0.03] border border-white/[0.06] p-3", className)}>
+    <div className={cn("rounded-sm surface-2 border border-border/60 p-3", className)}>
       {children}
     </div>
+  );
+}
+
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
   );
 }
 
@@ -109,10 +121,10 @@ function SectionHeader({ icon: Icon, label, accent = "violet" }: { icon: React.C
   };
   return (
     <div className="flex items-center gap-2 mb-2.5">
-      <div className={cn("w-6 h-6 rounded-md bg-gradient-to-br flex items-center justify-center", gradientMap[accent])}>
+      <div className={cn("w-6 h-6 rounded-sm bg-gradient-to-br flex items-center justify-center", gradientMap[accent])}>
         <Icon className={cn("w-3.5 h-3.5", textMap[accent])} />
       </div>
-      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{label}</span>
+      <span className="aura-microlabel">{label}</span>
     </div>
   );
 }
@@ -122,7 +134,7 @@ function TimelineDot({ color = "default", pulse = false }: { color?: "default" |
   const colorMap = {
     default: "bg-muted-foreground/40",
     primary: "bg-primary",
-    yellow: "bg-yellow-500",
+    yellow: "bg-rating",
     red: "bg-destructive",
   };
   return (
@@ -242,12 +254,12 @@ export function ImageDetailsPanel({
 
   // Status badge config
   const statusConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; bg: string; text: string; dot: string }> = {
-    ready: { icon: CheckCircle2, bg: "bg-emerald-500/15", text: "text-emerald-400", dot: "bg-emerald-400" },
+    ready: { icon: CheckCircle2, bg: "bg-secondary/15", text: "text-secondary", dot: "bg-secondary" },
     processing: { icon: Loader2, bg: "bg-rating/15", text: "text-rating", dot: "bg-rating" },
-    error: { icon: AlertCircle, bg: "bg-red-500/15", text: "text-red-400", dot: "bg-red-400" },
-    pending: { icon: Clock, bg: "bg-amber-500/15", text: "text-amber-400", dot: "bg-amber-400" },
+    error: { icon: AlertCircle, bg: "bg-destructive/15", text: "text-destructive", dot: "bg-destructive" },
+    pending: { icon: Clock, bg: "bg-rating/15", text: "text-rating", dot: "bg-rating" },
     uploading: { icon: Loader2, bg: "bg-rating/15", text: "text-rating", dot: "bg-rating" },
-    deleted: { icon: Trash2, bg: "bg-red-500/15", text: "text-red-400", dot: "bg-red-400" },
+    deleted: { icon: Trash2, bg: "bg-destructive/15", text: "text-destructive", dot: "bg-destructive" },
   };
   const currentStatus = statusConfig[image.status] || statusConfig.ready;
   const StatusIcon = currentStatus.icon;
@@ -267,10 +279,10 @@ export function ImageDetailsPanel({
               <button
                 key={style.id}
                 className={cn(
-                  "relative rounded-xl overflow-hidden cursor-pointer transition-all h-24 flex flex-col justify-end group",
+                  "relative rounded-sm overflow-hidden cursor-pointer transition-all h-24 flex flex-col justify-end group",
                   isActive
                     ? "ring-2 ring-primary ring-offset-1 ring-offset-background shadow-lg shadow-primary/20"
-                    : "ring-1 ring-border/50 hover:ring-primary/40"
+                    : "ring-1 ring-border/60 hover:ring-primary/40"
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -288,7 +300,7 @@ export function ImageDetailsPanel({
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <div className="relative z-10 p-2">
                   <div className="flex items-center gap-1.5">
-                    <Layers className="w-3 h-3 text-primary" />
+                    <Sparkle size={11} className="text-primary" />
                     <span className="font-medium text-xs text-white truncate">{style.name}</span>
                   </div>
                 </div>
@@ -334,7 +346,7 @@ export function ImageDetailsPanel({
           size="sm"
           className={cn(
             "gap-2 h-9 text-xs border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-all",
-            image.is_hero && "border-amber-500/30 bg-amber-500/5 text-amber-400"
+            image.is_hero && "border-rating/30 bg-rating/5 text-rating"
           )}
           onClick={(e) => { e.stopPropagation(); onSetAsHero(); }}
         >
@@ -453,7 +465,7 @@ export function ImageDetailsPanel({
         )}
         {/* Attempts warning */}
         {(image.processing_attempts ?? 0) > 1 && (
-          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-400">
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-rating">
             <AlertCircle className="w-3 h-3" />
             <span>{image.processing_attempts} attempts</span>
           </div>
@@ -590,14 +602,14 @@ export function ImageDetailsPanel({
     return (
       <div className="flex flex-wrap gap-1.5">
         {image.is_hero && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-gradient-to-r from-amber-500/15 to-orange-500/15 text-amber-400 border border-amber-500/20">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-[11px] font-medium bg-rating/15 text-rating border border-rating/25">
             <Award className="w-3 h-3" />
             Hero
           </span>
         )}
         {image.edited_url && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-primary/15 text-primary border border-primary/20">
-            <Zap className="w-3 h-3" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-[11px] font-medium bg-primary/15 text-primary border border-primary/25">
+            <Sparkle size={11} className="text-primary" />
             AI Edited
           </span>
         )}
@@ -699,8 +711,13 @@ export function ImageDetailsPanel({
   const renderAIAnalysis = () => {
     if (image.culling_score !== null && image.culling_score !== undefined) {
       return (
-        <SectionCard className="bg-gradient-to-br from-violet-500/[0.04] via-primary/[0.03] to-amber-500/[0.04] border-violet-500/10">
-          <SectionHeader icon={Bot} label="AI Analysis" accent="violet" />
+        <SectionCard className="bg-primary/[0.05] border-primary/20">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-6 h-6 rounded-sm bg-primary/15 border border-primary/30 flex items-center justify-center">
+              <Sparkle size={13} className="text-primary" />
+            </div>
+            <span className="aura-microlabel text-primary">AI Analysis</span>
+          </div>
           <AIAnalysisSection
             metrics={{
               culling_score: image.culling_score ?? null,
@@ -730,12 +747,12 @@ export function ImageDetailsPanel({
                 className={cn(
                   "w-4 h-4 transition-colors",
                   i < (image.ai_rating || 0)
-                    ? "text-amber-400 fill-amber-400"
+                    ? "text-rating fill-rating"
                     : "text-white/10"
                 )}
               />
             ))}
-            <span className="ml-2 text-xs text-muted-foreground tabular-nums">
+            <span className="ml-2 font-mono text-xs text-muted-foreground tabular-nums folio">
               {image.ai_rating || 0}/5
             </span>
           </div>

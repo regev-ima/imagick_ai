@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { getThumbnailUrl } from "@/lib/imageUrls";
@@ -340,64 +339,60 @@ export default function ShowcaseManager() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Showcase Manager</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Showcase Manager</h1>
+        <p className="caption mt-1.5 flex items-center gap-1.5">
+          <Sparkles className="h-3 w-3 text-accent" />
           Upload sample images, process through all styles, and manage before/after previews per style
         </p>
       </div>
 
       {/* Source Images - Link to Collection */}
-      <Card className="glass-card">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <ImageIcon className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-medium">Source Images</p>
-                <p className="text-sm text-muted-foreground">
-                  Manage images in the Showcase collection
-                </p>
-              </div>
+      <div className="glass-card overflow-hidden rounded-[--radius]">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-[--radius] bg-primary/10 p-2">
+              <ImageIcon className="w-5 h-5 text-primary" />
             </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="secondary">{showcaseImages.length} images</Badge>
-              <Button variant="outline" size="sm" asChild>
-                <Link to={`/dashboard/galleries/${SHOWCASE_GALLERY_ID}`} className="gap-2">
-                  <ExternalLink className="w-4 h-4" />
-                  Open Collection
-                </Link>
-              </Button>
+            <div>
+              <p className="font-medium">Source Images</p>
+              <p className="text-sm text-muted-foreground">
+                Manage images in the Showcase collection
+              </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary"><span className="folio">{showcaseImages.length}</span>&nbsp;images</Badge>
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/dashboard/galleries/${SHOWCASE_GALLERY_ID}`} className="gap-2">
+                <ExternalLink className="w-4 h-4" />
+                Open Collection
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {/* Style Results */}
       {presetStyles.length > 0 && (
-        <Card className="glass-card">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-accent/10">
-                  <Eye className="w-5 h-5 text-accent" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg">Style Results</CardTitle>
-                  <CardDescription>Review and manage before/after pairs per style. Hide images that didn't edit well.</CardDescription>
-                </div>
+        <div className="glass-card overflow-hidden rounded-[--radius]">
+          {/* Mono module header with AI action */}
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-primary/[0.06] px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <div>
+                <span className="aura-microlabel text-accent">Style Results</span>
+                <p className="mt-0.5 text-xs text-muted-foreground">Review and manage before/after pairs per style. Hide images that didn't edit well.</p>
               </div>
-              <Button onClick={handleApplyToStyles} disabled={isApplying} variant="glow" size="sm">
-                {isApplying ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
-                {isApplying ? "Applying..." : "Apply to Styles"}
-              </Button>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
+            <Button onClick={handleApplyToStyles} disabled={isApplying} variant="glow" size="sm">
+              {isApplying ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
+              {isApplying ? "Applying..." : "Apply to Styles"}
+            </Button>
+          </div>
+          <div className="space-y-2 p-4">
             {presetStyles.map((style) => {
               const status = styleStatus[style.id];
               const isExpanded = expandedStyles.has(style.id);
@@ -426,13 +421,13 @@ export default function ShowcaseManager() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{style.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="font-mono text-xs text-muted-foreground">
                         {editsForStyle.length} / {status?.total || 0} images
-                        {hiddenCount > 0 && <span className="text-yellow-500 ml-1">· {hiddenCount} hidden</span>}
+                        {hiddenCount > 0 && <span className="ml-1 text-[hsl(var(--rating))]">· {hiddenCount} hidden</span>}
                       </p>
                     </div>
-                    {status?.status === "complete" && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
-                    {status?.status === "processing" && <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />}
+                    {status?.status === "complete" && <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />}
+                    {status?.status === "processing" && <Loader2 className="w-4 h-4 animate-spin text-accent shrink-0" />}
                     {status?.status === "pending" && <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 shrink-0" />}
                   </button>
                   {(() => {
@@ -509,7 +504,7 @@ export default function ShowcaseManager() {
                                     className={cn(
                                       "p-1.5 rounded-md backdrop-blur-sm transition-colors",
                                       isHidden
-                                        ? "bg-yellow-500/80 text-white"
+                                        ? "bg-[hsl(var(--rating))] text-white"
                                         : "bg-background/60 text-foreground hover:bg-background/80"
                                     )}
                                     title={isHidden ? "Show this pair" : "Hide this pair"}
@@ -536,13 +531,13 @@ export default function ShowcaseManager() {
             })}
 
             {!overallProgress.allComplete && overallProgress.totalCompleted > 0 && (
-              <div className="flex items-center gap-1 text-xs text-yellow-500 pt-2">
+              <div className="flex items-center gap-1.5 pt-2 font-mono text-xs text-[hsl(var(--rating))]">
                 <AlertCircle className="w-3 h-3" />
                 <span>Partial results — you can still apply what's complete</span>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );

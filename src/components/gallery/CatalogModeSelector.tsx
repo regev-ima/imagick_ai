@@ -21,7 +21,7 @@ export function CatalogModeSelector({
 }: CatalogModeSelectorProps) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <span className="text-sm text-muted-foreground">View:</span>
+      <span className="aura-microlabel">View</span>
       <ToggleGroup 
         type="single" 
         value={mode} 

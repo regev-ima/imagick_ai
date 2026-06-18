@@ -190,50 +190,64 @@ export function PayPalCheckoutModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
-        {/* Header with gradient */}
-        <div className="relative px-6 pt-6 pb-4 bg-gradient-to-b from-primary/5 to-transparent">
-          <DialogHeader className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 flex items-center justify-center ring-1 ring-amber-500/20">
-                <Crown className="w-5 h-5 text-amber-500" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <DialogTitle className="text-base sm:text-lg truncate">Subscribe to {planName}</DialogTitle>
-                <DialogDescription className="text-xs mt-0.5">
-                  {billingCycle === "yearly" ? "Annual" : "Monthly"} billing
-                </DialogDescription>
-              </div>
-            </div>
+      <DialogContent className="surface-2 overflow-hidden p-0 sm:max-w-md sm:rounded-[--radius]">
+        {/* Mono header — Lightroom module title bar */}
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-primary/[0.08] px-4 py-2.5 text-accent">
+          <DialogHeader className="space-y-0">
+            <DialogTitle asChild>
+              <span className="aura-microlabel flex items-center gap-2" style={{ color: "inherit" }}>
+                <Crown className="h-3.5 w-3.5" />
+                Subscribe to {planName}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {billingCycle === "yearly" ? "Annual" : "Monthly"} billing
+            </DialogDescription>
           </DialogHeader>
+          <span className="caption" style={{ color: "inherit" }}>
+            {billingCycle === "yearly" ? "Annual" : "Monthly"}
+          </span>
+        </div>
+
+        <div className="space-y-4 p-5">
+          {/* Plan identity */}
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[--radius] bg-primary text-primary-foreground">
+              <Crown className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold tracking-tight">{planName}</p>
+              <p className="folio text-sm text-muted-foreground">
+                {billingCycle === "yearly" ? "Annual" : "Monthly"} billing
+              </p>
+            </div>
+          </div>
 
           {/* Plan highlight chip */}
-          <div className="mt-4 flex items-center gap-2 p-2.5 rounded-lg bg-muted/60 border border-border/50">
-            <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+          <div className="flex items-center gap-2 rounded-[--radius] border border-primary/25 bg-primary/[0.06] p-2.5">
+            <Sparkles className="h-4 w-4 flex-shrink-0 text-primary" />
             <span className="text-sm text-muted-foreground">
               Complete your payment below to unlock <strong className="text-foreground">{planName}</strong> features
             </span>
           </div>
-        </div>
 
-        <div className="px-6 pb-6 space-y-4">
           {loading && (
-            <div className="flex flex-col items-center justify-center py-10 gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <div className="flex flex-col items-center justify-center gap-3 py-10">
+              <div className="grid h-12 w-12 place-items-center rounded-[--radius] bg-primary/10">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
               <p className="text-sm text-muted-foreground">Preparing secure checkout...</p>
             </div>
           )}
 
           {error && (
-            <div className="text-center py-8 space-y-3">
-              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
-                <CreditCard className="w-5 h-5 text-destructive" />
+            <div className="space-y-3 py-8 text-center">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-[--radius] bg-destructive/10">
+                <CreditCard className="h-5 w-5 text-destructive" />
               </div>
               <p className="text-sm text-destructive">{error}</p>
               <button
-                className="text-sm text-primary hover:underline font-medium"
+                className="text-sm font-medium text-primary hover:underline"
                 onClick={loadAndRender}
               >
                 Try again
@@ -246,10 +260,8 @@ export function PayPalCheckoutModal({
             className={loading || error ? "hidden" : "min-h-[150px]"}
           />
 
-          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-3 border-t border-border/50">
-            <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <ShieldCheck className="w-3 h-3 text-emerald-500" />
-            </div>
+          <div className="flex items-center justify-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5" style={{ color: "hsl(var(--secondary))" }} />
             <span>Secure payment powered by PayPal</span>
           </div>
         </div>

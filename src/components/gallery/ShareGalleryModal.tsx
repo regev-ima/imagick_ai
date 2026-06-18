@@ -284,13 +284,13 @@ export function ShareGalleryModal({ isOpen, onClose, gallery, onUpdate }: ShareG
         className="w-full max-w-4xl max-h-[90vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <Card className="glass-card border-border/50 flex flex-col max-h-[90vh]">
+        <Card className="glass-card border-border rounded-[--radius] flex flex-col max-h-[90vh]">
           {/* Header with Link */}
           <div className="p-6 border-b border-border/50 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold">Share Gallery</h2>
-                <p className="text-sm text-muted-foreground">{gallery.name}</p>
+                <p className="aura-microlabel mt-0.5">{gallery.name}</p>
               </div>
               <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="w-5 h-5" />

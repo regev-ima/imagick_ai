@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -22,14 +22,11 @@ import {
   CreditCard,
   Image,
   Wand2,
-  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
@@ -48,22 +45,121 @@ import { useEffectiveUser } from "@/hooks/useImpersonation";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 type Tab = "profile" | "security" | "notifications" | "account";
 
-const tabs: { id: Tab; label: string; icon: React.ElementType; color: string; bg: string }[] = [
-  { id: "profile",       label: "Profile",       icon: User,     color: "text-primary", bg: "bg-primary/10" },
-  { id: "security",      label: "Security",      icon: Lock,     color: "text-primary", bg: "bg-primary/10" },
-  { id: "notifications", label: "Notifications", icon: Bell,     color: "text-primary", bg: "bg-primary/10" },
-  { id: "account",       label: "Account",       icon: Settings, color: "text-primary", bg: "bg-primary/10" },
+const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "profile",       label: "Profile",       icon: User },
+  { id: "security",      label: "Security",      icon: Lock },
+  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "account",       label: "Account",       icon: Settings },
 ];
+
+// LIGHTROOM motion — calm, responsive fades/slides. No bounce, no float.
+const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
+
+/**
+ * The AI mark — a 4-point sparkle (the logo star). Royal blue by default.
+ * Copied from the approved DashboardHome reference; tinted via currentColor
+ * so it inherits text-primary / text-accent tokens.
+ */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/** A Lightroom-style tonal panel — hairline border, soft shadow. */
+function Panel({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div className={cn("glass-card overflow-hidden rounded-[--radius]", className)}>{children}</div>
+  );
+}
+
+/** Mono section header — like a Lightroom module title bar. */
+function PanelHeader({
+  icon,
+  label,
+  trailing,
+  tone = "muted",
+}: {
+  icon?: ReactNode;
+  label: string;
+  trailing?: ReactNode;
+  tone?: "muted" | "ai" | "danger";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 border-b px-4 py-2.5",
+        tone === "ai"
+          ? "border-border bg-primary/[0.08] text-accent"
+          : tone === "danger"
+            ? "border-destructive/30 bg-destructive/[0.08] text-destructive"
+            : "border-border bg-background/40 text-muted-foreground",
+      )}
+    >
+      <span
+        className="aura-microlabel flex items-center gap-2"
+        style={tone === "muted" ? undefined : { color: "inherit" }}
+      >
+        {icon}
+        {label}
+      </span>
+      {trailing}
+    </div>
+  );
+}
+
+/** A hairline-divided settings row — mono-less, label + control. */
+function SettingRow({
+  icon,
+  title,
+  desc,
+  control,
+  className,
+}: {
+  icon?: ReactNode;
+  title: ReactNode;
+  desc?: ReactNode;
+  control: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4 px-4 py-3.5 transition-colors hover:bg-foreground/[0.02]",
+        className,
+      )}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        {icon && <span className="mt-0.5 shrink-0 text-muted-foreground">{icon}</span>}
+        <div className="min-w-0">
+          <p className="text-sm font-medium tracking-tight text-foreground">{title}</p>
+          {desc && <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{desc}</p>}
+        </div>
+      </div>
+      <div className="shrink-0">{control}</div>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { effectiveUserId, effectiveDisplayName, effectiveEmail, isImpersonating } = useEffectiveUser();
   const { theme, setTheme } = useTheme();
-  const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -226,6 +322,22 @@ export default function SettingsPage() {
 
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // ── Delete-account confirmation gate ──────────────────────────────────────
+  // The destructive action stays disabled until the user types their exact
+  // account email (case-insensitive, trimmed). Typing the word DELETE is an
+  // accepted fallback. The typed value is reset whenever the dialog closes.
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
+  const normalizedConfirm = deleteConfirmInput.trim().toLowerCase();
+  const deleteConfirmed =
+    normalizedConfirm.length > 0 &&
+    (normalizedConfirm === (email || "").trim().toLowerCase() || normalizedConfirm === "delete");
+
+  const handleDeleteDialogOpenChange = (open: boolean) => {
+    setDeleteDialogOpen(open);
+    if (!open) setDeleteConfirmInput("");
+  };
+
   const handleDeleteAccount = async () => {
     if (isImpersonating) {
       toast.info("Account deletion is disabled while impersonating");
@@ -286,269 +398,230 @@ export default function SettingsPage() {
   // ── Tab content renderers ────────────────────────────────────────────────
 
   const renderProfile = () => (
-    <Card className="glass-card border-border/50">
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <User className="w-5 h-5 text-primary" />
+    <div className="space-y-6">
+      {/* Identity */}
+      <Panel>
+        <PanelHeader icon={<User className="h-3.5 w-3.5" />} label="Profile — identity" />
+        <div className="p-5 sm:p-6">
+          {/* Avatar */}
+          <div className="flex items-center gap-6">
+            <div className="group relative">
+              <Avatar className="h-20 w-20 plate-keyline ring-1 ring-border ring-offset-2 ring-offset-background">
+                <AvatarImage src={avatarUrl} />
+                <AvatarFallback className="bg-primary text-xl text-primary-foreground">
+                  {userInitials}
+                </AvatarFallback>
+              </Avatar>
+              <button
+                onClick={handlePhotoClick}
+                disabled={isUploadingPhoto}
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+              >
+                {isUploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin text-foreground" /> : <Camera className="h-5 w-5 text-foreground" />}
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif"
+                onChange={handlePhotoChange} className="hidden" />
+              <Button variant="outline" size="sm" className="gap-2"
+                onClick={handlePhotoClick} disabled={isUploadingPhoto}>
+                {isUploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                {isUploadingPhoto ? "Uploading..." : "Change Photo"}
+              </Button>
+              <p className="font-mono text-[11px] text-muted-foreground">JPG, PNG or GIF · Max 2MB</p>
+            </div>
           </div>
-          <div>
-            <CardTitle>Profile Information</CardTitle>
-            <CardDescription>Update your personal information and profile picture</CardDescription>
+
+          <hr className="aura-hairline my-6" />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="aura-microlabel">Display Name</Label>
+              <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your name" className="bg-background border-border" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="aura-microlabel">Email Address</Label>
+              <Input id="email" type="email" value={email} disabled
+                className="bg-background border-border opacity-60" />
+              <p className="font-mono text-[11px] text-muted-foreground">Contact support to change email</p>
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Avatar */}
-        <div className="flex items-center gap-6">
-          <div className="relative group">
-            <Avatar className="w-20 h-20 ring-2 ring-border/50 ring-offset-2 ring-offset-background">
-              <AvatarImage src={avatarUrl} />
-              <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white text-xl">
-                {userInitials}
-              </AvatarFallback>
-            </Avatar>
-            <button
-              onClick={handlePhotoClick}
-              disabled={isUploadingPhoto}
-              className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-            >
-              {isUploadingPhoto ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Camera className="w-5 h-5 text-white" />}
-            </button>
-          </div>
-          <div className="space-y-1.5">
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif"
-              onChange={handlePhotoChange} className="hidden" />
-            <Button variant="outline" size="sm" className="gap-2"
-              onClick={handlePhotoClick} disabled={isUploadingPhoto}>
-              {isUploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-              {isUploadingPhoto ? "Uploading..." : "Change Photo"}
+
+          <div className="mt-6">
+            <Button onClick={handleSaveProfile} disabled={isSaving} className="gap-2">
+              <Save className="h-4 w-4" />
+              {isSaving ? "Saving..." : "Save Changes"}
             </Button>
-            <p className="text-xs text-muted-foreground">JPG, PNG or GIF. Max 2MB.</p>
           </div>
         </div>
+      </Panel>
 
-        <Separator />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="name">Display Name</Label>
-            <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your name" className="bg-muted/50 border-border/50" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input id="email" type="email" value={email} disabled
-              className="bg-muted/50 border-border/50 opacity-60" />
-            <p className="text-xs text-muted-foreground">Contact support to change email</p>
-          </div>
-        </div>
-
-        <Button onClick={handleSaveProfile} disabled={isSaving} className="gap-2">
-          <Save className="w-4 h-4" />
-          {isSaving ? "Saving..." : "Save Changes"}
-        </Button>
-
-        <Separator />
-
-        {/* Appearance */}
-        <div>
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="p-1.5 rounded-lg bg-primary/10">
-              <Palette className="w-4 h-4 text-primary" />
+      {/* Appearance */}
+      <Panel>
+        <PanelHeader icon={<Palette className="h-3.5 w-3.5" />} label="Profile — appearance" />
+        <SettingRow
+          icon={isDarkMode ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          title="Theme"
+          desc="The studio is dark-first. Switch to daylight for soft proofing."
+          control={
+            <div className="flex items-center gap-1 rounded-[--radius] border border-border bg-background p-1">
+              <button
+                onClick={() => handleThemeChange(false)}
+                className={cn(
+                  "flex items-center gap-2 rounded-sm px-3.5 py-1.5 text-sm font-medium transition-colors",
+                  !isDarkMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Sun className="h-4 w-4" />
+                Light
+              </button>
+              <button
+                onClick={() => handleThemeChange(true)}
+                className={cn(
+                  "flex items-center gap-2 rounded-sm px-3.5 py-1.5 text-sm font-medium transition-colors",
+                  isDarkMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Moon className="h-4 w-4" />
+                Dark
+              </button>
             </div>
-            <div>
-              <p className="font-medium text-sm">Appearance</p>
-              <p className="text-xs text-muted-foreground">Choose your preferred theme</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted border border-border/50 w-fit">
-            <button
-              onClick={() => handleThemeChange(false)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                !isDarkMode ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Sun className="w-4 h-4" />
-              Light
-            </button>
-            <button
-              onClick={() => handleThemeChange(true)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                isDarkMode ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Moon className="w-4 h-4" />
-              Dark
-            </button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          }
+        />
+      </Panel>
+    </div>
   );
 
   const renderSecurity = () => (
-    <Card className="glass-card border-border/50">
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Lock className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <CardTitle>Security</CardTitle>
-            <CardDescription>Manage your password and security settings</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <Panel>
+      <PanelHeader icon={<Lock className="h-3.5 w-3.5" />} label="Security — password" />
+      <div className="p-5 sm:p-6">
         <div className="grid gap-4">
           <div className="space-y-2">
-            <Label htmlFor="current-password">Current Password</Label>
+            <Label htmlFor="current-password" className="aura-microlabel">Current Password</Label>
             <div className="relative">
               <Input id="current-password" type={showCurrentPassword ? "text" : "password"}
                 value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter current password" className="bg-muted/50 border-border/50 pr-10" />
+                placeholder="Enter current password" className="bg-background border-border pr-10" />
               <Button type="button" variant="ghost" size="icon"
                 className="absolute right-0 top-0 h-full px-3"
                 onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
-                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
+              <Label htmlFor="new-password" className="aura-microlabel">New Password</Label>
               <div className="relative">
                 <Input id="new-password" type={showNewPassword ? "text" : "password"}
                   value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password" className="bg-muted/50 border-border/50 pr-10" />
+                  placeholder="Enter new password" className="bg-background border-border pr-10" />
                 <Button type="button" variant="ghost" size="icon"
                   className="absolute right-0 top-0 h-full px-3"
                   onClick={() => setShowNewPassword(!showNewPassword)}>
-                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Label htmlFor="confirm-password" className="aura-microlabel">Confirm New Password</Label>
               <Input id="confirm-password" type="password" value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password" className="bg-muted/50 border-border/50" />
+                placeholder="Confirm new password" className="bg-background border-border" />
             </div>
           </div>
         </div>
 
-        <Button onClick={handleChangePassword}
-          disabled={isSaving || !newPassword || !confirmPassword}
-          variant="outline" className="gap-2">
-          <Shield className="w-4 h-4" />
-          Change Password
-        </Button>
-      </CardContent>
-    </Card>
+        <div className="mt-6">
+          <Button onClick={handleChangePassword}
+            disabled={isSaving || !newPassword || !confirmPassword}
+            variant="outline" className="gap-2">
+            <Shield className="h-4 w-4" />
+            Change Password
+          </Button>
+        </div>
+      </div>
+    </Panel>
   );
 
-  const renderNotifications = () => (
-    <Card className="glass-card border-border/50">
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Bell className="w-5 h-5 text-primary" />
+  const renderNotifications = () => {
+    if (prefsLoading) {
+      return (
+        <Panel>
+          <PanelHeader icon={<Bell className="h-3.5 w-3.5" />} label="Notifications — email" />
+          <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading preferences…
           </div>
-          <div>
-            <CardTitle>Email Notifications</CardTitle>
-            <CardDescription>
-              Choose which emails you'd like to receive. Changes save automatically.
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {prefsLoading ? (
-          <div className="flex items-center gap-2 py-4 text-muted-foreground text-sm">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading preferences...
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {notificationGroups.map((group) => (
-              <div key={group.title}>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="p-1.5 rounded-md bg-muted">
-                    <group.icon className={`w-3.5 h-3.5 ${group.color}`} />
-                  </div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {group.title}
-                  </p>
-                </div>
-                <div className="space-y-0 rounded-lg border border-border/50 overflow-hidden">
-                  {group.items.map(({ key, label, desc, icon: ItemIcon }, i) => (
-                    <div key={key} className={cn(
-                      "flex items-center justify-between px-4 py-3.5 hover:bg-muted/30 transition-colors",
-                      i < group.items.length - 1 && "border-b border-border/30"
-                    )}>
-                      <div className="flex items-start gap-3">
-                        <ItemIcon className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium">{label}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-                        </div>
-                      </div>
-                      <Switch checked={emailPrefs[key]} onCheckedChange={(v) => handlePrefToggle(key, v)} />
-                    </div>
-                  ))}
-                </div>
+        </Panel>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <p className="font-mono text-[11px] leading-relaxed text-muted-foreground">
+          Choose which emails you'd like to receive. Changes save automatically.
+        </p>
+        {notificationGroups.map((group) => {
+          const isAi = group.title === "AI Styles";
+          return (
+            <Panel key={group.title}>
+              <PanelHeader
+                tone={isAi ? "ai" : "muted"}
+                icon={isAi ? <Sparkle size={12} className="text-accent" /> : <group.icon className="h-3.5 w-3.5" />}
+                label={`Notifications — ${group.title.toLowerCase()}`}
+              />
+              <div className="divide-y divide-border">
+                {group.items.map(({ key, label, desc, icon: ItemIcon }) => (
+                  <SettingRow
+                    key={key}
+                    icon={<ItemIcon className="h-4 w-4" />}
+                    title={label}
+                    desc={desc}
+                    control={<Switch checked={emailPrefs[key]} onCheckedChange={(v) => handlePrefToggle(key, v)} />}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+            </Panel>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderAccount = () => (
-    <div className="space-y-4">
-      {/* Sign Out */}
-      <Card className="glass-card border-border/50">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <LogOut className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium">Sign Out</p>
-                <p className="text-sm text-muted-foreground">Sign out of your account on this device</p>
-              </div>
-            </div>
+    <div className="space-y-6">
+      {/* Session */}
+      <Panel>
+        <PanelHeader icon={<Settings className="h-3.5 w-3.5" />} label="Account — session" />
+        <SettingRow
+          icon={<LogOut className="h-4 w-4" />}
+          title="Sign Out"
+          desc="Sign out of your account on this device"
+          control={
             <Button variant="outline" onClick={handleSignOut} className="gap-2">
-              <LogOut className="w-4 h-4" />
+              <LogOut className="h-4 w-4" />
               Sign Out
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          }
+        />
+      </Panel>
 
       {/* Danger Zone */}
-      <Card className="glass-card border-destructive/30">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-destructive/10">
-                <Trash2 className="w-5 h-5 text-destructive" />
-              </div>
-              <div>
-                <p className="font-medium text-destructive">Delete Account</p>
-                <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
-              </div>
-            </div>
-            <AlertDialog>
+      <Panel className="border-destructive/40">
+        <PanelHeader tone="danger" icon={<Trash2 className="h-3.5 w-3.5" />} label="Danger zone" />
+        <SettingRow
+          icon={<Trash2 className="h-4 w-4 text-destructive" />}
+          title={<span className="text-destructive">Delete Account</span>}
+          desc="Permanently delete your account and all data"
+          control={
+            <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="gap-2">
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="h-4 w-4" />
                   Delete Account
                 </Button>
               </AlertDialogTrigger>
@@ -556,22 +629,46 @@ export default function SettingsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your account and remove
-                    all your data including galleries, styles, and images.
+                    This permanently deletes your galleries, styles, and images. This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+
+                <div className="space-y-2">
+                  <Label htmlFor="delete-confirm" className="aura-microlabel text-destructive">
+                    Type your email to confirm
+                  </Label>
+                  <Input
+                    id="delete-confirm"
+                    type="text"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={deleteConfirmInput}
+                    onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                    placeholder={email || "DELETE"}
+                    aria-label="Confirm account deletion by typing your email"
+                    className="border-destructive/40 bg-background focus-visible:ring-destructive"
+                  />
+                  <p className="font-mono text-[11px] text-muted-foreground">
+                    Enter{" "}
+                    <span className="font-medium text-foreground">{email || "your account email"}</span>{" "}
+                    to enable deletion.
+                  </p>
+                </div>
+
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteAccount} disabled={isDeleting}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  <AlertDialogAction onClick={handleDeleteAccount} disabled={isDeleting || !deleteConfirmed}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-50">
                     {isDeleting ? "Deleting..." : "Delete Account"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </div>
-        </CardContent>
-      </Card>
+          }
+        />
+      </Panel>
     </div>
   );
 
@@ -583,79 +680,77 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Account <span className="text-gradient-primary">Settings</span>
-        </h1>
-        <p className="text-muted-foreground mt-1.5">Manage your account settings and preferences</p>
-      </motion.div>
-
-      {isImpersonating && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-500">
-          You are viewing this account in impersonation mode. Sensitive actions are disabled.
-        </div>
-      )}
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className={cn(
-          "flex gap-6",
-          isMobile ? "flex-col" : "flex-row items-start"
-        )}
-      >
-        {/* ── Sidebar / Tab list ────────────────────────────────────────── */}
-        {isMobile ? (
-          <div className="flex gap-1.5 overflow-x-auto pb-1 -mb-1">
-            {tabs.map(({ id, label, icon: Icon, color, bg }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all",
-                  activeTab === id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </button>
-            ))}
+    <div className="relative min-h-full bg-background px-5 py-7 lg:px-10 lg:py-10">
+      <div className="mx-auto w-full max-w-[1100px]">
+        {/* ════ MASTHEAD ════════════════════════════════════════════════ */}
+        <motion.header
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE }}
+        >
+          <div className="flex items-center justify-between gap-4 pb-3">
+            <span className="caption">Settings — console</span>
+            <span className="caption flex items-center gap-1.5 text-foreground">
+              <Sparkle size={11} className="text-accent" />
+              {email || "Account"}
+            </span>
           </div>
-        ) : (
-          <div className="w-52 shrink-0 flex flex-col gap-1">
-            {tabs.map(({ id, label, icon: Icon, color, bg }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left",
-                  activeTab === id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                )}
-              >
-                <div className={cn(
-                  "p-1.5 rounded-md transition-colors shrink-0",
-                  activeTab === id ? "bg-white/20" : bg
-                )}>
-                  <Icon className={cn("w-4 h-4", activeTab === id ? "text-primary-foreground" : color)} />
-                </div>
-                {label}
-              </button>
-            ))}
+          <hr className="aura-hairline" />
+          <h1 className="mt-6 text-3xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-4xl">
+            Account <span className="text-accent">settings</span>
+          </h1>
+          <p className="mt-3 font-sans text-base leading-relaxed text-muted-foreground">
+            Manage your profile, security, notifications, and account.
+          </p>
+        </motion.header>
+
+        {isImpersonating && (
+          <div className="mt-6 flex items-center gap-2 rounded-[--radius] border border-[hsl(var(--rating))]/30 bg-[hsl(var(--rating))]/10 px-3.5 py-3 text-sm text-[hsl(var(--rating))]">
+            <Shield className="h-4 w-4 shrink-0" />
+            You are viewing this account in impersonation mode. Sensitive actions are disabled.
           </div>
         )}
 
-        {/* ── Active tab content ───────────────────────────────────────── */}
-        <div className="flex-1 min-w-0">
-          {tabContent[activeTab]}
-        </div>
-      </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE, delay: 0.08 }}
+          className="mt-7 flex flex-col gap-6 lg:flex-row lg:items-start"
+        >
+          {/* ── Section index ──────────────────────────────────────────── */}
+          {/* Mobile: horizontal scroll. Desktop: sticky vertical rail. */}
+          <nav className="flex gap-1.5 overflow-x-auto pb-1 lg:sticky lg:top-6 lg:w-52 lg:shrink-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0">
+            {tabs.map(({ id, label, icon: Icon }) => {
+              const active = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={cn(
+                    "group flex items-center gap-3 whitespace-nowrap rounded-[--radius] px-3 py-2.5 text-left text-sm font-medium transition-colors",
+                    active
+                      ? "bg-primary/[0.1] text-foreground"
+                      : "text-muted-foreground hover:bg-foreground/[0.03] hover:text-foreground",
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-colors",
+                      active ? "text-accent" : "text-muted-foreground group-hover:text-foreground",
+                    )}
+                  />
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* ── Active section content ─────────────────────────────────── */}
+          <div className="min-w-0 flex-1">
+            {tabContent[activeTab]}
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }

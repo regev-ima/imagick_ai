@@ -1,0 +1,3 @@
+# Python bytecode cache generated when running the search scripts
+scripts/__pycache__/
+*.pyc

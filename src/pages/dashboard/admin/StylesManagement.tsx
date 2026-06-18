@@ -18,7 +18,6 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -57,6 +56,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import ShowcaseManager from "./ShowcaseManager";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { AdminLoading } from "@/components/admin/AdminLoading";
 
 interface Style {
    id: string;
@@ -144,11 +145,15 @@ export default function StylesManagement() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ready":
-        return <Badge className="bg-green-500/10 text-green-500 border-green-500/50">Ready</Badge>;
+        return <Badge variant="secondary">Ready</Badge>;
       case "training":
-        return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/50">Training</Badge>;
+        return (
+          <Badge className="border-[hsl(var(--rating)/0.4)] bg-[hsl(var(--rating)/0.15)] text-[hsl(var(--rating))]">
+            Training
+          </Badge>
+        );
       case "error":
-        return <Badge className="bg-red-500/10 text-red-500 border-red-500/50">Error</Badge>;
+        return <Badge variant="destructive">Error</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -156,25 +161,29 @@ export default function StylesManagement() {
 
   const getVisibilityBadge = (visibility: string, isPreset: boolean) => {
     if (isPreset) {
-      return <Badge className="bg-secondary/10 text-secondary border-secondary/50"><Star className="w-3 h-3 mr-1" />Preset</Badge>;
+      return <Badge variant="secondary"><Star className="w-3 h-3 mr-1" />Preset</Badge>;
     }
     if (visibility === "public") {
-      return <Badge className="bg-primary/10 text-primary border-primary/50"><Globe className="w-3 h-3 mr-1" />Public</Badge>;
+      return <Badge variant="default"><Globe className="w-3 h-3 mr-1" />Public</Badge>;
     }
     return <Badge variant="outline"><Lock className="w-3 h-3 mr-1" />Private</Badge>;
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="min-h-full bg-background p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-[1320px] space-y-5">
+      <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/dashboard/admin">
+          <Link to="/dashboard/admin" aria-label="Back to admin">
             <ArrowLeft className="w-5 h-5" />
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold">Styles & Showcase</h1>
-          <p className="text-muted-foreground">Manage styles, presets, and before/after previews</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Styles & Showcase</h1>
+          <p className="caption mt-1 flex items-center gap-1.5">
+            <Sparkles className="h-3 w-3" />
+            Manage styles, presets, and before/after previews
+          </p>
         </div>
         <Button onClick={() => navigate("/dashboard/styles/new")}>
           <Plus className="w-4 h-4 mr-2" />
@@ -182,53 +191,56 @@ export default function StylesManagement() {
         </Button>
       </div>
 
-      <Tabs defaultValue="styles" className="space-y-6">
+      <Tabs defaultValue="styles" className="space-y-5">
         <TabsList>
           <TabsTrigger value="styles">Manage Styles</TabsTrigger>
           <TabsTrigger value="showcase">Showcase Manager</TabsTrigger>
         </TabsList>
 
         <TabsContent value="styles">
-          <Card className="glass-card">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                <div className="flex items-center gap-2 flex-1 max-w-md">
-                  <Search className="w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search styles..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1"
-                  />
-                </div>
-                <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Filter" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Styles</SelectItem>
-                    <SelectItem value="preset">Presets Only</SelectItem>
-                    <SelectItem value="public">Public</SelectItem>
-                    <SelectItem value="private">Private</SelectItem>
-                  </SelectContent>
-                </Select>
+          <div className="glass-card overflow-hidden rounded-[--radius]">
+            <div className="flex flex-col justify-between gap-3 border-b border-border bg-background/40 p-3 sm:flex-row">
+              <div className="flex max-w-md flex-1 items-center gap-2 rounded-[--radius] border border-border bg-background px-3">
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <Input
+                  placeholder="Search styles..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 border-0 bg-transparent px-0 focus-visible:ring-0"
+                />
               </div>
-            </CardHeader>
-            <CardContent>
+              <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Styles</SelectItem>
+                  <SelectItem value="preset">Presets Only</SelectItem>
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="private">Private</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground">Loading styles...</div>
+                <AdminLoading rows={6} label="Loading styles" />
               ) : styles?.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No styles found</div>
+                <AdminEmptyState
+                  icon={Sparkles}
+                  title="No styles found"
+                  hint={searchQuery || visibilityFilter !== "all" ? "Try adjusting your search or filter." : "Trained styles will appear here."}
+                />
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                     <TableRow>
-                       <TableHead>Style</TableHead>
-                       <TableHead>Status</TableHead>
-                       <TableHead>Visibility</TableHead>
-                       <TableHead>Active</TableHead>
-                       <TableHead>Created</TableHead>
-                       <TableHead className="text-right">Actions</TableHead>
+                     <TableRow className="hover:bg-transparent">
+                       <TableHead className="aura-microlabel">Style</TableHead>
+                       <TableHead className="aura-microlabel">Status</TableHead>
+                       <TableHead className="aura-microlabel">Visibility</TableHead>
+                       <TableHead className="aura-microlabel">Active</TableHead>
+                       <TableHead className="aura-microlabel">Created</TableHead>
+                       <TableHead className="aura-microlabel text-right">Actions</TableHead>
                      </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -236,22 +248,22 @@ export default function StylesManagement() {
                       <TableRow key={style.id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-lg bg-muted overflow-hidden">
+                            <div className="h-12 w-12 overflow-hidden rounded-[--radius] bg-muted plate-keyline">
                               {style.thumbnail_url ? (
                                 <img
                                   src={style.thumbnail_url}
                                   alt={style.name}
-                                  className="w-full h-full object-cover"
+                                  className="h-full w-full object-cover"
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center">
+                                <div className="flex h-full w-full items-center justify-center">
                                   <Sparkles className="w-5 h-5 text-muted-foreground" />
                                 </div>
                               )}
                             </div>
                             <div>
                               <p className="font-medium">{style.name}</p>
-                              <p className="text-sm text-muted-foreground truncate max-w-xs">
+                              <p className="max-w-xs truncate text-sm text-muted-foreground">
                                 {style.description || "No description"}
                               </p>
                             </div>
@@ -261,18 +273,18 @@ export default function StylesManagement() {
                          <TableCell>{getVisibilityBadge(style.visibility, style.is_preset)}</TableCell>
                          <TableCell>
                            {style.is_active ? (
-                             <Badge className="bg-primary/10 text-primary border-primary/50"><Power className="w-3 h-3 mr-1" />Active</Badge>
+                             <Badge variant="default"><Power className="w-3 h-3 mr-1" />Active</Badge>
                            ) : (
                              <Badge variant="outline" className="text-muted-foreground"><PowerOff className="w-3 h-3 mr-1" />Inactive</Badge>
                            )}
                          </TableCell>
-                         <TableCell className="text-muted-foreground">
+                         <TableCell className="folio text-muted-foreground">
                            {format(new Date(style.created_at), "MMM d, yyyy")}
                          </TableCell>
                          <TableCell className="text-right">
                            <DropdownMenu>
                              <DropdownMenuTrigger asChild>
-                               <Button variant="ghost" size="icon">
+                               <Button variant="ghost" size="icon" aria-label="Style actions">
                                  <MoreHorizontal className="w-4 h-4" />
                                </Button>
                              </DropdownMenuTrigger>
@@ -342,9 +354,10 @@ export default function StylesManagement() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="showcase">
@@ -373,6 +386,7 @@ export default function StylesManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }
