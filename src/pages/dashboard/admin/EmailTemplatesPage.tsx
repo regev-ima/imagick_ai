@@ -173,6 +173,7 @@ export default function EmailTemplatesPage() {
                         size="sm"
                         onClick={() => handlePreview(template.key)}
                         disabled={previewingKey === template.key}
+                        aria-label={`Preview ${template.label}`}
                       >
                         {previewingKey === template.key ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -186,6 +187,7 @@ export default function EmailTemplatesPage() {
                         size="sm"
                         onClick={() => handleSend(template.key)}
                         disabled={sendingKey === template.key}
+                        aria-label={`Send test ${template.label}`}
                       >
                         {sendingKey === template.key ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
