@@ -590,7 +590,7 @@ export default function EmailLogsPage() {
           </>
         )}
 
-        <Button variant="outline" size="icon" onClick={refetchFromStart} disabled={isFetching}>
+        <Button variant="outline" size="icon" onClick={refetchFromStart} disabled={isFetching} aria-label="Refresh from start">
           <RefreshCw className={cn("w-4 h-4", isFetching && "animate-spin")} />
         </Button>
 

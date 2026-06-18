@@ -116,7 +116,7 @@
                    <Button
                      variant="ghost"
                      size="icon"
-                     className="h-8 w-8 shrink-0"
+                     aria-label="Edit plan" className="h-8 w-8 shrink-0"
                      onClick={() => {
                        setEditingPlan(plan);
                        setIsDialogOpen(true);

@@ -74,7 +74,7 @@ export default function UserDetailPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 overflow-x-auto text-sm text-muted-foreground">
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
-          <Link to="/dashboard/admin/users">
+          <Link to="/dashboard/admin/users" aria-label="Back to users">
             <ArrowLeft className="w-4 h-4" />
           </Link>
         </Button>

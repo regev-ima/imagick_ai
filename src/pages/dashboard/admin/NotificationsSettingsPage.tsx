@@ -157,7 +157,7 @@ export default function NotificationsSettingsPage() {
                     <p className="font-medium">{r.name}</p>
                     <p className="font-mono text-sm text-muted-foreground">{r.chatId.replace("@c.us", "")}</p>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => handleRemove(r.chatId)} disabled={saveMutation.isPending}>
+                  <Button variant="ghost" size="icon" onClick={() => handleRemove(r.chatId)} disabled={saveMutation.isPending} aria-label="Remove recipient">
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
