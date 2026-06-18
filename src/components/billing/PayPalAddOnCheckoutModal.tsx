@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck, Package } from "lucide-react";
 
 declare global {
   interface Window {
@@ -164,26 +164,40 @@ export function PayPalAddOnCheckoutModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Purchase {addonLabel}</DialogTitle>
-          <DialogDescription>
-            One-time payment of ${addonPrice} • Complete below
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="surface-2 overflow-hidden p-0 sm:max-w-md sm:rounded-[--radius]">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+          <DialogHeader className="space-y-0">
+            <DialogTitle asChild>
+              <span className="aura-microlabel flex items-center gap-2">
+                <Package className="h-3.5 w-3.5" />
+                Purchase {addonLabel}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              One-time payment of ${addonPrice}
+            </DialogDescription>
+          </DialogHeader>
+          <span className="folio text-sm text-foreground">${addonPrice}</span>
+        </div>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 p-5">
+          <p className="text-sm text-muted-foreground">
+            One-time payment of <strong className="folio text-foreground">${addonPrice}</strong> · Complete below
+          </p>
+
           {loading && (
-            <div className="flex flex-col items-center justify-center py-8 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="flex flex-col items-center justify-center gap-3 py-8">
+              <div className="grid h-12 w-12 place-items-center rounded-[--radius] bg-primary/10">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
               <p className="text-sm text-muted-foreground">Loading payment options...</p>
             </div>
           )}
 
           {error && (
-            <div className="text-center py-6">
-              <p className="text-sm text-destructive mb-2">{error}</p>
-              <button className="text-sm text-primary underline" onClick={loadAndRender}>
+            <div className="py-6 text-center">
+              <p className="mb-2 text-sm text-destructive">{error}</p>
+              <button className="text-sm font-medium text-primary hover:underline" onClick={loadAndRender}>
                 Try again
               </button>
             </div>
@@ -191,8 +205,8 @@ export function PayPalAddOnCheckoutModal({
 
           <div ref={containerRef} className={loading || error ? "hidden" : "min-h-[150px]"} />
 
-          <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground pt-2 border-t border-border/50">
-            <ShieldCheck className="w-3.5 h-3.5" />
+          <div className="flex items-center justify-center gap-1.5 border-t border-border pt-3 text-xs text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5" style={{ color: "hsl(var(--secondary))" }} />
             <span>Secure payment powered by PayPal</span>
           </div>
         </div>

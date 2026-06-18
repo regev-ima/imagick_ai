@@ -104,7 +104,7 @@ function tinyUnsubscribeFooter(unsubscribeUrl: string) {
   return `
     <p style="margin:22px 0 0;font-size:10px;line-height:1.45;color:#9e99ab;">
       No commitment, no lock-in.
-      <a href="${escAttr(unsubscribeUrl)}" style="color:#e85c9b;text-decoration:underline;">Unsubscribe</a>
+      <a href="${escAttr(unsubscribeUrl)}" style="color:#2C57F2;text-decoration:underline;">Unsubscribe</a>
     </p>
   `;
 }
@@ -113,12 +113,12 @@ function leadCtaBlock(studioUrl: string) {
   const ctaUrl = `${studioUrl}/auth`;
   return `
     <div style="margin:26px 0 0;">
-      <a href="${escAttr(ctaUrl)}" style="display:inline-block;padding:12px 22px;border-radius:12px;background:linear-gradient(90deg,#e85c9b 0%,#9a5be8 100%);color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;line-height:1.2;">
+      <a href="${escAttr(ctaUrl)}" style="display:inline-block;padding:12px 22px;border-radius:12px;background:linear-gradient(90deg,#2C57F2 0%,#3D67FF 100%);color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;line-height:1.2;">
         Start your free trial
       </a>
       <p style="margin:10px 0 0;font-size:13px;color:#66637a;">
         Prefer a direct link?
-        <a href="${escAttr(ctaUrl)}" style="color:#7e3fd4;text-decoration:underline;">Open Studio</a>
+        <a href="${escAttr(ctaUrl)}" style="color:#3D67FF;text-decoration:underline;">Open Studio</a>
       </p>
     </div>
   `;
@@ -214,19 +214,19 @@ function wrapLeadLightShell(params: {
   <meta name="supported-color-schemes" content="light" />
   <title>${escAttr(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background:#ece9f2;font-family:'Inter',Arial,sans-serif;color:#18181b;">
+<body style="margin:0;padding:0;background:#F5F7FC;font-family:'Inter',Arial,sans-serif;color:#18181b;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:34px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:690px;background:#ffffff;border:1px solid #e4e0ef;border-radius:20px;overflow:hidden;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:690px;background:#ffffff;border:1px solid #E1E6F0;border-radius:20px;overflow:hidden;">
           <tr>
-            <td style="padding:28px 32px;background:linear-gradient(135deg,#1a0a2e 0%,#0e0e17 100%);text-align:center;">
+            <td style="padding:28px 32px;background:linear-gradient(135deg,#1F2024 0%,#16171A 100%);text-align:center;">
               <img src="${escAttr(logoUrl)}" alt="Imagick.ai" width="160" style="display:inline-block;height:auto;" />
             </td>
           </tr>
           <tr>
             <td style="padding:34px 36px 30px;">
-              <div style="display:inline-block;padding:4px 14px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#e85c9b;border:1px solid #e6a3c4;">
+              <div style="display:inline-block;padding:4px 14px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#2C57F2;border:1px solid #9DB1F0;">
                 ${escAttr(badgeLabel)}
               </div>
               <div style="margin-top:18px;font-size:16px;line-height:1.68;color:#3f3f46;">
@@ -242,7 +242,7 @@ function wrapLeadLightShell(params: {
             </td>
           </tr>
           <tr>
-            <td style="padding:18px 32px;background:#f5f3fa;border-top:1px solid #e4e0ef;text-align:center;">
+            <td style="padding:18px 32px;background:#F0F3FA;border-top:1px solid #E1E6F0;text-align:center;">
               <p style="margin:0;font-size:12px;color:#9a95a8;line-height:1.7;">
                 © ${new Date().getFullYear()} Imagick.ai &nbsp;·&nbsp;
                 <a href="https://imagick.ai" style="color:#5f5a70;text-decoration:none;">imagick.ai</a>
@@ -295,7 +295,7 @@ function wrapSapirEmail(
         <td style="vertical-align:middle;">
           <p style="margin:0;font-size:16px;font-weight:700;color:#15151d;">Sapir Cohen</p>
           <p style="margin:2px 0 0 0;font-size:12px;color:#6b667b;">Sales Manager, Imagick.ai</p>
-          <p style="margin:2px 0 0 0;font-size:12px;"><a href="mailto:sapir@imagick.ai" style="color:#e85c9b;text-decoration:none;">sapir@imagick.ai</a></p>
+          <p style="margin:2px 0 0 0;font-size:12px;"><a href="mailto:sapir@imagick.ai" style="color:#2C57F2;text-decoration:none;">sapir@imagick.ai</a></p>
         </td>
       </tr>
     </table>

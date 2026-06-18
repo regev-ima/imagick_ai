@@ -1,28 +1,57 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Loader2, Camera, Sparkles, Zap, MailCheck, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Loader2, MailCheck, ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordStrength } from "@/components/ui/password-strength";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
-import imagickLogo from "@/assets/imagick-logo.png";
-import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
+import { useBrandLogo } from "@/hooks/useBrandLogo";
+import heroPlate from "@/assets/hero-gallery-1.jpg";
 
-const features = [
-  { icon: Zap, title: "Save 10+ hrs/week", iconColor: "text-primary", stat: "10+" },
-  { icon: Camera, title: "Faster culling", iconColor: "text-blue-400", stat: "90%" },
-  { icon: Sparkles, title: "AI accuracy", iconColor: "text-accent", stat: "99%" },
+// LIGHTROOM stats readout — mono caption labels + folio numerals.
+const colophon = [
+  { stat: "10+", label: "Hours saved / week" },
+  { stat: "90%", label: "Faster culling" },
+  { stat: "99%", label: "AI accuracy" },
 ];
+
+const EASE = [0.22, 0.61, 0.36, 1] as const;
+
+// The AI mark: a royal-blue 4-point sparkle (the logo star).
+// Copied from the approved LightroomDashboard preview.
+function Sparkle({
+  size = 16,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { logo: imagickLogo } = useBrandLogo();
   const { user, isAuthenticated, isEmailVerified, isLoading: authLoading } = useAuth();
 
   const [isAwaitingVerification, setIsAwaitingVerification] = useState(false);
@@ -67,11 +96,20 @@ export default function AuthPage() {
   const [loginFailures, setLoginFailures] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [, setTick] = useState(0);
+  // Form-level auth error shown inline (announced via role="alert") instead of
+  // a transient toast the user can miss right where they're acting.
+  const [authError, setAuthError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     fullName: "",
   });
+
+  // Update a field and clear any standing error so it doesn't linger.
+  const updateField = (patch: Partial<typeof formData>) => {
+    setFormData((prev) => ({ ...prev, ...patch }));
+    if (authError) setAuthError(null);
+  };
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -124,8 +162,9 @@ export default function AuthPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!formData.email) {
-      toast.error("Please enter your email address");
+      setAuthError("Please enter your email address.");
       return;
     }
     setIsLoading(true);
@@ -143,7 +182,7 @@ export default function AuthPage() {
       // transient toast that the user might miss.
       setPasswordResetSent(true);
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      setAuthError("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -151,14 +190,15 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
 
     if (isLockedOut()) {
-      toast.error(`Too many failed attempts. Try again in ${lockoutSecondsLeft()} seconds.`);
+      setAuthError(`Too many failed attempts. Try again in ${lockoutSecondsLeft()} seconds.`);
       return;
     }
 
     if (!isLogin && !isPasswordStrong(formData.password)) {
-      toast.error("Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.");
+      setAuthError("Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.");
       return;
     }
 
@@ -202,8 +242,8 @@ export default function AuthPage() {
 
         // Supabase returns success with empty identities when email already exists
         if (!data.user?.identities?.length) {
-          toast.error("An account with this email already exists. Try signing in instead.");
           setIsLogin(true);
+          setAuthError("An account with this email already exists. Try signing in instead.");
           return;
         }
 
@@ -212,7 +252,7 @@ export default function AuthPage() {
         setIsAwaitingVerification(true);
       }
     } catch (error: any) {
-      toast.error(error.message || "Something went wrong");
+      setAuthError(error.message || "Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -222,16 +262,20 @@ export default function AuthPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md text-center"
+          transition={{ duration: 0.5, ease: EASE }}
+          className="w-full max-w-md"
         >
-          <img src={imagickLogo} alt="Imagick.ai" className="h-8 mx-auto mb-8" />
+          <div className="flex items-center justify-center mb-8">
+            <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
+          </div>
 
-          <Card className="glass-card border-border/50 p-8">
-            <MailCheck className="w-12 h-12 text-primary mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Check your email</h2>
-            <p className="text-muted-foreground mb-6">
+          <div className="glass-card rounded-md p-8 text-center">
+            <div className="aura-microlabel mb-5">Verify · Account</div>
+            <MailCheck className="w-10 h-10 text-primary mx-auto mb-5" />
+            <h2 className="font-sans text-3xl font-semibold tracking-tight mb-3 leading-tight">Check your email</h2>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
               We sent a verification link to{" "}
               <span className="font-medium text-foreground">{pendingEmail}</span>.
               <br />
@@ -252,9 +296,11 @@ export default function AuthPage() {
               Resend verification email
             </Button>
 
-            <p className="text-xs text-muted-foreground mb-4">
+            <p className="text-xs text-muted-foreground mb-5">
               Didn't get it? Check your spam folder.
             </p>
+
+            <div className="aura-hairline mb-5" />
 
             <button
               type="button"
@@ -263,12 +309,12 @@ export default function AuthPage() {
                 setPendingEmail("");
                 setIsLogin(true);
               }}
-              className="text-sm text-gradient hover:underline font-medium inline-flex items-center gap-1"
+              className="text-sm text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary font-medium inline-flex items-center gap-1.5"
             >
-              <ArrowLeft className="w-3 h-3" />
+              <ArrowLeft className="w-3.5 h-3.5" />
               Back to sign in
             </button>
-          </Card>
+          </div>
         </motion.div>
       </div>
     );
@@ -276,175 +322,161 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Left Hero Section */}
-      <div className="hidden lg:flex lg:w-3/5">
-        <BackgroundGradientAnimation
-          gradientBackgroundStart="rgb(8, 2, 18)"
-          gradientBackgroundEnd="rgb(2, 5, 25)"
-          firstColor="200, 60, 140"
-          secondColor="130, 70, 200"
-          thirdColor="80, 140, 255"
-          fourthColor="180, 40, 100"
-          fifthColor="100, 60, 180"
-          pointerColor="200, 60, 140"
-          size="80%"
-          containerClassName="h-full w-full"
-          className="absolute z-50 inset-0 flex items-center justify-center"
-        >
-          {/* Hero Content */}
-          <div className="max-w-xl px-12 pointer-events-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
+      {/* ─────────────────────────────────────────────────────────────
+          LEFT — the studio. Dark graphite, royal-blue accents, the
+          hero photo framed as a Lightroom cell, Inter headline,
+          stats as a mono readout row.
+         ───────────────────────────────────────────────────────────── */}
+      <div className="hidden lg:flex lg:w-3/5 relative bg-background border-r border-border overflow-hidden">
+        {/* subtle royal-blue accent glow */}
+        <div
+          className="pointer-events-none absolute -left-32 top-1/4 h-[28rem] w-[28rem] rounded-full blur-3xl"
+          style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.14) 0%, transparent 70%)" }}
+        />
+        <div className="relative mx-auto flex w-full max-w-5xl flex-col justify-between px-14 xl:px-20 py-14">
+          {/* Brand row — Ai mark + sparkle */}
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: EASE }}
+            className="flex items-center justify-between"
+          >
+            <div className="flex items-center">
+              <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
+            </div>
+            <span className="aura-microlabel">AI Workspace · 2026</span>
+          </motion.div>
+
+          {/* Title block */}
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE, delay: 0.05 }}
+            className="max-w-3xl"
+          >
+            <div className="aura-microlabel mb-6 flex items-center gap-2">
+              <Sparkle size={11} className="text-primary" />
+              The AI editing studio
+            </div>
+
+            <h1 className="font-sans font-bold leading-[0.98] tracking-[-0.03em] text-foreground text-6xl xl:text-7xl">
+              Your editing.
+              <br />
+              Your AI.
+              <br />
+              <span className="text-primary">Zero presets.</span>
+            </h1>
+
+            <div className="aura-hairline my-9 max-w-lg" />
+
+            <p className="text-lg text-muted-foreground max-w-lg leading-relaxed">
+              Train an AI model on your unique editing style. Apply it to
+              thousands of photos in seconds.
+            </p>
+
+            {/* Hero photo framed as a Lightroom cell */}
+            <motion.figure
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: 0.6, ease: EASE, delay: 0.18 }}
+              className="surface-2 plate-keyline rounded-md mt-10 p-2.5 max-w-lg"
             >
-              <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-              >
-                <img src={imagickLogo} alt="Imagick.ai" className="h-10 mb-10" />
-              </motion.div>
-
-              {/* AI badge */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.15, duration: 0.4 }}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-primary/20 to-violet-500/20 backdrop-blur-md border border-primary/30 rounded-full px-3.5 py-1.5 mb-6"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+              <div className="relative overflow-hidden rounded-[2px] border border-border">
+                <img
+                  src={heroPlate}
+                  alt="A photograph edited with a custom AI style"
+                  className="w-full aspect-[16/9] object-cover"
+                />
+                {/* AI auto badge */}
+                <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground shadow-lg">
+                  <Sparkle size={12} className="text-primary-foreground" />
+                  Auto
+                </div>
+              </div>
+              <figcaption className="caption flex items-center justify-between pt-2.5 px-0.5">
+                <span>Your style, applied</span>
+                <span className="flex items-center gap-1.5 text-primary">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  READY
                 </span>
-                <span className="text-xs text-white/90 font-medium tracking-wide">Powered by AI · 2026</span>
-              </motion.div>
+              </figcaption>
+            </motion.figure>
+          </motion.div>
 
-              <h1 className="text-5xl xl:text-6xl font-bold leading-[1.1] mb-5">
-                <span className="text-white/95">Your editing.</span>
-                <br />
-                <span className="text-gradient">Your AI.</span>
-                <br />
-                <span className="text-white/50 text-4xl xl:text-5xl">Zero presets.</span>
-              </h1>
-
-              <p className="text-lg text-white/50 mb-10 max-w-md leading-relaxed">
-                Train an AI model on your unique editing style. Apply it to thousands of photos in seconds.
-              </p>
-
-              {/* Stats row */}
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.5 }}
-                className="flex gap-6 mb-10"
-              >
-                {features.map((feature, i) => (
-                  <motion.div
-                    key={feature.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.35 + i * 0.1, duration: 0.4 }}
-                    className="relative"
-                  >
-                    <div className="text-3xl font-bold text-white/90 tabular-nums">{feature.stat}</div>
-                    <div className="text-xs text-white/40 font-medium mt-0.5">{feature.title}</div>
-                    <div className={`absolute -left-3 top-1 w-1 h-8 rounded-full ${feature.iconColor.replace("text-", "bg-")} opacity-50`} />
-                  </motion.div>
-                ))}
-              </motion.div>
-
-              {/* Social proof */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.6, duration: 0.5 }}
-                className="flex items-center gap-3"
-              >
-                <div className="flex -space-x-2">
-                  {["S", "J", "A", "M", "R"].map((initial, i) => (
-                    <div
-                      key={i}
-                      className="w-7 h-7 rounded-full border-2 border-background/50 flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                      style={{ background: `hsl(${280 + i * 25}, 70%, 45%)` }}
-                    >
-                      {initial}
-                    </div>
-                  ))}
+          {/* Stats — mono readout row (caption labels + folio numerals) */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE, delay: 0.3 }}
+            className="border-t border-border pt-7"
+          >
+            <dl className="grid grid-cols-3 gap-8 max-w-xl">
+              {colophon.map((item) => (
+                <div key={item.label}>
+                  <dt className="folio text-4xl xl:text-5xl text-foreground">{item.stat}</dt>
+                  <dd className="caption mt-2">{item.label}</dd>
                 </div>
-                <div>
-                  <div className="text-sm text-white/70 font-medium">10,000+ photographers</div>
-                  <div className="text-[10px] text-white/35">already editing with AI</div>
-                </div>
-              </motion.div>
-            </motion.div>
-          </div>
-        </BackgroundGradientAnimation>
+              ))}
+            </dl>
+            <p className="caption mt-7">10,000+ photographers · already editing with AI</p>
+          </motion.div>
+        </div>
       </div>
 
-      {/* Right Form Section */}
-      <div className="w-full lg:w-2/5 flex items-center justify-center p-6 lg:p-10">
+      {/* ─────────────────────────────────────────────────────────────
+          RIGHT — the dark sign-in panel.
+         ───────────────────────────────────────────────────────────── */}
+      <div className="w-full lg:w-2/5 flex items-center justify-center p-6 lg:p-12 bg-background">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
           className="w-full max-w-md"
         >
           {/* Mobile-only header */}
-          <div className="relative text-center mb-8 lg:hidden overflow-hidden rounded-2xl p-6">
-            <div className="absolute inset-0 animate-gradient-shift bg-[length:400%_400%] rounded-2xl opacity-80"
-              style={{
-                backgroundImage: "linear-gradient(135deg, hsl(270, 50%, 10%) 0%, hsl(330, 40%, 12%) 25%, hsl(240, 40%, 8%) 50%, hsl(200, 50%, 10%) 75%, hsl(270, 50%, 10%) 100%)",
-              }}
-            />
-            <div className="relative z-10">
-              <img src={imagickLogo} alt="Imagick.ai" className="h-8 mx-auto mb-3" />
-              <div className="inline-flex items-center gap-1.5 bg-primary/20 border border-primary/30 rounded-full px-2.5 py-1 mb-3">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
-                </span>
-                <span className="text-[10px] text-white/80 font-medium">AI-Powered · 2026</span>
-              </div>
-              <h1 className="text-xl font-bold text-gradient">
-                Your AI. Your Style.
-              </h1>
-              <p className="text-xs text-muted-foreground mt-1.5">
-                10,000+ photographers already editing with AI
-              </p>
+          <div className="text-center mb-8 lg:hidden">
+            <div className="flex items-center justify-center mb-4">
+              <img src={imagickLogo} alt="Imagick.ai" className="h-7" />
             </div>
+            <div className="aura-microlabel mb-3">The AI editing studio</div>
+            <h1 className="font-sans text-3xl font-bold tracking-tight leading-tight">
+              Your editing. Your AI.
+              <br />
+              <span className="text-primary">Zero presets.</span>
+            </h1>
+            <p className="caption mt-4">10,000+ photographers editing with AI</p>
           </div>
 
           {/* Desktop header */}
           <div className="hidden lg:block mb-8">
-            <div className="inline-flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-full px-2.5 py-1 mb-4">
-              <Sparkles className="w-3 h-3 text-primary" />
-              <span className="text-[10px] text-primary font-medium uppercase tracking-wider">AI Photo Editor</span>
+            <div className="aura-microlabel mb-3 flex items-center gap-2">
+              <Sparkle size={11} className="text-primary" />
+              {isForgotPassword ? "Recover · Access" : isLogin ? "AI Workspace · Sign in" : "AI Workspace · Register"}
             </div>
-            <h2 className="text-2xl font-bold">
-              {isForgotPassword ? "Reset password" : isLogin ? "Welcome back" : "Start editing with AI"}
+            <h2 className="font-sans text-4xl font-bold tracking-tight leading-tight">
+              {isForgotPassword ? "Reset password" : isLogin ? "Welcome back" : "Start editing"}
             </h2>
-            <p className="text-muted-foreground mt-1.5 text-sm">
+            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
               {isForgotPassword
                 ? "Enter your email and we'll send you a reset link."
                 : isLogin
-                ? "Sign in to continue to your AI workspace."
+                ? "Sign in to continue to your studio."
                 : "Train your own AI style model. No presets, just you."}
             </p>
           </div>
 
-          <Card className="glass-card border-border/50 p-6">
-            {/* Google Sign In - prominent at top, hidden in forgot mode */}
+          <div className="glass-card rounded-md p-7">
+            {/* Google Sign In — prominent at top, hidden in forgot mode */}
             {!isForgotPassword && (
               <>
                 <button
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={isLoading || isGoogleLoading}
-                  className="relative w-full h-12 rounded-lg text-base font-semibold flex items-center justify-center gap-3 bg-white text-gray-800 transition-all duration-300 hover:bg-gray-50 hover:scale-[1.02] hover:shadow-[0_4px_24px_rgba(0,0,0,0.25)] disabled:pointer-events-none disabled:opacity-50"
+                  className="relative w-full h-11 rounded-md text-sm font-semibold flex items-center justify-center gap-3 border border-border bg-surface-2 text-foreground transition-[border-color,background-color] duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:border-primary/40 hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
                 >
                   {isGoogleLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                   ) : (
                     <>
                       <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -458,22 +490,23 @@ export default function AuthPage() {
                   )}
                 </button>
 
-                <div className="relative my-5">
+                {/* "or" hairline divider */}
+                <div className="relative my-6">
                   <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
+                    <span className="w-full aura-hairline" />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">or continue with email</span>
+                  <div className="relative flex justify-center">
+                    <span className="glass-card px-3 caption !border-0 !shadow-none">or continue with email</span>
                   </div>
                 </div>
               </>
             )}
 
             {isForgotPassword && passwordResetSent && (
-              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center space-y-3">
-                <MailCheck className="w-12 h-12 mx-auto text-primary" />
-                <h3 className="text-lg font-semibold">Check your email</h3>
-                <p className="text-sm text-muted-foreground">
+              <div className="rounded-md border border-border bg-surface-2 p-6 text-center space-y-3">
+                <MailCheck className="w-10 h-10 mx-auto text-primary" />
+                <h3 className="font-sans text-2xl font-semibold tracking-tight">Check your email</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   If an account exists for <strong className="text-foreground">{formData.email}</strong>,
                   we've sent a reset link. It can take a minute to arrive — also check spam.
                 </p>
@@ -482,6 +515,7 @@ export default function AuthPage() {
                   variant="ghost"
                   className="text-primary hover:text-primary"
                   onClick={() => {
+                    setAuthError(null);
                     setIsForgotPassword(false);
                     setPasswordResetSent(false);
                   }}
@@ -496,15 +530,20 @@ export default function AuthPage() {
             <form onSubmit={isForgotPassword ? handleForgotPassword : handleSubmit} className="space-y-4">
               {isForgotPassword ? (
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Email</label>
+                  <label htmlFor="reset-email" className="caption mb-2 block">Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
+                      id="reset-email"
                       type="email"
                       placeholder="you@example.com"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="pl-10 bg-muted border-border/50"
+                      onChange={(e) => updateField({ email: e.target.value })}
+                      autoComplete="email"
+                      inputMode="email"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                       required
                     />
                   </div>
@@ -513,17 +552,17 @@ export default function AuthPage() {
               <>
               {!isLogin && (
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Full Name</label>
+                  <label htmlFor="fullName" className="caption mb-2 block">Full Name</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
+                      id="fullName"
                       type="text"
                       placeholder="John Doe"
                       value={formData.fullName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, fullName: e.target.value })
-                      }
-                      className="pl-10 bg-muted border-border/50"
+                      onChange={(e) => updateField({ fullName: e.target.value })}
+                      autoComplete="name"
+                      className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                       required={!isLogin}
                     />
                   </div>
@@ -531,41 +570,46 @@ export default function AuthPage() {
               )}
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Email</label>
+                <label htmlFor="email" className="caption mb-2 block">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
+                    id="email"
                     type="email"
                     placeholder="you@example.com"
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    className="pl-10 bg-muted border-border/50"
+                    onChange={(e) => updateField({ email: e.target.value })}
+                    autoComplete="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="pl-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Password</label>
+                <label htmlFor="password" className="caption mb-2 block">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
+                    id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    className="pl-10 pr-10 bg-muted border-border/50"
+                    onChange={(e) => updateField({ password: e.target.value })}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
+                    className="pl-10 pr-10 rounded-md bg-background border-input focus-visible:border-primary focus-visible:ring-primary/25 focus-visible:shadow-none"
                     required
                     minLength={8}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -579,11 +623,11 @@ export default function AuthPage() {
                   <PasswordStrength password={formData.password} className="mt-3" />
                 )}
                 {isLogin && (
-                  <div className="text-right mt-1">
+                  <div className="text-right mt-2">
                     <button
                       type="button"
-                      onClick={() => setIsForgotPassword(true)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => { setAuthError(null); setIsForgotPassword(true); }}
+                      className="caption hover:text-primary transition-colors"
                     >
                       Forgot password?
                     </button>
@@ -593,10 +637,21 @@ export default function AuthPage() {
               </>
               )}
 
+              {authError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2.5 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5"
+                >
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <p className="text-sm leading-snug text-destructive">{authError}</p>
+                </div>
+              )}
+
               <Button
                 type="submit"
-                variant="glow"
-                className="w-full gap-2 font-semibold"
+                variant={isLogin && !isForgotPassword ? "default" : "glow"}
+                size="lg"
+                className="w-full gap-2"
                 disabled={isLoading || isGoogleLoading || isLockedOut()}
               >
                 {isLoading ? (
@@ -618,18 +673,19 @@ export default function AuthPage() {
                 {isForgotPassword ? (
                   <button
                     type="button"
-                    onClick={() => setIsForgotPassword(false)}
-                    className="text-gradient hover:underline font-medium"
+                    onClick={() => { setAuthError(null); setIsForgotPassword(false); }}
+                    className="text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary font-medium inline-flex items-center gap-1.5"
                   >
-                    ← Back to sign in
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Back to sign in
                   </button>
                 ) : (
                   <>
                     {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
                     <button
                       type="button"
-                      onClick={() => setIsLogin(!isLogin)}
-                      className="text-gradient hover:underline font-medium"
+                      onClick={() => { setAuthError(null); setIsLogin(!isLogin); }}
+                      className="text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary font-medium"
                     >
                       {isLogin ? "Sign up" : "Sign in"}
                     </button>
@@ -637,11 +693,18 @@ export default function AuthPage() {
                 )}
               </p>
             </div>
-          </Card>
+          </div>
+
+          {!isForgotPassword && (
+            <div className="flex items-center justify-center gap-1.5 mt-5 caption text-primary">
+              <Sparkle size={11} className="text-primary" />
+              <span>The Imagick.ai workspace</span>
+            </div>
+          )}
 
           {!isLogin && !isForgotPassword && (
-            <div className="flex items-center justify-center gap-4 mt-4 text-[10px] text-muted-foreground/70">
-              <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Secure</span>
+            <div className="flex items-center justify-center gap-4 mt-3 caption">
+              <span className="flex items-center gap-1.5"><Lock className="w-3 h-3" /> Secure</span>
               <span className="w-px h-3 bg-border" />
               <span>No credit card</span>
               <span className="w-px h-3 bg-border" />
@@ -649,18 +712,18 @@ export default function AuthPage() {
             </div>
           )}
 
-          <p className="text-[10px] text-center text-muted-foreground/50 mt-4">
+          <p className="text-[11px] leading-relaxed text-center text-muted-foreground/70 mt-5">
             By continuing, you agree to our{" "}
             <Link
               to="/legal/terms"
-              className="underline hover:text-muted-foreground transition-colors"
+              className="underline underline-offset-2 hover:text-foreground transition-colors"
             >
               Terms of Service
             </Link>
             {" "}and{" "}
             <Link
               to="/legal/privacy"
-              className="underline hover:text-muted-foreground transition-colors"
+              className="underline underline-offset-2 hover:text-foreground transition-colors"
             >
               Privacy Policy
             </Link>

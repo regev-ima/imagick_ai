@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Sparkles, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
+import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
 import { estimateCullingMs, formatCountdown } from "@/lib/cullingEta";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -11,10 +11,22 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import type { FilterOptions } from "@/components/gallery/filter-types";
 
+/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
+function Sparkle({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 // Culling rating tiers
 const CULLING_TIERS = [
-  { stars: 5, label: "Top Picks", color: "text-yellow-500" },
-  { stars: 4, label: "Strong Candidates", color: "text-yellow-500/80" },
+  { stars: 5, label: "Top Picks", color: "text-rating" },
+  { stars: 4, label: "Strong Candidates", color: "text-rating/80" },
   { stars: 3, label: "Decent Options", color: "text-muted-foreground" },
   { stars: 2, label: "Less Relevant", color: "text-muted-foreground" },
   { stars: 1, label: "Not Recommended", color: "text-muted-foreground" },
@@ -220,7 +232,7 @@ export function GalleryRightSidebar({
               )}
               {onRunCulling && (
                 <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onRunCulling} disabled={isCullingRunning}>
-                  {isCullingRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                  {isCullingRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkle size={13} className="text-primary" />}
                   AI Culling
                 </Button>
               )}
@@ -291,8 +303,9 @@ export function GalleryRightSidebar({
       )}
     >
       {/* Header */}
-      <div className="flex items-center px-3 py-2 border-b border-border/30">
-        <span className="text-sm font-semibold text-foreground">Gallery</span>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
+        <Sparkle size={13} className="text-primary" />
+        <span className="caption text-foreground">Develop</span>
       </div>
 
       <div className="overflow-y-auto min-h-0">
@@ -365,7 +378,7 @@ export function GalleryRightSidebar({
           – admin: Settings
         */}
       <div className="border-t border-border/30 px-3 py-2 space-y-1.5">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
+        <div className="aura-microlabel px-1">
           Actions
         </div>
         <div className="grid grid-cols-2 gap-1">
@@ -378,9 +391,9 @@ export function GalleryRightSidebar({
                 isCullingRunning ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : isCullingStuck ? (
-                  <Wand2 className="w-3 h-3 text-orange-500" />
+                  <Sparkle size={12} className="text-rating" />
                 ) : (
-                  <Wand2 className="w-3 h-3" />
+                  <Sparkle size={12} className="text-primary" />
                 )
               }
               label="AI Culling"
@@ -394,7 +407,7 @@ export function GalleryRightSidebar({
                 faceSearchStatus === "processing" ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : faceSearchStatus === "completed" ? (
-                  <ScanFace className="w-3 h-3 text-green-500" />
+                  <ScanFace className="w-3 h-3 text-secondary" />
                 ) : (
                   <ScanFace className="w-3 h-3" />
                 )
@@ -436,18 +449,18 @@ function SidebarSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border/30 bg-muted/20 overflow-hidden">
+    <div className="rounded-[--radius] border border-border/50 surface-1 overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/40 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 surface-2 hover:bg-muted/40 transition-colors"
         aria-expanded={isOpen}
       >
-        <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="caption flex items-center gap-2 text-muted-foreground">
           {icon}
           {title}
           {badge && (
-            <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-none">
+            <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-sm bg-primary text-primary-foreground text-[10px] font-bold leading-none folio">
               {badge}
             </span>
           )}
@@ -492,51 +505,6 @@ function ActionButton({
       {icon}
       <span className="truncate">{label}</span>
     </Button>
-  );
-}
-
-/* ── Toolbar Icon Button ── */
-function ToolbarIconButton({
-  icon,
-  label,
-  isActive,
-  onClick,
-  disabled,
-  badge,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  isActive?: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  badge?: number;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "w-8 h-8 relative",
-            isActive && "bg-primary/15 text-primary",
-            disabled && "opacity-40"
-          )}
-          onClick={onClick}
-          disabled={disabled}
-        >
-          {icon}
-          {badge !== undefined && (
-            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[9px] leading-none rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5">
-              {badge > 99 ? "99+" : badge}
-            </span>
-          )}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="left" className="text-xs">
-        {label}
-      </TooltipContent>
-    </Tooltip>
   );
 }
 
@@ -591,7 +559,7 @@ function StylesPanel({
                 {isOriginal ? (
                   <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
                 ) : (
-                  <Sparkles className={cn("w-3.5 h-3.5", color.replace("bg-", "text-"))} />
+                  <Sparkle size={14} className={color.replace("bg-", "text-")} />
                 )}
               </div>
             )}
@@ -681,30 +649,30 @@ function UnifiedFilterPanel({
     <div className="space-y-4">
       {/* Quick Filters */}
       <div className="space-y-2">
-        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Quick Filters</Label>
+        <Label className="aura-microlabel">Quick Filters</Label>
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={() => onToggleLikedFilter?.()}
             className={cn(
-              "flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all border",
+              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
               filters.showLikedOnly
-                ? "bg-pink-500/15 border-pink-500/30 text-pink-400"
+                ? "bg-accent/15 border-accent/30 text-accent"
                 : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             )}
           >
-            <Heart className={cn("w-3.5 h-3.5", filters.showLikedOnly && "fill-pink-400")} />
+            <Heart className={cn("w-3.5 h-3.5", filters.showLikedOnly && "fill-accent")} />
             Liked
           </button>
           <button
             onClick={() => onFiltersChange({ ...filters, showHeroOnly: !filters.showHeroOnly })}
             className={cn(
-              "flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all border",
+              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
               filters.showHeroOnly
-                ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                ? "bg-rating/15 border-rating/30 text-rating"
                 : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             )}
           >
-            <Star className={cn("w-3.5 h-3.5", filters.showHeroOnly && "fill-amber-400")} />
+            <Star className={cn("w-3.5 h-3.5", filters.showHeroOnly && "fill-rating")} />
             Hero
           </button>
         </div>
@@ -715,7 +683,7 @@ function UnifiedFilterPanel({
       {/* Star Rating */}
       {hasCullingData ? (
         <div className="space-y-2">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Star Rating</Label>
+          <Label className="aura-microlabel">Star Rating</Label>
           <div className="space-y-0.5">
             {CULLING_TIERS.filter(tier => {
               // Hide rating tiers with zero photos UNLESS the user has
@@ -768,11 +736,13 @@ function UnifiedFilterPanel({
         </div>
       ) : (
         <div className="space-y-2">
-          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">AI Features</Label>
-          <div className="rounded-xl border border-border/50 bg-gradient-to-br from-violet-500/5 via-primary/5 to-amber-500/5 p-3 space-y-3">
+          <Label className="aura-microlabel flex items-center gap-1.5">
+            <Sparkle size={10} className="text-primary" /> AI Features
+          </Label>
+          <div className="aura-ai-border rounded-[--radius] border border-primary/25 bg-primary/[0.06] p-3 space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-primary/20 flex items-center justify-center shrink-0">
-                <Wand2 className="w-4 h-4 text-violet-400" />
+              <div className="w-8 h-8 rounded-sm bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+                <Sparkle size={14} className="text-primary" />
               </div>
               <div>
                 <p className="text-xs font-medium text-foreground">AI Culling</p>
@@ -781,15 +751,12 @@ function UnifiedFilterPanel({
             </div>
             {onRunCulling && (
               <Button
-                variant="outline"
+                variant="glow"
                 size="sm"
                 className={cn(
                   "w-full gap-1.5 text-xs h-8 transition-colors",
-                  isCullingRunning
-                    ? "bg-primary/15 border-primary/40 text-primary cursor-not-allowed"
-                    : isCullingStuck
-                      ? "bg-orange-500/10 border-orange-500/30 text-orange-300 hover:bg-orange-500/20"
-                      : "bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary",
+                  isCullingRunning && "cursor-not-allowed",
+                  isCullingStuck && "bg-rating/10 border-rating/30 text-rating hover:bg-rating/20",
                 )}
                 onClick={onRunCulling}
                 disabled={isCullingRunning}
@@ -802,12 +769,12 @@ function UnifiedFilterPanel({
                   </>
                 ) : isCullingStuck ? (
                   <>
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Sparkle size={13} className="text-current" />
                     Retry AI Culling
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Sparkle size={13} className="text-current" />
                     Run AI Culling
                   </>
                 )}
@@ -815,15 +782,15 @@ function UnifiedFilterPanel({
             )}
             <div className="grid grid-cols-3 gap-1.5 pt-1">
               <div className="text-center">
-                <Star className="w-3.5 h-3.5 text-amber-400 mx-auto mb-0.5" />
+                <Star className="w-3.5 h-3.5 text-rating mx-auto mb-0.5" />
                 <p className="text-[9px] text-muted-foreground leading-tight">Star Ratings</p>
               </div>
               <div className="text-center">
-                <Tag className="w-3.5 h-3.5 text-cyan-400 mx-auto mb-0.5" />
+                <Tag className="w-3.5 h-3.5 text-primary mx-auto mb-0.5" />
                 <p className="text-[9px] text-muted-foreground leading-tight">Categories</p>
               </div>
               <div className="text-center">
-                <Copy className="w-3.5 h-3.5 text-pink-400 mx-auto mb-0.5" />
+                <Copy className="w-3.5 h-3.5 text-primary mx-auto mb-0.5" />
                 <p className="text-[9px] text-muted-foreground leading-tight">Duplicates</p>
               </div>
             </div>
@@ -837,7 +804,7 @@ function UnifiedFilterPanel({
           <Separator />
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Categories</Label>
+              <Label className="aura-microlabel">Categories</Label>
               <button
                 onClick={() => {
                   const allSelected = availableLabels.every(({ label }) => filters.selectedLabels?.includes(label));
@@ -870,7 +837,7 @@ function UnifiedFilterPanel({
         <>
           <Separator />
           <div className="space-y-1.5">
-            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Tags</Label>
+            <Label className="aura-microlabel">Tags</Label>
             <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
               {availableTags.map(tag => (
                 <button
@@ -896,7 +863,7 @@ function UnifiedFilterPanel({
         <>
           <Separator />
           <div className="space-y-2">
-            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Duplicates</Label>
+            <Label className="aura-microlabel">Duplicates</Label>
             <div className="space-y-3">
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1.5 block">Sensitivity</label>
@@ -1000,13 +967,13 @@ function GalleryInfoPanel({
   const formatTime = (iso: string | null) => {
     if (!iso) return null;
     const d = new Date(iso);
-    return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   };
 
   const formatDate = (iso: string | null) => {
     if (!iso) return null;
     const d = new Date(iso);
-    return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+    return d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit" });
   };
 
   const duration = (start: string | null, end: string | null) => {
@@ -1040,8 +1007,8 @@ function GalleryInfoPanel({
       startedAt: data.uploadStartedAt,
       completedAt: data.uploadCompletedAt,
       status: data.uploadCompletedAt ? "completed" : data.uploadStartedAt ? "active" : "idle",
-      color: "text-cyan-400",
-      bgColor: "bg-cyan-500",
+      color: "text-primary",
+      bgColor: "bg-primary",
     },
     {
       icon: <Scissors className="w-3.5 h-3.5" />,
@@ -1049,8 +1016,8 @@ function GalleryInfoPanel({
       startedAt: data.processingStartedAt,
       completedAt: data.processingCompletedAt,
       status: data.processingCompletedAt ? "completed" : data.processingStartedAt ? "active" : "idle",
-      color: "text-violet-400",
-      bgColor: "bg-violet-500",
+      color: "text-primary",
+      bgColor: "bg-primary",
     },
     {
       icon: <Wand2 className="w-3.5 h-3.5" />,
@@ -1058,8 +1025,8 @@ function GalleryInfoPanel({
       startedAt: data.cullingStartedAt,
       completedAt: data.cullingCompletedAt,
       status: data.cullingCompletedAt ? "completed" : data.cullingStartedAt ? "active" : "idle",
-      color: "text-amber-400",
-      bgColor: "bg-amber-500",
+      color: "text-primary",
+      bgColor: "bg-primary",
     },
   ];
 
@@ -1102,24 +1069,24 @@ function GalleryInfoPanel({
           {/* Progress bar */}
           <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
+              className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${processingStats.percentage}%` }}
             />
           </div>
           {/* Status badges */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
+            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm bg-secondary/15 text-secondary font-medium font-mono tabular-nums">
               <Check className="w-2.5 h-2.5" />
               {processingStats.ready} Ready
             </span>
             {processingStats.processing > 0 && (
-              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium">
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm bg-rating/15 text-rating font-medium font-mono tabular-nums">
                 <Loader2 className="w-2.5 h-2.5 animate-spin" />
                 {processingStats.processing} Processing
               </span>
             )}
             {processingStats.error > 0 && (
-              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 font-medium">
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm bg-destructive/15 text-destructive font-medium font-mono tabular-nums">
                 <X className="w-2.5 h-2.5" />
                 {processingStats.error} Error
               </span>
@@ -1182,7 +1149,7 @@ function GalleryInfoPanel({
                     </span>
                   )}
                   {stage.status === "active" && (
-                    <span className="text-[10px] text-amber-400 animate-pulse">In progress</span>
+                    <span className="text-[10px] text-rating animate-pulse">In progress</span>
                   )}
                 </div>
                 {stage.startedAt && (

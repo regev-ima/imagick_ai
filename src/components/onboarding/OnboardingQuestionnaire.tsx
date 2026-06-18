@@ -4,10 +4,30 @@ import { Button } from "@/components/ui/button";
 import {
   Camera, User, Heart, Calendar, Briefcase, Mountain, Home, Shirt,
   UtensilsCrossed, Trophy, Baby, Bird, Users, Building2, ChevronRight,
-  Sparkles, Clock, Layers, MessageSquare, Send, HelpCircle,
+  Clock, Layers, MessageSquare, Send, HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OnboardingQuestion } from "@/hooks/useOnboardingQuestionnaire";
+
+// ─── The AI mark — 4-point sparkle (the logo star), royal blue ─────────────────
+
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
 
@@ -34,21 +54,26 @@ interface Props {
 
 function ProgressDots({ current, total }: { current: number; total: number }) {
   return (
-    <div className="flex items-center gap-3 justify-center mb-8">
-      {Array.from({ length: total }, (_, i) => i + 1).map((s) => (
-        <div key={s} className="flex items-center gap-3">
-          <motion.div
-            animate={{ scale: s === current ? 1.2 : 1, opacity: s <= current ? 1 : 0.3 }}
-            className={cn(
-              "w-2.5 h-2.5 rounded-full transition-colors",
-              s < current ? "bg-primary" : s === current ? "bg-primary ring-4 ring-primary/20" : "bg-muted-foreground/30"
+    <div className="flex items-center justify-center gap-3 mb-8">
+      <span className="aura-microlabel">
+        {String(current).padStart(2, "0")} / {String(total).padStart(2, "0")}
+      </span>
+      <div className="flex items-center gap-2">
+        {Array.from({ length: total }, (_, i) => i + 1).map((s) => (
+          <div key={s} className="flex items-center gap-2">
+            <motion.div
+              animate={{ scale: s === current ? 1.2 : 1, opacity: s <= current ? 1 : 0.3 }}
+              className={cn(
+                "w-2 h-2 rounded-full transition-colors",
+                s < current ? "bg-primary" : s === current ? "bg-primary ring-4 ring-primary/20" : "bg-muted-foreground/30"
+              )}
+            />
+            {s < total && (
+              <div className={cn("w-6 h-0.5 rounded-full transition-colors", s < current ? "bg-primary" : "bg-muted-foreground/20")} />
             )}
-          />
-          {s < total && (
-            <div className={cn("w-8 h-0.5 rounded-full transition-colors", s < current ? "bg-primary" : "bg-muted-foreground/20")} />
-          )}
-        </div>
-      ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -137,7 +162,7 @@ export default function OnboardingQuestionnaire({ isOpen, questions, onSaveAnswe
                 type="button"
                 onClick={() => toggleOption(id)}
                 className={cn(
-                  "flex flex-col items-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all",
+                  "flex flex-col items-center gap-2 p-3 rounded-[--radius] border text-sm font-medium transition-colors",
                   currentSelections.includes(id)
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
@@ -163,11 +188,11 @@ export default function OnboardingQuestionnaire({ isOpen, questions, onSaveAnswe
                 type="button"
                 onClick={() => toggleOption(id)}
                 className={cn(
-                  "w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                  "w-full flex items-center gap-3 p-3 rounded-[--radius] border text-left transition-colors",
                   currentSelections.includes(id) ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
                 )}
               >
-                <div className={cn("p-2 rounded-lg", currentSelections.includes(id) ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground")}>
+                <div className={cn("p-2 rounded-[--radius]", currentSelections.includes(id) ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground")}>
                   <Icon className="w-4 h-4" />
                 </div>
                 <div>
@@ -209,15 +234,16 @@ export default function OnboardingQuestionnaire({ isOpen, questions, onSaveAnswe
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: "spring", duration: 0.4 }}
-          className="glass-card w-full max-w-2xl rounded-2xl p-8 shadow-2xl border border-primary/20"
+          className="glass-card w-full max-w-2xl rounded-[--radius] p-8 shadow-2xl"
+          style={{ boxShadow: "var(--elevation-3)" }}
         >
-          {/* Header */}
+          {/* Header — royal-blue sparkle mark */}
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-secondary">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="grid h-10 w-10 place-items-center rounded-[--radius] border border-primary/30 bg-primary/[0.12] text-accent">
+              <Sparkle size={18} className="text-accent" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Quick setup</h2>
+              <span className="aura-microlabel">Quick setup</span>
               <p className="text-sm text-muted-foreground">
                 {total} quick question{total !== 1 ? "s" : ""} — less than a minute
               </p>
@@ -244,7 +270,7 @@ export default function OnboardingQuestionnaire({ isOpen, questions, onSaveAnswe
           </AnimatePresence>
 
           {/* Footer */}
-          <div className="flex items-center justify-between mt-8 pt-4 border-t border-border/50">
+          <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
             <Button
               variant="ghost"
               size="sm"
@@ -254,9 +280,10 @@ export default function OnboardingQuestionnaire({ isOpen, questions, onSaveAnswe
               Skip for now
             </Button>
             <Button
+              variant="glow"
               onClick={handleNext}
               disabled={!canAdvance || isSaving}
-              className="gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+              className="gap-2"
             >
               {stepIndex === total - 1 ? (
                 isSaving ? "Saving…" : "Finish setup"

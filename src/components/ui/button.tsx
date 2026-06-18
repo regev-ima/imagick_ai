@@ -5,33 +5,35 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold ring-offset-background transition-[transform,box-shadow,background-color,border-color,color,opacity] duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
+        // Standard action — ink letterpress on ivory
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25",
+          "bg-primary text-primary-foreground hover:bg-primary/88",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15",
         outline:
-          "border border-border bg-transparent hover:bg-muted hover:border-primary/50",
+          "border border-border bg-card hover:border-foreground/30 hover:bg-muted",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-lg hover:shadow-secondary/25",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/90",
         ghost: "hover:bg-muted hover:text-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-        // Gradient — matches imagick-web primary CTA style (pink → purple, glow)
-        glow: "bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 glow-pink animate-pulse-glow shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02]",
+        link: "text-accent underline-offset-4 hover:underline",
+        // The engine / AI CTA — royal-blue with a precise blue glow (the
+        // "our AI" sparkle accent). Confident, not neon-rainbow.
+        glow: "bg-accent text-accent-foreground shadow-[0_0_18px_-6px_hsl(var(--accent)/0.7)] hover:bg-accent/90 hover:shadow-[0_0_26px_-6px_hsl(var(--accent)/0.9)]",
         "glow-secondary":
-          "bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-lg shadow-secondary/30 hover:shadow-xl hover:shadow-secondary/40 hover:scale-[1.02]",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/90",
         gradient:
-          "bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 glow-pink shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02]",
-        glass: "glass-card text-foreground hover:bg-muted/80 border border-border/50",
+          "bg-[image:var(--gradient-primary)] text-white shadow-[0_0_18px_-6px_hsl(var(--glow-primary)/0.7)] hover:shadow-[0_0_26px_-6px_hsl(var(--glow-primary)/0.9)]",
+        glass: "glass-card text-foreground hover:bg-muted border border-border",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3 text-xs",
-        lg: "h-12 rounded-lg px-8 text-base",
-        xl: "h-14 rounded-xl px-10 text-lg",
+        default: "h-10 px-5 py-2",
+        sm: "h-9 px-4 text-xs",
+        lg: "h-12 px-8 text-base",
+        xl: "h-14 px-10 text-lg",
         icon: "h-10 w-10",
       },
     },

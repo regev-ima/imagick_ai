@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useRef, useEffect } from "react";
+import { lazy, Suspense, useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,7 +7,6 @@ import {
   Zap,
   Check,
   Crown,
-  Sparkles,
   ChevronRight,
   HardDrive,
   AlertTriangle,
@@ -26,9 +25,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 // Modals are only rendered after a user interaction, so lazy-load them so
 // recharts (CreditsUsageModal) and the PayPal SDK loader stay out of the
@@ -67,6 +63,105 @@ type CreditGrant = {
   expires_at: string | null;
   credits_remaining: number;
 };
+
+// LIGHTROOM motion — calm, responsive fades/slides. No bounce, no float.
+const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
+const rise = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+};
+
+/**
+ * The AI mark — a 4-point sparkle (the logo star). Royal blue by default.
+ * Copied from the approved LightroomDashboard reference; tinted via
+ * currentColor so it inherits text-primary / text-accent tokens.
+ */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/** A Lightroom-style tonal panel — hairline border, soft shadow. */
+function Panel({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div className={cn("glass-card overflow-hidden rounded-[--radius]", className)}>{children}</div>
+  );
+}
+
+/** Mono section header — like a Lightroom module title bar. */
+function PanelHeader({
+  icon,
+  label,
+  trailing,
+  tone = "muted",
+}: {
+  icon?: ReactNode;
+  label: string;
+  trailing?: ReactNode;
+  tone?: "muted" | "ai";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 border-b border-border px-4 py-2.5",
+        tone === "ai" ? "bg-primary/[0.08] text-accent" : "bg-background/40 text-muted-foreground",
+      )}
+    >
+      <span className="aura-microlabel flex items-center gap-2" style={tone === "ai" ? { color: "inherit" } : undefined}>
+        {icon}
+        {label}
+      </span>
+      {trailing}
+    </div>
+  );
+}
+
+/** A status banner — hairline keyline cell tinted to its tone. */
+function StatusBanner({
+  tone,
+  icon,
+  title,
+  children,
+  action,
+}: {
+  tone: "warning" | "error";
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  const accent = tone === "warning" ? "var(--rating)" : "var(--destructive)";
+  return (
+    <div
+      className="flex items-center gap-3 rounded-[--radius] border bg-card px-4 py-3.5"
+      style={{ borderColor: `hsl(${accent} / 0.4)` }}
+    >
+      <span style={{ color: `hsl(${accent})` }} className="shrink-0">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold" style={{ color: `hsl(${accent})` }}>
+          {title}
+        </p>
+        <p className="mt-0.5 font-sans text-sm leading-snug text-muted-foreground">{children}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
 
 export default function BillingPage() {
   const {
@@ -194,6 +289,7 @@ export default function BillingPage() {
   };
 
   const editsPercentage = !isUnlimited && editsTotal > 0 ? (editsUsed / editsTotal) * 100 : 0;
+  const editsRemainingPct = isUnlimited ? 100 : editsTotal > 0 ? (editsRemaining / editsTotal) * 100 : 0;
   const storageUsedGb = storageUsedMb / 1024;
   const storagePercentage = maxStorageGb > 0 ? (storageUsedGb / maxStorageGb) * 100 : 0;
   const activeCreditGrants = (creditGrants as CreditGrant[]).filter((grant) => grant.status === "active");
@@ -222,143 +318,152 @@ export default function BillingPage() {
     : "Free forever";
 
   return (
-    <div className="p-6 lg:p-8 space-y-10">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <h1 className="text-3xl font-bold tracking-tight">
-          <span className="text-gradient-primary">Billing</span> & Usage
-        </h1>
-        <p className="text-muted-foreground mt-1.5">Manage your subscription and monitor usage</p>
-      </motion.div>
-
-      {/* Status Banners */}
-      {isCancelling && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-          <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-          <div>
-            <p className="font-medium text-yellow-500">Subscription cancelling</p>
-            <p className="text-sm text-muted-foreground">
-              Your {currentPlan?.name} plan remains active until {subscription?.current_period_end || "the end of your billing period"}.
-            </p>
+    <div className="min-h-full bg-background px-5 py-7 lg:px-10 lg:py-10">
+      <div className="mx-auto w-full max-w-[1320px] space-y-7">
+        {/* ════ MASTHEAD ═══════════════════════════════════════════════════ */}
+        <motion.header variants={rise} initial="hidden" animate="show">
+          <div className="flex items-center justify-between gap-4 pb-3">
+            <span className="caption">Account — billing &amp; usage</span>
+            {currentPlan && (
+              <span className="caption flex items-center gap-1.5 text-foreground">
+                <Zap className="h-3 w-3 text-accent" />
+                {currentPlan.name}
+              </span>
+            )}
           </div>
-        </div>
-      )}
+          <hr className="aura-hairline" />
+          <h1 className="mt-6 text-3xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-4xl">
+            Billing &amp; <span className="text-accent">Usage</span>
+          </h1>
+          <p className="mt-2 font-sans text-base text-muted-foreground">
+            Manage your subscription and monitor usage.
+          </p>
+        </motion.header>
 
-      {isSuspended && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
-          <XCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-          <div>
-            <p className="font-medium text-destructive">Payment failed</p>
-            <p className="text-sm text-muted-foreground">
-              Your subscription is suspended due to a payment failure. Please update your payment method.
-            </p>
-          </div>
-        </div>
-      )}
+        {/* ════ STATUS BANNERS ═════════════════════════════════════════════ */}
+        {isCancelling && (
+          <StatusBanner
+            tone="warning"
+            icon={<AlertTriangle className="h-5 w-5" />}
+            title="Subscription cancelling"
+          >
+            Your {currentPlan?.name} plan remains active until {subscription?.current_period_end || "the end of your billing period"}.
+          </StatusBanner>
+        )}
 
-      {isExpired && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
-          <XCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-          <div>
-            <p className="font-medium text-destructive">Subscription expired</p>
-            <p className="text-sm text-muted-foreground">
-              Your subscription has expired. Upgrade to continue uploading and editing photos.
-            </p>
-          </div>
-          <Button size="sm" onClick={scrollToPlans}>Upgrade Now</Button>
-        </div>
-      )}
+        {isSuspended && (
+          <StatusBanner
+            tone="error"
+            icon={<XCircle className="h-5 w-5" />}
+            title="Payment failed"
+          >
+            Your subscription is suspended due to a payment failure. Please update your payment method.
+          </StatusBanner>
+        )}
 
-      {isFreePlan && !isUnlimited && editsRemaining <= EDIT_LOW_THRESHOLD && editsRemaining > 0 && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-          <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-          <div>
-            <p className="font-medium text-yellow-500">Running low on edits</p>
-            <p className="text-sm text-muted-foreground">
-              You have {editsRemaining.toLocaleString()} edits remaining. Upgrade for unlimited edits.
-            </p>
-          </div>
-          <Button size="sm" variant="outline" onClick={scrollToPlans}>View Plans</Button>
-        </div>
-      )}
+        {isExpired && (
+          <StatusBanner
+            tone="error"
+            icon={<XCircle className="h-5 w-5" />}
+            title="Subscription expired"
+            action={<Button size="sm" onClick={scrollToPlans}>Upgrade Now</Button>}
+          >
+            Your subscription has expired. Upgrade to continue uploading and editing photos.
+          </StatusBanner>
+        )}
 
-      {isFreePlan && editsRemaining === 0 && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
-          <XCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-          <div>
-            <p className="font-medium text-destructive">All free edits used</p>
-            <p className="text-sm text-muted-foreground">
-              You've used all 3,000 free edits. Upgrade to a paid plan for unlimited editing.
-            </p>
-          </div>
-          <Button size="sm" onClick={scrollToPlans}>Upgrade Now</Button>
-        </div>
-      )}
+        {isFreePlan && !isUnlimited && editsRemaining <= EDIT_LOW_THRESHOLD && editsRemaining > 0 && (
+          <StatusBanner
+            tone="warning"
+            icon={<AlertTriangle className="h-5 w-5" />}
+            title="Running low on edits"
+            action={<Button size="sm" variant="outline" onClick={scrollToPlans}>View Plans</Button>}
+          >
+            You have {editsRemaining.toLocaleString()} edits remaining. Upgrade for unlimited edits.
+          </StatusBanner>
+        )}
 
-      {/* ── Hero: Current Plan ────────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.1 }}
-      >
-        <Card className="glass-card border-primary/30 overflow-hidden relative">
-          {/* Subtle gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
-          <CardContent className="pt-6 pb-6 relative">
-            <div className="flex flex-col md:flex-row md:items-center gap-6">
+        {isFreePlan && editsRemaining === 0 && (
+          <StatusBanner
+            tone="error"
+            icon={<XCircle className="h-5 w-5" />}
+            title="All free edits used"
+            action={<Button size="sm" onClick={scrollToPlans}>Upgrade Now</Button>}
+          >
+            You've used all 3,000 free edits. Upgrade to a paid plan for unlimited editing.
+          </StatusBanner>
+        )}
+
+        {/* ════ CURRENT PLAN ═══════════════════════════════════════════════ */}
+        <motion.section variants={rise} initial="hidden" animate="show">
+          <Panel className="border-primary/30">
+            <PanelHeader
+              icon={<Crown className="h-3.5 w-3.5" />}
+              label="Current plan"
+              trailing={
+                <span className="caption flex items-center gap-1.5" style={{ color: "inherit" }}>
+                  <span
+                    className="aura-led"
+                    style={{ "--led": isPaidPlan ? "var(--secondary)" : "var(--muted-foreground)" } as CSSProperties}
+                  />
+                  {isPaidPlan ? "Active" : isCancelling ? "Cancelling" : "Free"}
+                </span>
+              }
+            />
+            <div className="flex flex-col gap-6 p-5 md:flex-row md:items-center">
               {/* Plan identity */}
-              <div className="flex items-center gap-4 flex-1">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                  <Crown className="w-7 h-7 text-white" />
+              <div className="flex flex-1 items-center gap-4">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[--radius] bg-primary text-primary-foreground">
+                  <Crown className="h-7 w-7" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold">{currentPlan?.name || "Free"}</h2>
+                    <h2 className="text-2xl font-semibold tracking-tight">{currentPlan?.name || "Free"}</h2>
                     {isPaidPlan && (
-                      <Badge className="bg-primary/10 text-primary border-primary/30">Active</Badge>
+                      <span className="caption rounded-sm border border-secondary/40 bg-secondary/10 px-1.5 py-0.5" style={{ color: "hsl(var(--secondary))" }}>
+                        Active
+                      </span>
                     )}
                     {isCancelling && (
-                      <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30">Cancelling</Badge>
+                      <span className="caption rounded-sm border px-1.5 py-0.5" style={{ color: "hsl(var(--rating))", borderColor: "hsl(var(--rating) / 0.4)", background: "hsl(var(--rating) / 0.1)" }}>
+                        Cancelling
+                      </span>
                     )}
                   </div>
-                  <p className="text-lg text-muted-foreground">{priceDisplay}</p>
+                  <p className="folio mt-1 text-lg text-muted-foreground">{priceDisplay}</p>
                 </div>
               </div>
 
               {/* Plan meta */}
               <div className="flex items-center gap-6 text-sm">
                 {isPaidPlan && (
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-cyan-500/10">
-                      <CalendarDays className="w-4 h-4 text-cyan-400" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid h-9 w-9 place-items-center rounded-[--radius] bg-primary/10">
+                      <CalendarDays className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">{isCancelling ? "Active until" : "Next billing"}</p>
-                      <p className="font-medium">{subscription?.current_period_end || "—"}</p>
+                      <p className="caption">{isCancelling ? "Active until" : "Next billing"}</p>
+                      <p className="mt-0.5 font-mono text-sm text-foreground">{subscription?.current_period_end || "—"}</p>
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/10">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <div className="flex items-center gap-2.5">
+                  <div className="grid h-9 w-9 place-items-center rounded-[--radius] bg-secondary/10">
+                    <ShieldCheck className="h-4 w-4" style={{ color: "hsl(var(--secondary))" }} />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Payment</p>
-                    <p className="font-medium">{subscription?.paypal_subscription_id ? "PayPal" : "None"}</p>
+                    <p className="caption">Payment</p>
+                    <p className="mt-0.5 font-mono text-sm text-foreground">{subscription?.paypal_subscription_id ? "PayPal" : "None"}</p>
                   </div>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 {isPaidPlan && !isCancelling && (
                   <>
                     <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAddOnModal(true)}>
-                      <Package className="w-3.5 h-3.5" /> Add-ons
+                      <Package className="h-3.5 w-3.5" /> Add-ons
                     </Button>
                     <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setShowCancelModal(true)}>
                       Cancel
@@ -367,271 +472,279 @@ export default function BillingPage() {
                 )}
                 {isFreePlan && (
                   <Button size="sm" className="gap-1.5" onClick={scrollToPlans}>
-                    <TrendingUp className="w-3.5 h-3.5" /> Upgrade Plan
+                    <TrendingUp className="h-3.5 w-3.5" /> Upgrade Plan
                   </Button>
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          </Panel>
+        </motion.section>
 
-      {/* ── Usage Stats ───────────────────────────────────────────────── */}
-      <motion.div
-        className="grid gap-5 sm:grid-cols-2"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.15 }}
-      >
-        {/* AI Edits */}
-        <Card
-          className={cn(
-            "glass-card cursor-pointer hover:border-primary/40 transition-all group",
-            giftCreditsTotal > 0 && !isUnlimited
-              ? "border-green-500/30 hover:border-green-500/50"
-              : "border-border/50"
-          )}
-          onClick={() => setShowEditsUsage(true)}
-        >
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "p-2.5 rounded-xl",
-                  giftCreditsTotal > 0 && !isUnlimited ? "bg-green-500/10" : "bg-amber-500/10"
-                )}>
-                  {giftCreditsTotal > 0 && !isUnlimited ? (
-                    <Gift className="w-5 h-5 text-green-500" />
+        {/* ════ USAGE METERS ═══════════════════════════════════════════════ */}
+        <motion.section variants={rise} initial="hidden" animate="show" className="grid gap-6 sm:grid-cols-2">
+          {/* AI Edits */}
+          <Panel
+            className={cn(
+              "group cursor-pointer transition-colors",
+              giftCreditsTotal > 0 && !isUnlimited
+                ? "border-secondary/40 hover:border-secondary/60"
+                : "hover:border-primary/40",
+            )}
+          >
+            <button type="button" className="block w-full text-left" onClick={() => setShowEditsUsage(true)}>
+              <PanelHeader
+                tone={giftCreditsTotal > 0 && !isUnlimited ? "muted" : "ai"}
+                icon={
+                  giftCreditsTotal > 0 && !isUnlimited ? (
+                    <Gift className="h-3.5 w-3.5" style={{ color: "hsl(var(--secondary))" }} />
                   ) : (
-                    <Zap className="w-5 h-5 text-amber-400" />
-                  )}
-                </div>
-                <div>
-                  <p className="font-semibold">AI Edits</p>
-                  <p className="text-xs text-muted-foreground">{isUnlimited ? "Unlimited plan" : "Lifetime balance"}</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/0 group-hover:text-muted-foreground transition-all" />
-            </div>
-
-            {isUnlimited ? (
-              <div className="flex items-baseline gap-2">
-                <p className="text-4xl font-bold tabular-nums">{editsUsed.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">edits used this period</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-4xl font-bold tabular-nums">{editsRemaining.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">remaining</p>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{editsUsed.toLocaleString()} used</span>
-                    <span className="flex items-center gap-1">
-                      {editsTotal.toLocaleString()}
-                      {giftCreditsTotal > 0 && (
-                        <> + <Gift className="w-3 h-3 text-green-500 inline" />{giftCreditsTotal.toLocaleString()}</>
-                      )}
-                      {" "}total
+                    <Sparkle size={12} className="text-accent" />
+                  )
+                }
+                label="AI Edits"
+                trailing={
+                  <span className="flex items-center gap-2" style={{ color: "inherit" }}>
+                    <span className="caption" style={{ color: "inherit" }}>
+                      {isUnlimited ? "Unlimited" : "Lifetime balance"}
                     </span>
-                  </div>
-                  <Progress value={editsPercentage} className="h-2" />
-                </div>
-                {giftCreditsTotal > 0 && (
-                  <div className="pt-2 border-t border-border/50 space-y-1">
-                    {activeCreditGrants.map((grant) => (
-                      <div key={grant.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Gift className="w-3 h-3 text-green-500" />
-                          Gift credits
-                          <span className="text-[10px]">
-                            (expires {new Date(grant.expires_at!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})
-                          </span>
-                        </span>
-                        <span className="font-medium text-green-500">{grant.credits_remaining.toLocaleString()}</span>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Plan credits</span>
-                      <span className="font-medium">{planCreditsRemaining.toLocaleString()}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/0 transition-colors group-hover:text-muted-foreground" />
+                  </span>
+                }
+              />
+              <div className="p-5">
+                {isUnlimited ? (
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="folio text-4xl leading-none text-foreground sm:text-[2.75rem]">
+                        {editsUsed.toLocaleString()}
+                      </p>
+                      <p className="caption mt-3">edits used this period</p>
+                      <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">no cap</p>
                     </div>
+                    <p className="folio text-4xl leading-none text-accent">∞</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="folio text-4xl leading-none text-foreground sm:text-[2.75rem]">
+                          {editsRemaining.toLocaleString()}
+                        </p>
+                        <p className="caption mt-3">edits remaining</p>
+                      </div>
+                      <div className="relative h-11 w-11 shrink-0">
+                        <div
+                          className="aura-gauge absolute inset-0"
+                          style={{ "--gauge": Math.round(editsRemainingPct) } as CSSProperties}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground">
+                        <span>{editsUsed.toLocaleString()} used</span>
+                        <span className="flex items-center gap-1">
+                          {editsTotal.toLocaleString()}
+                          {giftCreditsTotal > 0 && (
+                            <>
+                              {" + "}
+                              <Gift className="inline h-3 w-3" style={{ color: "hsl(var(--secondary))" }} />
+                              {giftCreditsTotal.toLocaleString()}
+                            </>
+                          )}
+                          {" total"}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-accent"
+                          style={{ width: `${Math.min(100, editsPercentage)}%` }}
+                        />
+                      </div>
+                    </div>
+                    {giftCreditsTotal > 0 && (
+                      <div className="space-y-1 border-t border-border pt-3">
+                        {activeCreditGrants.map((grant) => (
+                          <div key={grant.id} className="flex items-center justify-between font-mono text-[11px] text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Gift className="h-3 w-3" style={{ color: "hsl(var(--secondary))" }} />
+                              Gift credits
+                              <span className="text-[10px]">
+                                (expires {new Date(grant.expires_at!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})
+                              </span>
+                            </span>
+                            <span className="font-semibold" style={{ color: "hsl(var(--secondary))" }}>{grant.credits_remaining.toLocaleString()}</span>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground">
+                          <span>Plan credits</span>
+                          <span className="font-semibold text-foreground">{planCreditsRemaining.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </button>
+          </Panel>
 
-        {/* Storage */}
-        <Card className="glass-card border-border/50 cursor-pointer hover:border-primary/40 transition-all group" onClick={() => setShowStorageBreakdown(true)}>
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-sky-500/10">
-                  <HardDrive className="w-5 h-5 text-sky-400" />
-                </div>
-                <div>
-                  <p className="font-semibold">Storage</p>
-                  <p className="text-xs text-muted-foreground">Cloud storage</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/0 group-hover:text-muted-foreground transition-all" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-baseline gap-2">
-                <p className="text-4xl font-bold tabular-nums">{storageUsedGb.toFixed(1)}</p>
-                <p className="text-sm text-muted-foreground">
-                  GB of{" "}
-                  {extraStorageGb > 0
-                    ? `${(currentPlan?.max_storage_gb || 5) + extraStorageGb} GB`
-                    : `${maxStorageGb} GB`}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
-                    {storageUsedMb < 1024
-                      ? `${Math.round(storageUsedMb)} MB`
-                      : `${storageUsedGb.toFixed(2)} GB`}{" "}
-                    used
+          {/* Storage */}
+          <Panel className="group cursor-pointer transition-colors hover:border-primary/40">
+            <button type="button" className="block w-full text-left" onClick={() => setShowStorageBreakdown(true)}>
+              <PanelHeader
+                icon={<HardDrive className="h-3.5 w-3.5" />}
+                label="Storage"
+                trailing={
+                  <span className="flex items-center gap-2">
+                    <span className="caption">Cloud storage</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/0 transition-colors group-hover:text-muted-foreground" />
                   </span>
-                  <span>{maxStorageGb} GB total</span>
+                }
+              />
+              <div className="p-5">
+                <div className="space-y-4">
+                  <div className="flex items-baseline gap-2">
+                    <p className="folio text-4xl leading-none text-foreground sm:text-[2.75rem]">{storageUsedGb.toFixed(1)}</p>
+                    <p className="font-mono text-sm text-muted-foreground">
+                      GB of{" "}
+                      {extraStorageGb > 0
+                        ? `${(currentPlan?.max_storage_gb || 5) + extraStorageGb} GB`
+                        : `${maxStorageGb} GB`}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground">
+                      <span>
+                        {storageUsedMb < 1024
+                          ? `${Math.round(storageUsedMb)} MB`
+                          : `${storageUsedGb.toFixed(2)} GB`}{" "}
+                        used
+                      </span>
+                      <span>{maxStorageGb} GB total</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-accent"
+                        style={{ width: `${Math.min(100, storagePercentage)}%` }}
+                      />
+                    </div>
+                  </div>
+                  {extraStorageGb > 0 && (
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Includes {extraStorageGb} GB from add-ons
+                    </p>
+                  )}
                 </div>
-                <Progress value={storagePercentage} className="h-2" />
               </div>
-              {extraStorageGb > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Includes {extraStorageGb} GB from add-ons
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+            </button>
+          </Panel>
+        </motion.section>
 
-      {/* Active Add-ons Summary */}
-      {activeAddons.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.2 }}
-        >
-          <Card className="glass-card border-border/50">
-            <CardHeader>
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-violet-500/10">
-                  <Package className="w-4 h-4 text-violet-400" />
-                </div>
-                <CardTitle className="text-lg">Active Add-ons</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* ════ ACTIVE ADD-ONS ═════════════════════════════════════════════ */}
+        {activeAddons.length > 0 && (
+          <motion.section variants={rise} initial="hidden" animate="show">
+            <Panel>
+              <PanelHeader icon={<Package className="h-3.5 w-3.5" />} label="Active add-ons" />
+              <div className="grid gap-px overflow-hidden bg-border sm:grid-cols-2 lg:grid-cols-3">
                 {extraModels > 0 && (
-                  <div className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/20">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Sparkles className="w-4 h-4 text-primary" />
+                  <div className="flex items-center gap-3 bg-card p-4">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[--radius] bg-primary/10">
+                      <Sparkle size={16} className="text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">Custom AI Models</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium tracking-tight">Custom AI Models</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                         {currentPlan?.max_styles || 0} + {extraModels} = {maxStyles} total
                       </p>
                     </div>
                   </div>
                 )}
                 {extraStorageGb > 0 && (
-                  <div className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/20">
-                    <div className="p-2 rounded-lg bg-sky-500/10">
-                      <HardDrive className="w-4 h-4 text-sky-400" />
+                  <div className="flex items-center gap-3 bg-card p-4">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[--radius] bg-accent/10">
+                      <HardDrive className="h-4 w-4 text-accent" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">Extra Storage</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium tracking-tight">Extra Storage</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                         {currentPlan?.max_storage_gb || 5} GB + {extraStorageGb} GB purchased
                       </p>
                     </div>
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+            </Panel>
+          </motion.section>
+        )}
 
-      {/* ── Billing History ───────────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.25 }}
-      >
-        <Card className="glass-card border-border/50">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-emerald-500/10">
-                  <Receipt className="w-4 h-4 text-emerald-400" />
-                </div>
-                <CardTitle>Billing History</CardTitle>
-              </div>
-              {invoices.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1"
-                  onClick={() => setShowBillingHistory(true)}
-                >
-                  View All
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
+        {/* ════ BILLING HISTORY ════════════════════════════════════════════ */}
+        <motion.section variants={rise} initial="hidden" animate="show">
+          <Panel>
+            <PanelHeader
+              icon={<Receipt className="h-3.5 w-3.5" />}
+              label="Billing history"
+              trailing={
+                invoices.length > 0 ? (
+                  <button
+                    type="button"
+                    className="group inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-accent"
+                    onClick={() => setShowBillingHistory(true)}
+                  >
+                    View all
+                    <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                ) : undefined
+              }
+            />
             {invoices.length === 0 ? (
-              <div className="flex flex-col items-center py-8 gap-3 text-muted-foreground">
-                <div className="p-3 rounded-2xl bg-muted/50">
-                  <Receipt className="w-6 h-6" />
+              <div className="flex flex-col items-center gap-3 py-10 text-muted-foreground">
+                <div className="grid h-12 w-12 place-items-center rounded-[--radius] border border-border bg-card">
+                  <Receipt className="h-5 w-5" />
                 </div>
-                <p className="text-sm">
+                <p className="font-sans text-sm">
                   {isPaidPlan ? "Your invoices will appear here after your first payment." : "Upgrade to a paid plan to see billing history."}
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {invoices.slice(0, 3).map((inv) => (
-                  <div key={inv.id} className="flex items-center justify-between p-3.5 rounded-lg border border-border/30 hover:bg-muted/20 transition-colors text-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-muted/50">
-                        <CreditCard className="w-4 h-4 text-muted-foreground" />
+              <div>
+                {/* Mono table header */}
+                <div className="hidden grid-cols-[1fr_auto_auto_2.5rem] items-center gap-4 border-b border-border px-5 py-2.5 sm:grid">
+                  <span className="aura-microlabel">Description</span>
+                  <span className="aura-microlabel text-right">Amount</span>
+                  <span className="aura-microlabel text-right">Status</span>
+                  <span />
+                </div>
+                <ul className="divide-y divide-border">
+                  {invoices.slice(0, 3).map((inv) => (
+                    <li
+                      key={inv.id}
+                      className="grid grid-cols-[1fr_auto_2.5rem] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-foreground/[0.03] sm:grid-cols-[1fr_auto_auto_2.5rem]"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[--radius] border border-border bg-card">
+                          <CreditCard className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium tracking-tight">{inv.description}</p>
+                          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                            {new Date(inv.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{inv.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(inv.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="font-semibold">${inv.amount.toFixed(2)}</p>
-                        <Badge
-                          className={cn(
-                            "text-[10px] px-1.5 py-0",
-                            inv.status === "paid"
-                              ? "bg-green-500/10 text-green-500 border-green-500/30"
-                              : "bg-amber-500/10 text-amber-500 border-amber-500/30"
-                          )}
-                        >
-                          {inv.status}
-                        </Badge>
-                      </div>
+                      <p className="folio text-right text-sm text-foreground">${inv.amount.toFixed(2)}</p>
+                      <span
+                        className="caption hidden justify-self-end rounded-sm border px-1.5 py-0.5 sm:inline-flex"
+                        style={
+                          inv.status === "paid"
+                            ? { color: "hsl(var(--secondary))", borderColor: "hsl(var(--secondary) / 0.4)", background: "hsl(var(--secondary) / 0.1)" }
+                            : { color: "hsl(var(--rating))", borderColor: "hsl(var(--rating) / 0.4)", background: "hsl(var(--rating) / 0.1)" }
+                        }
+                      >
+                        {inv.status}
+                      </span>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        className="h-8 w-8 justify-self-end text-muted-foreground hover:text-foreground"
                         disabled={downloadingInvoiceId === inv.id}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -639,170 +752,179 @@ export default function BillingPage() {
                         }}
                       >
                         {downloadingInvoiceId === inv.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <Download className="w-4 h-4" />
+                          <Download className="h-4 w-4" />
                         )}
                       </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* ── Plans ─────────────────────────────────────────────────────── */}
-      <motion.div
-        ref={plansRef}
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.3 }}
-      >
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold">Simple pricing for photographers</h2>
-          <p className="text-muted-foreground mt-1">Focus on shooting, not editing. Every paid plan includes unlimited AI editing.</p>
-        </div>
-
-        {/* Unlimited Strip */}
-        <div className="flex items-center justify-center gap-6 p-3 rounded-lg bg-primary/5 border border-primary/20 mb-6">
-          <span className="flex items-center gap-1.5 text-sm font-medium">
-            <InfinityIcon className="w-4 h-4 text-primary" /> AI Editing
-          </span>
-          <span className="flex items-center gap-1.5 text-sm font-medium">
-            <InfinityIcon className="w-4 h-4 text-primary" /> Culling & Grouping
-          </span>
-          <span className="flex items-center gap-1.5 text-sm font-medium">
-            <InfinityIcon className="w-4 h-4 text-primary" /> Galleries
-          </span>
-          <span className="text-xs text-muted-foreground">Included in every paid plan</span>
-        </div>
-
-        <div className="flex items-center justify-end mb-6">
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted border border-border/50">
-            <button
-              onClick={() => setBillingCycle("monthly")}
-              className={cn(
-                "px-4 py-2 rounded-md text-sm font-medium transition-all",
-                billingCycle === "monthly"
-                  ? "bg-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle("yearly")}
-              className={cn(
-                "px-4 py-2 rounded-md text-sm font-medium transition-all",
-                billingCycle === "yearly"
-                  ? "bg-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Yearly
-              <span className="ml-1 text-xs text-primary">-20%</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {plansList.map((plan) => {
-            const features = (plan.features as string[]) || [];
-            const isCurrentPlan = plan.slug === planSlug;
-            const isPopular = plan.slug === "pro";
-            const priceMonthly = plan.price_monthly;
-            const priceYearly = plan.price_yearly;
-            const monthlyEquivalent = priceYearly > 0 ? Math.round((priceYearly / 12) * 100) / 100 : 0;
-
-            return (
-              <motion.div
-                key={plan.id}
-                whileHover={{ y: -4 }}
-                className={cn(
-                  "relative rounded-xl border p-6 transition-all flex flex-col",
-                  isPopular
-                    ? "glass-card border-primary shadow-lg shadow-primary/20"
-                    : "bg-card/50 border-border/50"
-                )}
-              >
-                {isPopular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1 bg-gradient-to-r from-primary to-accent text-primary-foreground text-xs font-medium rounded-full flex items-center gap-1 whitespace-nowrap shadow-md">
-                    <Sparkles className="w-3 h-3" />
-                    Most Popular
-                  </div>
-                )}
-
-                <div className="mb-4">
-                  <h3 className="text-lg font-bold">{plan.name}</h3>
-                </div>
-
-                <div className="h-[72px] flex flex-col justify-start">
-                  <div>
-                    {billingCycle === "yearly" && priceMonthly > 0 && (
-                      <span className="text-lg text-muted-foreground line-through mr-1">${priceMonthly}</span>
-                    )}
-                    <span className="text-3xl font-bold">
-                      {billingCycle === "yearly" && priceYearly > 0
-                        ? `$${monthlyEquivalent}`
-                        : `$${priceMonthly}`}
-                    </span>
-                    <span className="text-muted-foreground"> /Month</span>
-                  </div>
-                  {billingCycle === "yearly" && priceYearly > 0 && (
-                    <p className="text-xs text-muted-foreground">*Billed annually (${priceYearly}/yr)</p>
-                  )}
-                </div>
-
-                <Button
-                  variant={getPlanButtonVariant(plan)}
-                  className="w-full mb-6 gap-1"
-                  disabled={isCurrentPlan}
-                  onClick={() => handleSelectPlan(plan)}
-                >
-                  {getPlanButtonLabel(plan)}
-                  {!isCurrentPlan && plan.sort_order > (currentPlan?.sort_order ?? 0) && (
-                    <ArrowUpRight className="w-4 h-4" />
-                  )}
-                  {!isCurrentPlan && plan.slug !== "free" && plan.sort_order < (currentPlan?.sort_order ?? 0) && (
-                    <ArrowDownRight className="w-4 h-4" />
-                  )}
-                </Button>
-
-                <p className="text-sm font-semibold mb-3">Plan includes:</p>
-
-                <ul className="space-y-3 mb-6 flex-1">
-                  {features.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                      <span>{feature}</span>
                     </li>
                   ))}
-                  {[...Array(Math.max(0, maxFeatures - features.length))].map((_, i) => (
-                    <li key={`empty-${i}`} className="h-6" />
-                  ))}
                 </ul>
-              </motion.div>
-            );
-          })}
-        </div>
+              </div>
+            )}
+          </Panel>
+        </motion.section>
 
-        {/* Marketplace Teaser */}
-        <div className="mt-8 p-6 rounded-xl border-2 border-dashed border-border/50 text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Store className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold">AI Style Marketplace</h3>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
-              Coming Soon
-            </span>
+        {/* ════ PLANS ══════════════════════════════════════════════════════ */}
+        <motion.section ref={plansRef} variants={rise} initial="hidden" animate="show" className="pt-2">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold tracking-tight">Simple pricing for photographers</h2>
+            <p className="mt-1.5 font-sans text-base text-muted-foreground">
+              Focus on shooting, not editing. Every paid plan includes unlimited AI editing.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Buy and sell custom AI editing styles created by photographers. Share your unique look with the community.
-          </p>
-        </div>
-      </motion.div>
 
+          {/* Unlimited Strip */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 rounded-[--radius] border border-primary/25 bg-primary/[0.06] px-4 py-3">
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              <InfinityIcon className="h-4 w-4 text-primary" /> AI Editing
+            </span>
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              <InfinityIcon className="h-4 w-4 text-primary" /> Culling &amp; Grouping
+            </span>
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              <InfinityIcon className="h-4 w-4 text-primary" /> Galleries
+            </span>
+            <span className="aura-microlabel">Included in every paid plan</span>
+          </div>
+
+          {/* Billing cycle toggle */}
+          <div className="mt-6 flex items-center justify-end">
+            <div className="flex items-center gap-1 rounded-[--radius] border border-border bg-card p-1">
+              <button
+                onClick={() => setBillingCycle("monthly")}
+                className={cn(
+                  "rounded-sm px-4 py-2 font-mono text-xs uppercase tracking-wide transition-colors",
+                  billingCycle === "monthly"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle("yearly")}
+                className={cn(
+                  "rounded-sm px-4 py-2 font-mono text-xs uppercase tracking-wide transition-colors",
+                  billingCycle === "yearly"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Yearly
+                <span className={cn("ml-1.5", billingCycle === "yearly" ? "text-primary-foreground" : "text-accent")}>-20%</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Plan comparison cells */}
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {plansList.map((plan) => {
+              const features = (plan.features as string[]) || [];
+              const isCurrentPlan = plan.slug === planSlug;
+              const isPopular = plan.slug === "pro";
+              const priceMonthly = plan.price_monthly;
+              const priceYearly = plan.price_yearly;
+              const monthlyEquivalent = priceYearly > 0 ? Math.round((priceYearly / 12) * 100) / 100 : 0;
+
+              return (
+                <motion.div
+                  key={plan.id}
+                  whileHover={{ y: -3 }}
+                  transition={{ duration: 0.2, ease: EASE }}
+                  className={cn(
+                    "relative flex flex-col rounded-[--radius] border bg-card p-6 transition-colors",
+                    isPopular
+                      ? "border-primary shadow-[var(--elevation-2)]"
+                      : isCurrentPlan
+                        ? "border-secondary/50"
+                        : "border-border hover:border-muted-foreground/40",
+                  )}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-primary-foreground shadow-[var(--elevation-2)]">
+                      <Sparkle size={11} />
+                      <span className="font-mono text-[10px] font-semibold uppercase tracking-wide">Most Popular</span>
+                    </div>
+                  )}
+
+                  <div className="mb-4 flex items-center justify-between gap-2">
+                    <h3 className="text-lg font-semibold tracking-tight">{plan.name}</h3>
+                    {isCurrentPlan && (
+                      <span
+                        className="caption rounded-sm border px-1.5 py-0.5"
+                        style={{ color: "hsl(var(--secondary))", borderColor: "hsl(var(--secondary) / 0.4)", background: "hsl(var(--secondary) / 0.1)" }}
+                      >
+                        Current
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex h-[72px] flex-col justify-start">
+                    <div className="flex items-baseline">
+                      {billingCycle === "yearly" && priceMonthly > 0 && (
+                        <span className="folio mr-1.5 text-lg text-muted-foreground line-through">${priceMonthly}</span>
+                      )}
+                      <span className="folio text-3xl text-foreground">
+                        {billingCycle === "yearly" && priceYearly > 0
+                          ? `$${monthlyEquivalent}`
+                          : `$${priceMonthly}`}
+                      </span>
+                      <span className="ml-1 font-mono text-sm text-muted-foreground">/Month</span>
+                    </div>
+                    {billingCycle === "yearly" && priceYearly > 0 && (
+                      <p className="mt-1 font-mono text-[11px] text-muted-foreground">*Billed annually (${priceYearly}/yr)</p>
+                    )}
+                  </div>
+
+                  <Button
+                    variant={getPlanButtonVariant(plan)}
+                    className="mb-6 w-full gap-1"
+                    disabled={isCurrentPlan}
+                    onClick={() => handleSelectPlan(plan)}
+                  >
+                    {getPlanButtonLabel(plan)}
+                    {!isCurrentPlan && plan.sort_order > (currentPlan?.sort_order ?? 0) && (
+                      <ArrowUpRight className="h-4 w-4" />
+                    )}
+                    {!isCurrentPlan && plan.slug !== "free" && plan.sort_order < (currentPlan?.sort_order ?? 0) && (
+                      <ArrowDownRight className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  <p className="aura-microlabel mb-3">Plan includes</p>
+
+                  <ul className="mb-2 flex-1 space-y-3">
+                    {features.map((feature, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                    {[...Array(Math.max(0, maxFeatures - features.length))].map((_, i) => (
+                      <li key={`empty-${i}`} className="h-6" />
+                    ))}
+                  </ul>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Marketplace Teaser */}
+          <div className="mt-8 rounded-[--radius] border border-dashed border-border bg-card/40 p-6 text-center">
+            <div className="mb-2 flex items-center justify-center gap-2">
+              <Store className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold tracking-tight">AI Style Marketplace</h3>
+              <span className="caption rounded-sm border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-primary">
+                Coming Soon
+              </span>
+            </div>
+            <p className="mx-auto max-w-md font-sans text-sm text-muted-foreground">
+              Buy and sell custom AI editing styles created by photographers. Share your unique look with the community.
+            </p>
+          </div>
+        </motion.section>
+      </div>
 
       {/* Modals (lazy-loaded; rendered only after user interaction) */}
       <AnimatePresence>

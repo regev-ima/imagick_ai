@@ -104,10 +104,10 @@ export function DockFilmstrip({ images, currentIndex, onGoToImage, getThumbnailU
                 key={img.id}
                 onClick={() => onGoToImage(globalIdx)}
                 className={cn(
-                  "flex-shrink-0 rounded overflow-hidden origin-bottom",
+                  "flex-shrink-0 rounded-sm overflow-hidden origin-bottom",
                   isCurrent
-                    ? "ring-1 ring-primary/60 shadow-[0_0_8px_-1px_hsl(var(--primary)/0.5)] opacity-100"
-                    : "opacity-50 hover:opacity-80"
+                    ? "ring-2 ring-primary shadow-[0_0_10px_-1px_hsl(var(--primary)/0.55)] opacity-100"
+                    : "opacity-45 hover:opacity-80"
                 )}
                 style={{
                   width: w, height: h,
@@ -133,7 +133,9 @@ export function DockFilmstrip({ images, currentIndex, onGoToImage, getThumbnailU
         </div>
       </div>
       <div className="text-center mt-1">
-        <span className="text-xs text-muted-foreground">{currentIndex + 1} / {images.length}</span>
+        <span className="font-mono text-[11px] tracking-[0.14em] text-muted-foreground tabular-nums">
+          <span className="text-foreground folio">{currentIndex + 1}</span> / {images.length}
+        </span>
       </div>
     </div>
   );

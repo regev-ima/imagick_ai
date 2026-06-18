@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUppyState } from "@uppy/react";
 import { UppyUploadArea } from "@/components/upload/UppyUploadArea";
@@ -13,14 +13,11 @@ import {
   Palette,
   FolderOpen,
   Loader2,
-  RefreshCw,
   CloudIcon,
   Plus,
   Tag,
   AlertTriangle,
-  FileImage,
   Eye,
-  Image as ImageIcon,
   Heart,
   User as UserIcon,
   Baby,
@@ -34,10 +31,10 @@ import {
   MapPin,
   Trophy,
   Globe,
-  type LucideIcon
+  ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -50,13 +47,12 @@ import { useImageProcessing } from "@/hooks/useImageProcessing";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Orb } from "@/components/aura/Orb";
 import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 import { useSubscription } from "@/hooks/useSubscription";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
-import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
 import {
   Select,
@@ -65,11 +61,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { useOnboardingQuestionnaire } from "@/hooks/useOnboardingQuestionnaire";
 
-const suggestedCategories = [
-  "Portrait", "Landscape", "Wedding", "Event", "Group Photo", "Close-up",
-  "Wide Shot", "Indoor", "Outdoor", "Night", "Golden Hour", "Black & White"
-];
+// The AI mark — a 4-point sparkle (the logo star), royal blue.
+// Copied from the approved LIGHTROOM dashboard.
+function Sparkle({
+  size = 16,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 const galleryTypes: { value: string; label: string; icon: LucideIcon }[] = [
   { value: "wedding", label: "Wedding", icon: Heart },
@@ -86,60 +119,24 @@ const galleryTypes: { value: string; label: string; icon: LucideIcon }[] = [
   { value: "sports", label: "Sports", icon: Trophy },
 ];
 
-// Floating particles config (generated once)
-const PARTICLES = Array.from({ length: 10 }, (_, i) => ({
-  id: i,
-  size: Math.random() > 0.5 ? "w-1 h-1" : "w-2 h-2",
-  color: Math.random() > 0.5 ? "bg-primary/20" : "bg-secondary/20",
-  top: `${Math.random() * 90 + 5}%`,
-  left: `${Math.random() * 90 + 5}%`,
-  duration: 4 + Math.random() * 4,
-  yOffset: 20 + Math.random() * 20,
-  xOffset: 10 + Math.random() * 10,
-  delay: Math.random() * 3,
-}));
-
-// Gradient orbs config
-const ORBS = [
-  { color: "bg-primary", size: "w-48 h-48 lg:w-72 lg:h-72", top: "10%", left: "15%", duration: 18 },
-  { color: "bg-secondary", size: "w-56 h-56 lg:w-64 lg:h-64", top: "60%", left: "70%", duration: 15 },
-  { color: "bg-accent", size: "w-48 h-48", top: "40%", left: "45%", duration: 20 },
+// Aura speaks each step — clean, confident, first-person.
+const steps = [
+  { number: 1, title: "Details", icon: FolderOpen, ask: "What are we working on?", say: "Name the shoot." },
+  { number: 2, title: "Styles", icon: Palette, ask: "How should I edit them?", say: "Pick up to three looks — or skip." },
+  { number: 3, title: "Culling", icon: Sparkles, ask: "Want me to cull first?", say: "I surface the keepers before you edit." },
+  { number: 4, title: "Upload", icon: Upload, ask: "Send me the photos.", say: "From your device or a Drive folder." },
 ];
-
-// Sparkle burst component for step completion
-function SparkleBurst({ active }: { active: boolean }) {
-  if (!active) return null;
-  const sparks = Array.from({ length: 6 }, (_, i) => {
-    const angle = (i / 6) * Math.PI * 2;
-    const dist = 14 + Math.random() * 10;
-    return { id: i, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist };
-  });
-  return (
-    <>
-      {sparks.map((s) => (
-        <motion.div
-          key={s.id}
-          className="absolute w-1 h-1 rounded-full bg-primary"
-          style={{ top: "50%", left: "50%" }}
-          initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-          animate={{ x: s.x, y: s.y, opacity: 0, scale: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        />
-      ))}
-    </>
-  );
-}
 
 export default function CreateGalleryPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const prefersReducedMotion = usePrefersReducedMotion();
   const { processImages } = useImageProcessing();
-  const { uppy, uploadImages, uploadProgress, isUploading: hookIsUploading, cancelUploads } = useImageUpload();
-  // Subscribe to Uppy's file count — replaces the old uploadedFiles array.
+  const { uppy, uploadImages, uploadProgress, isUploading: hookIsUploading } = useImageUpload();
   const uppyFileCount = useUppyState(uppy, (state) => Object.keys(state.files).length);
-  const { editsRemaining, availableEdits, editsReserved, isUnlimited, canEdit, isSuspended, isExpired, isFreePlan } = useSubscription();
+  const { availableEdits, editsReserved, isUnlimited, isFreePlan } = useSubscription();
+  // FIX 5 — onboarding answers (shoot types) can prefill the gallery type
+  const { answers: onboardingAnswers, allQuestions: onboardingQuestions } = useOnboardingQuestionnaire();
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
@@ -151,9 +148,10 @@ export default function CreateGalleryPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [customLabels, setCustomLabels] = useState<string[]>([]);
   const [aiCulling, setAiCulling] = useState(false);
+  const [cullingAdvancedOpen, setCullingAdvancedOpen] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  
+
   // Upload source state
   const [uploadSource, setUploadSource] = useState<UploadSource>("local");
   const [driveLinks, setDriveLinks] = useState<string[]>([]);
@@ -165,6 +163,9 @@ export default function CreateGalleryPage() {
   const [languageLoaded, setLanguageLoaded] = useState(false);
   const [styleTab, setStyleTab] = useState<"public" | "yours">("public");
 
+  // FIX 3 — guard leaving mid-upload (staged files or active transfer)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+
   // Edit calculations
   const imageCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : uppyFileCount;
   const stylesCount = selectedStyles.length;
@@ -172,14 +173,52 @@ export default function CreateGalleryPage() {
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
   const maxImages = isUnlimited ? Infinity : (stylesCount > 0 ? Math.floor(availableEdits / stylesCount) : 0);
 
-   // Pre-select style from URL parameter
-   const preSelectedStyleId = searchParams.get("styleId");
-   
-   useEffect(() => {
-     if (preSelectedStyleId && !selectedStyles.includes(preSelectedStyleId)) {
-       setSelectedStyles([preSelectedStyleId]);
-     }
-   }, [preSelectedStyleId]);
+  // Pre-select style from URL parameter
+  const preSelectedStyleId = searchParams.get("styleId");
+
+  useEffect(() => {
+    if (preSelectedStyleId && !selectedStyles.includes(preSelectedStyleId)) {
+      setSelectedStyles([preSelectedStyleId]);
+    }
+  }, [preSelectedStyleId]);
+
+  // Aura hand-off: ⌘K "start a collection named X" lands here with ?name=X
+  const prefillName = searchParams.get("name");
+  useEffect(() => {
+    if (prefillName) setGalleryName((prev) => prev || prefillName);
+  }, [prefillName]);
+
+  // FIX 5 — default the gallery type from the onboarding questionnaire's
+  // "What do you shoot?" answer (question_key === "photography_types").
+  // Onboarding option ids are plural (e.g. "weddings") and a few don't map
+  // to a wizard galleryType; we only prefill on a clean match and never
+  // override an existing pick (manual choice or ?styleId/?name flows).
+  useEffect(() => {
+    if (galleryType) return;
+    const shootQuestion = onboardingQuestions.find((q) => q.question_key === "photography_types");
+    if (!shootQuestion) return;
+    const answer = onboardingAnswers.find((a) => a.question_id === shootQuestion.id);
+    const picked: string[] = Array.isArray(answer?.answer) ? answer.answer : [];
+    if (picked.length === 0) return;
+    // Map onboarding shoot-type ids -> wizard galleryType values.
+    const ONBOARDING_TO_GALLERY_TYPE: Record<string, string> = {
+      weddings: "wedding",
+      portraits: "portrait",
+      events: "event",
+      commercial: "commercial",
+      landscape: "landscape",
+      real_estate: "real_estate",
+      fashion: "fashion",
+      food: "food",
+      sports: "sports",
+      newborn: "newborn",
+      // "wildlife" and "other" have no clean wizard equivalent — left unmapped.
+    };
+    const validTypes = new Set(galleryTypes.map((t) => t.value));
+    const match = picked.map((id) => ONBOARDING_TO_GALLERY_TYPE[id]).find((v) => v && validTypes.has(v));
+    if (match) setGalleryType(match);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingQuestions, onboardingAnswers]);
 
   // Fetch user's preferred language
   useEffect(() => {
@@ -197,7 +236,7 @@ export default function CreateGalleryPage() {
       });
   }, [user]);
 
-   // Reset selections when gallery type or language changes (don't auto-select)
+  // Reset selections when gallery type or language changes (don't auto-select)
   useEffect(() => {
     if (!galleryType || !languageLoaded) return;
     setSelectedCategories([]);
@@ -224,25 +263,18 @@ export default function CreateGalleryPage() {
         .select("*")
         .eq("is_active", true)
         .order("created_at", { ascending: true });
-      
+
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   const { data: showcaseCovers = {} } = useShowcaseCovers();
 
-  const steps = [
-    { number: 1, title: "Details", subtitle: "Name & gallery type", icon: FolderOpen },
-    { number: 2, title: "Styles", subtitle: "Choose AI styles", icon: Palette },
-    { number: 3, title: "Culling", subtitle: "Smart AI culling", icon: Sparkles },
-    { number: 4, title: "Upload", subtitle: "Add your photos", icon: Upload },
-  ];
-
   const toggleStyle = (styleId: string) => {
-    setSelectedStyles(prev => {
+    setSelectedStyles((prev) => {
       if (prev.includes(styleId)) {
-        return prev.filter(id => id !== styleId);
+        return prev.filter((id) => id !== styleId);
       }
       if (prev.length >= 3) return prev;
       return [...prev, styleId];
@@ -250,9 +282,9 @@ export default function CreateGalleryPage() {
   };
 
   const toggleCategory = (category: string) => {
-    setSelectedCategories(prev => {
+    setSelectedCategories((prev) => {
       if (prev.includes(category)) {
-        return prev.filter(c => c !== category);
+        return prev.filter((c) => c !== category);
       }
       if (prev.length >= 20) return prev;
       return [...prev, category];
@@ -263,11 +295,11 @@ export default function CreateGalleryPage() {
     const trimmed = customCategory.trim();
     const predefined = getCullingLabels(galleryType || "wedding", cullingLanguage);
     if (trimmed && !selectedCategories.includes(trimmed) && !predefined.includes(trimmed) && !customLabels.includes(trimmed) && selectedCategories.length < 20) {
-      setCustomLabels(prev => [...prev, trimmed]);
-      setSelectedCategories(prev => [...prev, trimmed]);
+      setCustomLabels((prev) => [...prev, trimmed]);
+      setSelectedCategories((prev) => [...prev, trimmed]);
       setCustomCategory("");
     } else if (trimmed && predefined.includes(trimmed) && !selectedCategories.includes(trimmed) && selectedCategories.length < 20) {
-      setSelectedCategories(prev => [...prev, trimmed]);
+      setSelectedCategories((prev) => [...prev, trimmed]);
       setCustomCategory("");
     }
   };
@@ -284,6 +316,17 @@ export default function CreateGalleryPage() {
       toast.error("Please sign in to create a gallery");
       return;
     }
+
+    // When AI culling is on, the labels that actually drive the first automatic
+    // culling live in `culling_labels` (the backend's image-webhook reads that
+    // column, not `categories`). If the photographer didn't pick any, fall back
+    // to the curated label set for the shoot type, so simply toggling culling on
+    // still tags sensibly instead of sending Aura an empty list.
+    const effectiveCullingLabels = aiCulling
+      ? (selectedCategories.length > 0
+          ? selectedCategories
+          : getCullingLabels(galleryType || "wedding", cullingLanguage))
+      : [];
 
     // Handle Google Drive upload
     if (uploadSource === "drive") {
@@ -304,9 +347,10 @@ export default function CreateGalleryPage() {
             gallery_type: galleryType,
             description: description || null,
             categories: selectedCategories,
+            culling_labels: effectiveCullingLabels,
             ai_culling_enabled: aiCulling,
             total_images: driveFolderInfo.totalImageCount,
-            status: "transferring"
+            status: "transferring",
           })
           .select()
           .single();
@@ -347,7 +391,6 @@ export default function CreateGalleryPage() {
 
         toast.success("Transfer started! Your images are being imported from Google Drive...");
         navigate(`/dashboard/galleries/${gallery.id}`);
-
       } catch (error: any) {
         console.error("Error creating gallery:", error);
         toast.error(error.message || "Failed to create gallery");
@@ -369,9 +412,10 @@ export default function CreateGalleryPage() {
           gallery_type: galleryType,
           description: description || null,
           categories: selectedCategories,
+          culling_labels: effectiveCullingLabels,
           ai_culling_enabled: aiCulling,
           total_images: uppyFileCount,
-          status: "uploading"
+          status: "uploading",
         })
         .select()
         .single();
@@ -426,10 +470,10 @@ export default function CreateGalleryPage() {
           .select("original_url")
           .eq("id", imageIds[0])
           .single();
-        
+
         if (firstImage) {
           heroImageUrl = firstImage.original_url;
-          
+
           // Mark first image as hero
           await supabase
             .from("gallery_images")
@@ -445,7 +489,7 @@ export default function CreateGalleryPage() {
           hero_image_url: heroImageUrl,
           status: selectedStyles.length > 0 ? "processing" : "ready",
           processed_images: 0,
-          total_images: imageIds.length
+          total_images: imageIds.length,
         })
         .eq("id", gallery.id);
 
@@ -458,7 +502,7 @@ export default function CreateGalleryPage() {
             imageCount: imageIds.length,
             galleryId: gallery.id,
           },
-        }).catch(err => console.error("Failed to send upload complete email:", err));
+        }).catch((err) => console.error("Failed to send upload complete email:", err));
       }
 
       // 7. Start AI processing for any IDs that weren't already streamed
@@ -472,7 +516,7 @@ export default function CreateGalleryPage() {
             .eq("status", "uploading");
           processImages(gallery.id, remaining, selectedStyles);
         }
-        toast.success("Gallery created! AI processing started...");
+        toast.success("Gallery created! Aura is on it...");
       } else {
         // Update images to ready if no styles selected
         await supabase
@@ -495,7 +539,7 @@ export default function CreateGalleryPage() {
       case 1:
         return galleryName.trim().length > 0 && galleryType.length > 0;
       case 2:
-        return selectedStyles.length > 0;
+        return true; // Styles are optional — gallery can be host & share only
       case 3:
         return true; // Culling is optional
       case 4:
@@ -508,443 +552,379 @@ export default function CreateGalleryPage() {
     }
   };
 
+  const active = steps[currentStep - 1];
+  const busy = isUploading || isTransferring;
+
+  // FIX 3 — the back button abandons staged photos / an active transfer.
+  // Intercept with a confirm when there's something to lose; otherwise leave.
+  const hasUnsavedWork = uppyFileCount > 0 || busy;
+  const handleLeave = () => {
+    if (hasUnsavedWork) {
+      setShowLeaveConfirm(true);
+    } else {
+      navigate("/dashboard/galleries");
+    }
+  };
+
+  // FIX 3 — warn on tab close / reload ONLY while an upload/transfer is active.
+  useEffect(() => {
+    if (!busy) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [busy]);
+
   return (
-    <div className="relative p-6 lg:p-8 overflow-hidden">
-      {/* === AI Ambient Animations (Background) === */}
-      {!prefersReducedMotion && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-          {/* Floating particles */}
-          {PARTICLES.map((p) => (
-            <motion.div
-              key={p.id}
-              className={cn("absolute rounded-full opacity-40", p.size, p.color)}
-              style={{ top: p.top, left: p.left }}
-              animate={{
-                y: [-p.yOffset, p.yOffset, -p.yOffset],
-                x: [-p.xOffset, p.xOffset, -p.xOffset],
-              }}
-              transition={{
-                duration: p.duration,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: p.delay,
-              }}
-            />
-          ))}
-          {/* Gradient orbs */}
-          {ORBS.map((orb, i) => (
-            <motion.div
-              key={i}
-              className={cn("absolute rounded-full blur-[100px] opacity-[0.06]", orb.size, orb.color)}
-              style={{ top: orb.top, left: orb.left }}
-              animate={{
-                x: [0, 60, -40, 0],
-                y: [0, -50, 30, 0],
-              }}
-              transition={{
-                duration: orb.duration,
-                repeat: Infinity,
-                repeatType: "mirror",
-                ease: "easeInOut",
-              }}
-            />
-          ))}
+    <div className="relative min-h-full bg-background px-4 py-8 lg:px-8 lg:py-12">
+      <div className="relative mx-auto max-w-3xl">
+        {/* Header — back mark + module index */}
+        <div className="flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLeave}
+            aria-label="Back to galleries"
+            className="-ml-2 gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="caption">Galleries</span>
+          </Button>
+          <span className="caption hidden sm:inline">New collection · {String(active.number).padStart(2, "0")} / 04</span>
         </div>
-      )}
 
-      {/* Header */}
-      <div className="relative flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/galleries")}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">
-            Create New <span className="text-gradient-primary">AI Gallery</span>
-          </h1>
-          <p className="text-muted-foreground">Upload and process your photos with AI</p>
-        </div>
-      </div>
-
-      {/* === Immersive Timeline Stepper === */}
-      <div className="relative flex items-start justify-center mb-8 px-0 sm:px-4 overflow-x-auto">
-        {steps.map((step, index) => {
-          const isActive = currentStep === step.number;
-          const isCompleted = currentStep > step.number || completedSteps.has(step.number);
-          const isUpcoming = !isActive && !isCompleted;
-
-          return (
-            <div key={step.number} className="flex items-start">
-              {/* Step node */}
-              <div className="flex flex-col items-center">
-                <div className="relative">
-                  <motion.div
+        {/* Stepper — mono module index on a hairline */}
+        <div className="mt-6">
+          <hr className="aura-hairline" />
+          <div className="-mt-px flex flex-wrap items-stretch">
+            {steps.map((step, i) => {
+              const isActive = currentStep === step.number;
+              const isDone = currentStep > step.number || completedSteps.has(step.number);
+              const reachable = isDone;
+              return (
+                <button
+                  key={step.number}
+                  type="button"
+                  disabled={!reachable || busy}
+                  onClick={() => reachable && setCurrentStep(step.number)}
+                  className={cn(
+                    "group relative flex items-center gap-2 py-3 pr-5",
+                    i > 0 && "pl-5",
+                    reachable ? "cursor-pointer" : "cursor-default",
+                  )}
+                >
+                  {/* active = royal-blue tick on the rule */}
+                  <span
                     className={cn(
-                      "w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all relative z-10",
-                      isActive && "bg-primary shadow-[0_0_20px_rgba(var(--primary-rgb,236,72,153),0.4)]",
-                      isCompleted && "bg-primary/20",
-                      isUpcoming && "bg-muted"
+                      "absolute left-0 top-0 h-0.5 w-full -translate-y-px transition-colors",
+                      isActive ? "bg-primary" : "bg-transparent",
                     )}
-                    animate={isActive ? { boxShadow: [
-                      "0 0 12px rgba(236,72,153,0.3)",
-                      "0 0 24px rgba(236,72,153,0.5)",
-                      "0 0 12px rgba(236,72,153,0.3)",
-                    ] } : {}}
-                    transition={isActive ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
-                  >
-                    {isCompleted ? (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                      >
-                        <Check className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                      </motion.div>
-                    ) : (
-                      <step.icon className={cn(
-                        "w-4 h-4 sm:w-5 sm:h-5",
-                        isActive ? "text-primary-foreground" : "text-muted-foreground"
-                      )} />
-                    )}
-                  </motion.div>
-                  {/* Sparkle burst on completion */}
-                  <SparkleBurst active={isCompleted && completedSteps.has(step.number)} />
-                </div>
-                <span className={cn(
-                  "text-xs sm:text-sm font-semibold mt-2",
-                  isActive ? "text-foreground" : isCompleted ? "text-primary" : "text-muted-foreground"
-                )}>
-                  {step.title}
-                </span>
-                <span className="text-xs text-muted-foreground hidden sm:block">{step.subtitle}</span>
-              </div>
-
-              {/* Connector line */}
-              {index < steps.length - 1 && (
-                <div className="relative w-8 sm:w-24 h-0.5 mt-[18px] sm:mt-[22px] mx-1 sm:mx-2 bg-muted overflow-hidden rounded-full">
-                  <motion.div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-secondary rounded-full"
-                    initial={{ width: "0%" }}
-                    animate={{ width: currentStep > step.number ? "100%" : "0%" }}
-                    transition={{ duration: 0.5, ease: "easeInOut" }}
                   />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                  <span
+                    className={cn(
+                      "caption text-xs transition-colors",
+                      isActive ? "text-primary" : isDone ? "text-foreground" : "text-muted-foreground/55",
+                    )}
+                  >
+                    {String(step.number).padStart(2, "0")}
+                  </span>
+                  <span
+                    className={cn(
+                      "caption transition-colors",
+                      isActive
+                        ? "text-foreground"
+                        : isDone
+                          ? "text-muted-foreground group-hover:text-foreground"
+                          : "text-muted-foreground/55",
+                    )}
+                  >
+                    {step.title}
+                  </span>
+                  {isDone && !isActive && <Check className="h-3 w-3 text-primary" strokeWidth={2.5} />}
+                </button>
+              );
+            })}
+          </div>
+          <hr className="aura-hairline" />
+        </div>
 
-      {/* Step Content */}
-      <Card className="glass-card border-border/50 p-6 lg:p-8">
-        <AnimatePresence mode="wait">
-          {/* Step 1: Details */}
-          {currentStep === 1 && (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div>
-                <h2 className="text-xl font-bold mb-1">Gallery Details</h2>
-                <p className="text-muted-foreground">Give your gallery a name and description</p>
-              </div>
+        {/* Masthead — Aura mark + step title + helper line */}
+        <div className="mb-7 mt-9 flex items-start gap-4">
+          <Orb className="mt-0.5 h-10 w-10 shrink-0" />
+          <div className="min-w-0">
+            <span className="aura-microlabel text-accent">Aura</span>
+            <h1 className="mt-1 text-3xl font-bold leading-[1.05] tracking-tight text-foreground lg:text-4xl">
+              {active.ask}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{active.say}</p>
+          </div>
+        </div>
 
-              <div className="space-y-6">
-                {/* Gallery Name */}
+        {/* Step panel */}
+        <div className="glass-card rounded-md p-5 lg:p-8">
+          <AnimatePresence mode="wait">
+            {/* Step 1: Details */}
+            {currentStep === 1 && (
+              <motion.div
+                key="step1"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                className="space-y-8"
+              >
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Gallery Name *</label>
+                  <label className="aura-microlabel mb-2.5 block">Gallery name</label>
                   <Input
-                    placeholder="e.g., Johnson Wedding - June 2024"
+                    placeholder="Cohen Wedding, June 2026"
                     value={galleryName}
                     onChange={(e) => setGalleryName(e.target.value)}
-                    className="bg-muted border-border/50"
+                    autoFocus
                   />
                 </div>
 
-                {/* Description */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Description</label>
+                  <label className="aura-microlabel mb-2.5 block">Notes for me (optional)</label>
                   <Textarea
-                    placeholder="Add notes about this gallery..."
+                    placeholder="Anything I should know about this shoot?"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="bg-muted border-border/50 min-h-[100px]"
+                    className="min-h-[90px]"
                   />
                 </div>
 
-                {/* Gallery Type */}
                 <div>
-                  <label className="text-sm font-medium mb-3 block">Gallery Type *</label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
-                    {galleryTypes.map(type => (
-                      <motion.button
-                        key={type.value}
-                        type="button"
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => setGalleryType(type.value)}
-                        className={cn(
-                          "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
-                          galleryType === type.value
-                            ? "border-primary bg-primary/10 shadow-md shadow-primary/10"
-                            : "border-border/50 bg-muted/30 hover:border-primary/30 hover:bg-muted/50"
-                        )}
-                      >
-                        <type.icon className={cn(
-                          "w-5 h-5 transition-colors",
-                          galleryType === type.value ? "text-primary" : "text-muted-foreground"
-                        )} />
-                        <span className={cn(
-                          "text-xs font-medium transition-colors",
-                          galleryType === type.value ? "text-foreground" : "text-muted-foreground"
-                        )}>
-                          {type.label}
-                        </span>
-                      </motion.button>
-                    ))}
+                  <div className="mb-4 flex items-baseline justify-between border-b border-border pb-2">
+                    <label className="aura-microlabel">What kind of shoot?</label>
+                    <span className="caption text-muted-foreground/70">{String(galleryTypes.length).padStart(2, "0")}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-4">
+                    {galleryTypes.map((type) => {
+                      const selected = galleryType === type.value;
+                      return (
+                        <button
+                          key={type.value}
+                          type="button"
+                          onClick={() => setGalleryType(type.value)}
+                          className={cn(
+                            "relative flex flex-col items-center gap-2.5 bg-card p-4 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                            selected ? "bg-primary/[0.1]" : "hover:bg-muted/60",
+                          )}
+                        >
+                          {/* active = royal-blue keyline */}
+                          {selected && <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-primary" />}
+                          <type.icon className={cn("h-5 w-5 transition-colors", selected ? "text-primary" : "text-foreground/70")} strokeWidth={1.5} />
+                          <span className={cn("text-xs font-medium transition-colors", selected ? "text-foreground" : "text-muted-foreground")}>
+                            {type.label}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
 
-          {/* Step 2: Styles */}
-          {currentStep === 2 && (
-             <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div>
-                <h2 className="text-xl font-bold mb-1">Select AI Styles</h2>
-                <p className="text-muted-foreground">
-                  Choose up to 3 styles to apply to your photos
-                </p>
-              </div>
-
-              {/* Style Tabs */}
-              <div className="flex gap-2">
-                <Button
-                  variant={styleTab === "public" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStyleTab("public")}
-                  className="gap-1.5"
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                  Public Styles
-                </Button>
-                <Button
-                  variant={styleTab === "yours" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStyleTab("yours")}
-                  className="gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Your Styles
-                </Button>
-              </div>
-
-              {/* Sticky Selected Styles Bar */}
-              <div className="bg-background/95 backdrop-blur-sm border border-border/50 rounded-xl p-3 mb-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Badge variant={selectedStyles.length > 0 ? "default" : "secondary"} className="shrink-0">
-                    {selectedStyles.length}/3
-                  </Badge>
-                  {selectedStyles.length === 0 ? (
-                    <span className="text-sm text-muted-foreground">No styles selected yet</span>
-                  ) : (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <AnimatePresence mode="popLayout">
-                        {selectedStyles.map(id => {
-                          const style = styles.find(s => s.id === id);
-                          if (!style) return null;
-                          const chipCover = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined) || style.thumbnail_url || undefined;
-                          return (
-                            <motion.div
-                              key={id}
-                              layout
-                              initial={{ scale: 0.8, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              exit={{ scale: 0.8, opacity: 0 }}
-                              className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-full pl-1 pr-2 py-1"
-                            >
-                              {chipCover ? (
-                                <img src={getThumbnailUrl(chipCover)} alt="" className="w-6 h-6 rounded-full object-cover" />
-                              ) : (
-                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/30 to-accent/30" />
-                              )}
-                              <span className="text-xs font-medium max-w-[80px] truncate">{style.name}</span>
-                              <button
-                                onClick={() => toggleStyle(id)}
-                                className="w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center transition-colors"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </motion.div>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </div>
-                  )}
+            {/* Step 2: Styles */}
+            {currentStep === 2 && (
+              <motion.div
+                key="step2"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                className="space-y-6"
+              >
+                {/* Tabs — segmented control */}
+                <div className="inline-flex items-center rounded-md border border-border bg-card p-0.5">
+                  {([["public", "Public looks", Globe], ["yours", "Your looks", Sparkles]] as const).map(([key, label, Icon]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setStyleTab(key)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-[5px] px-4 py-1.5 text-xs font-semibold transition-colors",
+                        styleTab === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      {label}
+                    </button>
+                  ))}
                 </div>
-              </div>
 
-              {(() => {
-                const filteredStyles = styles.filter(s => {
-                  if (styleTab === "yours") return s.user_id === user?.id && s.status === "ready";
-                  return s.is_preset || (s.visibility === "public" && s.user_id !== user?.id);
-                });
+                {/* Optional — host & share without AI editing */}
+                <p className="text-sm text-muted-foreground">
+                  Optional — skip to host &amp; share your photos as-is, with no AI editing.
+                </p>
 
-                return filteredStyles.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Palette className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">
-                      {styleTab === "yours" ? "You haven't created any styles yet." : "No public styles available."}
-                    </p>
-                    {styleTab === "yours" && (
+                {/* Selected index — chips with cover + count */}
+                <div className="border-y border-border py-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="caption shrink-0 text-primary">{String(selectedStyles.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 03</span></span>
+                    {selectedStyles.length === 0 ? (
                       <>
-                        <p className="text-sm text-muted-foreground mt-1">Create your first AI style to get started.</p>
-                        <Button
-                          variant="glow"
-                          size="sm"
-                          className="mt-4 gap-1.5"
-                          onClick={() => navigate("/dashboard/styles/new")}
+                        <span className="text-sm text-muted-foreground">Nothing picked yet. Choose a look below — or</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCompletedSteps((prev) => new Set([...prev, 2]));
+                            setCurrentStep(3);
+                          }}
+                          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          Create Style
-                        </Button>
+                          Skip — no AI editing
+                        </button>
                       </>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AnimatePresence mode="popLayout">
+                          {selectedStyles.map((id) => {
+                            const style = styles.find((s) => s.id === id);
+                            if (!style) return null;
+                            const chipCover = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined) || style.thumbnail_url || undefined;
+                            return (
+                              <motion.div
+                                key={id}
+                                layout
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
+                                className="flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/[0.1] py-1 pl-1 pr-2"
+                              >
+                                {chipCover ? (
+                                  <img src={getThumbnailUrl(chipCover)} alt="" className="h-6 w-6 rounded-full object-cover" />
+                                ) : (
+                                  <div className="h-6 w-6 rounded-full bg-primary/20" />
+                                )}
+                                <span className="max-w-[80px] truncate text-xs font-medium">{style.name}</span>
+                                <button onClick={() => toggleStyle(id)} className="grid h-4 w-4 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-primary/15 hover:text-primary">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <ScrollArea className="h-[350px] pr-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {filteredStyles.map(style => {
-                        const coverUrl = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined) || style.thumbnail_url || undefined;
-                        const isSelected = selectedStyles.includes(style.id);
-                        return (
-                          <motion.div
-                            key={style.id}
-                            role="checkbox"
-                            aria-checked={isSelected}
-                            aria-label={style.name}
-                            tabIndex={0}
-                            whileHover={{ scale: 1.01 }}
-                            whileTap={{ scale: 0.99 }}
-                            onClick={() => toggleStyle(style.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                toggleStyle(style.id);
-                              }
-                            }}
-                            className={cn(
-                              "flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all border group",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                              isSelected
-                                ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md shadow-primary/10 border-primary/50"
-                                : "border-border/50 hover:border-primary/40 hover:bg-muted/30"
-                            )}
-                          >
-                            {/* Thumbnail */}
-                            {coverUrl ? (
-                              <img
-                                src={getThumbnailUrl(coverUrl)}
-                                alt={style.name}
-                                className="w-16 h-16 rounded-lg object-cover shrink-0"
-                              />
-                            ) : (
-                              <div className="w-16 h-16 rounded-lg shrink-0 bg-gradient-to-br from-primary/20 to-accent/20" />
-                            )}
+                </div>
 
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                {style.is_preset ? (
-                                  <Palette className="w-3.5 h-3.5 text-primary shrink-0" />
-                                ) : (
-                                  <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
-                                )}
-                                <span className="font-semibold text-sm truncate">{style.name}</span>
-                              </div>
-                              {style.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{style.description}</p>
-                              )}
-                              <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                {style.category && (
-                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{style.category}</Badge>
-                                )}
-                                {style.associated_tags?.slice(0, 2).map(tag => (
-                                  <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0 h-4">{tag}</Badge>
-                                ))}
-                              </div>
-                            </div>
+                {(() => {
+                  const filteredStyles = styles.filter((s) => {
+                    if (styleTab === "yours") return s.user_id === user?.id && s.status === "ready";
+                    return s.is_preset || (s.visibility === "public" && s.user_id !== user?.id);
+                  });
 
-                            {/* Actions */}
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(`/dashboard/styles/${style.id}`, "_blank");
-                                }}
-                                className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
-                              >
-                                <Eye className="w-4 h-4 text-muted-foreground" />
-                              </button>
-                              <AnimatePresence>
-                                {isSelected && (
-                                  <motion.div
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    exit={{ scale: 0 }}
-                                    className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-sm"
-                                  >
-                                    <Check className="w-4 h-4 text-primary-foreground" />
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-                );
-              })()}
-            </motion.div>
-          )}
-
-          {/* Step 3: AI Culling (skippable) */}
-          {currentStep === 3 && (
-            <motion.div
-              key="step3"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div>
-                <h2 className="text-xl font-bold mb-1">AI Smart Culling</h2>
-                <p className="text-muted-foreground">
-                  Automatically remove duplicates and poor quality images
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-5 rounded-xl bg-muted/50 border border-border/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Enable AI Culling</p>
-                      <p className="text-sm text-muted-foreground">
-                        Let AI analyze and filter your photos before editing
+                  return filteredStyles.length === 0 ? (
+                    <div className="border-t border-border py-14 text-center">
+                      <Orb className="mx-auto mb-4 h-9 w-9" />
+                      <p className="text-lg font-semibold text-foreground">
+                        {styleTab === "yours" ? "You haven't trained a look yet." : "No public looks available."}
                       </p>
+                      {styleTab === "yours" && (
+                        <>
+                          <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">Train one and I'll match your editing exactly.</p>
+                          <Button variant="glow" size="sm" className="mt-5 gap-1.5" onClick={() => navigate("/dashboard/styles/new")}>
+                            <Plus className="h-3.5 w-3.5" />
+                            Train a look
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[360px] pr-2">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {filteredStyles.map((style) => {
+                          const coverUrl = showcaseCovers[style.id] || (style.user_id === user?.id && style.after_image_urls?.length ? style.after_image_urls[0] : undefined) || style.thumbnail_url || undefined;
+                          const isSelected = selectedStyles.includes(style.id);
+                          return (
+                            <div
+                              key={style.id}
+                              role="checkbox"
+                              aria-checked={isSelected}
+                              aria-label={style.name}
+                              tabIndex={0}
+                              onClick={() => toggleStyle(style.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  toggleStyle(style.id);
+                                }
+                              }}
+                              className={cn(
+                                "group relative flex cursor-pointer items-center gap-3.5 rounded-md border border-border bg-card p-2.5 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary",
+                                isSelected ? "bg-primary/[0.06]" : "hover:bg-muted/50",
+                              )}
+                            >
+                              {/* selected = royal-blue ring */}
+                              {isSelected && <span className="pointer-events-none absolute inset-0 rounded-md ring-1 ring-inset ring-primary" />}
+                              {coverUrl ? (
+                                <img src={getThumbnailUrl(coverUrl)} alt={style.name} className="plate-keyline h-16 w-16 shrink-0 rounded object-cover" />
+                              ) : (
+                                <div className="plate-keyline h-16 w-16 shrink-0 rounded bg-muted" />
+                              )}
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  {style.is_preset ? <Palette className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.75} /> : <Sparkle size={13} className="shrink-0 text-accent" />}
+                                  <span className="truncate text-base font-semibold leading-tight text-foreground">{style.name}</span>
+                                </div>
+                                {style.description && <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{style.description}</p>}
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                  {style.category && <span className="caption text-[0.625rem] tracking-[0.14em]">{style.category}</span>}
+                                  {style.associated_tags?.slice(0, 2).map((tag) => (
+                                    <Badge key={tag} variant="outline" className="h-4 px-1.5 py-0 text-[10px] font-normal">{tag}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(`/dashboard/styles/${style.id}`, "_blank");
+                                  }}
+                                  className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                                {isSelected && (
+                                  <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground">
+                                    <Check className="h-4 w-4" strokeWidth={2.5} />
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  );
+                })()}
+              </motion.div>
+            )}
+
+            {/* Step 3: AI Culling */}
+            {currentStep === 3 && (
+              <motion.div
+                key="step3"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                className="space-y-6"
+              >
+                <div className="flex items-center justify-between gap-4 border-y border-border py-5">
+                  <div className="flex items-center gap-3.5">
+                    <Orb className="h-10 w-10 shrink-0" />
+                    <div>
+                      <p className="text-lg font-semibold leading-tight text-foreground">Let me cull this gallery</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">I rank every frame before any editing, so you only pay to edit the keepers.</p>
                     </div>
                   </div>
                   <Switch checked={aiCulling} onCheckedChange={setAiCulling} />
@@ -956,328 +936,354 @@ export default function CreateGalleryPage() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
                       className="overflow-hidden"
                     >
-                      <div className="p-4 rounded-xl bg-muted/30 border border-border/30 space-y-3">
-                        {/* Language selector */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Tag className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Culling Labels ({selectedCategories.length}/20)</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                            <Select value={cullingLanguage} onValueChange={(v) => handleLanguageChange(v as LanguageCode)}>
-                              <SelectTrigger className="h-8 w-[140px] text-xs bg-muted/50 border-border/50">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {supportedLanguages.map(lang => (
-                                  <SelectItem key={lang.code} value={lang.code} className="text-xs">
-                                    {lang.name} ({lang.englishName})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">
-                            {galleryType 
-                              ? "Recommended labels for your gallery type. Select the ones you need or add custom ones."
-                              : "Select a gallery type in Step 1 to get recommended labels."}
+                      <div className="space-y-4 rounded-md border border-border bg-card p-4">
+                        {/* Calm default — Aura handles it automatically */}
+                        <div className="flex items-center gap-2.5">
+                          <Sparkle size={14} className="shrink-0 text-accent" />
+                          <p className="text-sm text-muted-foreground">
+                            Aura will tag and rank your best shots automatically.
                           </p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs h-7 px-2 shrink-0"
-                            onClick={() => {
-                              const currentLabels = getCullingLabels(galleryType || "wedding", cullingLanguage);
-                              const allSelected = currentLabels.every(l => selectedCategories.includes(l));
-                              if (allSelected) {
-                                setSelectedCategories(prev => prev.filter(c => !currentLabels.includes(c)));
-                              } else {
-                                setSelectedCategories(prev => {
-                                  const custom = prev.filter(c => !currentLabels.includes(c));
-                                  const remaining = 20 - custom.length;
-                                  return [...custom, ...currentLabels.slice(0, remaining)];
-                                });
-                              }
-                            }}
-                          >
-                            {getCullingLabels(galleryType || "wedding", cullingLanguage).every(l => selectedCategories.includes(l)) ? "Deselect All" : "Select All"}
-                          </Button>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          {[...getCullingLabels(galleryType || "wedding", cullingLanguage), ...customLabels.filter(cl => !getCullingLabels(galleryType || "wedding", cullingLanguage).includes(cl))].map(category => (
-                            <button
-                              key={category}
-                              onClick={() => toggleCategory(category)}
-                              disabled={selectedCategories.length >= 20 && !selectedCategories.includes(category)}
-                              className={cn(
-                                "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
-                                selectedCategories.includes(category)
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-muted text-muted-foreground hover:bg-muted/80",
-                                selectedCategories.length >= 20 && !selectedCategories.includes(category) && "opacity-50 cursor-not-allowed"
+                        {/* Advanced (optional) — detailed label controls, collapsed by default */}
+                        <Collapsible open={cullingAdvancedOpen} onOpenChange={setCullingAdvancedOpen}>
+                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-left transition-colors hover:bg-muted/50">
+                            <span className="flex items-center gap-2">
+                              <Tag className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+                              <span className="text-sm font-medium">Advanced (optional)</span>
+                              {selectedCategories.length > 0 && (
+                                <span className="caption text-primary">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
                               )}
-                            >
-                              {selectedCategories.includes(category) && (
-                                <Check className="w-3 h-3 inline mr-1" />
-                              )}
-                              {category}
-                            </button>
-                          ))}
-                        </div>
+                            </span>
+                            <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", cullingAdvancedOpen && "rotate-180")} />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="space-y-4 pt-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <Tag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                                <span className="text-sm font-medium">What should I look for?</span>
+                                <span className="caption text-primary">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Globe className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+                                <Select value={cullingLanguage} onValueChange={(v) => handleLanguageChange(v as LanguageCode)}>
+                                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {supportedLanguages.map((lang) => (
+                                      <SelectItem key={lang.code} value={lang.code} className="text-xs">
+                                        {lang.name} ({lang.englishName})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground">
+                                {galleryType
+                                  ? "I suggested labels for this shoot type. Keep the ones you want or add your own."
+                                  : "Pick a shoot type in step one and I'll suggest labels."}
+                              </p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 shrink-0 px-2 text-xs"
+                                onClick={() => {
+                                  const currentLabels = getCullingLabels(galleryType || "wedding", cullingLanguage);
+                                  const allSelected = currentLabels.every((l) => selectedCategories.includes(l));
+                                  if (allSelected) {
+                                    setSelectedCategories((prev) => prev.filter((c) => !currentLabels.includes(c)));
+                                  } else {
+                                    setSelectedCategories((prev) => {
+                                      const custom = prev.filter((c) => !currentLabels.includes(c));
+                                      const remaining = 20 - custom.length;
+                                      return [...custom, ...currentLabels.slice(0, remaining)];
+                                    });
+                                  }
+                                }}
+                              >
+                                {getCullingLabels(galleryType || "wedding", cullingLanguage).every((l) => selectedCategories.includes(l)) ? "Clear all" : "Select all"}
+                              </Button>
+                            </div>
 
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Add custom label..."
-                            value={customCategory}
-                            onChange={(e) => setCustomCategory(e.target.value)}
-                            onKeyPress={handleCategoryKeyPress}
-                            className="bg-muted/50 border-border/50 text-sm h-9"
-                            disabled={selectedCategories.length >= 20}
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 shrink-0"
-                            onClick={addCustomCategory}
-                            disabled={!customCategory.trim() || selectedCategories.length >= 20}
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
-                        </div>
+                            <div className="flex flex-wrap gap-2">
+                              {[...getCullingLabels(galleryType || "wedding", cullingLanguage), ...customLabels.filter((cl) => !getCullingLabels(galleryType || "wedding", cullingLanguage).includes(cl))].map((category) => {
+                                const on = selectedCategories.includes(category);
+                                const locked = selectedCategories.length >= 20 && !on;
+                                return (
+                                  <button
+                                    key={category}
+                                    onClick={() => toggleCategory(category)}
+                                    disabled={locked}
+                                    className={cn(
+                                      "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                                      on
+                                        ? "border-primary/50 bg-primary/[0.1] text-foreground"
+                                        : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                                      locked && "cursor-not-allowed opacity-50",
+                                    )}
+                                  >
+                                    {on && <Check className="mr-1 inline h-3 w-3 text-primary" strokeWidth={2.5} />}
+                                    {category}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Add your own label..."
+                                value={customCategory}
+                                onChange={(e) => setCustomCategory(e.target.value)}
+                                onKeyPress={handleCategoryKeyPress}
+                                className="h-9 text-sm"
+                                disabled={selectedCategories.length >= 20}
+                              />
+                              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={addCustomCategory} disabled={!customCategory.trim() || selectedCategories.length >= 20}>
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+
+                        <p className="text-xs text-muted-foreground">
+                          You can also do this later in the editor.
+                        </p>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
                 {!aiCulling && (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    Culling is disabled. You can enable it later from the gallery editor.
+                  <p className="py-2 text-center text-sm italic text-muted-foreground">
+                    No problem. You can ask me to cull anytime from the editor.
                   </p>
                 )}
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
 
-          {/* Step 4: Upload */}
-          {currentStep === 4 && (
-            <motion.div
-              key="step4"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div>
-                <h2 className="text-xl font-bold mb-1">Upload Photos</h2>
-                <p className="text-muted-foreground">
-                  Choose how to add your photos
-                </p>
-              </div>
+            {/* Step 4: Upload */}
+            {currentStep === 4 && (
+              <motion.div
+                key="step4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                className="space-y-6"
+              >
+                <div>
+                  <span className="aura-microlabel mb-2.5 block">Source</span>
+                  <UploadSourceSelector
+                    value={uploadSource}
+                    onChange={(source) => {
+                      setUploadSource(source);
+                      if (source === "local") {
+                        setDriveFolderInfo(null);
+                        setDriveLinks([]);
+                      } else {
+                        uppy.cancelAll();
+                      }
+                    }}
+                    disabled={isUploading || isTransferring}
+                  />
+                </div>
 
-              {/* Upload Source Selector */}
-              <UploadSourceSelector 
-                value={uploadSource} 
-                onChange={(source) => {
-                  setUploadSource(source);
-                  // Clear the other source's data when switching
-                  if (source === "local") {
-                    setDriveFolderInfo(null);
-                    setDriveLinks([]);
-                  } else {
-                    uppy.cancelAll();
-                  }
-                }}
-                disabled={isUploading || isTransferring}
-              />
+                {uploadSource === "drive" && (
+                  <GoogleDriveInput
+                    folderInfo={driveFolderInfo}
+                    onUpdate={(info, links) => {
+                      setDriveFolderInfo(info);
+                      setDriveLinks(links);
+                    }}
+                    disabled={isTransferring}
+                  />
+                )}
 
-              {/* Google Drive Input */}
-              {uploadSource === "drive" && (
-                <GoogleDriveInput
-                  folderInfo={driveFolderInfo}
-                  onUpdate={(info, links) => {
-                    setDriveFolderInfo(info);
-                    setDriveLinks(links);
-                  }}
-                  disabled={isTransferring}
-                />
-              )}
+                {uploadSource === "local" && (
+                  <UppyUploadArea
+                    uppy={uppy}
+                    maxFiles={!isUnlimited && stylesCount > 0 ? maxImages : undefined}
+                    disabled={isUploading || hookIsUploading}
+                  />
+                )}
 
-              {/* Local Upload — Uppy Dashboard (lazy-loaded thumbnails,
-                   handles drag-drop, picker, and per-file progress UI). */}
-              {uploadSource === "local" && (
-                <UppyUploadArea
-                  uppy={uppy}
-                  maxFiles={!isUnlimited && stylesCount > 0 ? maxImages : undefined}
-                  disabled={isUploading || hookIsUploading}
-                />
-              )}
+                {uploadSource === "local" && (
+                  <AnimatePresence>
+                    {(isUploading || hookIsUploading) && uploadProgress && (() => {
+                      const totalBytes = uploadProgress.totalBytes;
+                      const uploadedBytes = uploadProgress.bytesUploaded;
+                      const percentage = totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0;
+                      const formatMB = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
+                      return (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+                          className="space-y-3 overflow-hidden rounded-md border border-border bg-card p-4"
+                        >
+                          <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                            <motion.div
+                              className="h-full rounded-full bg-primary"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percentage}%` }}
+                              transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="truncate text-muted-foreground">
+                              Receiving <span className="font-medium text-foreground">{uploadProgress.currentFile}</span>
+                            </span>
+                            <span className="shrink-0 font-mono text-primary">
+                              {percentage}% · {formatMB(uploadedBytes)}/{formatMB(totalBytes)} MB
+                            </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })()}
+                  </AnimatePresence>
+                )}
 
-              {/* Upload Progress Bar - only for local uploads */}
-              {uploadSource === "local" && (
-                <AnimatePresence>
-                  {(isUploading || hookIsUploading) && uploadProgress && (() => {
-                    const totalBytes = uploadProgress.totalBytes;
-                    const uploadedBytes = uploadProgress.bytesUploaded;
-                    const percentage = totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0;
-                    const formatMB = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
-                    return (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -10, height: 0 }}
-                        animate={{ opacity: 1, y: 0, height: "auto" }}
-                        exit={{ opacity: 0, y: -10, height: 0 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="space-y-3 p-4 bg-muted/50 rounded-xl border border-border/50 overflow-hidden"
-                      >
-                        <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
-                          <motion.div 
-                            className="h-full bg-primary rounded-full animate-neon-pulse"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${percentage}%` }}
-                            transition={{ duration: 0.5, ease: "easeOut" }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            Uploading: <span className="text-foreground font-medium">{uploadProgress.currentFile}</span>
-                          </span>
-                          <span className="font-medium text-primary">
-                            {percentage}% — {formatMB(uploadedBytes)} / {formatMB(totalBytes)} MB
-                          </span>
-                        </div>
-                      </motion.div>
-                    );
-                  })()}
-                </AnimatePresence>
-              )}
-
-              {/* Edit Cost Summary */}
-              {imageCount > 0 && stylesCount > 0 && (
-                <div className={cn(
-                  "p-3 rounded-lg border text-sm",
-                  hasInsufficientEdits && !isUnlimited
-                    ? "bg-destructive/10 border-destructive/30"
-                    : "bg-muted/50 border-border/50"
-                )}>
-                  <div className="flex items-center justify-between">
-                    <span>
-                      {imageCount} images × {stylesCount} style{stylesCount > 1 ? "s" : ""} = <strong>{editsNeeded} edit{editsNeeded !== 1 ? "s" : ""}</strong>
-                    </span>
-                    {isUnlimited ? (
-                      <span className="flex items-center gap-1.5 text-primary">
-                        <Check className="w-4 h-4" />
-                        Included in your plan
-                      </span>
-                    ) : (
+                {/* Hosting-only summary — no styles selected */}
+                {imageCount > 0 && stylesCount === 0 && (
+                  <div className="rounded-md border border-border bg-card p-4 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-muted-foreground">
-                        You have <strong className={hasInsufficientEdits ? "text-destructive" : "text-primary"}>{availableEdits.toLocaleString()}</strong> available{editsReserved > 0 && <span className="text-xs ml-1">({editsReserved.toLocaleString()} reserved)</span>}
+                        <span className="font-mono font-semibold text-foreground">{imageCount}</span> photos
                       </span>
+                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                        <FolderOpen className="h-4 w-4" strokeWidth={1.75} /> Hosting only — no AI edits
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Edit cost summary */}
+                {imageCount > 0 && stylesCount > 0 && (
+                  <div className={cn("rounded-md border p-4 text-sm", hasInsufficientEdits && !isUnlimited ? "border-destructive/40 bg-destructive/[0.06]" : "border-border bg-card")}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-muted-foreground">
+                        <span className="font-mono font-semibold text-foreground">{imageCount}</span> photos
+                        <span className="text-muted-foreground/50"> × </span>
+                        <span className="font-mono font-semibold text-foreground">{stylesCount}</span> look{stylesCount > 1 ? "s" : ""}
+                        <span className="text-muted-foreground/50"> = </span>
+                        <strong className="font-mono text-primary">{editsNeeded} edits</strong>
+                      </span>
+                      {isUnlimited ? (
+                        <span className="inline-flex items-center gap-1.5 text-secondary">
+                          <Check className="h-4 w-4" strokeWidth={2.5} /> Covered by your plan
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          <strong className={cn("font-mono font-semibold", hasInsufficientEdits ? "text-destructive" : "text-foreground")}>{availableEdits.toLocaleString()}</strong> available
+                          {editsReserved > 0 && <span className="ml-1 text-xs">({editsReserved.toLocaleString()} reserved)</span>}
+                        </span>
+                      )}
+                    </div>
+                    {!isUnlimited && hasInsufficientEdits && (
+                      <div className="mt-3 flex items-center justify-between border-t border-destructive/20 pt-3">
+                        <span className="flex items-center gap-2 text-destructive">
+                          <AlertTriangle className="h-4 w-4 shrink-0" />
+                          Not enough edits. Max {maxImages} photos with {stylesCount} look{stylesCount > 1 ? "s" : ""}.
+                        </span>
+                        <Button size="sm" className="ml-3 shrink-0" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
+                      </div>
+                    )}
+                    {!isUnlimited && !hasInsufficientEdits && availableEdits === 0 && isFreePlan && (
+                      <div className="mt-3 flex items-center justify-between border-t border-destructive/20 pt-3">
+                        <span className="flex items-center gap-2 text-destructive">
+                          <AlertTriangle className="h-4 w-4 shrink-0" /> You have no edits remaining.
+                        </span>
+                        <Button size="sm" className="ml-3 shrink-0" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
+                      </div>
                     )}
                   </div>
-                  {!isUnlimited && hasInsufficientEdits && (
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-destructive/20">
-                      <div className="flex items-center gap-2 text-destructive">
-                        <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                        <span>Not enough edits. Max {maxImages} images with {stylesCount} style{stylesCount > 1 ? "s" : ""}.</span>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="ml-3 flex-shrink-0"
-                        onClick={() => navigate("/dashboard/billing")}
-                      >
-                        Upgrade Plan
-                      </Button>
-                    </div>
-                  )}
-                  {!isUnlimited && !hasInsufficientEdits && availableEdits === 0 && isFreePlan && (
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-destructive/20">
-                      <div className="flex items-center gap-2 text-destructive">
-                        <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                        <span>You have no edits remaining.</span>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="ml-3 flex-shrink-0"
-                        onClick={() => navigate("/dashboard/billing")}
-                      >
-                        Upgrade Plan
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-border/50">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setCurrentStep(prev => prev - 1);
-            }}
-            disabled={currentStep === 1 || isUploading}
-            className="gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
+          {/* Navigation */}
+          <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
+            <Button variant="ghost" onClick={() => setCurrentStep((p) => p - 1)} disabled={currentStep === 1 || busy} className="gap-2 text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
 
-          {currentStep < 4 ? (
-            <Button
-              variant="glow"
-              onClick={() => {
-                setCompletedSteps(prev => new Set([...prev, currentStep]));
-                setCurrentStep(prev => prev + 1);
-              }}
-              disabled={!canProceed()}
-              className="gap-2"
-            >
-              Continue
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          ) : (
-            <Button
-              variant="glow"
-              onClick={createGalleryAndUpload}
-              disabled={!canProceed() || isUploading || isTransferring || hasInsufficientEdits}
-              className="gap-2"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : isTransferring ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Starting Transfer...
-                </>
-              ) : uploadSource === "drive" ? (
-                <>
-                  <CloudIcon className="w-4 h-4" />
-                  Import & Create Gallery
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Create Gallery
-                </>
-              )}
-            </Button>
-          )}
+            {currentStep < 4 ? (
+              <Button
+                onClick={() => {
+                  setCompletedSteps((prev) => new Set([...prev, currentStep]));
+                  setCurrentStep((p) => p + 1);
+                }}
+                disabled={!canProceed()}
+                className="gap-2"
+              >
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="glow"
+                onClick={createGalleryAndUpload}
+                disabled={!canProceed() || busy || hasInsufficientEdits}
+                className="gap-2"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : isTransferring ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Starting transfer...
+                  </>
+                ) : uploadSource === "drive" ? (
+                  <>
+                    <CloudIcon className="h-4 w-4" />
+                    {selectedStyles.length > 0 ? "Import & hand to Aura" : "Import & share"}
+                  </>
+                ) : selectedStyles.length > 0 ? (
+                  <>
+                    <Sparkle size={15} />
+                    Hand it to Aura
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Upload & share
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
-      </Card>
+      </div>
 
+      {/* FIX 3 — confirm before abandoning staged photos / an active transfer */}
+      <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without creating?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your selected photos won't be uploaded.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/dashboard/galleries")}>
+              Leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

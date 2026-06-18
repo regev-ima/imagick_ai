@@ -66,7 +66,7 @@ function getInteractionIcon(type: string) {
     case "view": return <Eye className="w-3 h-3" />;
     case "like": return <Heart className="w-3 h-3 text-red-400" />;
     case "unlike": return <Heart className="w-3 h-3" />;
-    case "download": return <Download className="w-3 h-3 text-blue-400" />;
+    case "download": return <Download className="w-3 h-3 text-primary" />;
     case "feedback": return <MousePointer className="w-3 h-3 text-yellow-400" />;
     default: return <Activity className="w-3 h-3" />;
   }

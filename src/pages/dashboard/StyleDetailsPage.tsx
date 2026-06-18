@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type CSSProperties, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -13,27 +13,105 @@ import {
   Loader2,
   Image as ImageIcon,
   Plus,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { StyleStatusCard } from "@/components/styles/StyleStatusCard";
 import { BeforeAfterSlider } from "@/components/styles/BeforeAfterSlider";
 import { useImportProgress } from "@/hooks/useImportProgress";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Orb } from "@/components/aura/Orb";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import { getThumbnailUrl, getPreviewUrl } from "@/lib/imageUrls";
 import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 
 type StyleStatus = "importing" | "training" | "ready" | "error";
 
-const statusConfig: Record<StyleStatus, { label: string; className: string }> = {
-  importing: { label: "Importing", className: "bg-accent/10 text-accent" },
-  training: { label: "Training", className: "bg-secondary/10 text-secondary" },
-  ready: { label: "Ready", className: "bg-primary/10 text-primary" },
-  error: { label: "Error", className: "bg-destructive/10 text-destructive" },
+const statusConfig: Record<StyleStatus, { label: string; token: string }> = {
+  importing: { label: "Importing", token: "var(--accent)" },
+  training: { label: "Training", token: "var(--rating)" },
+  ready: { label: "Ready", token: "var(--secondary)" },
+  error: { label: "Error", token: "var(--destructive)" },
 };
+
+// LIGHTROOM motion — calm, responsive fades/slides. No bounce, no float.
+const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
+
+/**
+ * The AI mark — a 4-point sparkle (the logo star). Royal blue by default.
+ * Tinted via currentColor so it inherits text-primary / text-accent.
+ */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/** Mono section header — like a Lightroom module title bar. */
+function PanelHeader({
+  icon,
+  label,
+  trailing,
+  tone = "muted",
+}: {
+  icon?: ReactNode;
+  label: string;
+  trailing?: ReactNode;
+  tone?: "muted" | "ai";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 border-b border-border px-4 py-2.5",
+        tone === "ai" ? "bg-primary/[0.08] text-accent" : "bg-background/40 text-muted-foreground",
+      )}
+    >
+      <span className="aura-microlabel flex items-center gap-2" style={tone === "ai" ? { color: "inherit" } : undefined}>
+        {icon}
+        {label}
+      </span>
+      {trailing}
+    </div>
+  );
+}
 
 function ImageWithFallback({
   src,
@@ -68,9 +146,16 @@ export default function StyleDetailsPage() {
   const { styleId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [activeSliderIndex, setActiveSliderIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<"after" | "before">("after");
+
+  // ── Owner-action UI state ───────────────────────────────────────────
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [renameDescription, setRenameDescription] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: style, isLoading } = useQuery({
     queryKey: ["style", styleId],
@@ -135,6 +220,105 @@ export default function StyleDetailsPage() {
     style?.total_images_to_import
   );
 
+  // ── Owner mutations ─────────────────────────────────────────────────
+  const renameMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description: string | null }) => {
+      if (!styleId) throw new Error("Missing style id");
+      const { error } = await supabase
+        .from("styles")
+        .update({ name, description })
+        .eq("id", styleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["style", styleId] });
+      toast.success("Style updated");
+      setRenameOpen(false);
+    },
+    onError: (error: any) => {
+      console.error("Error renaming style:", error);
+      toast.error(error?.message || "Failed to update style");
+    },
+  });
+
+  const visibilityMutation = useMutation({
+    mutationFn: async (nextVisibility: "private" | "public") => {
+      if (!styleId) throw new Error("Missing style id");
+      const { error } = await supabase
+        .from("styles")
+        .update({ visibility: nextVisibility })
+        .eq("id", styleId);
+      if (error) throw error;
+      return nextVisibility;
+    },
+    onSuccess: (nextVisibility) => {
+      queryClient.invalidateQueries({ queryKey: ["style", styleId] });
+      toast.success(nextVisibility === "public" ? "Style is now public" : "Style is now private");
+    },
+    onError: (error: any) => {
+      console.error("Error changing visibility:", error);
+      toast.error(error?.message || "Failed to change visibility");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!styleId) throw new Error("Missing style id");
+      const { error } = await supabase
+        .from("styles")
+        .delete()
+        .eq("id", styleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["styles"] });
+      toast.success("Style deleted");
+      setDeleteOpen(false);
+      navigate("/dashboard/styles");
+    },
+    onError: (error: any) => {
+      console.error("Error deleting style:", error);
+      toast.error(error?.message || "Failed to delete style");
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: async () => {
+      if (!style || !styleId) throw new Error("Missing style");
+      // Reconstruct the train-style contract from the style row alone:
+      // dirs are deterministic paths keyed on user_id + style id, and the
+      // model type is stored on the style (category / first associated tag).
+      const modelType = style.category || style.associated_tags?.[0] || "event";
+      const beforeDir = `styles/${style.user_id}/${styleId}/before/`;
+      const afterDir = `styles/${style.user_id}/${styleId}/after/`;
+
+      // Flip status back to training so the page reflects the retry immediately.
+      const { error: statusError } = await supabase
+        .from("styles")
+        .update({ status: "training", error_details: null })
+        .eq("id", styleId);
+      if (statusError) throw statusError;
+
+      const { error } = await supabase.functions.invoke("train-style", {
+        body: {
+          styleId,
+          modelType,
+          beforeDirs: [beforeDir],
+          afterDirs: [afterDir],
+        },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["style", styleId] });
+      toast.success("Training restarted");
+    },
+    onError: (error: any) => {
+      console.error("Error retrying training:", error);
+      toast.error(error?.message || "Failed to restart training");
+    },
+  });
+
   const afterImages: string[] = useMemo(() => {
     if (editPairs.length > 0) return editPairs.map(p => p.after);
     return [...(style?.after_image_urls?.filter(Boolean) || [])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
@@ -151,106 +335,138 @@ export default function StyleDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-8 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="flex min-h-[400px] items-center justify-center bg-background p-6 lg:p-8">
+        <Orb className="h-12 w-12" />
       </div>
     );
   }
 
   if (!style) {
     return (
-      <div className="p-6 lg:p-8 text-center py-16">
-        <h2 className="text-xl font-semibold mb-2">Style not found</h2>
-        <p className="text-muted-foreground mb-4">This style doesn't exist or has been deleted.</p>
-        <Button variant="outline" onClick={() => navigate("/dashboard/styles")}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Styles
-        </Button>
+      <div className="min-h-full bg-background p-6 text-center lg:p-8">
+        <div className="mx-auto mt-16 max-w-md glass-card rounded-[--radius] p-8">
+          <h2 className="text-xl font-semibold tracking-tight">Style not found</h2>
+          <p className="mb-5 mt-2 font-sans text-sm text-muted-foreground">
+            This style doesn't exist or has been deleted.
+          </p>
+          <Button variant="outline" onClick={() => navigate("/dashboard/styles")}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Styles
+          </Button>
+        </div>
       </div>
     );
   }
 
   const status = statusConfig[style.status as StyleStatus] || statusConfig.ready;
   const isOwner = user?.id === style.user_id;
+  const isReady = style.status === "ready";
+  const isErrored = style.status === "error";
+  const isBusy = style.status === "training" || style.status === "importing";
+  const isPublic = style.visibility === "public";
+
+  const openRename = () => {
+    setRenameName(style.name ?? "");
+    setRenameDescription(style.description ?? "");
+    setRenameOpen(true);
+  };
 
   const heroImage = afterImages[0] ? getPreviewUrl(afterImages[0]) : null;
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section with blurred background */}
-      <div className="relative overflow-hidden">
+    <div className="min-h-screen bg-background">
+      {/* ════ HERO — blurred backdrop + masthead ═══════════════════════ */}
+      <div className="relative overflow-hidden border-b border-border">
         {/* Blurred background image */}
         {heroImage && (
           <div className="absolute inset-0">
             <img
               src={heroImage}
               alt=""
-              className="w-full h-full object-cover scale-110 blur-3xl opacity-30"
+              className="w-full h-full object-cover scale-110 blur-3xl opacity-25"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
+            <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/85 to-background" />
           </div>
         )}
         {!heroImage && (
-          <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-card to-background" />
         )}
 
-        <div className="relative p-6 lg:p-8">
-          <div className="max-w-[1400px] mx-auto">
+        <div className="relative px-5 py-7 lg:px-10 lg:py-10">
+          <div className="mx-auto max-w-[1320px]">
             {/* Back link */}
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
               <button
                 onClick={() => navigate("/dashboard/styles")}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
+                className="mb-6 inline-flex items-center gap-1.5 font-sans text-sm text-muted-foreground transition-colors hover:text-accent"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to All Styles
               </button>
             </motion.div>
 
+            {/* Mono dateline row */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: EASE }}
+              className="flex items-center justify-between gap-3 pb-3"
+            >
+              <span className="caption flex items-center gap-1.5 text-accent">
+                <Sparkle size={11} className="text-accent" />
+                AI Style
+              </span>
+              <span className="caption flex items-center gap-1.5" style={{ color: `hsl(${status.token})` }}>
+                <span
+                  className={cn("aura-led", (style.status === "training" || style.status === "importing") && "aura-led-pulse")}
+                  style={{ "--led": status.token } as CSSProperties}
+                />
+                {status.label}
+              </span>
+            </motion.div>
+            <hr className="aura-hairline" />
+
             {/* Hero content */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-              className="mb-8 text-center"
+              transition={{ delay: 0.05, duration: 0.5, ease: EASE }}
+              className="mt-6"
             >
               {style.category && (
-                <Badge variant="outline" className="capitalize mb-4 gap-1.5 px-3 py-1 bg-background/50 backdrop-blur-sm">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <span className="aura-chip mb-4 capitalize" style={{ color: "hsl(var(--accent))" }}>
+                  <Sparkle size={10} className="text-accent" />
                   {style.category}
-                </Badge>
+                </span>
               )}
 
-              <h1 className="text-4xl sm:text-5xl font-bold text-gradient mb-4">
+              <h1 className="text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl">
                 {style.name}
               </h1>
 
               {style.description && (
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
+                <p className="mt-4 max-w-2xl font-sans text-lg leading-relaxed text-muted-foreground">
                   {style.description}
                 </p>
               )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-center gap-4">
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium", status.className)}>
-                    {status.label}
-                  </span>
+              <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
                   {style.is_preset ? (
-                    <Badge variant="outline" className="text-xs gap-1 bg-background/50 backdrop-blur-sm">
+                    <span className="aura-chip">
                       <Globe className="w-3 h-3" />
                       Public
-                    </Badge>
+                    </span>
                   ) : (
-                    <Badge variant="outline" className="text-xs gap-1 bg-background/50 backdrop-blur-sm">
+                    <span className="aura-chip">
                       {style.visibility === "private" ? (
                         <><Lock className="w-3 h-3" /> Private</>
                       ) : (
                         <><Globe className="w-3 h-3" /> Public</>
                       )}
-                    </Badge>
+                    </span>
                   )}
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span className="aura-chip">
                     <Calendar className="w-3 h-3" />
                     {new Date(style.created_at).toLocaleDateString()}
                   </span>
@@ -259,7 +475,7 @@ export default function StyleDetailsPage() {
                     const endMs = new Date(style.training_completion_date).getTime();
                     const durationMin = Math.round((endMs - startMs) / 60000);
                     return (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="aura-chip">
                         ⏱ {durationMin < 1 ? "<1" : durationMin} min
                         · {new Date(style.training_completion_date).toLocaleDateString()}
                       </span>
@@ -267,27 +483,82 @@ export default function StyleDetailsPage() {
                   })()}
                 </div>
 
-                {style.status === "ready" && (
-                  <Button
-                    variant="glow"
-                    size="sm"
-                    onClick={() => navigate(`/dashboard/galleries/new?styleId=${style.id}`)}
-                    className="gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Create Gallery
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {/* Retry training — only in an error state, owner only */}
+                  {isOwner && isErrored && (
+                    <Button
+                      variant="glow"
+                      size="sm"
+                      onClick={() => retryMutation.mutate()}
+                      disabled={retryMutation.isPending}
+                      className="gap-1.5"
+                    >
+                      {retryMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      Retry training
+                    </Button>
+                  )}
+
+                  {style.status === "ready" && (
+                    <Button
+                      variant="glow"
+                      size="sm"
+                      onClick={() => navigate(`/dashboard/galleries/new?styleId=${style.id}`)}
+                      className="gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Create Gallery
+                    </Button>
+                  )}
+
+                  {/* Owner actions — Rename / Visibility / Delete */}
+                  {isOwner && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" className="shrink-0" aria-label="Style options">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={openRename}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={visibilityMutation.isPending}
+                          onClick={() => visibilityMutation.mutate(isPublic ? "private" : "public")}
+                        >
+                          {isPublic ? (
+                            <><Lock className="mr-2 h-4 w-4" /> Make private</>
+                          ) : (
+                            <><Globe className="mr-2 h-4 w-4" /> Make public</>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeleteOpen(true)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
             </motion.div>
           </div>
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="p-6 lg:p-8 -mt-4">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Status Card */}
+      {/* ════ MAIN CONTENT ═════════════════════════════════════════════ */}
+      <div className="px-5 py-7 lg:px-10 lg:py-10">
+        <div className="mx-auto max-w-[1320px]">
+          {/* Status Card — shared component (training / importing / error) */}
           <StyleStatusCard
             status={style.status}
             importProgress={importProgress}
@@ -297,22 +568,31 @@ export default function StyleDetailsPage() {
           {/* Before/After Slider */}
           {activePair && (
             <motion.section
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="mt-8 space-y-4"
+              transition={{ delay: 0.1, duration: 0.5, ease: EASE }}
+              className="mt-8"
             >
-              <p className="text-sm font-medium text-muted-foreground text-center uppercase tracking-wider">
-                Preview the transformation
-              </p>
-              <div className="flex justify-center">
-                <div className="w-full max-w-5xl">
-                  <BeforeAfterSlider
-                    key={activeSliderIndex}
-                    beforeSrc={activePair.before}
-                    afterSrc={getPreviewUrl(activePair.after)}
-                    className="max-h-[55vh]"
-                  />
+              <div className="glass-card overflow-hidden rounded-[--radius]">
+                <PanelHeader
+                  tone="ai"
+                  icon={<Sparkle size={12} className="text-accent" />}
+                  label="Preview the transformation"
+                  trailing={
+                    <span className="caption" style={{ color: "inherit" }}>
+                      Before → After
+                    </span>
+                  }
+                />
+                <div className="flex justify-center p-4 sm:p-5">
+                  <div className="w-full max-w-5xl">
+                    <BeforeAfterSlider
+                      key={activeSliderIndex}
+                      beforeSrc={activePair.before}
+                      afterSrc={getPreviewUrl(activePair.after)}
+                      className="max-h-[55vh]"
+                    />
+                  </div>
                 </div>
               </div>
             </motion.section>
@@ -321,48 +601,55 @@ export default function StyleDetailsPage() {
           {/* Sample Gallery Grid */}
           {(afterImages.length > 0 || beforeImages.length > 0) && (
             <motion.section
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="mt-12 space-y-4"
+              transition={{ delay: 0.15, duration: 0.5, ease: EASE }}
+              className="mt-8"
             >
-              <div className="flex justify-center">
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "after" | "before")}>
-                  <TabsList>
-                    <TabsTrigger value="after">After ({afterImages.length})</TabsTrigger>
-                    <TabsTrigger value="before">Before ({beforeImages.length})</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+              <div className="glass-card overflow-hidden rounded-[--radius]">
+                <PanelHeader
+                  icon={<ImageIcon className="h-3.5 w-3.5" />}
+                  label="Samples — develop grid"
+                  trailing={
+                    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "after" | "before")}>
+                      <TabsList>
+                        <TabsTrigger value="after">After ({afterImages.length})</TabsTrigger>
+                        <TabsTrigger value="before">Before ({beforeImages.length})</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  }
+                />
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-5xl mx-auto">
-                {gridImages.map((url, index) => (
-                  <button
-                    key={`${activeTab}-${index}`}
-                    onClick={() => {
-                      if (activeTab === "after" || activeTab === "before") {
-                        setActiveSliderIndex(index);
-                      }
-                    }}
-                    onDoubleClick={() => setLightboxIndex(index)}
-                    className={cn(
-                      "group relative aspect-[4/3] rounded-xl overflow-hidden border-2 transition-all",
-                      index === activeSliderIndex
-                        ? "border-primary shadow-[0_0_16px_hsl(var(--primary)/0.3)] ring-1 ring-primary/20"
-                        : "border-border hover:border-primary/40"
-                    )}
-                  >
-                    <ImageWithFallback
-                      src={getThumbnailUrl(url)}
-                      alt={editPairs[index]?.filename || `Example ${index + 1}`}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    <div className={cn(
-                      "absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300",
-                      index !== activeSliderIndex && "group-hover:bg-black/5"
-                    )} />
-                  </button>
-                ))}
+                <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
+                  {gridImages.map((url, index) => (
+                    <button
+                      key={`${activeTab}-${index}`}
+                      onClick={() => {
+                        if (activeTab === "after" || activeTab === "before") {
+                          setActiveSliderIndex(index);
+                        }
+                      }}
+                      onDoubleClick={() => setLightboxIndex(index)}
+                      className={cn(
+                        "group relative aspect-[4/3] overflow-hidden rounded-sm bg-muted plate-keyline transition-shadow duration-300 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]",
+                        index === activeSliderIndex
+                          ? "ring-2 ring-primary"
+                          : "border border-border hover:border-muted-foreground/40 hover:shadow-[var(--elevation-2)]"
+                      )}
+                    >
+                      <ImageWithFallback
+                        src={getThumbnailUrl(url)}
+                        alt={editPairs[index]?.filename || `Example ${index + 1}`}
+                        className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                      />
+                      {index === activeSliderIndex && (
+                        <span className="absolute right-1.5 top-1.5 rounded-sm bg-primary px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-primary-foreground">
+                          Selected
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             </motion.section>
           )}
@@ -373,13 +660,11 @@ export default function StyleDetailsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="flex flex-wrap justify-center gap-1.5 mt-8"
+              className="mt-6 flex flex-wrap items-center gap-2"
             >
+              <span className="aura-microlabel mr-1">Tags</span>
               {style.associated_tags.map((tag: string, index: number) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/50"
-                >
+                <span key={index} className="aura-chip">
                   <Tag className="w-2.5 h-2.5" />
                   {tag}
                 </span>
@@ -400,19 +685,117 @@ export default function StyleDetailsPage() {
             </DialogContent>
           </Dialog>
 
+          {/* Owner — Rename dialog */}
+          {isOwner && (
+            <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Sparkle size={14} className="text-accent" />
+                    Edit style
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div>
+                    <Label htmlFor="style-rename" className="mb-2 block">
+                      Name
+                    </Label>
+                    <Input
+                      id="style-rename"
+                      value={renameName}
+                      onChange={(e) => setRenameName(e.target.value)}
+                      placeholder="Style name"
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="style-redescribe" className="mb-2 block">
+                      Description
+                    </Label>
+                    <Textarea
+                      id="style-redescribe"
+                      value={renameDescription}
+                      onChange={(e) => setRenameDescription(e.target.value)}
+                      placeholder="Describe the look and feel..."
+                      className="min-h-[80px] bg-input border-border"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setRenameOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="glow"
+                    disabled={!renameName.trim() || renameMutation.isPending}
+                    onClick={() =>
+                      renameMutation.mutate({
+                        name: renameName.trim(),
+                        description: renameDescription.trim() || null,
+                      })
+                    }
+                    className="gap-1.5"
+                  >
+                    {renameMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Save
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Owner — Delete confirmation */}
+          {isOwner && (
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this style?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This can't be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={deleteMutation.isPending}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      deleteMutation.mutate();
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
           {/* Empty state */}
           {afterImages.length === 0 && (
             <motion.section
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-center py-20 mt-8 rounded-2xl border border-border bg-muted/5"
+              transition={{ delay: 0.1, duration: 0.5, ease: EASE }}
+              className="mt-8"
             >
-              <ImageIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-lg text-muted-foreground font-medium">No examples yet</p>
-              <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-                Use the Showcase Manager to generate comparison images for this style.
-              </p>
+              <div className="glass-card overflow-hidden rounded-[--radius]">
+                <PanelHeader
+                  icon={<ImageIcon className="h-3.5 w-3.5" />}
+                  label="Samples — empty"
+                />
+                <div className="p-10 text-center">
+                  <div className="mx-auto grid h-14 w-14 place-items-center rounded-[--radius] border border-border bg-muted">
+                    <ImageIcon className="h-7 w-7 text-muted-foreground/60" />
+                  </div>
+                  <p className="mt-4 text-lg font-semibold tracking-tight">No examples yet</p>
+                  <p className="mx-auto mt-2 max-w-md font-sans text-sm leading-relaxed text-muted-foreground">
+                    Use the Showcase Manager to generate comparison images for this style.
+                  </p>
+                </div>
+              </div>
             </motion.section>
           )}
         </div>

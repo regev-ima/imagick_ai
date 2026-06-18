@@ -1,31 +1,30 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Images,
-  Plus,
   ArrowRight,
-  Loader2,
-  Camera,
+  ArrowUpRight,
   HardDrive,
   Zap,
   Gift,
-  Calendar,
-  Sparkles,
-  ExternalLink,
-  CheckCircle2,
-  Palette,
+  Send,
+  Wand2,
   Share2,
-  Lightbulb,
-  TrendingUp,
+  Palette,
+  Plus,
+  Layers,
+  FolderTree,
+  Film,
+  Cpu,
+  Upload,
 } from "lucide-react";
 
 const CreditsUsageChart = lazy(() => import("@/components/dashboard/CreditsUsageChart"));
 import OnboardingQuestionnaire from "@/components/onboarding/OnboardingQuestionnaire";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Orb } from "@/components/aura/Orb";
+import { openAuraCommand } from "@/components/aura/AuraCommand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -41,24 +40,100 @@ const getGreeting = () => {
   return "Good evening";
 };
 
+const todayLabel = () =>
+  new Date()
+    .toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+    .toUpperCase();
 
-const stagger = {
+// LIGHTROOM motion — calm, responsive fades/slides. No bounce, no float.
+const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
+const deck = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.08 } },
+  show: { transition: { staggerChildren: 0.06 } },
+};
+const rise = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
 };
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-};
+const PROMPT_CHIPS = [
+  { label: "New collection", icon: Plus, to: "/dashboard/galleries/new" },
+  { label: "Train an AI style", icon: Wand2, to: "/dashboard/styles/new" },
+];
+
+/**
+ * The AI mark — a 4-point sparkle (the logo star). Royal blue by default.
+ * Copied from the approved LightroomDashboard reference; tinted via
+ * currentColor so it inherits text-primary / text-accent tokens.
+ */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/** A Lightroom-style tonal panel — hairline border, soft shadow. */
+function Panel({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div className={cn("glass-card overflow-hidden rounded-[--radius]", className)}>{children}</div>
+  );
+}
+
+/** Mono section header — like a Lightroom module title bar. */
+function PanelHeader({
+  icon,
+  label,
+  trailing,
+  tone = "muted",
+}: {
+  icon?: ReactNode;
+  label: string;
+  trailing?: ReactNode;
+  tone?: "muted" | "ai";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 border-b border-border px-4 py-2.5",
+        tone === "ai" ? "bg-primary/[0.08] text-accent" : "bg-background/40 text-muted-foreground",
+      )}
+    >
+      <span className="aura-microlabel flex items-center gap-2" style={tone === "ai" ? { color: "inherit" } : undefined}>
+        {icon}
+        {label}
+      </span>
+      {trailing}
+    </div>
+  );
+}
 
 export default function DashboardHome() {
+  const navigate = useNavigate();
+  const [promptText, setPromptText] = useState("");
   const { effectiveUserId, effectiveDisplayName } = useEffectiveUser();
   const userName = effectiveDisplayName?.split(" ")[0] || "there";
-  const { shouldShow: showQuestionnaire, unansweredQuestions, onSaveAnswer, onSkip: skipQuestionnaire, isSaving: isSavingQuestionnaire, dismiss: dismissQuestionnaire } = useOnboardingQuestionnaire();
+  const {
+    shouldShow: showQuestionnaire,
+    unansweredQuestions,
+    onSaveAnswer,
+    onSkip: skipQuestionnaire,
+    isSaving: isSavingQuestionnaire,
+    dismiss: dismissQuestionnaire,
+  } = useOnboardingQuestionnaire();
   const {
     currentPlan,
-    editsUsed,
     editsTotal,
     editsRemaining,
     isUnlimited,
@@ -66,15 +141,14 @@ export default function DashboardHome() {
     maxStorageGb,
     creditGrants,
     giftCreditsTotal,
-    planCreditsRemaining,
   } = useSubscription();
 
   useGiftCreditsCelebration(creditGrants);
   const hasGiftCredits = giftCreditsTotal > 0 && !isUnlimited;
 
   const storagePercent = maxStorageGb > 0 ? (storageUsedMb / (maxStorageGb * 1024)) * 100 : 0;
+  const editsPercent = isUnlimited ? 100 : editsTotal > 0 ? (editsRemaining / editsTotal) * 100 : 0;
 
-  // Separate query for accurate totals across ALL galleries
   const { data: galleryTotals } = useQuery({
     queryKey: ["dashboard-gallery-totals", effectiveUserId],
     queryFn: async () => {
@@ -111,55 +185,64 @@ export default function DashboardHome() {
   const totalCollections = galleryTotals?.count ?? 0;
   const totalImages = galleryTotals?.images ?? 0;
 
-  // Smart Quick Actions — derived from gallery data
-  const quickActions = useMemo(() => {
-    const actions: Array<{
-      id: string;
-      icon: "processing" | "ready";
-      label: string;
-      detail: string;
-      link: string;
-      progress?: number;
-    }> = [];
-
-    for (const g of galleries) {
-      if (actions.length >= 3) break;
-
-      if (g.status === "processing" || g.status === "uploading") {
-        const pct = g.total_images > 0
-          ? Math.round((g.processed_images / g.total_images) * 100)
-          : 0;
-        actions.push({
+  // Live engine queue — galleries the system is still processing.
+  const engineQueue = useMemo(
+    () =>
+      galleries
+        .filter((g) => g.status === "processing" || g.status === "uploading")
+        .map((g) => ({
           id: g.id,
-          icon: "processing",
-          label: `Continue with ${g.name}`,
-          detail: `Processing ${pct}%`,
-          link: `/dashboard/galleries/${g.id}`,
-          progress: pct,
-        });
-      } else if (g.status === "ready") {
-        const updatedAt = new Date(g.updated_at);
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        if (updatedAt >= sevenDaysAgo) {
-          actions.push({
-            id: g.id,
-            icon: "ready",
-            label: `${g.name} is ready to share`,
-            detail: `Updated ${updatedAt.toLocaleDateString()}`,
-            link: `/dashboard/galleries/${g.id}`,
-          });
-        }
-      }
-    }
-
-    return actions;
-  }, [galleries]);
+          name: g.name,
+          heroUrl: g.hero_image_url as string | null,
+          pct: g.total_images > 0 ? Math.round((g.processed_images / g.total_images) * 100) : 0,
+          detail: `${g.processed_images || 0} / ${g.total_images || 0} images`,
+        })),
+    [galleries],
+  );
 
   const isEmpty = galleries.length === 0 && !galleriesLoading;
 
+  // Aura briefing — up to two genuinely useful observations, derived
+  // from live data. Renders nothing when there is nothing worth saying.
+  const briefing = useMemo(() => {
+    const items: { key: string; text: string; to: string; label: string }[] = [];
+    const working = galleries.filter((g) => g.status === "processing" || g.status === "uploading");
+    if (working.length > 0) {
+      items.push({
+        key: "working",
+        text:
+          working.length === 1
+            ? `I'm working through ${working[0].name} right now.`
+            : `I'm working through ${working.length} collections right now.`,
+        to: `/dashboard/galleries/${working[0].id}`,
+        label: "Watch progress",
+      });
+    }
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const readyRecent = galleries.find(
+      (g) => g.status === "ready" && new Date(g.updated_at) >= sevenDaysAgo,
+    );
+    if (readyRecent) {
+      items.push({
+        key: "ready",
+        text: `${readyRecent.name} is finished and ready to deliver.`,
+        to: `/dashboard/galleries/${readyRecent.id}`,
+        label: "Open it",
+      });
+    }
+    // Storage and edits are reported once each in the ledger cells below —
+    // they are intentionally not duplicated here.
+    return items.slice(0, 2);
+  }, [galleries]);
+
+  const formatStorage = (mb: number) =>
+    mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
+
+  const engineWorking = engineQueue.length > 0;
+
   return (
-    <div className="relative p-4 lg:p-6 space-y-4">
+    <div className="relative min-h-full bg-background px-5 py-7 lg:px-10 lg:py-10">
       <OnboardingQuestionnaire
         isOpen={showQuestionnaire}
         questions={unansweredQuestions}
@@ -168,454 +251,514 @@ export default function DashboardHome() {
         onDismiss={dismissQuestionnaire}
         isSaving={isSavingQuestionnaire}
       />
-      {/* Subtle grid background */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-[0.04] pointer-events-none" />
-      {/* Gradient glow behind hero */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full bg-primary/[0.12] blur-[130px] pointer-events-none" />
 
-      {/* Hero Welcome */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative flex flex-col sm:flex-row sm:items-end justify-between gap-3"
+        variants={deck}
+        initial="hidden"
+        animate="show"
+        className="relative mx-auto w-full max-w-[1320px]"
       >
-        <div>
-          <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
-            {getGreeting()},{" "}
-            <span className="text-gradient-primary">{userName}</span>
-          </h1>
-          <p className="text-muted-foreground mt-2 flex items-center gap-2 flex-wrap">
-            <span>{totalCollections} collection{totalCollections !== 1 ? "s" : ""}</span>
-            <span className="text-border">·</span>
-            <span>{totalImages.toLocaleString()} images</span>
+        {/* ════ 1 · MASTHEAD ══════════════════════════════════════════════
+            A restrained pro masthead: a mono dateline + plan readout on a
+            hairline row, then the greeting. */}
+        <motion.header variants={rise}>
+          <div className="flex items-center justify-between gap-4 pb-3">
+            <span className="caption">{todayLabel()}</span>
             {currentPlan && (
-              <>
-                <span className="text-border">·</span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/15 text-primary border border-primary/20">
-                  {currentPlan.name}
-                </span>
-              </>
+              <span className="caption flex items-center gap-1.5 text-foreground">
+                <Zap className="h-3 w-3 text-accent" />
+                {currentPlan.name}
+              </span>
             )}
-          </p>
-        </div>
-        <Button variant="glow" asChild>
-          <Link to="/dashboard/galleries/new" className="gap-2">
-            <Plus className="w-4 h-4" />
-            Create Collection
-          </Link>
-        </Button>
-      </motion.div>
+          </div>
+          <hr className="aura-hairline" />
+          <h1 className="mt-6 text-3xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-4xl">
+            {getGreeting()}, <span className="text-accent">{userName}</span>
+          </h1>
+        </motion.header>
 
-      {/* Loading state gates entire content area below hero */}
-      {galleriesLoading ? (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : isEmpty ? (
-        /* ── Full Premium Onboarding Experience ── */
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-          className="relative"
-        >
-          {/* Decorative gradient orbs */}
-          <div className="absolute top-20 left-1/4 w-72 h-72 rounded-full bg-primary/[0.08] blur-[100px] pointer-events-none" />
-          <div className="absolute top-40 right-1/4 w-56 h-56 rounded-full bg-secondary/[0.08] blur-[90px] pointer-events-none" />
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full bg-accent/[0.06] blur-[80px] pointer-events-none" />
+        {/* ════ 2 · AURA AI — the command bar panel ═══════════════════════
+            The "our AI" surface: sparkle-headed panel with the command
+            input, quick actions, and the live briefing notes inside it. */}
+        <motion.section variants={rise} className="mt-7">
+          <Panel>
+            <PanelHeader
+              tone="ai"
+              icon={<Sparkle size={12} className="text-accent" />}
+              label="Aura AI"
+              trailing={
+                <span className="caption flex items-center gap-1.5" style={{ color: "inherit" }}>
+                  <span
+                    className="aura-led aura-led-pulse"
+                    style={{ "--led": engineWorking ? "var(--accent)" : "var(--secondary)" } as CSSProperties}
+                  />
+                  {engineWorking ? "Working" : "Ready"}
+                </span>
+              }
+            />
 
-          <motion.div variants={fadeUp} className="text-center pt-12 pb-8">
-            <h2 className="text-2xl lg:text-3xl font-bold tracking-tight">
-              Your AI photography studio{" "}
-              <span className="text-gradient-primary">awaits</span>
-            </h2>
-            <p className="text-muted-foreground mt-3 max-w-md mx-auto">
-              Upload your photos, enhance them with AI, and share stunning galleries — all in one place.
-            </p>
-          </motion.div>
-
-          {/* 3-step visual flow */}
-          <motion.div variants={fadeUp} className="relative max-w-3xl mx-auto px-4">
-            {/* Connecting line (desktop only) */}
-            <div className="hidden md:block absolute top-1/2 left-[16%] right-[16%] h-px bg-border/40 -translate-y-1/2 z-0" />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-              {[
-                {
-                  step: 1,
-                  icon: Images,
-                  title: "Upload Photos",
-                  description: "Drag and drop your images or select from your device",
-                },
-                {
-                  step: 2,
-                  icon: Sparkles,
-                  title: "AI Enhance",
-                  description: "Let our AI enhance, retouch, and transform your photos",
-                },
-                {
-                  step: 3,
-                  icon: ExternalLink,
-                  title: "Share Gallery",
-                  description: "Publish beautiful galleries and share them with anyone",
-                },
-              ].map((item) => (
-                <div
-                  key={item.step}
-                  className="glass-card rounded-2xl border border-border/30 p-6 text-center"
-                >
-                  <div className="w-12 h-12 mx-auto rounded-xl bg-primary/15 flex items-center justify-center mb-4">
-                    <item.icon className="w-6 h-6 text-primary" />
-                  </div>
-                  <div className="text-xs text-muted-foreground/60 font-medium mb-1">
-                    Step {item.step}
-                  </div>
-                  <h3 className="font-semibold mb-1">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
+            <div className="p-4 sm:p-5">
+              {/* command input */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  openAuraCommand(promptText);
+                  setPromptText("");
+                }}
+                className="group/desk"
+              >
+                <div className="flex items-center gap-3 rounded-[--radius] border border-primary/35 bg-background px-3.5 py-2.5 transition-colors duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] focus-within:border-primary/70">
+                  <Orb className="h-6 w-6 shrink-0" />
+                  <input
+                    value={promptText}
+                    onChange={(e) => setPromptText(e.target.value)}
+                    className="min-w-0 flex-1 bg-transparent font-sans text-sm text-foreground outline-none placeholder:text-muted-foreground/80 sm:text-base"
+                    placeholder="Search or jump to…   (⌘K)"
+                    aria-label="Search or jump to"
+                  />
+                  <button
+                    type="submit"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-[--radius] bg-primary text-primary-foreground transition-opacity duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:opacity-90 active:opacity-100"
+                    aria-label="Send to Aura"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
                 </div>
-              ))}
-            </div>
-          </motion.div>
+              </form>
 
-          <motion.div variants={fadeUp} className="text-center pt-8 pb-4">
-            <Button variant="glow" size="lg" asChild>
-              <Link to="/dashboard/galleries/new" className="gap-2">
-                <Plus className="w-5 h-5" />
-                Create Your First Collection
-              </Link>
-            </Button>
-          </motion.div>
-        </motion.div>
-      ) : (
-        /* ── With Collections: Stats + Actions + Collections + Edits + Chart ── */
-        <>
-          {/* Compact Stats Bar */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="glass-card rounded-2xl border border-border/30 p-4"
-          >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-0">
-              {/* Total Images */}
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-                  <Camera className="w-4 h-4 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-lg font-bold leading-tight">{totalImages.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">Images</p>
-                </div>
+              {/* quick actions */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+                <span className="aura-microlabel">Quick marks</span>
+                {PROMPT_CHIPS.map((c) => (
+                  <Link
+                    key={c.label}
+                    to={c.to}
+                    className="group/link inline-flex items-center gap-1.5 font-sans text-sm text-foreground/80 transition-colors hover:text-accent"
+                  >
+                    <c.icon className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover/link:text-accent" />
+                    <span className="underline decoration-border underline-offset-4 transition-colors group-hover/link:decoration-accent">
+                      {c.label}
+                    </span>
+                  </Link>
+                ))}
               </div>
 
-              {/* Collections */}
-              <div className="flex items-center gap-3 lg:border-l lg:border-border/30 lg:pl-4">
-                <div className="w-9 h-9 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
-                  <Images className="w-4 h-4 text-secondary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-lg font-bold leading-tight">{totalCollections}</p>
-                  <p className="text-xs text-muted-foreground">Collections</p>
-                </div>
-              </div>
-
-              {/* AI Edits */}
-              <div className="flex items-center gap-3 lg:border-l lg:border-border/30 lg:pl-4">
-                <div className={cn(
-                  "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
-                  hasGiftCredits ? "bg-green-500/15" : "bg-primary/15"
-                )}>
-                  {hasGiftCredits ? (
-                    <Gift className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <Zap className="w-4 h-4 text-primary" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-lg font-bold leading-tight">
-                      {isUnlimited ? "∞" : editsRemaining.toLocaleString()}
-                    </p>
-                    {hasGiftCredits && (
-                      <span className="relative flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/10 text-green-500 border border-green-500/20 overflow-hidden">
-                        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-green-500/10 to-transparent animate-shimmer" />
-                        <Gift className="w-2.5 h-2.5 relative" />
-                        <span className="relative">+{giftCreditsTotal.toLocaleString()}</span>
+              {/* briefing notes — live, inside the AI panel */}
+              {briefing.length > 0 && (
+                <div className="mt-5 space-y-2.5 border-t border-border pt-4">
+                  {briefing.map((b) => (
+                    <Link
+                      key={b.key}
+                      to={b.to}
+                      className="group/note flex items-start gap-3 rounded-[--radius] border border-primary/25 bg-primary/[0.06] px-3.5 py-3 transition-colors hover:border-primary/50"
+                    >
+                      <Sparkle size={13} className="mt-0.5 shrink-0 text-accent" />
+                      <p className="min-w-0 flex-1 font-sans text-sm leading-snug text-foreground">
+                        {b.text}
+                      </p>
+                      <span className="shrink-0 whitespace-nowrap font-mono text-[11px] text-accent transition-transform group-hover/note:translate-x-0.5">
+                        {b.label} →
                       </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">AI Edits</p>
-                  {!isUnlimited && editsTotal > 0 && (
-                    <Progress value={(editsUsed / editsTotal) * 100} className="h-1 w-24 mt-1" />
-                  )}
+                    </Link>
+                  ))}
                 </div>
-              </div>
-
-              {/* Storage */}
-              <div className="flex items-center gap-3 lg:border-l lg:border-border/30 lg:pl-4">
-                <div className="w-9 h-9 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
-                  <HardDrive className="w-4 h-4 text-secondary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-lg font-bold leading-tight">
-                    {storageUsedMb >= 1024
-                      ? `${(storageUsedMb / 1024).toFixed(1)} GB`
-                      : `${Math.round(storageUsedMb)} MB`}
-                  </p>
-                  <p className="text-xs text-muted-foreground">of {maxStorageGb} GB</p>
-                  <Progress value={storagePercent} className="h-1 w-24 mt-1" />
-                </div>
-              </div>
+              )}
             </div>
-          </motion.div>
+          </Panel>
+        </motion.section>
 
-          {/* Smart Quick Actions */}
-          {quickActions.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="flex flex-col sm:flex-row gap-3"
-            >
-              {quickActions.map((action) => (
+        {galleriesLoading ? (
+          <div className="flex items-center justify-center py-32">
+            <Orb className="h-12 w-12" />
+          </div>
+        ) : isEmpty ? (
+          /* ════ EMPTY STATE — a pro "import to begin" panel ══════════════ */
+          <motion.section variants={rise} className="mt-7">
+            <Panel>
+              <PanelHeader icon={<FolderTree className="h-3.5 w-3.5" />} label="Library — empty catalog" />
+              <div className="p-6 sm:p-8">
+                <span className="folio block text-5xl text-accent sm:text-6xl">01</span>
+                <h2 className="mt-4 max-w-2xl text-2xl font-semibold leading-[1.1] tracking-tight sm:text-3xl">
+                  Your studio is set. The first <span className="text-accent">plate</span> is yours to print.
+                </h2>
+                <p className="mt-4 max-w-lg font-sans text-base leading-relaxed text-muted-foreground">
+                  Upload a shoot and Aura culls it, retouches it in your style, and hands you a
+                  gallery to deliver. It starts with one collection.
+                </p>
+
+                <div className="mt-8 grid gap-px overflow-hidden rounded-[--radius] border border-border bg-border sm:grid-cols-3">
+                  {[
+                    { icon: Upload, title: "Upload", body: "Drop a full shoot — RAW or JPEG." },
+                    { icon: Sparkle, title: "Enhance", body: "Aura scores, culls and retouches." },
+                    { icon: Share2, title: "Deliver", body: "Share a gallery, no account needed." },
+                  ].map((s, i) => (
+                    <div key={s.title} className="bg-card p-5">
+                      <div className="flex items-baseline gap-3">
+                        <span className="folio text-2xl text-accent">0{i + 1}</span>
+                        <s.icon size={16} className="h-4 w-4 text-foreground/70" />
+                      </div>
+                      <p className="mt-3.5 text-lg font-semibold tracking-tight">{s.title}</p>
+                      <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted-foreground">
+                        {s.body}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
                 <Link
-                  key={action.id}
-                  to={action.link}
-                  className="flex-1 flex items-center gap-3 rounded-xl bg-card/60 backdrop-blur-sm border border-border/30 hover:border-primary/30 transition-all p-3 group"
+                  to="/dashboard/galleries/new"
+                  className="mt-8 inline-flex items-center gap-2 rounded-[--radius] bg-primary px-6 py-3 font-sans text-sm font-semibold text-primary-foreground transition-opacity duration-200 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] hover:opacity-90"
                 >
-                  <div className={cn(
-                    "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
-                    action.icon === "processing" ? "bg-amber-500/15" : "bg-emerald-500/15"
-                  )}>
-                    {action.icon === "processing" ? (
-                      <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{action.label}</p>
-                    <p className="text-xs text-muted-foreground">{action.detail}</p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                  <Plus className="h-4 w-4" /> Create your first collection
                 </Link>
-              ))}
-            </motion.div>
-          )}
-
-          {/* Collections — full width, 4 columns, max 2 rows */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold">Recent Collections</h2>
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/dashboard/galleries" className="gap-1 text-muted-foreground hover:text-foreground text-xs">
-                  View All
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {galleries.map((gallery, index) => (
-                <motion.div
-                  key={gallery.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.25 + index * 0.05 }}
-                >
-                  <Link to={`/dashboard/galleries/${gallery.id}`}>
-                    <Card className={cn(
-                      "relative border-border/40 hover:border-primary/40 transition-all duration-300 group overflow-hidden rounded-xl bg-card/80 backdrop-blur-sm h-full",
-                      "hover:shadow-lg hover:shadow-primary/5",
-                      gallery.status === "ready" && "ring-1 ring-emerald-500/10",
-                    )}>
-                      <div className="relative overflow-hidden bg-muted aspect-[4/3]">
-                        {gallery.hero_image_url ? (
-                          <img
-                            src={getThumbnailUrl(gallery.hero_image_url)}
-                            alt={gallery.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-                            onError={(e) => {
-                              const target = e.currentTarget;
-                              if (target.src !== gallery.hero_image_url) {
-                                target.src = gallery.hero_image_url!;
-                              }
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Images className="w-8 h-8 text-muted-foreground/40" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent opacity-80" />
-
-                        {gallery.status !== "ready" && gallery.status !== "error" && (
-                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
-                            <motion.div
-                              className="h-full bg-gradient-to-r from-amber-500 to-primary"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${gallery.total_images > 0 ? (gallery.processed_images / gallery.total_images) * 100 : 0}%` }}
-                              transition={{ duration: 0.5, delay: index * 0.05 }}
-                            />
-                          </div>
+              </div>
+            </Panel>
+          </motion.section>
+        ) : (
+          <>
+            {/* ════ 3 · THE LEDGER (telemetry) — a Lightroom info panel ════
+                Mono readout rows / stat cells across a panel. Big tabular
+                numerals, gauge ring, gift credits, engine LED. */}
+            <motion.section variants={rise} className="mt-7">
+              <Panel>
+                <PanelHeader icon={<Cpu className="h-3.5 w-3.5" />} label="Library — catalog info" trailing={<span className="caption">Studio telemetry</span>} />
+                <div className="grid grid-cols-2 divide-border md:grid-cols-4 md:divide-x">
+                  {/* AI edits remaining → billing */}
+                  <Link
+                    to="/dashboard/billing"
+                    className="group border-b border-border p-5 transition-colors hover:bg-foreground/[0.03] md:border-b-0"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="folio flex items-baseline gap-2 text-4xl leading-none text-foreground sm:text-[2.75rem]">
+                          {isUnlimited ? "∞" : editsRemaining.toLocaleString()}
+                          <ArrowUpRight className="h-4 w-4 self-start text-muted-foreground/0 transition-colors group-hover:text-accent" />
+                        </p>
+                        <p className="caption mt-3 flex items-center gap-1.5 transition-colors group-hover:text-accent">
+                          {hasGiftCredits ? <Gift className="h-3 w-3" /> : <Sparkle size={11} className="text-accent" />}
+                          AI edits left
+                        </p>
+                        <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                          {isUnlimited ? "no cap" : `of ${editsTotal.toLocaleString()}`}
+                        </p>
+                        {hasGiftCredits && (
+                          <p className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] text-accent">
+                            <Gift className="h-2.5 w-2.5" /> +{giftCreditsTotal.toLocaleString()} gift
+                          </p>
                         )}
                       </div>
+                      <div className="relative h-11 w-11 shrink-0">
+                        <div
+                          className="aura-gauge absolute inset-0"
+                          style={{ "--gauge": Math.round(editsPercent) } as CSSProperties}
+                        />
+                      </div>
+                    </div>
+                  </Link>
 
-                      <CardContent className="p-2.5 space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className={cn(
-                            "w-1.5 h-1.5 rounded-full shrink-0",
-                            gallery.status === "ready" && "bg-emerald-500",
-                            gallery.status === "error" && "bg-red-500",
-                            gallery.status !== "ready" && gallery.status !== "error" && "bg-amber-500 animate-pulse",
-                          )} />
-                          <h3 className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-                            {gallery.name}
-                          </h3>
-                        </div>
+                  {/* Storage → billing */}
+                  <Link
+                    to="/dashboard/billing"
+                    className="group border-b border-border p-5 transition-colors hover:bg-foreground/[0.03] md:border-b-0"
+                  >
+                    <p className="folio flex items-baseline gap-2 text-4xl leading-none text-foreground sm:text-[2.75rem]">
+                      {formatStorage(storageUsedMb)}
+                      <ArrowUpRight className="h-4 w-4 self-start text-muted-foreground/0 transition-colors group-hover:text-accent" />
+                    </p>
+                    <p className="caption mt-3 flex items-center gap-1.5 transition-colors group-hover:text-accent">
+                      <HardDrive className="h-3 w-3" /> Storage
+                    </p>
+                    <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">of {maxStorageGb} GB</p>
+                    <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-accent"
+                        style={{ width: `${Math.min(100, storagePercent)}%` }}
+                      />
+                    </div>
+                  </Link>
 
-                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground/70">
-                          <span className="flex items-center gap-1">
-                            <Images className="w-3 h-3" />
-                            {gallery.total_images || 0}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {new Date(gallery.created_at).toLocaleDateString()}
-                          </span>
-                          {gallery.status !== "ready" && gallery.status !== "error" && gallery.total_images > 0 && (
-                            <span className="ml-auto text-amber-500 font-medium">
-                              {Math.round((gallery.processed_images / gallery.total_images) * 100)}%
+                  {/* Collections → galleries */}
+                  <Link
+                    to="/dashboard/galleries"
+                    className="group p-5 transition-colors hover:bg-foreground/[0.03]"
+                  >
+                    <p className="folio flex items-baseline gap-2 text-4xl leading-none text-foreground sm:text-[2.75rem]">
+                      {totalCollections}
+                      <ArrowUpRight className="h-4 w-4 self-start text-muted-foreground/0 transition-colors group-hover:text-accent" />
+                    </p>
+                    <p className="caption mt-3 flex items-center gap-1.5 transition-colors group-hover:text-accent">
+                      <Layers className="h-3 w-3" /> Collections
+                    </p>
+                    <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                      {totalImages.toLocaleString()} images total
+                    </p>
+                  </Link>
+
+                  {/* Aura engine */}
+                  <div className="p-5">
+                    <p
+                      className={cn(
+                        "folio text-4xl leading-none sm:text-[2.75rem]",
+                        engineWorking ? "text-accent" : "text-foreground",
+                      )}
+                    >
+                      {engineWorking ? engineQueue.length : "Idle"}
+                    </p>
+                    <p className="caption mt-3 flex items-center gap-1.5">
+                      <span
+                        className="aura-led aura-led-pulse"
+                        style={
+                          { "--led": engineWorking ? "var(--accent)" : "var(--secondary)" } as CSSProperties
+                        }
+                      />
+                      Aura engine
+                    </p>
+                    <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                      {engineWorking
+                        ? `${engineQueue.length === 1 ? "job" : "jobs"} working now`
+                        : "ready when you are"}
+                    </p>
+                  </div>
+                </div>
+              </Panel>
+            </motion.section>
+
+            {/* ════ 4 · PROCESSING — the engine queue ═════════════════════
+                A tight list: thumbnail + name + mono progress. */}
+            {engineQueue.length > 0 && (
+              <motion.section variants={rise} className="mt-6">
+                <Panel>
+                  <PanelHeader
+                    tone="ai"
+                    icon={<Sparkle size={12} className="text-accent" />}
+                    label="Processing"
+                    trailing={<span className="caption" style={{ color: "inherit" }}>Aura is working on</span>}
+                  />
+                  <ul className="divide-y divide-border">
+                    {engineQueue.map((job) => (
+                      <li key={job.id}>
+                        <Link
+                          to={`/dashboard/galleries/${job.id}`}
+                          className="group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-foreground/[0.03]"
+                        >
+                          <div className="h-12 w-16 shrink-0 overflow-hidden rounded-sm bg-muted plate-keyline">
+                            {job.heroUrl ? (
+                              <img
+                                src={getThumbnailUrl(job.heroUrl)}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="grid h-full w-full place-items-center">
+                                <Images className="h-4 w-4 text-muted-foreground/40" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-base font-medium tracking-tight transition-colors group-hover:text-accent">
+                              {job.name}
+                            </p>
+                            <p className="font-mono text-[11px] text-muted-foreground">{job.detail}</p>
+                          </div>
+                          <div className="hidden w-40 sm:block">
+                            <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                              <motion.div
+                                className="h-full rounded-full bg-accent"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${job.pct}%` }}
+                                transition={{ duration: 0.8, ease: EASE }}
+                              />
+                            </div>
+                          </div>
+                          <span className="w-12 text-right font-mono text-sm text-accent">{job.pct}%</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </Panel>
+              </motion.section>
+            )}
+
+            {/* ════ 5 · COLLECTIONS — the recents filmstrip ═══════════════
+                Signature Lightroom element: a horizontal filmstrip of recent
+                collection thumbnails (keyline cells, status dots). A single
+                "View all" leads to the full Collections page. */}
+            <motion.section variants={rise} className="mt-6">
+              <Panel>
+                <PanelHeader
+                  icon={<Film className="h-3.5 w-3.5" />}
+                  label="Filmstrip — recent collections"
+                  trailing={
+                    <Link
+                      to="/dashboard/galleries"
+                      className="group inline-flex items-center gap-1.5 font-sans text-sm text-foreground/80 transition-colors hover:text-accent"
+                    >
+                      <span className="underline decoration-border underline-offset-4 transition-colors group-hover:decoration-accent">
+                        View all
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  }
+                />
+
+                {/* Status legend row */}
+                <div className="flex items-center gap-3 border-b border-border bg-background/40 px-4 py-2">
+                  <span className="caption flex items-center gap-1.5">
+                    <span className="aura-led" style={{ "--led": "var(--secondary)" } as CSSProperties} /> Ready
+                  </span>
+                  <span className="caption flex items-center gap-1.5">
+                    <span className="aura-led" style={{ "--led": "var(--rating)" } as CSSProperties} /> Proc
+                  </span>
+                  <span className="caption flex items-center gap-1.5">
+                    <span className="aura-led" style={{ "--led": "var(--destructive)" } as CSSProperties} /> Error
+                  </span>
+                </div>
+
+                {/* FILMSTRIP */}
+                <div className="flex items-stretch gap-2.5 overflow-x-auto p-3">
+                  {galleries.map((gallery, idx) => {
+                    const pct =
+                      gallery.total_images > 0
+                        ? Math.round((gallery.processed_images / gallery.total_images) * 100)
+                        : 0;
+                    const isReady = gallery.status === "ready";
+                    const isError = gallery.status === "error";
+                    const isProcessing = !isReady && !isError;
+                    const statusToken = isReady
+                      ? "var(--secondary)"
+                      : isError
+                        ? "var(--destructive)"
+                        : "var(--rating)";
+                    // The newest collection gets a quiet "Latest" tag — not a
+                    // full selection ring (there is no selection to make here).
+                    const isLatest = idx === 0;
+                    return (
+                      <Link
+                        key={gallery.id}
+                        to={`/dashboard/galleries/${gallery.id}`}
+                        className="group relative w-[140px] shrink-0 overflow-hidden rounded-sm border border-border bg-popover transition-colors hover:border-muted-foreground/40"
+                      >
+                        <div className="relative">
+                          <div className="aspect-[5/4] w-full overflow-hidden bg-muted plate-keyline">
+                            {gallery.hero_image_url ? (
+                              <img
+                                src={getThumbnailUrl(gallery.hero_image_url)}
+                                alt={gallery.name}
+                                className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                                onError={(e) => {
+                                  const t = e.currentTarget;
+                                  if (t.src !== gallery.hero_image_url) t.src = gallery.hero_image_url!;
+                                }}
+                              />
+                            ) : (
+                              <div className="grid h-full w-full place-items-center">
+                                <Images className="h-5 w-5 text-muted-foreground/40" />
+                              </div>
+                            )}
+                          </div>
+                          {isProcessing && pct > 0 && (
+                            <div className="absolute inset-x-0 bottom-0 h-1 bg-black/40">
+                              <motion.div
+                                className="h-full bg-rating"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${pct}%` }}
+                                transition={{ duration: 0.8, ease: EASE }}
+                              />
+                            </div>
+                          )}
+                          {isLatest && (
+                            <span className="absolute right-1.5 top-1.5 rounded-sm border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
+                              Latest
                             </span>
                           )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
+                        <div className="px-2 py-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={cn("aura-led", isProcessing && "aura-led-pulse")}
+                              style={{ "--led": statusToken } as CSSProperties}
+                            />
+                            <span className="truncate text-[11px] font-medium text-foreground">
+                              {gallery.name}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 flex items-center justify-between font-mono text-[9px] text-muted-foreground">
+                            <span>{(gallery.total_images || 0).toLocaleString()} IMG</span>
+                            <span>{isProcessing ? `${pct}%` : isError ? "ERROR" : "READY"}</span>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </Panel>
+            </motion.section>
 
-          {/* Bottom split: Usage (left) + Tips & CTAs (right) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Left — Credits chart + Storage gauge */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="space-y-4"
+            {/* ════ 6 · DEVELOP / USAGE + IN THE STUDIO ═══════════════════ */}
+            <motion.section
+              variants={rise}
+              className="mt-6 grid gap-6 lg:grid-cols-[1.4fr,1fr] lg:items-start"
             >
-              <Suspense fallback={<div className="glass-card rounded-2xl border border-border/30 p-4 h-64" />}>
-                <CreditsUsageChart />
-              </Suspense>
-
-              {/* Storage gauge card */}
-              <div className="glass-card rounded-2xl border border-border/30 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
-                    <HardDrive className="w-4 h-4 text-secondary" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold">Storage</p>
-                    <p className="text-xs text-muted-foreground">
-                      {storageUsedMb >= 1024
-                        ? `${(storageUsedMb / 1024).toFixed(1)} GB`
-                        : `${Math.round(storageUsedMb)} MB`}{" "}
-                      of {maxStorageGb} GB used
-                    </p>
-                  </div>
-                  <p className="text-lg font-bold text-foreground">{Math.round(storagePercent)}%</p>
+              <Panel>
+                <PanelHeader icon={<Zap className="h-3.5 w-3.5" />} label="Develop — usage" />
+                <div className="p-2">
+                  <Suspense fallback={<div className="h-64 rounded-[--radius] border border-border bg-card" />}>
+                    <CreditsUsageChart />
+                  </Suspense>
                 </div>
-                <Progress value={storagePercent} className="h-2" />
-              </div>
-            </motion.div>
+              </Panel>
 
-            {/* Right — Tips & Product CTAs */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="space-y-3"
-            >
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-primary" />
-                Tips & Quick Actions
-              </h2>
-
-              {/* AI Styles CTA */}
-              <Link to="/dashboard/styles" className="block group">
-                <div className="glass-card rounded-xl border border-border/30 hover:border-primary/30 transition-all p-4 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                    <Palette className="w-5 h-5 text-violet-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold group-hover:text-primary transition-colors">Create AI Styles</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Build custom editing styles that match your brand. Apply them to entire collections in one click.
-                    </p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 mt-1" />
-                </div>
-              </Link>
-
-              {/* Share Galleries CTA */}
-              <Link to="/dashboard/galleries" className="block group">
-                <div className="glass-card rounded-xl border border-border/30 hover:border-primary/30 transition-all p-4 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                    <Share2 className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold group-hover:text-primary transition-colors">Share with Clients</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Generate shareable gallery links for your clients. They can view, select favorites, and download — no account needed.
-                    </p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 mt-1" />
-                </div>
-              </Link>
-
-              {/* Batch Editing Tip */}
-              <Link to="/dashboard/galleries/new" className="block group">
-                <div className="glass-card rounded-xl border border-border/30 hover:border-primary/30 transition-all p-4 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                    <Sparkles className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold group-hover:text-primary transition-colors">Batch AI Enhancement</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Upload an entire shoot and let AI enhance all photos at once. Save hours of manual editing per session.
-                    </p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 mt-1" />
-                </div>
-              </Link>
-
-              {/* Upgrade CTA — show only for non-unlimited users */}
-              {!isUnlimited && (
-                <Link to="/dashboard/billing" className="block group">
-                  <div className="glass-card rounded-xl border border-primary/20 hover:border-primary/40 bg-primary/[0.03] transition-all p-4 flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
-                      <TrendingUp className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold group-hover:text-primary transition-colors">Upgrade Your Plan</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Get unlimited AI edits, more storage, and priority processing. Scale your photography business.
-                      </p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 mt-1" />
-                  </div>
-                </Link>
-              )}
-            </motion.div>
-          </div>
-        </>
-      )}
+              <Panel>
+                <PanelHeader icon={<FolderTree className="h-3.5 w-3.5" />} label="In the studio" />
+                <ul className="divide-y divide-border">
+                  {[
+                    {
+                      to: "/dashboard/styles",
+                      icon: Palette,
+                      title: "Train an AI style",
+                      body: "Teach Aura your editing look, then apply it to a whole collection.",
+                    },
+                    {
+                      to: "/dashboard/galleries",
+                      icon: Share2,
+                      title: "Share with clients",
+                      body: "Send a gallery link. Clients view, favorite and download, no account.",
+                    },
+                    ...(!isUnlimited
+                      ? [
+                          {
+                            to: "/dashboard/billing",
+                            icon: Zap,
+                            title: "Upgrade your plan",
+                            body: "Move up for unlimited edits, more storage and priority processing.",
+                          },
+                        ]
+                      : []),
+                  ].map((card) => (
+                    <li key={card.to + card.title}>
+                      <Link
+                        to={card.to}
+                        className="group flex items-start gap-4 px-4 py-4 transition-colors hover:bg-foreground/[0.03]"
+                      >
+                        <card.icon className="mt-1 h-4 w-4 shrink-0 text-foreground/70 transition-colors group-hover:text-accent" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-base font-medium tracking-tight transition-colors group-hover:text-accent">
+                            {card.title}
+                          </p>
+                          <p className="mt-1 font-sans text-sm leading-relaxed text-muted-foreground">
+                            {card.body}
+                          </p>
+                        </div>
+                        <ArrowUpRight className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-accent" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            </motion.section>
+          </>
+        )}
+      </motion.div>
     </div>
   );
 }

@@ -59,37 +59,38 @@ export function CancelSubscriptionModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.95 }}
-        animate={{ scale: 1 }}
-        exit={{ scale: 0.95 }}
-        className="glass-card w-full max-w-md mx-4 p-6 rounded-xl border"
+        initial={{ scale: 0.97, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.97, opacity: 0 }}
+        className="glass-card surface-2 w-full max-w-md overflow-hidden rounded-[--radius] border border-border"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center ring-1 ring-destructive/20">
-              <ShieldX className="w-5 h-5 text-destructive" />
-            </div>
-            <h3 className="text-lg font-semibold">Cancel Subscription</h3>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+          <span className="aura-microlabel flex items-center gap-2" style={{ color: "hsl(var(--destructive))" }}>
+            <ShieldX className="h-3.5 w-3.5" />
+            Cancel Subscription
+          </span>
+          <button onClick={onClose} className="text-muted-foreground transition-colors hover:text-foreground">
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 p-5">
           {/* Warning banner */}
-          <div className="p-4 rounded-xl bg-amber-500/8 border border-amber-500/20">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-              <p className="text-sm font-semibold text-amber-500">Are you sure?</p>
+          <div
+            className="rounded-[--radius] border bg-card p-4"
+            style={{ borderColor: "hsl(var(--rating) / 0.4)" }}
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" style={{ color: "hsl(var(--rating))" }} />
+              <p className="text-sm font-semibold" style={{ color: "hsl(var(--rating))" }}>Are you sure?</p>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm leading-snug text-muted-foreground">
               Your <strong className="text-foreground">{planName}</strong> features stay active until <strong className="text-foreground">{periodEnd}</strong>. After that you'll lose:
             </p>
           </div>
@@ -97,14 +98,14 @@ export function CancelSubscriptionModal({
           {/* Lost features list */}
           <div className="space-y-2">
             {[
-              { icon: Wand2, color: "text-violet-400", bg: "bg-violet-500/10", label: "Unlimited AI editing & culling" },
-              { icon: Sparkles, color: "text-cyan-400", bg: "bg-cyan-500/10", label: "Custom AI models access" },
-              { icon: Cloud, color: "text-sky-400", bg: "bg-sky-500/10", label: "Cloud storage (galleries become read-only)" },
-              { icon: HeadphonesIcon, color: "text-emerald-400", bg: "bg-emerald-500/10", label: "Priority processing & support" },
+              { icon: Wand2, color: "hsl(var(--primary))", bg: "bg-primary/10", label: "Unlimited AI editing & culling" },
+              { icon: Sparkles, color: "hsl(var(--accent))", bg: "bg-accent/10", label: "Custom AI models access" },
+              { icon: Cloud, color: "hsl(var(--accent))", bg: "bg-accent/10", label: "Cloud storage (galleries become read-only)" },
+              { icon: HeadphonesIcon, color: "hsl(var(--secondary))", bg: "bg-secondary/10", label: "Priority processing & support" },
             ].map(({ icon: Icon, color, bg, label }) => (
-              <div key={label} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/40">
-                <div className={`w-7 h-7 rounded-md ${bg} flex items-center justify-center flex-shrink-0`}>
-                  <Icon className={`w-3.5 h-3.5 ${color}`} />
+              <div key={label} className="flex items-center gap-3 rounded-[--radius] bg-muted/40 p-2.5">
+                <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[--radius] ${bg}`}>
+                  <Icon className="h-3.5 w-3.5" style={{ color }} />
                 </div>
                 <span className="text-sm text-muted-foreground">{label}</span>
               </div>

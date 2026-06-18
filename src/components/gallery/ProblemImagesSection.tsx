@@ -20,7 +20,7 @@ export function ProblemImagesSection() {
   if (failed.length === 0) return null;
 
   return (
-    <div className="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 overflow-hidden">
+    <div className="mb-3 rounded-[--radius] border border-destructive/40 bg-destructive/5 overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 gap-3">
         <button
           type="button"
@@ -30,7 +30,7 @@ export function ProblemImagesSection() {
         >
           <AlertTriangle className="w-4 h-4" />
           <span>
-            {failed.length} image{failed.length === 1 ? "" : "s"} failed to load
+            <span className="folio">{failed.length}</span> image{failed.length === 1 ? "" : "s"} failed to load
           </span>
           {expanded ? (
             <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -62,7 +62,7 @@ export function ProblemImagesSection() {
           {failed.map((rec) => (
             <div
               key={rec.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-background/60 border border-border/50 min-w-0"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-sm surface-2 border border-border/60 min-w-0"
               title={rec.filename}
             >
               <FileWarning className="w-3.5 h-3.5 text-destructive shrink-0" />

@@ -282,7 +282,7 @@ function ImageCardImpl({
   // while we wait for load/error to fire, so the user gets immediate
   // feedback that their click did something.
   const renderRetryingOverlay = () => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md z-10 bg-muted/60 backdrop-blur-sm">
+    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-sm z-10 bg-surface-2/80 backdrop-blur-sm">
       {thinkingDots}
     </div>
   );
@@ -298,11 +298,11 @@ function ImageCardImpl({
     const manualRetriesLeft = MAX_MANUAL_RETRIES - manualRetryCount;
     const terminal = manualRetriesLeft <= 0;
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md z-10 bg-muted/60 backdrop-blur-sm gap-1.5 px-2 text-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-sm z-10 bg-surface-2/80 backdrop-blur-sm gap-1.5 px-2 text-center">
         <AlertTriangle className={cn("w-5 h-5", terminal ? "text-destructive" : "text-muted-foreground")} />
         {terminal ? (
           <>
-            <span className="text-[10px] font-medium text-destructive uppercase tracking-wide">Re-upload</span>
+            <span className="aura-microlabel text-destructive">Re-upload</span>
             <span className="text-[10px] text-muted-foreground truncate max-w-full" title={image.filename}>
               {image.filename}
             </span>
@@ -332,10 +332,10 @@ function ImageCardImpl({
 
     return (
       <div className={cn(
-        "absolute inset-0 flex flex-col items-center justify-center rounded-md z-10",
+        "absolute inset-0 flex flex-col items-center justify-center rounded-sm z-10",
         status === "error"
           ? "bg-destructive/20 backdrop-blur-sm"
-          : "bg-muted/60 backdrop-blur-sm"
+          : "bg-surface-2/80 backdrop-blur-sm"
       )}>
         {status === "uploading" && (
           <Upload className="w-6 h-6 text-primary animate-pulse" />
@@ -371,9 +371,9 @@ function ImageCardImpl({
           ready so the user sees the slot the image will live in.   */}
       {(!isInView || !isReady || (!isLoaded && isReady) || hasFailed || isRetrying) && (
         <div className={cn(
-          "rounded-md overflow-hidden border-2 relative",
-          isSelected ? "border-primary ring-1 ring-primary/30" : "border-transparent",
-          "bg-muted/30 thumbnail-shimmer",
+          "rounded-sm overflow-hidden border relative",
+          isSelected ? "border-primary ring-2 ring-primary/50" : "border-border/60",
+          "bg-surface-2 thumbnail-shimmer plate-keyline",
           viewMode === "grid" ? "aspect-square" : "w-full h-full"
         )}
           onClick={() => onImageClick(image.id, index)}
@@ -389,11 +389,11 @@ function ImageCardImpl({
             aria-label={isSelected ? "Deselect image" : "Select image"}
             aria-pressed={isSelected}
             className={cn(
-              "absolute top-1.5 left-1.5 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all duration-150 cursor-pointer z-20",
+              "absolute top-1.5 left-1.5 w-5 h-5 rounded-sm border-[1.5px] flex items-center justify-center transition-all duration-150 cursor-pointer z-20",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isSelected
                 ? "bg-primary border-primary opacity-100 scale-100"
-                : "border-white/80 bg-black/30 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:scale-110"
+                : "border-white/80 bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:scale-110"
             )}
             onClick={(e) => onSelectionToggle(image.id, index, e)}
           >
@@ -414,10 +414,10 @@ function ImageCardImpl({
         >
           <div
             className={cn(
-              "relative rounded-md overflow-hidden border transition-all duration-200 h-full",
+              "relative rounded-sm overflow-hidden border transition-all duration-200 h-full plate-keyline",
               isSelected
-                ? "border-primary ring-1 ring-primary/30"
-                : "border-transparent hover:border-white/10"
+                ? "border-primary ring-2 ring-primary/50"
+                : "border-border/40 hover:border-border"
             )}
             onClick={() => onImageClick(image.id, index)}
           >
@@ -453,11 +453,11 @@ function ImageCardImpl({
               aria-label={isSelected ? "Deselect image" : "Select image"}
               aria-pressed={isSelected}
               className={cn(
-                "absolute top-1.5 left-1.5 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all duration-150 cursor-pointer",
+                "absolute top-1.5 left-1.5 w-5 h-5 rounded-sm border-[1.5px] flex items-center justify-center transition-all duration-150 cursor-pointer",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isSelected
                   ? "bg-primary border-primary opacity-100 scale-100"
-                  : "border-white/80 bg-black/30 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:scale-110"
+                  : "border-white/80 bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:scale-110"
               )}
               onClick={(e) => onSelectionToggle(image.id, index, e)}
             >
@@ -466,13 +466,13 @@ function ImageCardImpl({
               )}
             </button>
 
-            {/* Hero Badge — top-left, shifts when selected */}
+            {/* Hero Badge — top-left, shifts when selected (pick flag) */}
             {image.is_hero && (
               <div className={cn(
-                "absolute top-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-primary/90 text-primary-foreground",
+                "absolute top-1.5 px-1.5 py-0.5 rounded-sm font-mono text-[8px] font-semibold uppercase tracking-[0.14em] bg-primary text-primary-foreground",
                 isSelected ? "left-8" : "left-1.5 group-hover:left-8"
               )} style={{ transition: "left 0.2s ease" }}>
-                Hero
+                Pick
               </div>
             )}
 
@@ -483,7 +483,7 @@ function ImageCardImpl({
             )}>
               <button
                 type="button"
-                className="w-6 h-6 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors opacity-0 group-hover:opacity-100"
+                className="w-6 h-6 rounded-sm bg-black/45 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-white hover:bg-black/65 transition-colors opacity-0 group-hover:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation();
                   onOpenLightbox(image.id);
@@ -494,10 +494,10 @@ function ImageCardImpl({
               <button
                 type="button"
                 className={cn(
-                  "w-6 h-6 rounded-full flex items-center justify-center transition-colors",
+                  "w-6 h-6 rounded-sm flex items-center justify-center transition-colors",
                   image.is_liked
-                    ? "bg-red-500/90 text-white"
-                    : "bg-black/40 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/60"
+                    ? "bg-destructive text-white"
+                    : "bg-black/45 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/65"
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -533,13 +533,13 @@ function ImageCardImpl({
                     {processingInfo.sentAt && (
                       <p className="tabular-nums">
                         <span className="text-muted-foreground">Sent: </span>
-                        {new Date(processingInfo.sentAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        {new Date(processingInfo.sentAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                       </p>
                     )}
                     {processingInfo.completedAt && (
                       <p className="tabular-nums">
                         <span className="text-muted-foreground">Completed: </span>
-                        {new Date(processingInfo.completedAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        {new Date(processingInfo.completedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                       </p>
                     )}
                     {processingInfo.attempts > 0 && (
@@ -561,7 +561,7 @@ function ImageCardImpl({
             {/* Bottom: Star rating (when culling has run) */}
             {hasRating && (
               <div className={cn(
-                "absolute bottom-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/50 backdrop-blur-sm transition-opacity duration-200",
+                "absolute bottom-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-black/55 backdrop-blur-sm transition-opacity duration-200",
                 isSelected ? "opacity-100" : "opacity-80 group-hover:opacity-100"
               )}>
                 <div className="flex items-center gap-0.5">
@@ -571,14 +571,14 @@ function ImageCardImpl({
                       className={cn(
                         "w-2.5 h-2.5",
                         i < starRating
-                          ? "text-amber-400 fill-amber-400"
+                          ? "text-rating fill-rating"
                           : "text-white/20"
                       )}
                     />
                   ))}
                 </div>
                 {showRawScore && (
-                  <span className="text-[10px] font-mono text-white/90 tabular-nums">
+                  <span className="font-mono text-[10px] text-white/90 tabular-nums folio">
                     {(image.culling_score as number).toFixed(2)}
                   </span>
                 )}

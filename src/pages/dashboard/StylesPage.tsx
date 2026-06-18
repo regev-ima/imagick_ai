@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, type CSSProperties, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Orb } from "@/components/aura/Orb";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,6 +49,75 @@ const statusConfig: Record<StyleStatus, { label: string; className: string }> = 
   error: { label: "Error", className: "bg-destructive/10 text-destructive" },
   deleted: { label: "Deleted", className: "bg-muted text-muted-foreground" }
 };
+
+// LIGHTROOM motion — calm, responsive fades/slides. No bounce, no float.
+const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
+const deck = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+};
+const rise = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+};
+
+/**
+ * The AI mark — a 4-point sparkle (the logo star). Royal blue by default.
+ * Copied from the approved Lightroom dashboard reference; tinted via
+ * currentColor so it inherits text-primary / text-accent tokens.
+ */
+function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <path
+        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/** A Lightroom-style tonal panel — hairline border, soft shadow. */
+function Panel({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div className={cn("glass-card overflow-hidden rounded-[--radius]", className)}>{children}</div>
+  );
+}
+
+/** Mono section header — like a Lightroom module title bar. */
+function PanelHeader({
+  icon,
+  label,
+  trailing,
+  tone = "muted",
+}: {
+  icon?: ReactNode;
+  label: string;
+  trailing?: ReactNode;
+  tone?: "muted" | "ai";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 border-b border-border px-4 py-2.5",
+        tone === "ai" ? "bg-primary/[0.08] text-accent" : "bg-background/40 text-muted-foreground",
+      )}
+    >
+      <span className="aura-microlabel flex items-center gap-2" style={tone === "ai" ? { color: "inherit" } : undefined}>
+        {icon}
+        {label}
+      </span>
+      {trailing}
+    </div>
+  );
+}
 
 export default function StylesPage() {
   const { user } = useAuth();
@@ -108,187 +178,204 @@ export default function StylesPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-8 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="flex min-h-[400px] items-center justify-center bg-background p-6 lg:p-8">
+        <Orb className="h-12 w-12" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Hero Header — AI Model Studio */}
+    <div className="relative min-h-full bg-background px-5 py-7 lg:px-10 lg:py-10">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        variants={deck}
+        initial="hidden"
+        animate="show"
+        className="relative mx-auto w-full max-w-[1320px]"
       >
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            AI Model <span className="text-gradient-primary">Studio</span>
-          </h1>
-          <p className="text-muted-foreground mt-1.5">
-            Your AI editing models — trained, curated, ready to transform
-          </p>
-        </div>
-        <Button variant="glow" className="gap-2" asChild>
-          <Link to="/dashboard/styles/new">
-            <Plus className="w-4 h-4" />
-            Train New Style
-          </Link>
-        </Button>
-      </motion.div>
-
-      {/* Marketplace Banner — Coming Soon */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-      >
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/15 via-violet-500/10 to-primary/5 border border-primary/20 p-5 sm:p-6">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-base">Style Marketplace</h3>
-                <Badge variant="secondary" className="text-[10px] uppercase tracking-wider font-semibold">
-                  Coming Soon
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Share your custom styles with the community and earn from every use. Train once, earn forever.
+        {/* ════ MASTHEAD — AI Model Studio ═══════════════════════════════ */}
+        <motion.header variants={rise}>
+          <div className="flex items-center justify-between gap-4 pb-3">
+            <span className="caption flex items-center gap-1.5 text-accent">
+              <Sparkle size={11} className="text-accent" />
+              AI Model Studio
+            </span>
+            <span className="caption flex items-center gap-1.5">
+              <span className="aura-led" style={{ "--led": "var(--primary)" } as CSSProperties} />
+              {styles.length} {styles.length === 1 ? "model" : "models"}
+            </span>
+          </div>
+          <hr className="aura-hairline" />
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-4xl">
+                AI Model <span className="text-accent">Studio</span>
+              </h1>
+              <p className="mt-2 max-w-lg font-sans text-base leading-relaxed text-muted-foreground">
+                Your AI editing models — trained, curated, ready to transform.
               </p>
             </div>
-            <Rocket className="w-8 h-8 text-primary/30 shrink-0 hidden sm:block" />
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Search & Filter */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col sm:flex-row gap-4"
-      >
-        <div className="flex-1 flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/50 border border-border/50">
-          <Search className="w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search styles..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent border-none outline-none text-sm flex-1 placeholder:text-muted-foreground"
-          />
-        </div>
-
-        <div className="flex items-center rounded-lg border border-border/50 p-1">
-          {([
-            { value: "all", label: "All", count: styles.length },
-            { value: "public", label: "Public Styles", count: publicCount },
-            { value: "yours", label: "Your Styles", count: yourCount },
-          ] as const).map((f) => (
-            <Button
-              key={f.value}
-              variant={filter === f.value ? "default" : "ghost"}
-              size="sm"
-              className={cn(
-                filter === f.value && "bg-primary text-primary-foreground hover:bg-primary/90"
-              )}
-              onClick={() => setFilter(f.value as any)}
-            >
-              {f.label}
-              <span className={cn(
-                "ml-1.5 text-[10px] font-semibold tabular-nums",
-                filter === f.value ? "opacity-80" : "text-muted-foreground"
-              )}>
-                ({f.count})
-              </span>
-            </Button>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Custom Styles Section */}
-      {customStyles.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-              <Lock className="w-4 h-4 text-violet-500" />
-            </div>
-            <h2 className="text-xl font-semibold">Your Custom Styles</h2>
-            <Badge variant="secondary" className="text-xs tabular-nums">
-              {customStyles.length}
-            </Badge>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {customStyles.map((style, index) => (
-              <StyleCard
-                key={style.id}
-                style={style}
-                coverUrl={showcaseCovers[style.id]}
-                index={index}
-                onView={handleViewStyle}
-                 onCreateGallery={handleCreateGallery}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Preset Styles Section */}
-      {presetStyles.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-              <Globe className="w-4 h-4 text-cyan-500" />
-            </div>
-            <h2 className="text-xl font-semibold">Public Styles</h2>
-            <Badge variant="secondary" className="text-xs tabular-nums">
-              {presetStyles.length}
-            </Badge>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {presetStyles.map((style, index) => (
-              <StyleCard
-                key={style.id}
-                style={style}
-                coverUrl={showcaseCovers[style.id]}
-                index={index + customStyles.length}
-                onView={handleViewStyle}
-                 onCreateGallery={handleCreateGallery}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {filteredStyles.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-20"
-        >
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 border border-primary/10 flex items-center justify-center mb-5">
-            <BrainCircuit className="w-9 h-9 text-primary/60" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">
-            {searchQuery ? "No models match your search" : "No AI models yet"}
-          </h3>
-          <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-            {searchQuery
-              ? "Try a different search term or adjust your filters"
-              : "Train your first custom AI style model and start transforming images with your unique aesthetic"}
-          </p>
-          {!searchQuery && (
             <Button variant="glow" className="gap-2" asChild>
               <Link to="/dashboard/styles/new">
                 <Plus className="w-4 h-4" />
                 Train New Style
               </Link>
             </Button>
-          )}
-        </motion.div>
-      )}
+          </div>
+        </motion.header>
+
+        {/* ════ MARKETPLACE — Coming Soon (AI panel) ═════════════════════ */}
+        <motion.section variants={rise} className="mt-7">
+          <Panel className="border-primary/25">
+            <div className="relative flex items-center gap-4 bg-primary/[0.06] p-5 sm:p-6">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[--radius] border border-primary/30 bg-background">
+                <Rocket className="h-5 w-5 text-accent" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-semibold tracking-tight">Style Marketplace</h3>
+                  <span className="aura-chip" style={{ color: "hsl(var(--accent))" }}>
+                    Coming Soon
+                  </span>
+                </div>
+                <p className="mt-1 font-sans text-sm leading-relaxed text-muted-foreground">
+                  Share your custom styles with the community and earn from every use. Train once, earn forever.
+                </p>
+              </div>
+            </div>
+          </Panel>
+        </motion.section>
+
+        {/* ════ SEARCH & FILTER — instrument bar ═════════════════════════ */}
+        <motion.section variants={rise} className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-1 items-center gap-2.5 rounded-[--radius] border border-border bg-card px-3.5 py-2.5 transition-colors duration-200 focus-within:border-primary/60">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search styles…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="min-w-0 flex-1 border-none bg-transparent font-sans text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+
+          <div className="flex items-center rounded-[--radius] border border-border bg-card p-1">
+            {([
+              { value: "all", label: "All", count: styles.length },
+              { value: "public", label: "Public", count: publicCount },
+              { value: "yours", label: "Yours", count: yourCount },
+            ] as const).map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value as any)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-[calc(var(--radius)-2px)] px-3 py-1.5 font-sans text-sm font-medium transition-colors",
+                  filter === f.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {f.label}
+                <span className={cn(
+                  "font-mono text-[10px] font-semibold tabular-nums",
+                  filter === f.value ? "opacity-80" : "text-muted-foreground/80",
+                )}>
+                  {f.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </motion.section>
+
+        {/* ════ CUSTOM STYLES — your trained models ══════════════════════ */}
+        {customStyles.length > 0 && (
+          <motion.section variants={rise} className="mt-6">
+            <Panel>
+              <PanelHeader
+                tone="ai"
+                icon={<Lock className="h-3.5 w-3.5" />}
+                label="Your Custom Styles"
+                trailing={
+                  <span className="caption flex items-center gap-1.5" style={{ color: "inherit" }}>
+                    <Sparkle size={11} className="text-accent" />
+                    {customStyles.length} trained
+                  </span>
+                }
+              />
+              <div className="grid grid-cols-1 gap-px overflow-hidden bg-border sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {customStyles.map((style, index) => (
+                  <StyleCard
+                    key={style.id}
+                    style={style}
+                    coverUrl={showcaseCovers[style.id]}
+                    index={index}
+                    onView={handleViewStyle}
+                     onCreateGallery={handleCreateGallery}
+                  />
+                ))}
+              </div>
+            </Panel>
+          </motion.section>
+        )}
+
+        {/* ════ PUBLIC STYLES — community looks ══════════════════════════ */}
+        {presetStyles.length > 0 && (
+          <motion.section variants={rise} className="mt-6">
+            <Panel>
+              <PanelHeader
+                icon={<Globe className="h-3.5 w-3.5" />}
+                label="Public Styles"
+                trailing={<span className="caption">{presetStyles.length} looks</span>}
+              />
+              <div className="grid grid-cols-1 gap-px overflow-hidden bg-border sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {presetStyles.map((style, index) => (
+                  <StyleCard
+                    key={style.id}
+                    style={style}
+                    coverUrl={showcaseCovers[style.id]}
+                    index={index + customStyles.length}
+                    onView={handleViewStyle}
+                     onCreateGallery={handleCreateGallery}
+                  />
+                ))}
+              </div>
+            </Panel>
+          </motion.section>
+        )}
+
+        {/* ════ EMPTY STATE — a pro "train to begin" panel ═══════════════ */}
+        {filteredStyles.length === 0 && (
+          <motion.section variants={rise} className="mt-6">
+            <Panel>
+              <PanelHeader
+                tone="ai"
+                icon={<Sparkle size={12} className="text-accent" />}
+                label="Model catalog — empty"
+              />
+              <div className="p-6 sm:p-10 text-center">
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-[--radius] border border-primary/30 bg-primary/[0.06]">
+                  <BrainCircuit className="h-8 w-8 text-accent" />
+                </div>
+                <h3 className="mt-5 text-2xl font-semibold tracking-tight">
+                  {searchQuery ? "No models match your search" : "No AI models yet"}
+                </h3>
+                <p className="mx-auto mt-3 max-w-sm font-sans text-base leading-relaxed text-muted-foreground">
+                  {searchQuery
+                    ? "Try a different search term or adjust your filters."
+                    : "Train your first custom AI style model and start transforming images with your unique aesthetic."}
+                </p>
+                {!searchQuery && (
+                  <Button variant="glow" className="mt-7 gap-2" asChild>
+                    <Link to="/dashboard/styles/new">
+                      <Plus className="w-4 h-4" />
+                      Train New Style
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </Panel>
+          </motion.section>
+        )}
+      </motion.div>
     </div>
   );
 }
@@ -308,97 +395,106 @@ interface StyleCardProps {
   const isReady = style.status === "ready";
   const isError = style.status === "error";
   const isTraining = style.status === "training" || style.status === "importing";
+  const statusToken = isReady
+    ? "var(--secondary)"
+    : isError
+      ? "var(--destructive)"
+      : isTraining
+        ? "var(--rating)"
+        : "var(--muted-foreground)";
+  const statusLabel = isReady ? "Ready" : isError ? "Error" : isTraining ? "Training" : "Idle";
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      transition={{ delay: index * 0.04, duration: 0.5, ease: EASE }}
+      className="group relative bg-card transition-colors hover:bg-foreground/[0.02]"
     >
-      <Card className={cn(
-        "relative border-border/40 hover:border-primary/40 transition-all duration-300 group overflow-hidden rounded-2xl bg-card/80 backdrop-blur-sm",
-        "hover:shadow-lg hover:shadow-primary/5",
-        isReady && "ring-1 ring-emerald-500/10",
-      )}>
-        {/* Image area */}
-        <div
-          className="relative aspect-video overflow-hidden cursor-pointer"
-          onClick={() => onView(style.id)}
-        >
-          {imgError ? (
-            <div className="w-full h-full bg-gradient-to-br from-muted to-muted/60 flex items-center justify-center">
-              <div className="w-14 h-14 rounded-2xl bg-background/60 flex items-center justify-center">
-                <ImageIcon className="w-7 h-7 text-muted-foreground/60" />
-              </div>
-            </div>
-          ) : (
-            <img
-              src={imgSrc}
-              alt={style.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-              onError={() => setImgError(true)}
-            />
-          )}
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent opacity-80" />
-
-          {/* Action buttons — top-right on hover */}
-          <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <button
-              className="w-8 h-8 rounded-lg bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                onView(style.id);
-              }}
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-            <button
-              className="w-8 h-8 rounded-lg bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateGallery(style.id);
-              }}
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
+      {/* Plate — keyline preview cell */}
+      <div
+        className="relative aspect-video cursor-pointer overflow-hidden bg-muted plate-keyline"
+        onClick={() => onView(style.id)}
+      >
+        {imgError ? (
+          <div className="grid h-full w-full place-items-center bg-muted">
+            <ImageIcon className="h-7 w-7 text-muted-foreground/50" />
           </div>
+        ) : (
+          <img
+            src={imgSrc}
+            alt={style.name}
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+            onError={() => setImgError(true)}
+          />
+        )}
+        {/* Bottom legibility scrim */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/80 via-transparent to-transparent" />
+
+        {/* AI-ready keyline accent */}
+        {isReady && (
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-sm bg-background/85 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-accent backdrop-blur-sm">
+            <Sparkle size={9} className="text-accent" />
+            AI
+          </span>
+        )}
+
+        {/* Action buttons — top-right on hover */}
+        <div className="absolute right-2 top-2 flex gap-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <button
+            className="grid h-8 w-8 place-items-center rounded-[--radius] border border-border bg-background/85 text-foreground/80 backdrop-blur-sm transition-colors hover:border-primary/50 hover:text-accent"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView(style.id);
+            }}
+            aria-label="View style"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className="grid h-8 w-8 place-items-center rounded-[--radius] border border-border bg-background/85 text-foreground/80 backdrop-blur-sm transition-colors hover:border-primary/50 hover:text-accent"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateGallery(style.id);
+            }}
+            aria-label="Create gallery with this style"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Card body */}
+      <div className="p-3">
+        {/* Row 1: Status LED + Name */}
+        <div className="flex items-center gap-2">
+          <span
+            className={cn("aura-led", isTraining && "aura-led-pulse")}
+            style={{ "--led": statusToken } as CSSProperties}
+          />
+          <h3
+            className="cursor-pointer truncate text-sm font-medium tracking-tight text-foreground transition-colors group-hover:text-accent"
+            onClick={() => onView(style.id)}
+          >
+            {style.name}
+          </h3>
         </div>
 
-        {/* Card body */}
-        <CardContent className="p-3 space-y-1">
-          {/* Row 1: Status dot + Name */}
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              "w-2 h-2 rounded-full shrink-0",
-              isReady && "bg-emerald-500",
-              isError && "bg-red-500",
-              isTraining && "bg-amber-500 animate-pulse",
-              !isReady && !isError && !isTraining && "bg-muted-foreground/40",
-            )} />
-            <h3
-              className="font-semibold text-sm truncate group-hover:text-primary transition-colors cursor-pointer"
-              onClick={() => onView(style.id)}
-            >
-              {style.name}
-            </h3>
-          </div>
+        {/* Row 2: Description */}
+        <p className="mt-1 truncate font-sans text-xs text-muted-foreground">
+          {style.description || "No description"}
+        </p>
 
-          {/* Row 2: Description */}
-          <p className="text-xs text-muted-foreground truncate">
-            {style.description || "No description"}
-          </p>
-
-          {/* Row 3: Category badge */}
+        {/* Row 3: mono meta — status + category */}
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="caption" style={{ color: `hsl(${statusToken})` }}>
+            {statusLabel}
+          </span>
           {style.category && (
-            <div className="pt-0.5">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-muted text-muted-foreground capitalize">
-                {style.category}
-              </span>
-            </div>
+            <span className="aura-chip capitalize">{style.category}</span>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </motion.div>
   );
 }

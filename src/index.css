@@ -1,565 +1,465 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Imagick.ai Design System - Unified with imagick-web */
+/* ════════════════════════════════════════════════════════════════════
+   LIGHTROOM — Imagick.ai design system (v3) · the photographer's tool
+   Direction chosen with the founder: make photographers feel they're
+   inside a professional editor (Lightroom / Capture One). Dark-first,
+   neutral pro graphite panels, brand ROYAL BLUE (#2B50F0) for selection
+   and AI, the 4-point sparkle as the AI mark. Mono readouts for precision.
+   Brand colors pulled from the logo (royal blue + navy + white).
+   Token names stay stable so the whole app inherits the language.
+   ════════════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
-    /* Base dark colors — matches imagick-web dark mode */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* Pro editor canvas — neutral graphite */
+    --background: 228 8% 9%;            /* #16171A */
+    --foreground: 228 13% 92%;          /* #E8E9ED */
 
-    /* Card */
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
+    /* Panels (Lightroom-style tonal panels) */
+    --card: 228 8% 13%;                 /* #1F2024 panel */
+    --card-foreground: 228 13% 92%;
+    --popover: 228 8% 16%;              /* #26272C raised */
+    --popover-foreground: 228 13% 92%;
+    --surface-1: 228 8% 13%;
+    --surface-2: 228 8% 16%;
+    --surface-3: 228 8% 20%;
 
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
-
-    /* Primary - Neon Pink (matches imagick-web) */
-    --primary: 330 100% 60%;
+    /* Primary — brand ROYAL BLUE (#2B50F0): selection, key actions, AI */
+    --primary: 227 88% 56%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Purple brand color */
-    --secondary: 270 75% 60%;
+    /* Secondary — "ready/success" green */
+    --secondary: 152 46% 45%;
     --secondary-foreground: 0 0% 100%;
 
-    /* Muted for subtle backgrounds */
-    --muted: 240 10% 15%;
-    --muted-foreground: 240 5% 60%;
+    /* Muted */
+    --muted: 228 7% 17%;
+    --muted-foreground: 228 6% 58%;     /* #8A8C94 */
 
-    /* Accent - Purple brand (matches imagick-web --accent) */
-    --accent: 270 100% 65%;
+    /* Accent — brighter AI blue (#3A63FF) for the sparkle / AI surfaces */
+    --accent: 227 100% 62%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 358 72% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 10% 15%;
-    --input: 240 10% 15%;
-    --ring: 330 100% 60%;
+    --border: 228 7% 21%;               /* #33343A hairline */
+    --input: 228 7% 18%;
+    --ring: 227 88% 56%;
 
-    --radius: 0.75rem;
+    --radius: 0.375rem;                 /* crisp, instrument-like */
 
-    /* Neon color tokens (matches imagick-web) */
-    --neon-pink: 330 100% 60%;
-    --neon-purple: 270 100% 65%;
-    --neon-blue: 210 100% 60%;
+    /* Dynamic color (per-photo tint) — defaults to brand blue */
+    --dynamic-primary: 227 88% 56%;
+    --dynamic-soft: 227 60% 24%;
 
-    /* Gradient tokens */
-    --gradient-start: 330 100% 60%;
-    --gradient-end: 270 100% 65%;
+    /* "neon" legacy names → brand blue family */
+    --neon-pink: 227 100% 62%;
+    --neon-purple: 232 80% 64%;
+    --neon-blue: 227 88% 56%;
 
-    /* Sidebar */
-    --sidebar-background: 240 10% 5%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 330 100% 60%;
+    /* AI gradient endpoints (royal → light blue) */
+    --gradient-start: 227 88% 56%;
+    --gradient-end: 227 100% 68%;
+
+    /* Sidebar — dark panel rail */
+    --sidebar-background: 228 8% 11%;
+    --sidebar-foreground: 228 10% 78%;
+    --sidebar-primary: 227 88% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 12%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 10% 15%;
-    --sidebar-ring: 330 100% 60%;
+    --sidebar-accent: 228 8% 16%;
+    --sidebar-accent-foreground: 228 13% 92%;
+    --sidebar-border: 228 7% 19%;
+    --sidebar-ring: 227 88% 56%;
 
-    /* Custom glow tokens */
-    --glow-primary: 330 100% 60%;
-    --glow-secondary: 270 100% 65%;
-    --glow-accent: 240 10% 25%;
+    --glow-primary: 227 88% 56%;
+    --glow-secondary: 227 100% 62%;
+    --glow-accent: 232 80% 64%;
 
-    /* Rating star color */
-    --rating: 45 93% 47%;
+    /* Rating star — amber */
+    --rating: 38 85% 56%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(330, 100%, 60%) 0%, hsl(270, 100%, 65%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(330, 100%, 60%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(240, 10%, 25%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(240, 10%, 6%) 0%, hsl(240, 10%, 3.9%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(330, 100%, 60%, 0.15) 0%, transparent 70%);
+    /* Motion — precise, responsive (under 250ms for UI feedback) */
+    --ease-out-strong: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out-strong: cubic-bezier(0.65, 0, 0.35, 1);
 
-    /* Glass effect */
-    --glass-background: hsla(240, 10%, 12%, 0.6);
-    --glass-border: hsla(0, 0%, 98%, 0.08);
+    /* The AI signature — royal-blue gradient, reserved for engine/sparkle */
+    --gradient-primary: linear-gradient(115deg, hsl(227 88% 56%) 0%, hsl(227 100% 64%) 60%, hsl(232 90% 70%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(227 88% 56%) 0%, hsl(232 80% 64%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(227 100% 62%) 0%, hsl(227 88% 56%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(228 8% 13%) 0%, hsl(228 8% 9%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(227 88% 56% / 0.18) 0%, transparent 70%);
+
+    /* Panel fill (replaces glass) — solid panel, hairline, soft shadow */
+    --glass-background: hsl(228 8% 13%);
+    --glass-border: hsl(228 7% 21%);
+
+    --elevation-1: 0 1px 0 hsl(0 0% 0% / 0.3), 0 1px 2px hsl(0 0% 0% / 0.3);
+    --elevation-2: 0 2px 6px hsl(0 0% 0% / 0.35), 0 8px 24px -12px hsl(0 0% 0% / 0.5);
+    --elevation-3: 0 4px 12px hsl(0 0% 0% / 0.4), 0 18px 48px -18px hsl(0 0% 0% / 0.6);
   }
 
-  /* Light mode */
+  /* Light mode — Lightroom "soft proofing" daylight: cool white + navy */
   .light {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 10%;
-    --card: 0 0% 98%;
-    --card-foreground: 240 10% 10%;
+    --background: 222 36% 97%;          /* #F5F7FC */
+    --foreground: 224 62% 14%;          /* #0E1A3A navy */
+    --card: 0 0% 100%;
+    --card-foreground: 224 62% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 10%;
-    --primary: 330 85% 50%;
+    --popover-foreground: 224 62% 14%;
+    --surface-1: 0 0% 100%;
+    --surface-2: 222 30% 96%;
+    --surface-3: 222 26% 92%;
+    --primary: 227 86% 52%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 270 60% 55%;
+    --secondary: 152 52% 36%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 240 5% 92%;
-    --muted-foreground: 240 5% 45%;
-    /* Accent - Purple brand (matches imagick-web light mode --accent) */
-    --accent: 270 80% 55%;
+    --muted: 222 26% 94%;
+    --muted-foreground: 224 14% 42%;
+    --accent: 227 90% 56%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 50%;
+    --destructive: 358 68% 52%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5% 88%;
-    --input: 240 5% 92%;
-    --ring: 330 85% 50%;
-
-    /* Neon tokens */
-    --neon-pink: 330 100% 60%;
-    --neon-purple: 270 100% 65%;
-    --neon-blue: 210 100% 60%;
-
-    /* Gradient tokens */
-    --gradient-start: 330 85% 50%;
-    --gradient-end: 270 80% 55%;
-
-    /* Sidebar light */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5% 35%;
-    --sidebar-primary: 330 85% 50%;
+    --border: 222 24% 88%;
+    --input: 222 24% 90%;
+    --ring: 227 86% 52%;
+    --dynamic-primary: 227 86% 52%;
+    --dynamic-soft: 227 70% 90%;
+    --neon-pink: 227 90% 56%;
+    --neon-purple: 232 78% 56%;
+    --neon-blue: 227 86% 52%;
+    --gradient-start: 227 86% 52%;
+    --gradient-end: 227 96% 60%;
+    --sidebar-background: 222 32% 98%;
+    --sidebar-foreground: 224 18% 38%;
+    --sidebar-primary: 227 86% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 94%;
-    --sidebar-accent-foreground: 240 10% 10%;
-    --sidebar-border: 240 5% 88%;
-    --sidebar-ring: 330 85% 50%;
-
-    /* Light glow tokens */
-    --glow-primary: 330 85% 50%;
-    --glow-secondary: 270 80% 55%;
-
-    /* Light mode glass */
-    --glass-background: hsla(0, 0%, 100%, 0.8);
-    --glass-border: hsla(240, 5%, 85%, 0.5);
-
-    /* Light gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(330, 85%, 50%) 0%, hsl(270, 80%, 55%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(270, 80%, 55%) 0%, hsl(330, 85%, 50%) 100%);
+    --sidebar-accent: 222 28% 94%;
+    --sidebar-accent-foreground: 224 62% 14%;
+    --sidebar-border: 222 24% 88%;
+    --sidebar-ring: 227 86% 52%;
+    --glow-primary: 227 86% 52%;
+    --glow-secondary: 227 90% 56%;
+    --glow-accent: 232 78% 56%;
+    --rating: 38 82% 48%;
+    --gradient-primary: linear-gradient(115deg, hsl(227 86% 52%) 0%, hsl(227 96% 60%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(227 86% 52%) 0%, hsl(232 78% 56%) 100%);
+    --glass-background: hsl(0 0% 100%);
+    --glass-border: hsl(222 24% 88%);
+    --elevation-1: 0 1px 0 hsl(224 40% 40% / 0.06), 0 1px 2px hsl(224 40% 40% / 0.08);
+    --elevation-2: 0 2px 6px hsl(224 40% 40% / 0.08), 0 12px 32px -16px hsl(224 40% 40% / 0.22);
+    --elevation-3: 0 4px 12px hsl(224 40% 40% / 0.1), 0 20px 48px -20px hsl(224 40% 40% / 0.26);
   }
 
+  /* Explicit dark mirrors :root */
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 330 100% 60%;
+    --background: 228 8% 9%;
+    --foreground: 228 13% 92%;
+    --card: 228 8% 13%;
+    --card-foreground: 228 13% 92%;
+    --popover: 228 8% 16%;
+    --popover-foreground: 228 13% 92%;
+    --surface-1: 228 8% 13%;
+    --surface-2: 228 8% 16%;
+    --surface-3: 228 8% 20%;
+    --primary: 227 88% 56%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 270 75% 60%;
+    --secondary: 152 46% 45%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 240 10% 15%;
-    --muted-foreground: 240 5% 60%;
-    --accent: 270 100% 65%;
+    --muted: 228 7% 17%;
+    --muted-foreground: 228 6% 58%;
+    --accent: 227 100% 62%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 358 72% 58%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 10% 15%;
-    --input: 240 10% 15%;
-    --ring: 330 100% 60%;
-
-    --neon-pink: 330 100% 60%;
-    --neon-purple: 270 100% 65%;
-    --neon-blue: 210 100% 60%;
-    --gradient-start: 330 100% 60%;
-    --gradient-end: 270 100% 65%;
-
-    /* Sidebar dark */
-    --sidebar-background: 240 10% 5%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 330 100% 60%;
+    --border: 228 7% 21%;
+    --input: 228 7% 18%;
+    --ring: 227 88% 56%;
+    --dynamic-primary: 227 88% 56%;
+    --dynamic-soft: 227 60% 24%;
+    --neon-pink: 227 100% 62%;
+    --neon-purple: 232 80% 64%;
+    --neon-blue: 227 88% 56%;
+    --gradient-start: 227 88% 56%;
+    --gradient-end: 227 100% 68%;
+    --sidebar-background: 228 8% 11%;
+    --sidebar-foreground: 228 10% 78%;
+    --sidebar-primary: 227 88% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 12%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 10% 15%;
-    --sidebar-ring: 330 100% 60%;
-
-    --glow-primary: 330 100% 60%;
-    --glow-secondary: 270 100% 65%;
-    --glow-accent: 240 10% 25%;
-
-    /* Dark mode glass */
-    --glass-background: hsla(240, 10%, 12%, 0.6);
-    --glass-border: hsla(0, 0%, 98%, 0.08);
-
-    --gradient-primary: linear-gradient(135deg, hsl(330, 100%, 60%) 0%, hsl(270, 100%, 65%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(330, 100%, 60%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(270, 100%, 65%) 0%, hsl(240, 10%, 25%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(240, 10%, 6%) 0%, hsl(240, 10%, 3.9%) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(330, 100%, 60%, 0.15) 0%, transparent 70%);
+    --sidebar-accent: 228 8% 16%;
+    --sidebar-accent-foreground: 228 13% 92%;
+    --sidebar-border: 228 7% 19%;
+    --sidebar-ring: 227 88% 56%;
+    --glow-primary: 227 88% 56%;
+    --glow-secondary: 227 100% 62%;
+    --glow-accent: 232 80% 64%;
+    --rating: 38 85% 56%;
+    --gradient-primary: linear-gradient(115deg, hsl(227 88% 56%) 0%, hsl(227 100% 64%) 60%, hsl(232 90% 70%) 100%);
+    --gradient-secondary: linear-gradient(115deg, hsl(227 88% 56%) 0%, hsl(232 80% 64%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(227 100% 62%) 0%, hsl(227 88% 56%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(228 8% 13%) 0%, hsl(228 8% 9%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(227 88% 56% / 0.18) 0%, transparent 70%);
+    --glass-background: hsl(228 8% 13%);
+    --glass-border: hsl(228 7% 21%);
+    --elevation-1: 0 1px 0 hsl(0 0% 0% / 0.3), 0 1px 2px hsl(0 0% 0% / 0.3);
+    --elevation-2: 0 2px 6px hsl(0 0% 0% / 0.35), 0 8px 24px -12px hsl(0 0% 0% / 0.5);
+    --elevation-3: 0 4px 12px hsl(0 0% 0% / 0.4), 0 18px 48px -18px hsl(0 0% 0% / 0.6);
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    @apply bg-background;
-  }
-
+  /* Custom scrollbar — thin, pro */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { @apply bg-background; }
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted rounded-full;
+    @apply bg-muted rounded;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/40; }
 
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/30;
-  }
-
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
 
 @layer components {
-  /* Glass card effect */
+  /* PANEL — a pro tonal panel (replaces glass) under the same name */
   .glass-card {
     background: var(--glass-background);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--glass-border);
+    box-shadow: var(--elevation-1);
   }
 
-  /* Glow effects */
-  .glow-primary {
-    box-shadow: 0 0 30px -5px hsl(var(--glow-primary) / 0.4);
-  }
+  .surface-1 { background: hsl(var(--surface-1)); box-shadow: var(--elevation-1); }
+  .surface-2 { background: hsl(var(--surface-2)); box-shadow: var(--elevation-1); }
+  .surface-3 { background: hsl(var(--surface-3)); box-shadow: var(--elevation-2); }
 
-  .glow-secondary {
-    box-shadow: 0 0 30px -5px hsl(var(--glow-secondary) / 0.4);
-  }
+  /* Image frame — a thin keyline like a Lightroom cell */
+  .plate { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); }
+  .plate-keyline { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / 0.06); }
 
-  .glow-accent {
-    box-shadow: 0 0 30px -5px hsl(var(--glow-accent) / 0.4);
-  }
+  .glow-primary { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.5), 0 0 24px -6px hsl(var(--primary) / 0.5); }
+  .glow-secondary { box-shadow: 0 0 24px -6px hsl(var(--glow-secondary) / 0.5); }
+  .glow-accent { box-shadow: 0 0 24px -6px hsl(var(--glow-accent) / 0.5); }
 
-  /* Text gradients */
+  /* AI text (royal-blue gradient) */
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[hsl(var(--gradient-start))] to-[hsl(var(--gradient-end))];
   }
-
   .text-gradient-primary {
     background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
-
   .text-gradient-secondary {
     background: var(--gradient-secondary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
 
-  /* Background patterns */
   .bg-grid-pattern {
     background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
+      linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
     background-size: 40px 40px;
   }
-
   .bg-dots-pattern {
-    background-image: radial-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image: radial-gradient(hsl(var(--border) / 0.6) 1px, transparent 1px);
+    background-size: 22px 22px;
   }
 
-  /* Gradient borders */
-  .gradient-border {
-    position: relative;
-  }
-
+  /* Royal-blue keyline border (AI) */
+  .gradient-border { position: relative; }
   .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    padding: 1px;
-    border-radius: inherit;
+    content: ''; position: absolute; inset: 0; padding: 1px; border-radius: inherit;
     background: var(--gradient-primary);
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
+    -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+  }
+
+  .dynamic-tint {
+    background:
+      linear-gradient(180deg, hsl(var(--dynamic-primary) / 0.10), transparent 45%),
+      hsl(var(--card));
+  }
+
+  /* Mono micro caption / readout (the instrument labels) */
+  .caption {
+    font-family: 'Roboto Mono', ui-monospace, monospace;
+    font-size: 0.6875rem; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+  .folio {
+    font-variant-numeric: lining-nums tabular-nums;
+    font-weight: 700; letter-spacing: -0.02em;
   }
 }
 
 @layer utilities {
-  /* Animation utilities */
-  .animate-gradient {
-    background-size: 200% 200%;
-    animation: gradient-shift 3s ease infinite;
-  }
-
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
-
-  /* Glow effects (matches imagick-web) */
-  .glow-pink {
-    box-shadow: 0 4px 20px hsl(330 85% 50% / 0.2), 0 8px 40px hsl(330 85% 50% / 0.1);
-  }
-
-  .dark .glow-pink {
-    box-shadow: 0 0 40px hsl(330 100% 60% / 0.3), 0 0 80px hsl(330 100% 60% / 0.1);
-  }
-
-  /* Glow text effect (matches imagick-web) */
-  .glow-text {
-    text-shadow: 0 2px 10px hsl(330 85% 50% / 0.3);
-  }
-
-  .dark .glow-text {
-    text-shadow: 0 0 30px hsl(330 100% 60% / 0.5);
-  }
+  .animate-gradient { background-size: 200% 200%; animation: gradient-shift 4s ease infinite; }
+  .animate-pulse-glow { animation: pulse-glow 2.4s ease-in-out infinite; }
+  .animate-float { animation: float 5s ease-in-out infinite; }
+  .glow-pink { box-shadow: 0 0 24px -8px hsl(var(--glow-primary) / 0.5); }
+  .dark .glow-pink { box-shadow: 0 0 28px -8px hsl(var(--glow-primary) / 0.55); }
+  .glow-text { text-shadow: 0 0 18px hsl(var(--glow-primary) / 0.35); }
+  .dark .glow-text { text-shadow: 0 0 22px hsl(var(--glow-primary) / 0.45); }
 }
 
 /* Keyframes */
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px hsl(330 100% 60% / 0.3);
-  }
-  50% {
-    box-shadow: 0 0 40px hsl(330 100% 60% / 0.5);
-  }
-}
+@keyframes pulse-glow { 0%,100% { box-shadow: 0 0 0 1px hsl(var(--primary)/0.4); } 50% { box-shadow: 0 0 22px -4px hsl(var(--primary)/0.6); } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes gradient-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes shake { 0%,100%{transform:translateX(0)} 10%,30%,50%,70%,90%{transform:translateX(-2px)} 20%,40%,60%,80%{transform:translateX(2px)} }
+@keyframes neon-pulse { 0%,100%{box-shadow:0 0 6px hsl(var(--primary)/0.5)} 50%{box-shadow:0 0 18px hsl(var(--primary)/0.8)} }
+.animate-neon-pulse { animation: neon-pulse 1.6s ease-in-out infinite; }
 
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
-  20%, 40%, 60%, 80% { transform: translateX(2px); }
-}
-
-@keyframes neon-pulse {
-  0%, 100% {
-    box-shadow: 0 0 6px hsl(var(--primary) / 0.6);
-  }
-  50% {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.9), 0 0 40px hsl(var(--primary) / 0.3);
-  }
-}
-
-.animate-neon-pulse {
-  animation: neon-pulse 1.5s ease-in-out infinite;
-}
-
-/* ── Uppy Dashboard — imagick.ai theming ──────────────────────────────
- * Match the rest of the app's pink-on-dark visual language:
- *   - rounded-xl (12px) outer corners, like our cards
- *   - dashed pink border at 30% opacity, like our previous custom
- *     drop zone
- *   - pink accents on buttons / progress / focus rings
- *   - full-width grid (Uppy's default leaves a gap on wide screens)
- */
-.imagick-uppy-dashboard .uppy-Dashboard {
-  width: 100% !important;
-}
+/* ── Uppy Dashboard — Lightroom theming (drives off --primary = blue) ── */
+.imagick-uppy-dashboard .uppy-Dashboard { width: 100% !important; }
 .imagick-uppy-dashboard .uppy-Dashboard-inner {
-  max-width: 100% !important;
-  width: 100% !important;
-  border-radius: 12px !important;
-  border: 2px dashed hsl(330 100% 60% / 0.30) !important;
-  background: hsl(330 100% 60% / 0.04) !important;
+  max-width: 100% !important; width: 100% !important;
+  border-radius: 6px !important;
+  border: 1px dashed hsl(var(--primary) / 0.4) !important;
+  background: hsl(var(--primary) / 0.04) !important;
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 .imagick-uppy-dashboard .uppy-Dashboard-inner:hover,
 .imagick-uppy-dashboard .uppy-Dashboard--isDraggingOver .uppy-Dashboard-inner {
-  border-color: hsl(330 100% 60% / 0.60) !important;
-  background: hsl(330 100% 60% / 0.08) !important;
+  border-color: hsl(var(--primary) / 0.7) !important;
+  background: hsl(var(--primary) / 0.08) !important;
 }
-
-/* Solid pink primary buttons (browse files, retry-all, etc.) */
 .imagick-uppy-dashboard .uppy-c-btn-primary,
 .imagick-uppy-dashboard .uppy-DashboardContent-addMore {
-  background-color: hsl(330 100% 60%) !important;
-  color: white !important;
-  border-radius: 8px !important;
+  background-color: hsl(var(--primary)) !important; color: white !important; border-radius: 6px !important;
 }
 .imagick-uppy-dashboard .uppy-c-btn-primary:hover,
-.imagick-uppy-dashboard .uppy-DashboardContent-addMore:hover {
-  background-color: hsl(330 100% 55%) !important;
-}
-
-/* Pink focus rings everywhere */
-.imagick-uppy-dashboard *:focus-visible {
-  outline-color: hsl(330 100% 60%) !important;
-}
-
-/* Status bar — dark muted background (matches our card bg), with the
- * progress fill itself in pink. Previously we coloured BOTH the bar
- * background and the fill, which produced a jarring solid-pink slab. */
+.imagick-uppy-dashboard .uppy-DashboardContent-addMore:hover { background-color: hsl(var(--primary) / 0.9) !important; }
+.imagick-uppy-dashboard *:focus-visible { outline-color: hsl(var(--primary)) !important; }
 .imagick-uppy-dashboard .uppy-StatusBar {
-  background-color: hsl(0 0% 100% / 0.04) !important;
-  color: hsl(0 0% 100% / 0.85) !important;
-  border-top: 1px solid hsl(0 0% 100% / 0.06) !important;
+  background-color: hsl(var(--surface-2)) !important; color: hsl(var(--foreground) / 0.85) !important;
+  border-top: 1px solid hsl(var(--border)) !important;
 }
-.imagick-uppy-dashboard .uppy-StatusBar.is-uploading {
-  background-color: hsl(0 0% 100% / 0.04) !important;
-}
-.imagick-uppy-dashboard .uppy-StatusBar-progress {
-  background-color: hsl(330 100% 60%) !important;
-  height: 3px !important;
-  opacity: 1 !important;
-}
-/* The faint "track" line behind the progress fill */
-.imagick-uppy-dashboard .uppy-StatusBar:not(.is-error)
-  .uppy-StatusBar-progress.is-indeterminate {
-  background-image: linear-gradient(
-    45deg,
-    hsl(330 100% 60% / 0.6) 25%,
-    transparent 25%,
-    transparent 50%,
-    hsl(330 100% 60% / 0.6) 50%,
-    hsl(330 100% 60% / 0.6) 75%,
-    transparent 75%,
-    transparent
-  ) !important;
-}
-
-/* Per-file thumbnail tiles — slightly rounded to match our cards */
-.imagick-uppy-dashboard .uppy-Dashboard-Item {
-  border-radius: 10px !important;
-}
-
-/* "browse files" text link inside the empty drop zone — Uppy uses
- * its own blue here. Force it to our pink. Same for any other link
- * rendered by Dashboard / StatusBar plugins. */
+.imagick-uppy-dashboard .uppy-StatusBar.is-uploading { background-color: hsl(var(--surface-2)) !important; }
+.imagick-uppy-dashboard .uppy-StatusBar-progress { background-color: hsl(var(--primary)) !important; height: 3px !important; opacity: 1 !important; }
+.imagick-uppy-dashboard .uppy-Dashboard-Item { border-radius: 4px !important; }
 .imagick-uppy-dashboard .uppy-Dashboard-browse,
 .imagick-uppy-dashboard .uppy-Dashboard-AddFiles a,
 .imagick-uppy-dashboard a.uppy-c-btn-link,
 .imagick-uppy-dashboard .uppy-StatusBar-actionBtn--retry,
 .imagick-uppy-dashboard .uppy-StatusBar-actionBtn--upload,
-.imagick-uppy-dashboard .uppy-c-btn-link {
-  color: hsl(330 100% 60%) !important;
-}
-.imagick-uppy-dashboard .uppy-Dashboard-browse:hover,
-.imagick-uppy-dashboard .uppy-Dashboard-AddFiles a:hover,
-.imagick-uppy-dashboard .uppy-c-btn-link:hover {
-  color: hsl(330 100% 70%) !important;
-}
+.imagick-uppy-dashboard .uppy-c-btn-link { color: hsl(var(--primary)) !important; }
+.imagick-uppy-dashboard { --uppy-c-blue: hsl(var(--primary)); --uppy-c-cornflower-blue: hsl(var(--primary)); }
+.light .imagick-uppy-dashboard .uppy-StatusBar { color: hsl(var(--foreground)) !important; }
 
-/* Override Uppy's --uppy-c-blue (used in many internal accents) so
- * any element we didn't explicitly target still picks up our pink. */
-.imagick-uppy-dashboard {
-  --uppy-c-blue: hsl(330 100% 60%);
-  --uppy-c-cornflower-blue: hsl(330 100% 60%);
-}
-
-/* ── Light-mode contrast fixes ─────────────────────────────────────
- * The rules above were written when the app was dark-only. They
- * paint white-on-translucent for the status bar and let Uppy's own
- * "shy" / secondary text (the "Drop files here or" line, the file
- * count, the upload-speed readout) inherit Uppy's grey defaults.
- * On a white app background those become unreadable. Re-target the
- * same elements with dark ink when html.light is active. */
-.light .imagick-uppy-dashboard .uppy-StatusBar {
-  background-color: hsl(0 0% 0% / 0.04) !important;
-  color: hsl(240 10% 15%) !important;
-  border-top-color: hsl(0 0% 0% / 0.08) !important;
-}
-.light .imagick-uppy-dashboard .uppy-StatusBar.is-uploading {
-  background-color: hsl(0 0% 0% / 0.04) !important;
-}
-.light .imagick-uppy-dashboard .uppy-Dashboard-AddFiles-title,
-.light .imagick-uppy-dashboard .uppy-Dashboard-Item-name,
-.light .imagick-uppy-dashboard .uppy-Dashboard-Item-status,
-.light .imagick-uppy-dashboard .uppy-StatusBar-content,
-.light .imagick-uppy-dashboard .uppy-StatusBar-statusPrimary,
-.light .imagick-uppy-dashboard .uppy-StatusBar-statusSecondary,
-.light .imagick-uppy-dashboard .uppy-Dashboard-note {
-  color: hsl(240 10% 15%) !important;
-}
-
-/* ── Gallery thumbnail shimmer ────────────────────────────────────────
- * Subtle animated gradient on placeholder tiles so the user sees
- * "loading" motion while scrolling fast, instead of a dead grid of
- * gray squares. Cheap — one keyframe, runs on the GPU compositor.
- */
+/* ── Gallery thumbnail shimmer ──────────────────────────────────────── */
 .thumbnail-shimmer {
-  /* In dark mode the underlying card is near-black, so a faint white
-   * highlight reads as a shimmer. In light mode the underlying card
-   * is near-white, so the *same* white highlight is invisible — and
-   * stuck/empty tiles looked like blank squares. Re-targeted via
-   * html.light below. */
-  background-image: linear-gradient(
-    105deg,
-    hsl(0 0% 100% / 0.02) 0%,
-    hsl(0 0% 100% / 0.06) 50%,
-    hsl(0 0% 100% / 0.02) 100%
-  );
-  background-size: 200% 100%;
-  animation: thumbnail-shimmer 1.4s ease-in-out infinite;
+  background-image: linear-gradient(105deg, hsl(0 0% 100% / 0.02) 0%, hsl(0 0% 100% / 0.06) 50%, hsl(0 0% 100% / 0.02) 100%);
+  background-size: 200% 100%; animation: thumbnail-shimmer 1.4s ease-in-out infinite;
 }
 .light .thumbnail-shimmer {
-  background-image: linear-gradient(
-    105deg,
-    hsl(0 0% 0% / 0.04) 0%,
-    hsl(0 0% 0% / 0.10) 50%,
-    hsl(0 0% 0% / 0.04) 100%
-  );
+  background-image: linear-gradient(105deg, hsl(224 40% 30% / 0.04) 0%, hsl(224 40% 30% / 0.1) 50%, hsl(224 40% 30% / 0.04) 100%);
 }
+@keyframes thumbnail-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-@keyframes thumbnail-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* Three-dot "thinking" indicator used by ImageCard while an upload is
- * still being processed (queued, AI-scored, thumbnail being generated).
- * Cheap — opacity/scale on three spans, one keyframe, runs in compositor. */
+/* Three-dot "thinking" — royal blue */
 .thinking-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background-color: hsl(330 100% 60%);
-  display: inline-block;
-  opacity: 0.3;
-  animation: thinking-dot 1.2s ease-in-out infinite;
+  width: 6px; height: 6px; border-radius: 9999px; background-color: hsl(var(--primary));
+  display: inline-block; opacity: 0.3; animation: thinking-dot 1.2s ease-in-out infinite;
 }
 .thinking-dot-1 { animation-delay: 0s; }
 .thinking-dot-2 { animation-delay: 0.16s; }
 .thinking-dot-3 { animation-delay: 0.32s; }
+@keyframes thinking-dot { 0%,80%,100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
 
-@keyframes thinking-dot {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40%          { opacity: 1;   transform: scale(1); }
+/* ════════════════════════════════════════════════════════════════════
+   Aura AI kit — royal-blue "engine" mark (the sparkle). Same class names
+   so every call-site inherits it. The AI glows brand-blue, precisely.
+   ════════════════════════════════════════════════════════════════════ */
+
+@property --aura-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+
+:where(.aura-ai-border, .aura-orb, .aura-gauge, .aura-chip) { position: relative; }
+
+/* AI frame — royal-blue rotating keyline + soft blue bloom */
+.aura-ai-border::before {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px;
+  background: conic-gradient(from var(--aura-angle), hsl(var(--primary)), hsl(var(--accent)), hsl(227 90% 72%), hsl(var(--primary)));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
 }
+.aura-ai-border::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit;
+  background: hsl(var(--primary)); filter: blur(16px); opacity: 0.16; z-index: -1; pointer-events: none;
+}
+
+/* The Aura mark — a royal-blue luminous core (pairs with the sparkle SVG) */
+.aura-orb { border-radius: 9999px; }
+.aura-orb-halo {
+  position: absolute; inset: -30%; border-radius: 9999px;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.5), hsl(var(--accent) / 0.16) 55%, transparent 72%);
+  filter: blur(5px);
+}
+.aura-orb-ring {
+  position: absolute; inset: 0; border-radius: 9999px;
+  background: conic-gradient(from 0deg, hsl(var(--accent)), hsl(var(--primary)), hsl(227 90% 72%), transparent 78%, hsl(var(--accent)));
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3px), black calc(100% - 2px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 3px), black calc(100% - 2px));
+}
+.aura-orb-core {
+  position: absolute; inset: 26%; border-radius: 9999px;
+  background: radial-gradient(circle at 36% 30%, hsl(0 0% 100% / 0.95), hsl(var(--accent) / 0.95) 40%, hsl(var(--primary)) 100%);
+}
+
+/* Telemetry chip → mono readout chip */
+.aura-chip {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.25rem 0.6rem; border-radius: 4px;
+  border: 1px solid hsl(var(--border)); background: hsl(var(--surface-2));
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.625rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+  white-space: nowrap; color: hsl(var(--muted-foreground));
+}
+.aura-led {
+  width: 6px; height: 6px; border-radius: 9999px; display: inline-block; flex-shrink: 0;
+  background: hsl(var(--led, var(--primary))); box-shadow: 0 0 8px hsl(var(--led, var(--primary)) / 0.8);
+}
+
+/* Ring gauge — blue arc */
+.aura-gauge {
+  border-radius: 9999px;
+  background: conic-gradient(from -90deg, hsl(var(--accent)) 0deg, hsl(var(--primary)) calc(var(--gauge, 70) * 3.6deg), hsl(var(--border)) calc(var(--gauge, 70) * 3.6deg));
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 5px), black calc(100% - 4px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 5px), black calc(100% - 4px));
+}
+
+.aura-microlabel {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.625rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.aura-hairline { height: 1px; border: none; background: hsl(var(--border)); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .aura-ai-border::before { animation: aura-spin-angle 6s linear infinite; }
+  .aura-orb-ring { animation: aura-rotate 7s linear infinite; }
+  .aura-orb-core { animation: aura-breathe 3.6s ease-in-out infinite; }
+  .aura-orb-halo { animation: aura-breathe 3.6s ease-in-out infinite reverse; }
+  .aura-led-pulse { animation: aura-led 2.2s ease-in-out infinite; }
+}
+@keyframes aura-spin-angle { to { --aura-angle: 360deg; } }
+@keyframes aura-rotate { to { transform: rotate(360deg); } }
+@keyframes aura-breathe { 0%,100% { opacity: 0.85; transform: scale(0.96); } 50% { opacity: 1; transform: scale(1.05); } }
+@keyframes aura-led { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }

@@ -19,25 +19,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 import { formatDistanceToNow, format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 // ─── Stage config ─────────────────────────────────────────────────────────────
 
 const STAGE_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | null; color: string }> = {
   new:        { label: "New",        variant: "outline",     color: "text-muted-foreground" },
-  onboarding: { label: "Onboarding", variant: "secondary",   color: "text-blue-400" },
-  exploring:  { label: "Exploring",  variant: "secondary",   color: "text-cyan-400" },
-  engaged:    { label: "Engaged",    variant: "secondary",   color: "text-green-400" },
-  converting: { label: "Converting", variant: "default",     color: "text-yellow-400" },
+  onboarding: { label: "Onboarding", variant: "secondary",   color: "text-accent" },
+  exploring:  { label: "Exploring",  variant: "secondary",   color: "text-accent" },
+  engaged:    { label: "Engaged",    variant: "secondary",   color: "text-secondary" },
+  converting: { label: "Converting", variant: "default",     color: "text-[hsl(var(--rating))]" },
   paying:     { label: "Paying",     variant: "default",     color: "text-primary" },
-  at_risk:    { label: "At Risk",    variant: "destructive", color: "text-orange-400" },
+  at_risk:    { label: "At Risk",    variant: "destructive", color: "text-[hsl(var(--rating))]" },
   churned:    { label: "Churned",    variant: "destructive", color: "text-destructive" },
 };
 
 const STAGE_OPTIONS = ["all", ...Object.keys(STAGE_CONFIG)];
 
 const ENROLLMENT_STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
-  active:    { label: "Pending",   icon: Clock,       color: "text-yellow-400" },
-  completed: { label: "Completed", icon: CheckCircle, color: "text-green-400" },
+  active:    { label: "Pending",   icon: Clock,       color: "text-[hsl(var(--rating))]" },
+  completed: { label: "Completed", icon: CheckCircle, color: "text-secondary" },
   cancelled: { label: "Cancelled", icon: Ban,         color: "text-muted-foreground" },
 };
 
@@ -77,13 +78,13 @@ interface Enrollment {
 // ─── Score bar ────────────────────────────────────────────────────────────────
 
 function ScoreBar({ score }: { score: number }) {
-  const color = score >= 70 ? "from-green-500 to-green-400" : score >= 40 ? "from-yellow-500 to-yellow-400" : "from-muted to-muted-foreground";
+  const color = score >= 70 ? "bg-secondary" : score >= 40 ? "bg-[hsl(var(--rating))]" : "bg-muted-foreground";
   return (
     <div className="flex items-center gap-2">
       <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full bg-gradient-to-r ${color}`} style={{ width: `${score}%` }} />
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${score}%` }} />
       </div>
-      <span className="text-xs font-mono text-muted-foreground">{score}</span>
+      <span className="folio text-xs text-muted-foreground">{score}</span>
     </div>
   );
 }
@@ -188,7 +189,7 @@ export default function CustomerJourneyPage() {
   const isLoading = profilesLoading || usersLoading;
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="min-h-full bg-background p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -196,13 +197,14 @@ export default function CustomerJourneyPage() {
             <Link to="/dashboard/admin"><ArrowLeft className="w-4 h-4 mr-1" />Admin</Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-primary" />Customer Journey
+            <span className="caption">Lifecycle</span>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-accent" />Customer Journey
             </h1>
             <p className="text-sm text-muted-foreground">Lifecycle stages, conversion scores & automated emails</p>
           </div>
         </div>
-        <Badge variant="outline" className="gap-1.5 text-xs">
+        <Badge variant="outline" className="gap-1.5 text-xs border-border text-muted-foreground">
           <Clock className="w-3 h-3" />
           Automated — runs every hour
         </Badge>
@@ -211,20 +213,20 @@ export default function CustomerJourneyPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Tracked", value: profiles?.length ?? 0, icon: Users, color: "text-primary", bg: "bg-primary/10" },
+          { label: "Total Tracked", value: profiles?.length ?? 0, icon: Users, color: "text-foreground", bg: "bg-muted" },
           { label: "Paying Customers", value: payingCount, icon: UserCheck, color: "text-primary", bg: "bg-primary/10" },
-          { label: "At Risk", value: atRiskCount, icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-500/10" },
-          { label: "Pending Emails", value: activeEnrollments, icon: Mail, color: "text-yellow-400", bg: "bg-yellow-500/10" },
+          { label: "At Risk", value: atRiskCount, icon: AlertTriangle, color: "text-[hsl(var(--rating))]", bg: "bg-[hsl(var(--rating))]/10" },
+          { label: "Pending Emails", value: activeEnrollments, icon: Mail, color: "text-accent", bg: "bg-accent/10" },
         ].map(({ label, value, icon: Icon, color, bg }, i) => (
           <motion.div key={label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-            <Card className="glass-card border-border/50">
+            <Card className="glass-card rounded-[--radius] border-border">
               <CardContent className="pt-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">{label}</p>
-                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                    <p className="caption">{label}</p>
+                    <p className={`folio text-3xl mt-1 ${color}`}>{value}</p>
                   </div>
-                  <div className={`p-3 rounded-xl ${bg}`}><Icon className={`w-5 h-5 ${color}`} /></div>
+                  <div className={`p-3 rounded-[--radius] ${bg}`}><Icon className={`w-5 h-5 ${color}`} /></div>
                 </div>
               </CardContent>
             </Card>
@@ -240,8 +242,8 @@ export default function CustomerJourneyPage() {
         </TabsList>
 
         <TabsContent value="users">
-          <Card className="glass-card border-border/50">
-            <CardHeader className="pb-3">
+          <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
+            <CardHeader className="border-b border-border bg-background/40 p-3">
               <div className="flex gap-3 flex-wrap">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -264,14 +266,14 @@ export default function CustomerJourneyPage() {
                 <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Stage</TableHead>
-                      <TableHead>Score</TableHead>
-                      <TableHead>Galleries</TableHead>
-                      <TableHead>Last Active</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="caption">User</TableHead>
+                      <TableHead className="caption">Stage</TableHead>
+                      <TableHead className="caption">Score</TableHead>
+                      <TableHead className="caption">Galleries</TableHead>
+                      <TableHead className="caption">Last Active</TableHead>
+                      <TableHead className="caption">Plan</TableHead>
+                      <TableHead className="caption text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -280,22 +282,22 @@ export default function CustomerJourneyPage() {
                     ) : rows.map((row) => {
                       const stageConf = STAGE_CONFIG[row.lifecycle_stage] ?? { label: row.lifecycle_stage, variant: "outline" as const };
                       return (
-                        <TableRow key={row.user_id}>
+                        <TableRow key={row.user_id} className="border-border">
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="text-sm font-medium">{row.user?.user_metadata?.full_name ?? "—"}</span>
                               <span className="text-xs text-muted-foreground">{row.user?.email ?? row.user_id}</span>
                             </div>
                           </TableCell>
-                          <TableCell><Badge variant={stageConf.variant as any}>{stageConf.label}</Badge></TableCell>
+                          <TableCell><Badge variant={stageConf.variant as any} className={cn(stageConf.variant === "outline" && "border-border text-muted-foreground")}>{stageConf.label}</Badge></TableCell>
                           <TableCell><ScoreBar score={row.conversion_score} /></TableCell>
-                          <TableCell><span className="text-sm">{row.gallery_count}</span></TableCell>
+                          <TableCell><span className="folio text-sm">{row.gallery_count}</span></TableCell>
                           <TableCell>
                             <span className="text-xs text-muted-foreground">
                               {row.last_active_at ? formatDistanceToNow(new Date(row.last_active_at), { addSuffix: true }) : "Never"}
                             </span>
                           </TableCell>
-                          <TableCell><Badge variant={row.is_paid ? "default" : "outline"}>{row.is_paid ? "Paid" : "Free"}</Badge></TableCell>
+                          <TableCell><Badge variant={row.is_paid ? "default" : "outline"} className={cn(!row.is_paid && "border-border text-muted-foreground")}>{row.is_paid ? "Paid" : "Free"}</Badge></TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" onClick={() => navigate(`/dashboard/admin/users/${row.user_id}`)}>View</Button>
                           </TableCell>
@@ -311,7 +313,7 @@ export default function CustomerJourneyPage() {
         </TabsContent>
 
         <TabsContent value="emails">
-          <Card className="glass-card border-border/50">
+          <Card className="glass-card overflow-hidden rounded-[--radius] border-border p-0">
             <CardContent className="p-0">
               {enrollmentsLoading ? (
                 <div className="flex items-center justify-center py-12"><RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" /></div>
@@ -320,12 +322,12 @@ export default function CustomerJourneyPage() {
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Current Step</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Next Send</TableHead>
-                      <TableHead>Enrolled</TableHead>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="caption">User</TableHead>
+                      <TableHead className="caption">Current Step</TableHead>
+                      <TableHead className="caption">Status</TableHead>
+                      <TableHead className="caption">Next Send</TableHead>
+                      <TableHead className="caption">Enrolled</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -334,7 +336,7 @@ export default function CustomerJourneyPage() {
                       const statusConf = ENROLLMENT_STATUS_CONFIG[enrollment.status] ?? { label: enrollment.status, icon: Clock, color: "text-muted-foreground" };
                       const StatusIcon = statusConf.icon;
                       return (
-                        <TableRow key={enrollment.id}>
+                        <TableRow key={enrollment.id} className="border-border">
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="text-sm font-medium">{user?.user_metadata?.full_name ?? "—"}</span>
@@ -345,7 +347,7 @@ export default function CustomerJourneyPage() {
                             <span className="text-sm">{getStepLabel(enrollment.sequence_id, enrollment.current_step)}</span>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={`gap-1 ${statusConf.color}`}>
+                            <Badge variant="outline" className={`gap-1 border-border ${statusConf.color}`}>
                               <StatusIcon className="w-3 h-3" />
                               {statusConf.label}
                             </Badge>
