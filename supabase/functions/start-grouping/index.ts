@@ -61,7 +61,7 @@ serve(async (req: Request) => {
     // Verify gallery ownership
     const { data: gallery, error: galleryError } = await supabaseAdmin
       .from("galleries")
-      .select("id, user_id, status")
+      .select("id, user_id, status, culling_status, culling_started_at")
       .eq("id", galleryId)
       .eq("user_id", userId)
       .single();
@@ -72,6 +72,37 @@ serve(async (req: Request) => {
         JSON.stringify({ error: "Gallery not found or unauthorized" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Guard against duplicate runs. While a run is genuinely in flight we
+    // reject a second request so two tabs / a double-click can't fire
+    // overlapping jobs that overwrite each other's ratings. We only allow
+    // a restart once the run is "stuck" — past its whole expected window
+    // (5 min + 10s/photo, mirroring src/lib/cullingEta.ts) with no result.
+    if (gallery.culling_status === "processing" && gallery.culling_started_at) {
+      const { count: imageCount } = await supabaseAdmin
+        .from("gallery_images")
+        .select("id", { count: "exact", head: true })
+        .eq("gallery_id", galleryId)
+        .neq("status", "deleted");
+
+      const BASE_CULLING_MS = 5 * 60 * 1000;
+      const MS_PER_IMAGE = 10 * 1000;
+      const expectedWindowMs = BASE_CULLING_MS + (imageCount ?? 0) * MS_PER_IMAGE;
+      const elapsedMs = Date.now() - new Date(gallery.culling_started_at).getTime();
+
+      if (elapsedMs <= expectedWindowMs) {
+        console.log(
+          `Rejecting duplicate culling for ${galleryId}: ${Math.round(elapsedMs / 1000)}s elapsed of ~${Math.round(expectedWindowMs / 1000)}s window`,
+        );
+        return new Response(
+          JSON.stringify({
+            error: "AI Culling is already in progress for this gallery.",
+            code: "culling_in_progress",
+          }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     // Update gallery culling status to processing, store labels, and record start time
