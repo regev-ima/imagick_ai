@@ -194,7 +194,10 @@ export default function CreateConceptChat() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={currentNote ?? "Type your answer…"}
                 aria-label="Message Aura"
-                className="h-11 flex-1 rounded-full border border-border bg-surface-2 px-4 text-sm outline-none transition-colors focus:border-primary/50"
+                /* text-base (16px) on mobile stops iOS Safari auto-zooming on focus
+                   (which otherwise shoves the Send button off-screen); min-w-0 lets
+                   the flex input shrink so the button never overflows the row. */
+                className="h-11 min-w-0 flex-1 rounded-full border border-border bg-surface-2 px-4 text-base outline-none transition-colors focus:border-primary/50 sm:text-sm"
               />
               <Button type="submit" variant="glow" size="icon" className="h-11 w-11 shrink-0" aria-label="Send">
                 <Send className="h-4 w-4" />
