@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Clock, Zap, UploadCloud } from "lucide-react";
+import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Zap, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
@@ -73,8 +73,10 @@ export default function CreateConceptCanvas() {
   };
 
   const style = styles.find((s) => s.id === styleId) ?? null;
-  const editCount = useMemo(() => (cull ? Math.round(photos * 0.25) : photos), [cull, photos]);
-  const ready = useMemo(() => Math.max(1, Math.round(editCount / 600)), [editCount]);
+  // Exact figures only — edits consumed = photos × looks (matches the real
+  // wizard's editsNeeded). No fabricated keepers/timing estimates.
+  const stylesCount = styleId ? 1 : 0;
+  const editsNeeded = useMemo(() => photos * stylesCount, [photos, stylesCount]);
   const complete = name.trim().length > 0 && photos > 0 && !!type;
 
   const onCreate = () => {
@@ -209,7 +211,7 @@ export default function CreateConceptCanvas() {
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-semibold">Cull first {cull ? "· on" : "· off"}</div>
-                  <div className="caption">{cull ? `Edit only the ~${editCount.toLocaleString()} keepers Aura picks` : "Edit every photo in the shoot"}</div>
+                  <div className="caption">{cull ? "Aura ranks every frame and surfaces the keepers first" : "Edit every photo in the shoot"}</div>
                 </div>
                 <span className={`h-6 w-11 rounded-full p-0.5 transition-colors ${cull ? "bg-primary" : "bg-muted"}`}>
                   <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cull ? "auto" : 0 }} />
@@ -241,12 +243,11 @@ export default function CreateConceptCanvas() {
               <hr className="aura-hairline my-4" />
 
               <div className="grid grid-cols-2 gap-3">
-                <Stat icon={<Images className="h-3.5 w-3.5" />} label="To edit" value={photos ? editCount.toLocaleString() : "—"} />
-                <Stat icon={<Clock className="h-3.5 w-3.5" />} label="Ready in" value={photos ? `~${ready}h` : "—"} />
+                <Stat icon={<Sparkle size={13} />} label="Edits to use" value={editsNeeded.toLocaleString()} />
+                <Stat icon={<Images className="h-3.5 w-3.5" />} label="Edits available" value={isUnlimited ? "Unlimited" : availableEdits.toLocaleString()} />
               </div>
-
-              {!isUnlimited && (
-                <p className="caption mt-3 text-center">{availableEdits.toLocaleString()} edits available</p>
+              {stylesCount > 0 && (
+                <p className="caption mt-2 text-center">{photos.toLocaleString()} photos × 1 look = {editsNeeded.toLocaleString()} edits</p>
               )}
 
               {busy ? (

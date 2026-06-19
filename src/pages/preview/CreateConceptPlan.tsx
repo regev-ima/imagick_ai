@@ -101,9 +101,10 @@ export default function CreateConceptPlan() {
 
   const count = files.length;
   const rankedStyles = rankStyles(styles, galleryType);
-  const keepers = Math.round(count * 0.25);
-  const editCount = culling ? keepers : count;
-  const readyHours = Math.max(1, Math.round(editCount / 600));
+  // Exact only — edits = photos × looks (matches the real wizard). No
+  // fabricated keepers/timing guesses.
+  const stylesCount = styleId ? 1 : 0;
+  const editsNeeded = count * stylesCount;
 
   // Aura pre-picks the top-ranked look once we reach the plan — the user can
   // tap any card to change it (or choose "No editing").
@@ -298,7 +299,7 @@ export default function CreateConceptPlan() {
                   )}
                 </div>
 
-                {/* Culling + ready */}
+                {/* Culling + edits */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <button type="button" onClick={toggleCulling}
                     className={`glass-card flex items-center gap-3 rounded-[--radius] p-4 text-left transition-colors ${culling ? "border-primary/40" : ""}`}>
@@ -307,14 +308,14 @@ export default function CreateConceptPlan() {
                     </div>
                     <div>
                       <div className="text-sm font-semibold">Cull first {culling ? "· on" : "· off"}</div>
-                      <div className="caption">{culling ? `~${keepers.toLocaleString()} keepers est.` : "edit everything"}</div>
+                      <div className="caption">{culling ? "Aura surfaces the keepers first" : "edit everything"}</div>
                     </div>
                   </button>
                   <div className="glass-card flex items-center gap-3 rounded-[--radius] p-4">
-                    <div className="grid h-9 w-9 place-items-center rounded-[--radius] bg-secondary/15 text-secondary"><Clock className="h-4 w-4" /></div>
+                    <div className="grid h-9 w-9 place-items-center rounded-[--radius] bg-secondary/15 text-secondary"><Sparkle size={16} /></div>
                     <div>
-                      <div className="text-sm font-semibold">Ready in ~{readyHours}h</div>
-                      <div className="caption">I'll email you when done</div>
+                      <div className="text-sm font-semibold">{editsNeeded.toLocaleString()} edits</div>
+                      <div className="caption">{stylesCount === 0 ? "hosting only — no edits" : isUnlimited ? "unlimited on your plan" : `${availableEdits.toLocaleString()} available`}</div>
                     </div>
                   </div>
                 </div>
@@ -329,10 +330,6 @@ export default function CreateConceptPlan() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-
-                {!isUnlimited && (
-                  <p className="caption text-right">{availableEdits.toLocaleString()} edits available on your plan</p>
-                )}
 
                 {busy ? (
                   <UploadProgress uploading={isUploading} progress={uploadProgress} total={count} previews={previews} />

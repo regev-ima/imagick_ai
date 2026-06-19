@@ -293,8 +293,8 @@ export default function CreateConceptChat() {
                 <h3 className="mt-2 text-lg font-semibold tracking-tight">{name}</h3>
                 <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {TYPES.find((t) => t.value === galleryType)?.label} · {files.length.toLocaleString()} photos</li>
-                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> Look: {selectedStyleName}</li>
-                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Cull first → ~${Math.round(files.length * 0.25).toLocaleString()} keepers${categories.length ? ` · ${categories.length} tags` : ""}` : "Edit everything"}</li>
+                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> Look: {selectedStyleName}{styleId ? ` · ${files.length.toLocaleString()} edits` : ""}</li>
+                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Cull first — Aura keeps the best${categories.length ? ` · ${categories.length} tags` : ""}` : "Edit everything"}</li>
                 </ul>
 
                 {busy ? (
