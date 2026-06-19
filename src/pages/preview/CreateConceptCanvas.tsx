@@ -1,8 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Clock, Zap } from "lucide-react";
+import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Clock, Zap, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// A real shoot is RAW + JPG; ignore sidecars/junk in a dropped folder.
+const IMAGE_RE = /\.(jpe?g|png|heic|heif|tiff?|webp|cr2|cr3|nef|arw|raf|rw2|dng|orf|srw|pef)$/i;
+const isImage = (f: File) => f.type.startsWith("image/") || IMAGE_RE.test(f.name);
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -20,20 +24,42 @@ const STYLES = [
 ];
 
 export default function CreateConceptCanvas() {
-  const [name, setName] = useState("Cohen Wedding · June 2026");
+  const [name, setName] = useState("");
   const [type, setType] = useState("Wedding");
-  const [photos] = useState(1847);
+  const [photos, setPhotos] = useState(0);
   const [styleId, setStyleId] = useState("warm");
   const [cull, setCull] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const ingest = (fileList: FileList | null) => {
+    if (!fileList) return;
+    const imgs = Array.from(fileList).filter(isImage);
+    if (imgs.length === 0) return;
+    setPhotos(imgs.length);
+    if (!name.trim()) {
+      const mid = imgs.map((f) => f.lastModified).filter(Boolean).sort((a, b) => a - b)[Math.floor(imgs.length / 2)];
+      const d = mid ? new Date(mid) : new Date();
+      setName(`Shoot · ${d.toLocaleString("en-US", { month: "long", year: "numeric" })}`);
+    }
+  };
 
   const style = STYLES.find((s) => s.id === styleId)!;
-  const keepers = useMemo(() => (cull ? Math.round(photos * 0.25) : photos), [cull, photos]);
-  const ready = useMemo(() => Math.max(1, Math.round(keepers / 600)), [keepers]);
+  const editCount = useMemo(() => (cull ? Math.round(photos * 0.25) : photos), [cull, photos]);
+  const keepers = editCount;
+  const ready = useMemo(() => Math.max(1, Math.round(editCount / 600)), [editCount]);
 
-  const complete = name.trim().length > 0 && !!type && !!styleId;
+  const complete = name.trim().length > 0 && photos > 0 && !!type && !!styleId;
 
   return (
     <div className="min-h-screen bg-background px-6 py-8">
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept="image/*,.cr2,.cr3,.nef,.arw,.raf,.rw2,.dng,.orf,.srw,.pef"
+        className="hidden"
+        onChange={(e) => ingest(e.target.files)}
+      />
       <div className="mx-auto w-full max-w-5xl">
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -59,9 +85,22 @@ export default function CreateConceptCanvas() {
                 className="mt-1 w-full border-0 bg-transparent text-2xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
                 placeholder="Untitled shoot"
               />
-              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                <Images className="h-3.5 w-3.5" /> {photos.toLocaleString()} photos detected
-              </div>
+              {photos > 0 ? (
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Images className="h-3.5 w-3.5" /> {photos.toLocaleString()} photos selected
+                  <button type="button" onClick={() => inputRef.current?.click()} className="text-accent hover:underline">change</button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); ingest(e.dataTransfer.files); }}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[--radius] border-2 border-dashed border-border py-3 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.03]"
+                >
+                  <UploadCloud className="h-4 w-4" /> Select or drag your real photos
+                </button>
+              )}
             </div>
 
             {/* Type */}
