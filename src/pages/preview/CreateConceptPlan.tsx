@@ -42,7 +42,12 @@ export default function CreateConceptPlan() {
           <AnimatePresence mode="wait">
             {phase !== "plan" ? (
               <motion.div key="drop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -8 }}
-                className="glass-card relative overflow-hidden rounded-[--radius] border-2 border-dashed border-border p-12 text-center">
+                onClick={phase === "drop" ? start : undefined}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); if (phase === "drop") start(); }}
+                className={`glass-card relative overflow-hidden rounded-[--radius] border-2 border-dashed border-border p-12 text-center transition-colors ${
+                  phase === "drop" ? "cursor-pointer hover:border-primary/50 hover:bg-primary/[0.03]" : ""
+                }`}>
                 <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">
                   {phase === "analyzing" ? <Loader2 className="h-6 w-6 animate-spin" /> : <UploadCloud className="h-6 w-6" />}
                 </div>
@@ -50,12 +55,15 @@ export default function CreateConceptPlan() {
                   {phase === "analyzing" ? "Reading your shoot…" : "Drop your shoot — I'll handle the setup"}
                 </h2>
                 <p className="mt-1.5 text-sm text-muted-foreground">
-                  {phase === "analyzing" ? "Detecting type, lighting and the best matching style." : "RAW or JPG, or paste a Drive link. No naming, no settings up front."}
+                  {phase === "analyzing" ? "Detecting type, lighting and the best matching style." : "RAW or JPG — drag them in or browse. No naming, no settings up front."}
                 </p>
                 {phase === "drop" && (
-                  <Button variant="glow" className="mt-6 gap-2" onClick={start}>
-                    <Sparkle size={14} className="text-accent-foreground" /> Simulate a drop (1,847 photos)
-                  </Button>
+                  <div className="mt-6 flex flex-col items-center gap-2.5">
+                    <Button variant="glow" className="gap-2" onClick={(e) => { e.stopPropagation(); start(); }}>
+                      <UploadCloud className="h-4 w-4" /> Select photos
+                    </Button>
+                    <span className="text-xs text-muted-foreground/70">or drag your shoot anywhere in this box</span>
+                  </div>
                 )}
               </motion.div>
             ) : (

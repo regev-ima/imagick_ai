@@ -78,9 +78,9 @@ export default function CreateConceptChat() {
   const currentNote = !done && step < script.length ? script[step].note : undefined;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-background/80 px-6 py-4 backdrop-blur">
+      <div className="shrink-0 border-b border-border/60 bg-background/80 px-6 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
             <Link to="/preview/create" aria-label="Back to concepts"><ArrowLeft className="h-5 w-5" /></Link>
@@ -98,8 +98,8 @@ export default function CreateConceptChat() {
         </div>
       </div>
 
-      {/* Thread */}
-      <div className="flex-1 px-6 py-6">
+      {/* Thread (the only scrollable region) */}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
           <AnimatePresence initial={false}>
             {msgs.map((m) => (
@@ -151,13 +151,21 @@ export default function CreateConceptChat() {
             )}
           </AnimatePresence>
 
+          <p className="mt-4 flex items-start gap-2 text-xs text-muted-foreground/60">
+            <Images className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            Concept B — Aura guides you one question at a time. Tap a suggestion, type freely, or skip anything. No forms, no steps to track.
+          </p>
+
           <div ref={endRef} />
         </div>
       </div>
 
-      {/* Composer */}
+      {/* Composer — pinned to the bottom of the viewport (last flex child) */}
       {!done && (
-        <div className="sticky bottom-0 border-t border-border/60 bg-background/80 px-6 py-4 backdrop-blur">
+        <div
+          className="shrink-0 border-t border-border/60 bg-background/80 px-6 pt-4 backdrop-blur"
+          style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+        >
           <div className="mx-auto w-full max-w-2xl">
             {currentChips && (
               <div className="mb-3 flex flex-wrap gap-2">
@@ -195,11 +203,6 @@ export default function CreateConceptChat() {
           </div>
         </div>
       )}
-
-      <p className="mx-auto flex w-full max-w-2xl items-start gap-2 px-6 pb-8 pt-2 text-xs text-muted-foreground/70">
-        <Images className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Concept B — Aura guides you one question at a time. Tap a suggestion, type freely, or skip anything. No forms, no steps to track.
-      </p>
     </div>
   );
 }
