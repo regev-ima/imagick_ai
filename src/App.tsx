@@ -115,11 +115,11 @@ const App = () => (
                 <Route path="/legal/terms" element={<TermsPage />} />
                 <Route path="/g/:shortId" element={<ShortLinkRedirect />} />
                 <Route path="/gallery/:galleryId" element={<ClientGalleryPage />} />
-                {/* Internal design exploration — create-collection concepts (static mocks) */}
-                <Route path="/preview/create" element={<CreateConceptIndex />} />
-                <Route path="/preview/create-a" element={<CreateConceptPlan />} />
-                <Route path="/preview/create-b" element={<CreateConceptChat />} />
-                <Route path="/preview/create-c" element={<CreateConceptCanvas />} />
+                {/* Internal design exploration — create-collection concepts (wired to the real backend; auth required) */}
+                <Route path="/preview/create" element={<ProtectedRoute><CreateConceptIndex /></ProtectedRoute>} />
+                <Route path="/preview/create-a" element={<ProtectedRoute><CreateConceptPlan /></ProtectedRoute>} />
+                <Route path="/preview/create-b" element={<ProtectedRoute><CreateConceptChat /></ProtectedRoute>} />
+                <Route path="/preview/create-c" element={<ProtectedRoute><CreateConceptCanvas /></ProtectedRoute>} />
                 <Route
                   path="/dashboard"
                   element={(

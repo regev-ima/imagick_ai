@@ -2,8 +2,9 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Wand2, MessagesSquare, LayoutPanelLeft } from "lucide-react";
 
 // Internal design exploration — 3 concepts for "create a new collection".
-// Static mocks, unlinked from nav. Compare on the branch preview, pick a
-// direction, then we build the chosen one for real.
+// Each is wired to the REAL backend (auth required): selecting photos and
+// hitting create makes an actual collection and starts editing. Compare on
+// the branch preview, then we ship the chosen direction.
 
 const concepts = [
   {
@@ -42,7 +43,8 @@ export default function CreateConceptIndex() {
         </h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
           Same goal — turn a pile of RAWs into an edited, culled, branded gallery — three different
-          feelings. Click each, then tell me which direction to build for real.
+          feelings. Each one is fully wired: pick your photos and hit create and it makes a real
+          collection. Run all three, then tell me which to ship.
         </p>
         <hr className="aura-hairline my-8" />
 
