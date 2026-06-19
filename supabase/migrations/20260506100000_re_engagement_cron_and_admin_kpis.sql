@@ -9,6 +9,16 @@
 --    underlying tables. Computed at query time so we never lag behind.
 -- =====================================================================
 
+-- ── 0. Self-heal a production schema drift ──────────────────────────────
+-- The admin_kpi_overview view below reads gallery_images.processing_completed_at.
+-- Migration 20260225203919 added that column, but production drifted (the
+-- column went missing while the migration stayed recorded as applied), which
+-- made THIS migration fail — and that failure silently blocked the whole
+-- `supabase db push` chain (and therefore every backend deploy) for weeks.
+-- Re-assert the column defensively so the chain can always apply.
+ALTER TABLE public.gallery_images
+  ADD COLUMN IF NOT EXISTS processing_completed_at timestamptz;
+
 -- ── 1. Schedule re-engagement-cron daily ────────────────────────────────
 DO $$
 BEGIN
