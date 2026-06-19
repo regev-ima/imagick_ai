@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -34,6 +34,21 @@ export function useCreateGalleryFlow() {
   const { uploadImages, uploadProgress, isUploading } = useImageUpload();
   const { availableEdits, editsReserved, isUnlimited, isFreePlan } = useSubscription();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // The user's preferred culling-label language, so curated tags match what
+  // they'd see in the real wizard. Defaults to English until loaded.
+  const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("user_subscriptions")
+      .select("preferred_language")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.preferred_language) setCullingLanguage(data.preferred_language as LanguageCode);
+      });
+  }, [user]);
 
   // Same source + cache key as the real wizard, so styles are shared.
   const { data: styles = [], isLoading: stylesLoading } = useQuery({
@@ -189,6 +204,7 @@ export function useCreateGalleryFlow() {
     user,
     styles,
     stylesLoading,
+    cullingLanguage,
     uploadProgress,
     isUploading,
     isSubmitting,

@@ -5,6 +5,7 @@ import { ArrowLeft, Send, Check, UploadCloud, FolderOpen, Loader2, Images, Spark
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
+import { CullingTags, defaultCullingTags } from "./CullingTags";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -41,6 +42,35 @@ function deriveName(files: FileWithPath[]): string {
   return `Shoot · ${d.toLocaleString("en-US", { month: "long", year: "numeric" })}`;
 }
 
+// Read files from a drag-and-drop — including whole folders, recursively —
+// via the entries API. Unlike <input webkitdirectory>, this path does NOT
+// trigger Chrome's "Upload N files to this site?" confirmation.
+async function filesFromDataTransfer(dt: DataTransfer): Promise<File[]> {
+  const items = Array.from(dt.items ?? []);
+  const entries = items
+    .map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null))
+    .filter((e): e is FileSystemEntry => !!e);
+  if (entries.length === 0) return Array.from(dt.files ?? []);
+
+  const out: File[] = [];
+  const walk = async (entry: FileSystemEntry): Promise<void> => {
+    if (entry.isFile) {
+      const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
+      out.push(file);
+    } else if (entry.isDirectory) {
+      const reader = (entry as FileSystemDirectoryEntry).createReader();
+      const readBatch = () => new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej));
+      let batch = await readBatch();
+      while (batch.length) {
+        for (const e of batch) await walk(e);
+        batch = await readBatch();
+      }
+    }
+  };
+  for (const e of entries) await walk(e);
+  return out;
+}
+
 // Rank styles for the chosen shoot type: tag/category matches first, then
 // presets, then the rest — so Aura's first suggestions are relevant.
 function rankStyles(styles: StyleRow[], type: string): StyleRow[] {
@@ -55,16 +85,16 @@ function rankStyles(styles: StyleRow[], type: string): StyleRow[] {
   return [...styles].sort((a, b) => score(a) - score(b));
 }
 
-type Step = "upload" | "type" | "name" | "style" | "cull" | "done";
+type Step = "upload" | "type" | "name" | "style" | "cull" | "cullTags" | "done";
 type Msg = { id: number; sender: "aura" | "user"; text: string; thumbs?: string[]; more?: number };
 
 export default function CreateConceptChat() {
   const navigate = useNavigate();
-  const { styles, submit, busy, isUploading, uploadProgress } = useCreateGalleryFlow();
+  const { styles, submit, busy, isUploading, uploadProgress, cullingLanguage } = useCreateGalleryFlow();
 
   const [step, setStep] = useState<Step>("upload");
   const [msgs, setMsgs] = useState<Msg[]>([
-    { id: 0, sender: "aura", text: "Let's start a new collection. Drop your shoot — photos or a whole folder — and I'll set everything up." },
+    { id: 0, sender: "aura", text: "Hi — I'm Aura. Let's start a new collection. Drop your shoot below — loose photos or a whole folder — and I'll read it, set up the gallery, and get it ready to edit. Nothing leaves your device until you confirm." },
   ]);
   const [input, setInput] = useState("");
   const [showAllStyles, setShowAllStyles] = useState(false);
@@ -76,10 +106,12 @@ export default function CreateConceptChat() {
 
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const [galleryType, setGalleryType] = useState("wedding");
   const [name, setName] = useState("");
   const [styleId, setStyleId] = useState<string | null>(null);
   const [culling, setCulling] = useState(true);
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -91,9 +123,8 @@ export default function CreateConceptChat() {
   const say = (sender: Msg["sender"], text: string, extra?: Partial<Msg>) =>
     setMsgs((m) => [...m, { id: idRef.current++, sender, text, ...extra }]);
 
-  const ingest = (list: FileList | null) => {
-    if (!list) return;
-    const imgs = Array.from(list).filter(isImage) as FileWithPath[];
+  const ingest = (incoming: File[]) => {
+    const imgs = incoming.filter(isImage) as FileWithPath[];
     if (imgs.length === 0) return;
     setFiles(imgs);
 
@@ -110,14 +141,14 @@ export default function CreateConceptChat() {
     const more = imgs.length - thumbs.length;
 
     say("user", `Added ${imgs.length.toLocaleString()} photos`, { thumbs, more: more > 0 ? more : undefined });
-    say("aura", `Got ${imgs.length.toLocaleString()} photos. What kind of shoot is this?`);
+    say("aura", `Lovely — ${imgs.length.toLocaleString()} photos loaded. What kind of shoot is this? It tells me which look to suggest and what to look for when I cull.`);
     setStep("type");
   };
 
   const pickType = (t: { value: string; label: string }) => {
     setGalleryType(t.value);
     say("user", t.label);
-    say("aura", "What should I call this gallery?");
+    say("aura", "Great. What should I call this gallery? You'll see this name in your dashboard and on the client share link.");
     setName(deriveName(files as FileWithPath[]));
     setStep("name");
   };
@@ -128,10 +159,10 @@ export default function CreateConceptChat() {
     say("user", finalName);
     const typeLabel = TYPES.find((t) => t.value === galleryType)?.label ?? "this";
     if (styles.length > 0) {
-      say("aura", `Since it's a ${typeLabel.toLowerCase()} shoot, here are the looks I'd recommend. Tap one — or browse more.`);
+      say("aura", `“${finalName}” it is. Since it's a ${typeLabel.toLowerCase()} shoot, here are the AI looks I'd start with — each one edits every photo in a trained style. Tap one to apply it, browse more, or skip editing. You can also train your own look from your past edits.`);
       setStep("style");
     } else {
-      say("aura", "You haven't trained a look yet — I'll host them as-is. Want me to cull first so you only keep the best?");
+      say("aura", "“" + finalName + "” it is. You haven't trained a look yet, so I'll host these as-is for now — you can train your own AI look anytime and re-edit. Want me to cull first so you only keep the best frames?");
       setStep("cull");
     }
     setInput("");
@@ -140,19 +171,40 @@ export default function CreateConceptChat() {
   const pickStyle = (label: string, id: string | null) => {
     setStyleId(id);
     say("user", label);
-    say("aura", "Want me to cull first so you only edit the keepers?");
+    say("aura", "Good pick. Want me to cull first? I'll rank every frame and surface the keepers before any editing, so you only spend edits on the shots worth keeping.");
     setStep("cull");
   };
 
   const pickCull = (on: boolean) => {
     setCulling(on);
     say("user", on ? "Yes, cull first" : "Edit everything");
-    say("aura", "Perfect — here's the plan. Review and create when you're ready.");
+    if (on) {
+      const typeLabel = TYPES.find((t) => t.value === galleryType)?.label ?? "this";
+      setCategories(defaultCullingTags(galleryType, cullingLanguage));
+      say("aura", `Here's what I'll look for in a ${typeLabel.toLowerCase()} — tap to add or remove anything, then we're set.`);
+      setStep("cullTags");
+    } else {
+      say("aura", "No problem — I'll keep every frame. Here's the plan; review and create when you're ready.");
+      setStep("done");
+    }
+  };
+
+  const confirmCullTags = () => {
+    say("user", `Look for: ${categories.length} tags`);
+    say("aura", "Perfect — here's the plan. Review and create when you're ready; I'll start editing the moment your photos finish uploading.");
     setStep("done");
   };
 
   const onCreate = () => {
-    submit({ name: name.trim() || deriveName(files as FileWithPath[]), galleryType, styleIds: styleId ? [styleId] : [], aiCulling: culling, files });
+    submit({
+      name: name.trim() || deriveName(files as FileWithPath[]),
+      galleryType,
+      styleIds: styleId ? [styleId] : [],
+      aiCulling: culling,
+      categories: culling ? categories : [],
+      cullingLanguage,
+      files,
+    });
   };
 
   const ranked = rankStyles(styles, galleryType);
@@ -160,10 +212,26 @@ export default function CreateConceptChat() {
   const selectedStyleName = styleId ? styles.find((s) => s.id === styleId)?.name : "Hosting only";
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
-      <input ref={photosRef} type="file" multiple accept="image/*,.cr2,.cr3,.nef,.arw,.raf,.rw2,.dng,.orf,.srw,.pef" className="hidden" onChange={(e) => ingest(e.target.files)} />
+    <div
+      className="relative flex h-[100dvh] flex-col overflow-hidden bg-background"
+      onDragOver={step === "upload" ? (e) => { e.preventDefault(); setDragOver(true); } : undefined}
+      onDragLeave={step === "upload" ? () => setDragOver(false) : undefined}
+      onDrop={step === "upload" ? async (e) => { e.preventDefault(); setDragOver(false); ingest(await filesFromDataTransfer(e.dataTransfer)); } : undefined}
+    >
+      <input ref={photosRef} type="file" multiple accept="image/*,.cr2,.cr3,.nef,.arw,.raf,.rw2,.dng,.orf,.srw,.pef" className="hidden" onChange={(e) => ingest(Array.from(e.target.files ?? []))} />
       {/* @ts-expect-error -- webkitdirectory is a valid non-standard attribute */}
-      <input ref={folderRef} type="file" webkitdirectory="" directory="" multiple className="hidden" onChange={(e) => ingest(e.target.files)} />
+      <input ref={folderRef} type="file" webkitdirectory="" directory="" multiple className="hidden" onChange={(e) => ingest(Array.from(e.target.files ?? []))} />
+
+      {/* Drag-and-drop overlay — folders included, no browser prompt */}
+      {dragOver && step === "upload" && (
+        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-background/80 backdrop-blur-sm">
+          <div className="rounded-[--radius] border-2 border-dashed border-primary px-10 py-8 text-center">
+            <UploadCloud className="mx-auto h-8 w-8 text-primary" />
+            <p className="mt-2 font-semibold">Drop your shoot</p>
+            <p className="caption">photos or a whole folder — no prompt</p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="shrink-0 border-b border-border/60 bg-background/80 px-6 py-4 backdrop-blur">
@@ -227,7 +295,7 @@ export default function CreateConceptChat() {
                 <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {TYPES.find((t) => t.value === galleryType)?.label} · {files.length.toLocaleString()} photos</li>
                   <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> Look: {selectedStyleName}</li>
-                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Cull first → ~${Math.round(files.length * 0.25).toLocaleString()} keepers` : "Edit everything"}</li>
+                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Cull first → ~${Math.round(files.length * 0.25).toLocaleString()} keepers${categories.length ? ` · ${categories.length} tags` : ""}` : "Edit everything"}</li>
                 </ul>
 
                 {busy ? (
@@ -251,14 +319,19 @@ export default function CreateConceptChat() {
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
           <div className="mx-auto w-full max-w-2xl">
             {step === "upload" && (
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="glow" className="gap-2" onClick={() => photosRef.current?.click()}>
-                  <UploadCloud className="h-4 w-4" /> Select photos
-                </Button>
-                <Button variant="outline" className="gap-2" onClick={() => folderRef.current?.click()}>
-                  <FolderOpen className="h-4 w-4" /> Select a folder
-                </Button>
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="glow" className="gap-2" onClick={() => photosRef.current?.click()}>
+                    <UploadCloud className="h-4 w-4" /> Select photos
+                  </Button>
+                  <Button variant="outline" className="gap-2" onClick={() => folderRef.current?.click()}>
+                    <FolderOpen className="h-4 w-4" /> Select a folder
+                  </Button>
+                </div>
+                <p className="mt-2 text-center text-xs text-muted-foreground/70">
+                  Tip: drag a folder straight in to skip the browser's upload prompt.
+                </p>
+              </>
             )}
 
             {step === "type" && (
@@ -287,13 +360,14 @@ export default function CreateConceptChat() {
                     );
                   })}
                 </div>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   {!showAllStyles && ranked.length > 4 && (
                     <button type="button" onClick={() => setShowAllStyles(true)}
                       className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10">
                       Show more looks <ChevronDown className="h-3.5 w-3.5" />
                     </button>
                   )}
+                  <Chip muted onClick={() => window.open("/dashboard/styles/new", "_blank")}>Train my own look ↗</Chip>
                   <Chip muted onClick={() => pickStyle("No editing — host as-is", null)}>No editing</Chip>
                 </div>
               </div>
@@ -303,6 +377,15 @@ export default function CreateConceptChat() {
               <div className="flex flex-wrap gap-2">
                 <Chip onClick={() => pickCull(true)}>Yes, cull first</Chip>
                 <Chip muted onClick={() => pickCull(false)}>Edit everything</Chip>
+              </div>
+            )}
+
+            {step === "cullTags" && (
+              <div className="space-y-3">
+                <CullingTags galleryType={galleryType} language={cullingLanguage} value={categories} onChange={setCategories} />
+                <Button variant="glow" className="w-full gap-2" onClick={confirmCullTags}>
+                  <Check className="h-4 w-4" /> Looks good
+                </Button>
               </div>
             )}
 

@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Clock, Za
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
+import { CullingTags, defaultCullingTags } from "./CullingTags";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -27,14 +28,26 @@ const TYPES: { value: string; label: string }[] = [
 
 export default function CreateConceptCanvas() {
   const navigate = useNavigate();
-  const { styles, submit, busy, isUploading, uploadProgress, availableEdits, isUnlimited } = useCreateGalleryFlow();
+  const { styles, submit, busy, isUploading, uploadProgress, availableEdits, isUnlimited, cullingLanguage } = useCreateGalleryFlow();
 
   const [name, setName] = useState("");
   const [type, setType] = useState("wedding");
   const [files, setFiles] = useState<File[]>([]);
   const [styleId, setStyleId] = useState<string | null>(null);
   const [cull, setCull] = useState(true);
+  const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const toggleCull = () =>
+    setCull((on) => {
+      const next = !on;
+      if (next) setCategories(defaultCullingTags(type, cullingLanguage));
+      return next;
+    });
+  const changeType = (value: string) => {
+    setType(value);
+    if (cull) setCategories(defaultCullingTags(value, cullingLanguage));
+  };
 
   const photos = files.length;
   const ingest = (list: FileList | null) => {
@@ -60,6 +73,8 @@ export default function CreateConceptCanvas() {
       galleryType: type,
       styleIds: styleId ? [styleId] : [],
       aiCulling: cull,
+      categories: cull ? categories : [],
+      cullingLanguage,
       files,
     });
   };
@@ -122,7 +137,7 @@ export default function CreateConceptCanvas() {
                   <button
                     key={t.value}
                     type="button"
-                    onClick={() => setType(t.value)}
+                    onClick={() => changeType(t.value)}
                     className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                       type === t.value
                         ? "bg-primary text-primary-foreground"
@@ -173,22 +188,29 @@ export default function CreateConceptCanvas() {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setCull((c) => !c)}
-              className={`glass-card flex w-full items-center gap-3 rounded-[--radius] p-5 text-left transition-colors ${cull ? "border-primary/40" : ""}`}
-            >
-              <div className={`grid h-10 w-10 place-items-center rounded-[--radius] ${cull ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                <Scissors className="h-4 w-4" />
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-semibold">Cull first {cull ? "· on" : "· off"}</div>
-                <div className="caption">{cull ? `Edit only the ~${editCount.toLocaleString()} keepers Aura picks` : "Edit every photo in the shoot"}</div>
-              </div>
-              <span className={`h-6 w-11 rounded-full p-0.5 transition-colors ${cull ? "bg-primary" : "bg-muted"}`}>
-                <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cull ? "auto" : 0 }} />
-              </span>
-            </button>
+            <div className={`glass-card rounded-[--radius] transition-colors ${cull ? "border-primary/40" : ""}`}>
+              <button
+                type="button"
+                onClick={toggleCull}
+                className="flex w-full items-center gap-3 p-5 text-left"
+              >
+                <div className={`grid h-10 w-10 place-items-center rounded-[--radius] ${cull ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                  <Scissors className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold">Cull first {cull ? "· on" : "· off"}</div>
+                  <div className="caption">{cull ? `Edit only the ~${editCount.toLocaleString()} keepers Aura picks` : "Edit every photo in the shoot"}</div>
+                </div>
+                <span className={`h-6 w-11 rounded-full p-0.5 transition-colors ${cull ? "bg-primary" : "bg-muted"}`}>
+                  <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cull ? "auto" : 0 }} />
+                </span>
+              </button>
+              {cull && (
+                <div className="border-t border-border/60 p-5 pt-4">
+                  <CullingTags galleryType={type} language={cullingLanguage} value={categories} onChange={setCategories} />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Live plan rail */}

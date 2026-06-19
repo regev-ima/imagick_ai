@@ -5,6 +5,7 @@ import { ArrowLeft, UploadCloud, Check, ThumbsUp, ThumbsDown, Pencil, Images, Sc
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
+import { CullingTags, defaultCullingTags } from "./CullingTags";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -52,7 +53,7 @@ function deriveDateLabel(files: File[]): string {
 
 export default function CreateConceptPlan() {
   const navigate = useNavigate();
-  const { styles, submit, busy, isUploading, uploadProgress, availableEdits, isUnlimited } = useCreateGalleryFlow();
+  const { styles, submit, busy, isUploading, uploadProgress, availableEdits, isUnlimited, cullingLanguage } = useCreateGalleryFlow();
 
   const [phase, setPhase] = useState<Phase>("drop");
   const [files, setFiles] = useState<File[]>([]);
@@ -62,7 +63,21 @@ export default function CreateConceptPlan() {
   const [styleIdx, setStyleIdx] = useState(0);
   const [useStyle, setUseStyle] = useState(true);
   const [culling, setCulling] = useState(true);
+  const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep culling tags meaningful: when culling turns on (or the shoot type
+  // changes while it's on) pre-fill the curated labels for that type.
+  const toggleCulling = () =>
+    setCulling((on) => {
+      const next = !on;
+      if (next) setCategories(defaultCullingTags(galleryType, cullingLanguage));
+      return next;
+    });
+  const changeType = (value: string) => {
+    setGalleryType(value);
+    if (culling) setCategories(defaultCullingTags(value, cullingLanguage));
+  };
 
   const count = files.length;
   const style = styles.length ? styles[styleIdx % styles.length] : null;
@@ -99,6 +114,8 @@ export default function CreateConceptPlan() {
       galleryType,
       styleIds: useStyle && style ? [style.id] : [],
       aiCulling: culling,
+      categories: culling ? categories : [],
+      cullingLanguage,
       files,
     });
   };
@@ -187,7 +204,7 @@ export default function CreateConceptPlan() {
                     <div className="caption mb-1.5">Shoot type</div>
                     <div className="flex flex-wrap gap-1.5">
                       {TYPES.map((t) => (
-                        <button key={t.value} type="button" onClick={() => setGalleryType(t.value)}
+                        <button key={t.value} type="button" onClick={() => changeType(t.value)}
                           className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                             galleryType === t.value ? "bg-primary text-primary-foreground" : "border border-border bg-surface-2 text-muted-foreground hover:text-foreground"
                           }`}>
@@ -237,7 +254,7 @@ export default function CreateConceptPlan() {
 
                 {/* Culling + ready */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button type="button" onClick={() => setCulling((c) => !c)}
+                  <button type="button" onClick={toggleCulling}
                     className={`glass-card flex items-center gap-3 rounded-[--radius] p-4 text-left transition-colors ${culling ? "border-primary/40" : ""}`}>
                     <div className={`grid h-9 w-9 place-items-center rounded-[--radius] ${culling ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                       <Scissors className="h-4 w-4" />
@@ -255,6 +272,17 @@ export default function CreateConceptPlan() {
                     </div>
                   </div>
                 </div>
+
+                {/* Culling tags — what Aura looks for (curated for the type) */}
+                <AnimatePresence initial={false}>
+                  {culling && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <div className="glass-card rounded-[--radius] p-4">
+                        <CullingTags galleryType={galleryType} language={cullingLanguage} value={categories} onChange={setCategories} />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {!isUnlimited && (
                   <p className="caption text-right">{availableEdits.toLocaleString()} edits available on your plan</p>
