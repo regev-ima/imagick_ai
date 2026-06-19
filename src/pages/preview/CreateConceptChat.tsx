@@ -325,11 +325,11 @@ export default function CreateConceptChat() {
                     <UploadCloud className="h-4 w-4" /> Select photos
                   </Button>
                   <Button variant="outline" className="gap-2" onClick={() => folderRef.current?.click()}>
-                    <FolderOpen className="h-4 w-4" /> Select a folder
+                    <FolderOpen className="h-4 w-4" /> Folder <span className="text-[10px] text-muted-foreground/70">(browser asks once)</span>
                   </Button>
                 </div>
                 <p className="mt-2 text-center text-xs text-muted-foreground/70">
-                  Tip: drag a folder straight in to skip the browser's upload prompt.
+                  Best: <span className="text-foreground/80">drag a folder right into this chat</span> — no browser prompt. The “Folder” button uses Chrome's picker, which always shows that confirmation.
                 </p>
               </>
             )}
