@@ -75,6 +75,7 @@ export default function CreateConceptChat() {
   const objectUrls = useRef<string[]>([]);
 
   const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [galleryType, setGalleryType] = useState("wedding");
   const [name, setName] = useState("");
   const [styleId, setStyleId] = useState<string | null>(null);
@@ -96,13 +97,16 @@ export default function CreateConceptChat() {
     if (imgs.length === 0) return;
     setFiles(imgs);
 
-    // Build up to 5 visual previews to confirm the upload inside the chat.
-    const previewFiles = imgs.filter(isPreviewable).slice(0, 5);
-    const thumbs = previewFiles.map((f) => {
+    // Object URLs for previewable shots — first 5 confirm the upload in the
+    // chat bubble; the fuller set (capped) feeds the live upload filmstrip.
+    const previewFiles = imgs.filter(isPreviewable).slice(0, 120);
+    const urls = previewFiles.map((f) => {
       const url = URL.createObjectURL(f);
       objectUrls.current.push(url);
       return url;
     });
+    setPreviews(urls);
+    const thumbs = urls.slice(0, 5);
     const more = imgs.length - thumbs.length;
 
     say("user", `Added ${imgs.length.toLocaleString()} photos`, { thumbs, more: more > 0 ? more : undefined });
@@ -227,7 +231,7 @@ export default function CreateConceptChat() {
                 </ul>
 
                 {busy ? (
-                  <UploadBar uploading={isUploading} progress={uploadProgress} total={files.length} />
+                  <UploadBar uploading={isUploading} progress={uploadProgress} total={files.length} previews={previews} />
                 ) : (
                   <Button variant="glow" size="lg" className="mt-4 w-full gap-2" onClick={onCreate}>
                     <Sparkle size={15} className="text-accent-foreground" /> Create &amp; start editing
@@ -333,18 +337,50 @@ export default function CreateConceptChat() {
   );
 }
 
-function UploadBar({ uploading, progress, total }: {
+function UploadBar({ uploading, progress, total, previews }: {
   uploading: boolean;
   progress: ReturnType<typeof useCreateGalleryFlow>["uploadProgress"];
   total: number;
+  previews: string[];
 }) {
   const done = progress?.uploaded ?? 0;
   const totalCount = progress?.total || total;
   const pct = progress && progress.totalBytes > 0
     ? Math.round((progress.bytesUploaded / progress.totalBytes) * 100)
     : 0;
+
+  // A sliding window of 5 preview thumbnails that tracks the progress —
+  // completed shots get a check, the current one is highlighted.
+  const ratio = totalCount > 0 ? done / totalCount : 0;
+  const curIdx = previews.length ? Math.min(previews.length - 1, Math.floor(ratio * previews.length)) : 0;
+  const start = Math.max(0, Math.min(curIdx - 4, previews.length - 5));
+  const windowUrls = previews.slice(start, start + 5);
+
   return (
-    <div className="mt-4 space-y-2 rounded-[--radius] border border-border bg-card p-4">
+    <div className="mt-4 space-y-3 rounded-[--radius] border border-border bg-card p-4">
+      {uploading && windowUrls.length > 0 && (
+        <div className="flex gap-1.5">
+          {windowUrls.map((src, i) => {
+            const gi = start + i;
+            const state = gi < curIdx ? "done" : gi === curIdx ? "current" : "pending";
+            return (
+              <div key={src} className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md">
+                <img src={src} alt="" className={`h-full w-full object-cover transition-opacity ${state === "pending" ? "opacity-40" : "opacity-100"}`} />
+                {state === "current" && (
+                  <span className="absolute inset-0 rounded-md ring-2 ring-inset ring-primary">
+                    <span className="absolute inset-0 animate-pulse bg-primary/10" />
+                  </span>
+                )}
+                {state === "done" && (
+                  <span className="absolute inset-0 grid place-items-center bg-background/55">
+                    <Check className="h-4 w-4 text-primary" strokeWidth={3} />
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="flex items-center justify-between text-sm">
         <span className="flex items-center gap-2 text-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
