@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Zap, UploadCloud } from "lucide-react";
+import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Zap, UploadCloud, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
@@ -19,6 +19,21 @@ function Sparkle({ size = 16, className = "" }: { size?: number; className?: str
 const IMAGE_RE = /\.(jpe?g|png|heic|heif|tiff?|webp|cr2|cr3|nef|arw|raf|rw2|dng|orf|srw|pef)$/i;
 const isImage = (f: File) => f.type.startsWith("image/") || IMAGE_RE.test(f.name);
 
+type StyleRow = ReturnType<typeof useCreateGalleryFlow>["styles"][number];
+
+// Rank styles for the shoot type: tag/category match first, then presets.
+function rankStyles(styles: StyleRow[], type: string): StyleRow[] {
+  const t = type.toLowerCase();
+  const score = (s: StyleRow) => {
+    const tagHit = (s.associated_tags ?? []).some((tag) => tag.toLowerCase().includes(t));
+    const catHit = (s.category ?? "").toLowerCase().includes(t);
+    if (tagHit || catHit) return 0;
+    if (s.is_preset) return 1;
+    return 2;
+  };
+  return [...styles].sort((a, b) => score(a) - score(b));
+}
+
 const TYPES: { value: string; label: string }[] = [
   { value: "wedding", label: "Wedding" },
   { value: "portrait", label: "Portrait" },
@@ -35,6 +50,7 @@ export default function CreateConceptCanvas() {
   const [type, setType] = useState("wedding");
   const [files, setFiles] = useState<File[]>([]);
   const [styleId, setStyleId] = useState<string | null>(null);
+  const [styleTouched, setStyleTouched] = useState(false);
   const [cull, setCull] = useState(true);
   const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
   const [previews, setPreviews] = useState<string[]>([]);
@@ -73,11 +89,27 @@ export default function CreateConceptCanvas() {
   };
 
   const style = styles.find((s) => s.id === styleId) ?? null;
+  const rankedStyles = rankStyles(styles, type);
   // Exact figures only — edits consumed = photos × looks (matches the real
   // wizard's editsNeeded). No fabricated keepers/timing estimates.
   const stylesCount = styleId ? 1 : 0;
   const editsNeeded = useMemo(() => photos * stylesCount, [photos, stylesCount]);
   const complete = name.trim().length > 0 && photos > 0 && !!type;
+
+  // Pre-pick Aura's best-matching look once photos are in — the user can tap
+  // another card or "No editing". Prevents an accidental hosting-only / 0-edits
+  // state when they meant to edit.
+  useEffect(() => {
+    if (photos > 0 && !styleTouched && rankedStyles.length > 0) {
+      setStyleId(rankedStyles[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos, styles, type]);
+
+  const pickStyle = (id: string | null) => {
+    setStyleId(id);
+    setStyleTouched(true);
+  };
 
   const onCreate = () => {
     submit({
@@ -164,25 +196,39 @@ export default function CreateConceptCanvas() {
 
             <div className="glass-card rounded-[--radius] p-5">
               <div className="mb-2.5 flex items-center justify-between">
-                <div className="caption">Look</div>
-                <span className="caption">{styleId ? "1" : "0"} selected · optional</span>
+                <div className="caption">Look — tap to choose</div>
+                <span className="caption">{styleId ? style?.name : "Hosting only"}</span>
               </div>
               {styles.length === 0 ? (
                 <p className="caption">No trained looks yet — photos will be hosted as-is. You can train a look later.</p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-3">
-                  {styles.slice(0, 6).map((s) => {
+                  {/* No-editing card */}
+                  <button
+                    type="button"
+                    onClick={() => pickStyle(null)}
+                    className={`relative rounded-[--radius] border p-3 text-left transition-colors ${
+                      styleId === null ? "border-primary bg-primary/10 ring-2 ring-inset ring-primary" : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    {styleId === null && <span className="absolute right-2 top-2 grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" strokeWidth={3} /></span>}
+                    <div className="mb-2 grid h-10 w-full place-items-center rounded-md bg-surface-2 text-muted-foreground"><Ban className="h-4 w-4" /></div>
+                    <div className="text-sm font-semibold">No editing</div>
+                    <div className="caption mt-0.5">Host as-is · 0 edits</div>
+                  </button>
+                  {rankedStyles.slice(0, 5).map((s, i) => {
                     const cover = s.thumbnail_url || s.after_image_urls?.[0];
                     const on = styleId === s.id;
                     return (
                       <button
                         key={s.id}
                         type="button"
-                        onClick={() => setStyleId(on ? null : s.id)}
-                        className={`rounded-[--radius] border p-3 text-left transition-colors ${
-                          on ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/30"
+                        onClick={() => pickStyle(s.id)}
+                        className={`relative rounded-[--radius] border p-3 text-left transition-colors ${
+                          on ? "border-primary bg-primary/10 ring-2 ring-inset ring-primary" : "border-border hover:border-primary/40"
                         }`}
                       >
+                        {on && <span className="absolute right-2 top-2 z-10 grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" strokeWidth={3} /></span>}
                         {cover ? (
                           <img src={getThumbnailUrl(cover)} alt="" className="mb-2 h-10 w-full rounded-md object-cover plate-keyline" />
                         ) : (
@@ -190,7 +236,7 @@ export default function CreateConceptCanvas() {
                         )}
                         <div className="flex items-center gap-1.5 text-sm font-semibold">
                           <span className="truncate">{s.name}</span>
-                          {on && <Check className="h-3 w-3 shrink-0 text-primary" />}
+                          {i === 0 && !on && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[9px] font-semibold uppercase text-primary">Pick</span>}
                         </div>
                         {s.description && <div className="caption mt-0.5 truncate">{s.description}</div>}
                       </button>
