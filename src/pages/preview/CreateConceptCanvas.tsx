@@ -1,11 +1,12 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Clock, Zap, UploadCloud, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Images, Scissors, Sparkles as SparklesIcon, Clock, Zap, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { CullingTags, defaultCullingTags } from "./CullingTags";
+import { UploadProgress, isPreviewable } from "./UploadProgress";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -36,7 +37,11 @@ export default function CreateConceptCanvas() {
   const [styleId, setStyleId] = useState<string | null>(null);
   const [cull, setCull] = useState(true);
   const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
+  const [previews, setPreviews] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const objectUrls = useRef<string[]>([]);
+
+  useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   const toggleCull = () =>
     setCull((on) => {
@@ -55,6 +60,11 @@ export default function CreateConceptCanvas() {
     const imgs = Array.from(list).filter(isImage);
     if (imgs.length === 0) return;
     setFiles(imgs);
+    setPreviews(imgs.filter(isPreviewable).slice(0, 120).map((f) => {
+      const url = URL.createObjectURL(f);
+      objectUrls.current.push(url);
+      return url;
+    }));
     if (!name.trim()) {
       const mid = imgs.map((f) => f.lastModified).filter(Boolean).sort((a, b) => a - b)[Math.floor(imgs.length / 2)];
       const d = mid ? new Date(mid) : new Date();
@@ -239,16 +249,18 @@ export default function CreateConceptCanvas() {
                 <p className="caption mt-3 text-center">{availableEdits.toLocaleString()} edits available</p>
               )}
 
-              <Button variant="glow" size="lg" disabled={!complete || busy} className="mt-4 w-full gap-2" onClick={onCreate}>
-                {busy ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> {isUploading ? uploadLabel(uploadProgress) : "Creating…"}</>
-                ) : (
-                  <><Zap className="h-4 w-4" /> Create &amp; start</>
-                )}
-              </Button>
-              <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
-                Creates a real collection &amp; starts editing
-              </p>
+              {busy ? (
+                <div className="mt-4"><UploadProgress uploading={isUploading} progress={uploadProgress} total={photos} previews={previews} /></div>
+              ) : (
+                <>
+                  <Button variant="glow" size="lg" disabled={!complete} className="mt-4 w-full gap-2" onClick={onCreate}>
+                    <Zap className="h-4 w-4" /> Create &amp; start
+                  </Button>
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
+                    Creates a real collection &amp; starts editing
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -260,11 +272,6 @@ export default function CreateConceptCanvas() {
       </div>
     </div>
   );
-}
-
-function uploadLabel(p: { bytesUploaded: number; totalBytes: number } | null): string {
-  if (!p || p.totalBytes <= 0) return "Uploading…";
-  return `Uploading ${Math.round((p.bytesUploaded / p.totalBytes) * 100)}%`;
 }
 
 function Row({ label, value, done }: { label: string; value: string; done: boolean }) {

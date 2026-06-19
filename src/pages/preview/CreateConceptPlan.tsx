@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { CullingTags, defaultCullingTags } from "./CullingTags";
+import { UploadProgress, isPreviewable } from "./UploadProgress";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -79,7 +80,11 @@ export default function CreateConceptPlan() {
   const [styleTouched, setStyleTouched] = useState(false);
   const [culling, setCulling] = useState(true);
   const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
+  const [previews, setPreviews] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const objectUrls = useRef<string[]>([]);
+
+  useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   // Keep culling tags meaningful: when culling turns on (or the shoot type
   // changes while it's on) pre-fill the curated labels for that type.
@@ -114,6 +119,12 @@ export default function CreateConceptPlan() {
     const imgs = Array.from(list).filter(isImage) as FileWithPath[];
     if (imgs.length === 0) return;
     setFiles(imgs);
+    // Previews feed the live upload filmstrip (capped, revoked on unmount).
+    setPreviews(imgs.filter(isPreviewable).slice(0, 120).map((f) => {
+      const url = URL.createObjectURL(f);
+      objectUrls.current.push(url);
+      return url;
+    }));
     setName(deriveName(imgs));
     setDateLabel(deriveDateLabel(imgs));
     setPhase("analyzing");
@@ -123,6 +134,7 @@ export default function CreateConceptPlan() {
   const reset = () => {
     setPhase("drop");
     setFiles([]);
+    setPreviews([]);
     setName("");
     setDateLabel("");
     setCulling(true);
@@ -322,14 +334,16 @@ export default function CreateConceptPlan() {
                   <p className="caption text-right">{availableEdits.toLocaleString()} edits available on your plan</p>
                 )}
 
-                <Button variant="glow" size="lg" className="mt-1 w-full gap-2" onClick={onCreate} disabled={busy || count === 0}>
-                  {busy ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> {isUploading ? uploadProgressLabel(uploadProgress) : "Creating…"}</>
-                  ) : (
-                    <><Sparkle size={15} className="text-accent-foreground" /> Create &amp; start editing</>
-                  )}
-                </Button>
-                <button onClick={reset} disabled={busy} className="caption mx-auto block pt-1 hover:text-foreground disabled:opacity-50">← start over</button>
+                {busy ? (
+                  <UploadProgress uploading={isUploading} progress={uploadProgress} total={count} previews={previews} />
+                ) : (
+                  <Button variant="glow" size="lg" className="mt-1 w-full gap-2" onClick={onCreate} disabled={count === 0}>
+                    <Sparkle size={15} className="text-accent-foreground" /> Create &amp; start editing
+                  </Button>
+                )}
+                {!busy && (
+                  <button onClick={reset} className="caption mx-auto block pt-1 hover:text-foreground">← start over</button>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -342,9 +356,4 @@ export default function CreateConceptPlan() {
       </div>
     </div>
   );
-}
-
-function uploadProgressLabel(p: { bytesUploaded: number; totalBytes: number } | null): string {
-  if (!p || p.totalBytes <= 0) return "Uploading…";
-  return `Uploading ${Math.round((p.bytesUploaded / p.totalBytes) * 100)}%`;
 }

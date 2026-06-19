@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, Check, UploadCloud, FolderOpen, Loader2, Images, Sparkles as SparklesIcon, ChevronDown } from "lucide-react";
+import { ArrowLeft, Send, Check, UploadCloud, FolderOpen, Images, Sparkles as SparklesIcon, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { CullingTags, defaultCullingTags } from "./CullingTags";
+import { UploadProgress, isPreviewable } from "./UploadProgress";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -20,8 +21,6 @@ type FileWithPath = File & { webkitRelativePath?: string };
 
 const IMAGE_RE = /\.(jpe?g|png|heic|heif|tiff?|webp|cr2|cr3|nef|arw|raf|rw2|dng|orf|srw|pef)$/i;
 const isImage = (f: File) => f.type.startsWith("image/") || IMAGE_RE.test(f.name);
-// RAW files can't be shown as <img>; only make previews from web-renderable ones.
-const isPreviewable = (f: File) => f.type.startsWith("image/") && !/heic|heif/i.test(f.type);
 
 const TYPES: { value: string; label: string }[] = [
   { value: "wedding", label: "Wedding" },
@@ -299,7 +298,7 @@ export default function CreateConceptChat() {
                 </ul>
 
                 {busy ? (
-                  <UploadBar uploading={isUploading} progress={uploadProgress} total={files.length} previews={previews} />
+                  <div className="mt-4"><UploadProgress uploading={isUploading} progress={uploadProgress} total={files.length} previews={previews} /></div>
                 ) : (
                   <Button variant="glow" size="lg" className="mt-4 w-full gap-2" onClick={onCreate}>
                     <Sparkle size={15} className="text-accent-foreground" /> Create &amp; start editing
@@ -416,68 +415,6 @@ export default function CreateConceptChat() {
         <Images className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Concept B — Aura collects everything in a chat, then creates a real collection and starts editing.
       </p>
-    </div>
-  );
-}
-
-function UploadBar({ uploading, progress, total, previews }: {
-  uploading: boolean;
-  progress: ReturnType<typeof useCreateGalleryFlow>["uploadProgress"];
-  total: number;
-  previews: string[];
-}) {
-  const done = progress?.uploaded ?? 0;
-  const totalCount = progress?.total || total;
-  const pct = progress && progress.totalBytes > 0
-    ? Math.round((progress.bytesUploaded / progress.totalBytes) * 100)
-    : 0;
-
-  // A sliding window of 5 preview thumbnails that tracks the progress —
-  // completed shots get a check, the current one is highlighted.
-  const ratio = totalCount > 0 ? done / totalCount : 0;
-  const curIdx = previews.length ? Math.min(previews.length - 1, Math.floor(ratio * previews.length)) : 0;
-  const start = Math.max(0, Math.min(curIdx - 4, previews.length - 5));
-  const windowUrls = previews.slice(start, start + 5);
-
-  return (
-    <div className="mt-4 space-y-3 rounded-[--radius] border border-border bg-card p-4">
-      {uploading && windowUrls.length > 0 && (
-        <div className="flex gap-1.5">
-          {windowUrls.map((src, i) => {
-            const gi = start + i;
-            const state = gi < curIdx ? "done" : gi === curIdx ? "current" : "pending";
-            return (
-              <div key={src} className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md">
-                <img src={src} alt="" className={`h-full w-full object-cover transition-opacity ${state === "pending" ? "opacity-40" : "opacity-100"}`} />
-                {state === "current" && (
-                  <span className="absolute inset-0 rounded-md ring-2 ring-inset ring-primary">
-                    <span className="absolute inset-0 animate-pulse bg-primary/10" />
-                  </span>
-                )}
-                {state === "done" && (
-                  <span className="absolute inset-0 grid place-items-center bg-background/55">
-                    <Check className="h-4 w-4 text-primary" strokeWidth={3} />
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <div className="flex items-center justify-between text-sm">
-        <span className="flex items-center gap-2 text-foreground">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          {uploading ? "Uploading your photos…" : "Creating gallery…"}
-        </span>
-        <span className="font-mono text-primary">{uploading ? `${done}/${totalCount}` : ""}</span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <motion.div className="h-full rounded-full bg-primary" initial={{ width: 0 }}
-          animate={{ width: `${uploading ? pct : 100}%` }} transition={{ ease: "easeOut", duration: 0.4 }} />
-      </div>
-      {uploading && progress?.currentFile && (
-        <p className="truncate text-xs text-muted-foreground">Receiving {progress.currentFile} · {pct}%</p>
-      )}
     </div>
   );
 }
