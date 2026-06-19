@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, UploadCloud, Check, ThumbsUp, ThumbsDown, Pencil, Images, Scissors, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, UploadCloud, Check, Ban, Pencil, Images, Scissors, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
@@ -29,6 +29,21 @@ const TYPES: { value: string; label: string }[] = [
   { value: "newborn", label: "Newborn" },
   { value: "commercial", label: "Commercial" },
 ];
+
+type StyleRow = ReturnType<typeof useCreateGalleryFlow>["styles"][number];
+
+// Rank styles for the shoot type: tag/category match first, then presets.
+function rankStyles(styles: StyleRow[], type: string): StyleRow[] {
+  const t = type.toLowerCase();
+  const score = (s: StyleRow) => {
+    const tagHit = (s.associated_tags ?? []).some((tag) => tag.toLowerCase().includes(t));
+    const catHit = (s.category ?? "").toLowerCase().includes(t);
+    if (tagHit || catHit) return 0;
+    if (s.is_preset) return 1;
+    return 2;
+  };
+  return [...styles].sort((a, b) => score(a) - score(b));
+}
 
 function titleCase(s: string) {
   return s.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -60,8 +75,8 @@ export default function CreateConceptPlan() {
   const [name, setName] = useState("");
   const [dateLabel, setDateLabel] = useState("");
   const [galleryType, setGalleryType] = useState("wedding");
-  const [styleIdx, setStyleIdx] = useState(0);
-  const [useStyle, setUseStyle] = useState(true);
+  const [styleId, setStyleId] = useState<string | null>(null);
+  const [styleTouched, setStyleTouched] = useState(false);
   const [culling, setCulling] = useState(true);
   const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -80,11 +95,19 @@ export default function CreateConceptPlan() {
   };
 
   const count = files.length;
-  const style = styles.length ? styles[styleIdx % styles.length] : null;
+  const rankedStyles = rankStyles(styles, galleryType);
   const keepers = Math.round(count * 0.25);
   const editCount = culling ? keepers : count;
   const readyHours = Math.max(1, Math.round(editCount / 600));
-  const styleCover = style ? (style.thumbnail_url || style.after_image_urls?.[0]) : null;
+
+  // Aura pre-picks the top-ranked look once we reach the plan — the user can
+  // tap any card to change it (or choose "No editing").
+  useEffect(() => {
+    if (phase === "plan" && !styleTouched && rankedStyles.length > 0) {
+      setStyleId(rankedStyles[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, styles, galleryType]);
 
   const ingest = (list: FileList | null) => {
     if (!list || list.length === 0) return;
@@ -103,16 +126,21 @@ export default function CreateConceptPlan() {
     setName("");
     setDateLabel("");
     setCulling(true);
-    setUseStyle(true);
-    setStyleIdx(0);
+    setStyleId(null);
+    setStyleTouched(false);
     if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const pickStyle = (id: string | null) => {
+    setStyleId(id);
+    setStyleTouched(true);
   };
 
   const onCreate = () => {
     submit({
       name: name.trim() || "Untitled shoot",
       galleryType,
-      styleIds: useStyle && style ? [style.id] : [],
+      styleIds: styleId ? [styleId] : [],
       aiCulling: culling,
       categories: culling ? categories : [],
       cullingLanguage,
@@ -215,40 +243,46 @@ export default function CreateConceptPlan() {
                   </div>
                 </div>
 
-                {/* Suggested style — real, from your library */}
+                {/* Look — tap a card to choose (Aura pre-picks the best match) */}
                 <div className="glass-card rounded-[--radius] p-4">
                   <div className="mb-2.5 flex items-center justify-between">
-                    <div className="caption">Suggested look</div>
-                    <button type="button" onClick={() => setUseStyle((v) => !v)} className="caption text-accent hover:underline">
-                      {useStyle ? "skip editing" : "add editing"}
-                    </button>
+                    <div className="caption">Look — tap to choose</div>
+                    <span className="caption">{styleId ? "editing on" : "hosting only"}</span>
                   </div>
-                  {useStyle ? (
-                    style ? (
-                      <div className="flex items-center gap-3">
-                        {styleCover ? (
-                          <img src={getThumbnailUrl(styleCover)} alt="" className="h-12 w-12 shrink-0 rounded-[--radius] object-cover plate-keyline" />
-                        ) : (
-                          <div className="h-12 w-12 shrink-0 rounded-[--radius] bg-[image:var(--gradient-primary)] plate-keyline" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate font-semibold tracking-tight">{style.name}</div>
-                          <div className="caption truncate">{style.description || "Your trained look"}</div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Button variant="glow" size="sm" className="gap-1.5 pointer-events-none"><ThumbsUp className="h-3.5 w-3.5" /> Use</Button>
-                          <Button variant="outline" size="icon" aria-label="Suggest a different style"
-                            disabled={styles.length < 2}
-                            onClick={() => setStyleIdx((i) => (i + 1) % Math.max(styles.length, 1))}>
-                            <ThumbsDown className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="caption">No trained looks yet — your photos will be hosted as-is. Train a look later in the editor.</p>
-                    )
+                  {rankedStyles.length === 0 ? (
+                    <p className="caption">No trained looks yet — I'll host your photos as-is. You can train your own look later.</p>
                   ) : (
-                    <p className="caption">Hosting only — no AI editing. Your photos upload and share as-is.</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {/* No-editing card */}
+                      <button type="button" onClick={() => pickStyle(null)}
+                        className={`relative w-[112px] shrink-0 overflow-hidden rounded-[--radius] border text-left transition-colors ${styleId === null ? "border-primary/60 bg-primary/5" : "border-border hover:border-primary/40"}`}>
+                        <div className="grid h-[70px] w-full place-items-center bg-surface-2 text-muted-foreground"><Ban className="h-5 w-5" /></div>
+                        <div className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium">
+                          No editing {styleId === null && <Check className="h-3 w-3 text-primary" />}
+                        </div>
+                      </button>
+                      {rankedStyles.map((s, i) => {
+                        const cover = s.thumbnail_url || s.after_image_urls?.[0];
+                        const on = styleId === s.id;
+                        return (
+                          <button key={s.id} type="button" onClick={() => pickStyle(s.id)}
+                            className={`relative w-[112px] shrink-0 overflow-hidden rounded-[--radius] border text-left transition-colors ${on ? "border-primary/60 bg-primary/5" : "border-border hover:border-primary/40"}`}>
+                            {cover ? (
+                              <img src={getThumbnailUrl(cover)} alt="" className="h-[70px] w-full object-cover" />
+                            ) : (
+                              <div className="h-[70px] w-full bg-[image:var(--gradient-primary)]" />
+                            )}
+                            {i === 0 && (
+                              <span className="absolute left-1 top-1 rounded-full bg-primary/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary-foreground">Aura's pick</span>
+                            )}
+                            <div className="flex items-center gap-1 px-2 py-1.5">
+                              <span className="truncate text-xs font-medium">{s.name}</span>
+                              {on && <Check className="h-3 w-3 shrink-0 text-primary" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 
