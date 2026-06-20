@@ -319,42 +319,11 @@ serve(async (req) => {
       }
     }
 
-    // Send "import complete" email
-    try {
-      const { data: { user: authUser } } = await supabase.auth.admin.getUserById(userId);
-      if (authUser?.email) {
-        const { data: gallery } = await supabase
-          .from("galleries")
-          .select("name")
-          .eq("id", galleryId)
-          .single();
-        const galleryName = gallery?.name || "Untitled Gallery";
-        const userName = authUser.user_metadata?.full_name || authUser.email.split("@")[0];
-        const studioUrl = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
-        const galleryUrl = `${studioUrl}/dashboard/galleries/${galleryId}`;
-        // Dynamic imports — loaded only now, never at module boot.
-        const { sendEmail } = await import("../_shared/email-sender.ts");
-        const { gdImportCompleteTemplate } = await import("../_shared/email-templates.ts");
-        const { sendWhatsAppNotification } = await import("../_shared/whatsapp.ts");
-        const { subject, html } = gdImportCompleteTemplate(galleryName, totalCount, galleryUrl);
-        await sendEmail({
-          to: authUser.email,
-          subject,
-          html,
-          emailType: "gd_import_complete",
-          userId,
-          metadata: { galleryId, imageCount: totalCount },
-          supabaseAdmin: supabase,
-        });
-
-        const now = new Date();
-        const dateStr = `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1).toString().padStart(2, "0")}/${now.getFullYear()} ${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-        const waMsg = `✅ Google Drive Import Complete\nUser: ${userName}\nEmail: ${authUser.email}\nGallery: ${galleryName}\nImages: ${totalCount}\nFolders: ${totalFolders ?? 1}\nProcessing: ${styleIds.length > 0 ? "Yes" : "No"}\nDate: ${dateStr}`;
-        sendWhatsAppNotification(waMsg).catch(() => {});
-      }
-    } catch (emailErr) {
-      console.error("Error sending import complete email:", emailErr);
-    }
+    // NOTE: the "import complete" email + WhatsApp notification were removed
+    // here for the same reason as gd-transfer — the email/template/WhatsApp
+    // import chain was implicated in a worker boot crash. The gallery is still
+    // marked ready and processing is triggered above; notifications can be
+    // re-added later via a dedicated lightweight path.
 
     console.log("Webhook finalization completed successfully");
 
