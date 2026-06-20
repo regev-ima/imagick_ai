@@ -3,11 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Imagick.ai - AI Photo Gallery Platform</title>
-    <meta name="description" content="Professional AI-powered photo gallery platform for photographers" />
+    <meta name="theme-color" content="#16171A" />
+
+    <title>Imagick.ai — Train AI on your editing style | AI photo editing for photographers</title>
+    <meta
+      name="description"
+      content="Train an AI model on your own editing style and apply it to thousands of photos in seconds. AI culling, face grouping and beautiful client galleries — built for professional photographers."
+    />
     <meta name="author" content="Imagick.ai" />
+    <meta name="keywords" content="AI photo editing, AI culling, photography workflow, wedding photography software, AI photo styles, client gallery, photo proofing, photographer tools" />
+    <link rel="canonical" href="https://imagick.ai/" />
 
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
 
     <!-- Preconnect to Supabase (API + storage) to shave TLS/DNS off the first request -->
     <link rel="preconnect" href="https://zfcltfqgrhytpvgqkkfo.supabase.co" crossorigin />
@@ -18,18 +26,59 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
 
-    <meta property="og:title" content="Imagick.ai - AI Photo Gallery Platform" />
-    <meta property="og:description" content="Professional AI-powered photo gallery platform for photographers" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Imagick.ai — The AI editing studio for photographers" />
+    <meta property="og:description" content="Your editing. Your AI. Zero presets. Train an AI model on your unique style and edit a whole shoot in seconds." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/favicon.png" />
+    <meta property="og:url" content="https://imagick.ai/" />
+    <meta property="og:site_name" content="Imagick.ai" />
+    <meta property="og:image" content="https://imagick.ai/og-image.jpg" />
 
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@imagick_ai" />
-    <meta name="twitter:image" content="/favicon.png" />
+    <meta name="twitter:title" content="Imagick.ai — The AI editing studio for photographers" />
+    <meta name="twitter:description" content="Your editing. Your AI. Zero presets. Train AI on your style and edit a whole shoot in seconds." />
+    <meta name="twitter:image" content="https://imagick.ai/og-image.jpg" />
+
+    <!-- Structured data (homepage) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Imagick.ai",
+        "url": "https://imagick.ai",
+        "logo": "https://imagick.ai/favicon.png",
+        "sameAs": ["https://twitter.com/imagick_ai"]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Imagick.ai",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Web",
+        "description": "AI photo editing studio for professional photographers. Train a model on your style, auto-cull shoots and deliver client galleries.",
+        "offers": [
+          { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "USD" },
+          { "@type": "Offer", "name": "Starter", "price": "19", "priceCurrency": "USD" },
+          { "@type": "Offer", "name": "Pro", "price": "49", "priceCurrency": "USD" },
+          { "@type": "Offer", "name": "Studio", "price": "99", "priceCurrency": "USD" }
+        ]
+      }
+    </script>
   </head>
 
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="max-width:640px;margin:64px auto;padding:0 24px;font-family:system-ui,sans-serif;color:#E8E9ED;background:#16171A">
+        <h1>Imagick.ai — The AI editing studio for photographers</h1>
+        <p>Train an AI model on your own editing style and apply it to thousands of photos in seconds. Automatic AI culling, face grouping and beautiful client galleries — built for professional photographers.</p>
+        <p><a href="/auth?mode=signup" style="color:#2B50F0">Start for free</a> · <a href="/pricing" style="color:#2B50F0">View pricing</a></p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

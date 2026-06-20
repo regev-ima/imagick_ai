@@ -1,14 +1,9 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
+
+# Keep the authenticated app out of the index
+Disallow: /dashboard
+Disallow: /reset-password
+Disallow: /unsubscribe
+
+Sitemap: https://imagick.ai/sitemap.xml
