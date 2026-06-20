@@ -1,8 +1,9 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendEmail } from "../_shared/email-sender.ts";
-import { gdImportCompleteTemplate } from "../_shared/email-templates.ts";
-import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
+// Notification helpers (email templates + Resend + WhatsApp) are imported
+// dynamically inside the handler so they never evaluate at module boot —
+// same boot-safety fix as gd-transfer (a heavy module here crashed the worker).
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,7 @@ interface WebhookPayload {
   callback_args: CallbackArgs;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -331,6 +332,10 @@ Deno.serve(async (req) => {
         const userName = authUser.user_metadata?.full_name || authUser.email.split("@")[0];
         const studioUrl = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
         const galleryUrl = `${studioUrl}/dashboard/galleries/${galleryId}`;
+        // Dynamic imports — loaded only now, never at module boot.
+        const { sendEmail } = await import("../_shared/email-sender.ts");
+        const { gdImportCompleteTemplate } = await import("../_shared/email-templates.ts");
+        const { sendWhatsAppNotification } = await import("../_shared/whatsapp.ts");
         const { subject, html } = gdImportCompleteTemplate(galleryName, totalCount, galleryUrl);
         await sendEmail({
           to: authUser.email,
