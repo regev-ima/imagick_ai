@@ -7,6 +7,8 @@ import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { CullingTags, defaultCullingTags } from "./CullingTags";
 import { UploadProgress, isPreviewable } from "./UploadProgress";
+import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
+import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -81,6 +83,9 @@ export default function CreateConceptPlan() {
   const [culling, setCulling] = useState(true);
   const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
   const [previews, setPreviews] = useState<string[]>([]);
+  const [uploadSource, setUploadSource] = useState<UploadSource>("local");
+  const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
+  const [driveLinks, setDriveLinks] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
 
@@ -99,7 +104,7 @@ export default function CreateConceptPlan() {
     if (culling) setCategories(defaultCullingTags(value, cullingLanguage));
   };
 
-  const count = files.length;
+  const count = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : files.length;
   const rankedStyles = rankStyles(styles, galleryType);
   // Exact only — edits = photos × looks (matches the real wizard). No
   // fabricated keepers/timing guesses.
@@ -132,6 +137,15 @@ export default function CreateConceptPlan() {
     window.setTimeout(() => setPhase("plan"), 1200);
   };
 
+  // Drive: once folders are linked, go straight to the plan (the transfer runs
+  // server-side, so there's nothing to "read" locally).
+  const continueWithDrive = (info: DriveFolderInfo | null) => {
+    if (!info || info.folders.length === 0) return;
+    setName(info.folders[0].folderName || "Imported shoot");
+    setDateLabel("");
+    setPhase("plan");
+  };
+
   const reset = () => {
     setPhase("drop");
     setFiles([]);
@@ -141,6 +155,9 @@ export default function CreateConceptPlan() {
     setCulling(true);
     setStyleId(null);
     setStyleTouched(false);
+    setUploadSource("local");
+    setDriveFolderInfo(null);
+    setDriveLinks([]);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -157,7 +174,9 @@ export default function CreateConceptPlan() {
       aiCulling: culling,
       categories: culling ? categories : [],
       cullingLanguage,
-      files,
+      source: uploadSource === "drive"
+        ? { kind: "drive", links: driveLinks, totalImageCount: driveFolderInfo?.totalImageCount || 0, totalSizeMB: driveFolderInfo?.totalSizeMB || 0 }
+        : { kind: "local", files },
     });
   };
 
@@ -186,28 +205,48 @@ export default function CreateConceptPlan() {
         <div className="mt-8">
           <AnimatePresence mode="wait">
             {(phase === "drop" || phase === "analyzing") && (
-              <motion.div key="drop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -8 }}
-                onClick={phase === "drop" ? () => inputRef.current?.click() : undefined}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); if (phase === "drop") ingest(e.dataTransfer.files); }}
-                className={`glass-card relative overflow-hidden rounded-[--radius] border-2 border-dashed border-border p-12 text-center transition-colors ${
-                  phase === "drop" ? "cursor-pointer hover:border-primary/50 hover:bg-primary/[0.03]" : ""
-                }`}>
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">
-                  {phase === "analyzing" ? <Loader2 className="h-6 w-6 animate-spin" /> : <UploadCloud className="h-6 w-6" />}
-                </div>
-                <h2 className="mt-4 text-xl font-semibold tracking-tight">
-                  {phase === "analyzing" ? `Reading ${count.toLocaleString()} photos…` : "Drop your shoot — I'll handle the setup"}
-                </h2>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  {phase === "analyzing" ? "Building your plan." : "RAW or JPG — drag them in or browse. No naming, no settings up front."}
-                </p>
+              <motion.div key="drop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
                 {phase === "drop" && (
-                  <div className="mt-6 flex flex-col items-center gap-2.5">
-                    <Button variant="glow" className="gap-2" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
-                      <UploadCloud className="h-4 w-4" /> Select photos
-                    </Button>
-                    <span className="text-xs text-muted-foreground/70">your real photos — they'll upload when you hit create</span>
+                  <UploadSourceSelector value={uploadSource} onChange={setUploadSource} disabled={busy} />
+                )}
+
+                {uploadSource === "drive" && phase === "drop" ? (
+                  <div className="glass-card rounded-[--radius] p-6">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-tight">
+                      <Sparkle size={13} className="text-accent" /> Import from Google Drive
+                    </div>
+                    <GoogleDriveInput folderInfo={driveFolderInfo} onUpdate={(info, links) => { setDriveFolderInfo(info); setDriveLinks(links); }} disabled={busy} />
+                    {driveFolderInfo && driveFolderInfo.folders.length > 0 && (
+                      <Button variant="glow" className="mt-4 w-full gap-2" onClick={() => continueWithDrive(driveFolderInfo)}>
+                        <Sparkle size={14} className="text-accent-foreground" /> Continue — {driveFolderInfo.totalImageCount.toLocaleString()} photos
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    onClick={phase === "drop" ? () => inputRef.current?.click() : undefined}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); if (phase === "drop") ingest(e.dataTransfer.files); }}
+                    className={`glass-card relative overflow-hidden rounded-[--radius] border-2 border-dashed border-border p-12 text-center transition-colors ${
+                      phase === "drop" ? "cursor-pointer hover:border-primary/50 hover:bg-primary/[0.03]" : ""
+                    }`}>
+                    <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">
+                      {phase === "analyzing" ? <Loader2 className="h-6 w-6 animate-spin" /> : <UploadCloud className="h-6 w-6" />}
+                    </div>
+                    <h2 className="mt-4 text-xl font-semibold tracking-tight">
+                      {phase === "analyzing" ? `Reading ${count.toLocaleString()} photos…` : "Drop your shoot — I'll handle the setup"}
+                    </h2>
+                    <p className="mt-1.5 text-sm text-muted-foreground">
+                      {phase === "analyzing" ? "Building your plan." : "RAW or JPG — drag them in or browse. No naming, no settings up front."}
+                    </p>
+                    {phase === "drop" && (
+                      <div className="mt-6 flex flex-col items-center gap-2.5">
+                        <Button variant="glow" className="gap-2" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
+                          <UploadCloud className="h-4 w-4" /> Select photos
+                        </Button>
+                        <span className="text-xs text-muted-foreground/70">your real photos — they'll upload when you hit create</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </motion.div>

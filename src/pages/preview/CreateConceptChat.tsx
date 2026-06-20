@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, Check, UploadCloud, FolderOpen, Images, Sparkles as SparklesIcon, ChevronDown } from "lucide-react";
+import { ArrowLeft, Send, Check, UploadCloud, FolderOpen, Images, Sparkles as SparklesIcon, ChevronDown, CloudIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { CullingTags, defaultCullingTags } from "./CullingTags";
 import { UploadProgress, isPreviewable } from "./UploadProgress";
+import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -111,6 +112,11 @@ export default function CreateConceptChat() {
   const [styleId, setStyleId] = useState<string | null>(null);
   const [culling, setCulling] = useState(true);
   const [categories, setCategories] = useState<string[]>([]);
+  const [uploadSource, setUploadSource] = useState<"local" | "drive">("local");
+  const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
+  const [driveLinks, setDriveLinks] = useState<string[]>([]);
+
+  const photoCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : files.length;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -144,16 +150,30 @@ export default function CreateConceptChat() {
     setStep("type");
   };
 
+  // Best-guess name from whichever source is active.
+  const derivedName = () =>
+    uploadSource === "drive"
+      ? (driveFolderInfo?.folders[0]?.folderName || "Imported shoot")
+      : deriveName(files as FileWithPath[]);
+
+  // Google Drive: folders are linked in the composer, then continue.
+  const continueDrive = () => {
+    if (!driveFolderInfo || driveFolderInfo.folders.length === 0) return;
+    say("user", `Imported ${driveFolderInfo.totalImageCount.toLocaleString()} photos from Google Drive`);
+    say("aura", `Got ${driveFolderInfo.totalImageCount.toLocaleString()} photos from Drive. What kind of shoot is this? It tells me which look to suggest and what to look for when I cull.`);
+    setStep("type");
+  };
+
   const pickType = (t: { value: string; label: string }) => {
     setGalleryType(t.value);
     say("user", t.label);
     say("aura", "Great. What should I call this gallery? You'll see this name in your dashboard and on the client share link.");
-    setName(deriveName(files as FileWithPath[]));
+    setName(derivedName());
     setStep("name");
   };
 
   const confirmName = (value: string) => {
-    const finalName = value.trim() || deriveName(files as FileWithPath[]);
+    const finalName = value.trim() || derivedName();
     setName(finalName);
     say("user", finalName);
     const typeLabel = TYPES.find((t) => t.value === galleryType)?.label ?? "this";
@@ -196,13 +216,15 @@ export default function CreateConceptChat() {
 
   const onCreate = () => {
     submit({
-      name: name.trim() || deriveName(files as FileWithPath[]),
+      name: name.trim() || derivedName(),
       galleryType,
       styleIds: styleId ? [styleId] : [],
       aiCulling: culling,
       categories: culling ? categories : [],
       cullingLanguage,
-      files,
+      source: uploadSource === "drive"
+        ? { kind: "drive", links: driveLinks, totalImageCount: driveFolderInfo?.totalImageCount || 0, totalSizeMB: driveFolderInfo?.totalSizeMB || 0 }
+        : { kind: "local", files },
     });
   };
 
@@ -213,16 +235,16 @@ export default function CreateConceptChat() {
   return (
     <div
       className="relative flex h-[100dvh] flex-col overflow-hidden bg-background"
-      onDragOver={step === "upload" ? (e) => { e.preventDefault(); setDragOver(true); } : undefined}
-      onDragLeave={step === "upload" ? () => setDragOver(false) : undefined}
-      onDrop={step === "upload" ? async (e) => { e.preventDefault(); setDragOver(false); ingest(await filesFromDataTransfer(e.dataTransfer)); } : undefined}
+      onDragOver={step === "upload" && uploadSource === "local" ? (e) => { e.preventDefault(); setDragOver(true); } : undefined}
+      onDragLeave={step === "upload" && uploadSource === "local" ? () => setDragOver(false) : undefined}
+      onDrop={step === "upload" && uploadSource === "local" ? async (e) => { e.preventDefault(); setDragOver(false); ingest(await filesFromDataTransfer(e.dataTransfer)); } : undefined}
     >
       <input ref={photosRef} type="file" multiple accept="image/*,.cr2,.cr3,.nef,.arw,.raf,.rw2,.dng,.orf,.srw,.pef" className="hidden" onChange={(e) => ingest(Array.from(e.target.files ?? []))} />
       {/* @ts-expect-error -- webkitdirectory is a valid non-standard attribute */}
       <input ref={folderRef} type="file" webkitdirectory="" directory="" multiple className="hidden" onChange={(e) => ingest(Array.from(e.target.files ?? []))} />
 
       {/* Drag-and-drop overlay — folders included, no browser prompt */}
-      {dragOver && step === "upload" && (
+      {dragOver && step === "upload" && uploadSource === "local" && (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-background/80 backdrop-blur-sm">
           <div className="rounded-[--radius] border-2 border-dashed border-primary px-10 py-8 text-center">
             <UploadCloud className="mx-auto h-8 w-8 text-primary" />
@@ -292,13 +314,13 @@ export default function CreateConceptChat() {
                 </span>
                 <h3 className="mt-2 text-lg font-semibold tracking-tight">{name}</h3>
                 <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {TYPES.find((t) => t.value === galleryType)?.label} · {files.length.toLocaleString()} photos</li>
-                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> Look: {selectedStyleName}{styleId ? ` · ${files.length.toLocaleString()} edits` : ""}</li>
+                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {TYPES.find((t) => t.value === galleryType)?.label} · {photoCount.toLocaleString()} photos{uploadSource === "drive" ? " · from Drive" : ""}</li>
+                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> Look: {selectedStyleName}{styleId ? ` · ${photoCount.toLocaleString()} edits` : ""}</li>
                   <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Cull first — Aura keeps the best${categories.length ? ` · ${categories.length} tags` : ""}` : "Edit everything"}</li>
                 </ul>
 
                 {busy ? (
-                  <div className="mt-4"><UploadProgress uploading={isUploading} progress={uploadProgress} total={files.length} previews={previews} /></div>
+                  <div className="mt-4"><UploadProgress uploading={isUploading} progress={uploadProgress} total={photoCount} previews={previews} /></div>
                 ) : (
                   <Button variant="glow" size="lg" className="mt-4 w-full gap-2" onClick={onCreate}>
                     <Sparkle size={15} className="text-accent-foreground" /> Create &amp; start editing
@@ -317,19 +339,34 @@ export default function CreateConceptChat() {
         <div className="shrink-0 border-t border-border/60 bg-background/80 px-6 pt-4 backdrop-blur"
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
           <div className="mx-auto w-full max-w-2xl">
-            {step === "upload" && (
+            {step === "upload" && uploadSource === "local" && (
               <>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <Button variant="glow" className="gap-2" onClick={() => photosRef.current?.click()}>
-                    <UploadCloud className="h-4 w-4" /> Select photos
+                    <UploadCloud className="h-4 w-4" /> Photos
                   </Button>
                   <Button variant="outline" className="gap-2" onClick={() => folderRef.current?.click()}>
-                    <FolderOpen className="h-4 w-4" /> Folder <span className="text-[10px] text-muted-foreground/70">(browser asks once)</span>
+                    <FolderOpen className="h-4 w-4" /> Folder
+                  </Button>
+                  <Button variant="outline" className="gap-2" onClick={() => setUploadSource("drive")}>
+                    <CloudIcon className="h-4 w-4" /> Drive
                   </Button>
                 </div>
                 <p className="mt-2 text-center text-xs text-muted-foreground/70">
-                  Best: <span className="text-foreground/80">drag a folder right into this chat</span> — no browser prompt. The “Folder” button uses Chrome's picker, which always shows that confirmation.
+                  Best: <span className="text-foreground/80">drag a folder right into this chat</span> — no browser prompt. The “Folder” button uses Chrome's picker, which always shows a confirmation.
                 </p>
+              </>
+            )}
+
+            {step === "upload" && uploadSource === "drive" && (
+              <>
+                <GoogleDriveInput folderInfo={driveFolderInfo} onUpdate={(info, links) => { setDriveFolderInfo(info); setDriveLinks(links); }} />
+                <div className="mt-3 flex items-center gap-2">
+                  <Button variant="glow" className="flex-1 gap-2" disabled={!driveFolderInfo || driveFolderInfo.folders.length === 0} onClick={continueDrive}>
+                    <Send className="h-4 w-4" /> Continue{driveFolderInfo ? ` — ${driveFolderInfo.totalImageCount.toLocaleString()} photos` : ""}
+                  </Button>
+                  <button type="button" onClick={() => { setUploadSource("local"); setDriveFolderInfo(null); setDriveLinks([]); }} className="caption hover:text-foreground">← from device</button>
+                </div>
               </>
             )}
 
@@ -391,7 +428,7 @@ export default function CreateConceptChat() {
             {step === "name" && (
               <>
                 <div className="mb-3 flex flex-wrap gap-2">
-                  <Chip onClick={() => confirmName(deriveName(files as FileWithPath[]))}>{deriveName(files as FileWithPath[])}</Chip>
+                  <Chip onClick={() => confirmName(derivedName())}>{derivedName()}</Chip>
                 </div>
                 <form onSubmit={(e) => { e.preventDefault(); confirmName(input); }} className="flex items-center gap-2">
                   <input

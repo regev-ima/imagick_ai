@@ -7,6 +7,8 @@ import { getThumbnailUrl } from "@/lib/imageUrls";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { CullingTags, defaultCullingTags } from "./CullingTags";
 import { UploadProgress, isPreviewable } from "./UploadProgress";
+import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
+import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -54,6 +56,9 @@ export default function CreateConceptCanvas() {
   const [cull, setCull] = useState(true);
   const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
   const [previews, setPreviews] = useState<string[]>([]);
+  const [uploadSource, setUploadSource] = useState<UploadSource>("local");
+  const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
+  const [driveLinks, setDriveLinks] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
 
@@ -70,7 +75,7 @@ export default function CreateConceptCanvas() {
     if (cull) setCategories(defaultCullingTags(value, cullingLanguage));
   };
 
-  const photos = files.length;
+  const photos = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : files.length;
   const ingest = (list: FileList | null) => {
     if (!list) return;
     const imgs = Array.from(list).filter(isImage);
@@ -119,7 +124,9 @@ export default function CreateConceptCanvas() {
       aiCulling: cull,
       categories: cull ? categories : [],
       cullingLanguage,
-      files,
+      source: uploadSource === "drive"
+        ? { kind: "drive", links: driveLinks, totalImageCount: driveFolderInfo?.totalImageCount || 0, totalSizeMB: driveFolderInfo?.totalSizeMB || 0 }
+        : { kind: "local", files },
     });
   };
 
@@ -156,8 +163,17 @@ export default function CreateConceptCanvas() {
                 className="mt-1 w-full border-0 bg-transparent text-2xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
                 placeholder="Untitled shoot"
               />
-              {photos > 0 ? (
-                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+
+              <div className="mt-3">
+                <UploadSourceSelector value={uploadSource} onChange={setUploadSource} disabled={busy} />
+              </div>
+
+              {uploadSource === "drive" ? (
+                <div className="mt-3">
+                  <GoogleDriveInput folderInfo={driveFolderInfo} onUpdate={(info, links) => { setDriveFolderInfo(info); setDriveLinks(links); }} disabled={busy} />
+                </div>
+              ) : photos > 0 ? (
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <Images className="h-3.5 w-3.5" /> {photos.toLocaleString()} photos selected
                   <button type="button" onClick={() => inputRef.current?.click()} className="text-accent hover:underline">change</button>
                 </div>

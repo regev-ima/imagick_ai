@@ -12,9 +12,17 @@ import { getCullingLabels, type LanguageCode } from "@/lib/cullingLabels";
 // Shared "create a collection" engine for the design-concept prototypes.
 // It mirrors the real CreateGalleryPage local-upload path exactly (gallery
 // insert → upload via Uppy → hero → status → upload-complete email → AI
-// processing → navigate to the gallery), but takes a plain File[] and the
-// form values as params so each concept UI can drive the identical backend.
-// Local-upload only (no Google Drive) — that's the core end-to-end flow.
+// processing → navigate to the gallery), and also the Google Drive
+// server-transfer path (gallery → transferring → gd-transfer). The import
+// source is a small discriminated union so new providers (Dropbox, OneDrive…)
+// can be added later without touching the three concept UIs.
+
+// Where the photos come from. "local" = the browser holds the File[] and
+// uploads via Uppy. "drive" = the backend pulls them from Google Drive
+// folders (no bytes through the browser). Future: add { kind: "dropbox" }, etc.
+export type ImportSpec =
+  | { kind: "local"; files: File[] }
+  | { kind: "drive"; links: string[]; totalImageCount: number; totalSizeMB: number };
 
 export interface CreateGalleryParams {
   name: string;
@@ -24,7 +32,7 @@ export interface CreateGalleryParams {
   categories?: string[];
   aiCulling: boolean;
   cullingLanguage?: LanguageCode;
-  files: File[];
+  source: ImportSpec;
 }
 
 export function useCreateGalleryFlow() {
@@ -69,8 +77,13 @@ export function useCreateGalleryFlow() {
       toast.error("Please sign in to create a gallery");
       return false;
     }
-    if (params.files.length === 0) {
+    const { source } = params;
+    if (source.kind === "local" && source.files.length === 0) {
       toast.error("Add at least one photo first");
+      return false;
+    }
+    if (source.kind === "drive" && source.links.length === 0) {
+      toast.error("Add a Google Drive folder first");
       return false;
     }
 
@@ -85,6 +98,51 @@ export function useCreateGalleryFlow() {
 
     setIsSubmitting(true);
     try {
+      // ── Google Drive: server-side transfer (no bytes through the browser) ──
+      if (source.kind === "drive") {
+        const { data: gallery, error: galleryError } = await supabase
+          .from("galleries")
+          .insert({
+            user_id: user.id,
+            name: params.name,
+            gallery_type: params.galleryType,
+            description: params.description || null,
+            categories: params.categories ?? [],
+            culling_labels: effectiveCullingLabels,
+            ai_culling_enabled: params.aiCulling,
+            total_images: source.totalImageCount,
+            status: "transferring",
+          })
+          .select()
+          .single();
+        if (galleryError) throw galleryError;
+
+        const updatePayload: Record<string, unknown> = { source_drive_links: source.links };
+        if (params.styleIds.length > 0) updatePayload.selected_style_ids = params.styleIds;
+        await supabase.from("galleries").update(updatePayload).eq("id", gallery.id);
+
+        const response = await supabase.functions.invoke("gd-transfer", {
+          body: {
+            driveLinks: source.links,
+            galleryId: gallery.id,
+            styleIds: params.styleIds,
+            metadataOnly: false,
+            totalImageCount: source.totalImageCount,
+            totalSizeMB: source.totalSizeMB,
+          },
+        });
+        if (response.error) throw new Error(response.error.message || "Failed to start transfer");
+        if (response.data?.error === "storage_limit_exceeded") {
+          throw new Error(response.data.message || "Storage limit exceeded. Upgrade your plan or add storage.");
+        }
+
+        toast.success("Import started! Pulling your photos from Google Drive…");
+        navigate(`/dashboard/galleries/${gallery.id}`);
+        return true;
+      }
+
+      // ── Local upload (Uppy) ──
+      const files = source.files;
       // 1. Create the gallery.
       const { data: gallery, error: galleryError } = await supabase
         .from("galleries")
@@ -96,7 +154,7 @@ export function useCreateGalleryFlow() {
           categories: params.categories ?? [],
           culling_labels: effectiveCullingLabels,
           ai_culling_enabled: params.aiCulling,
-          total_images: params.files.length,
+          total_images: files.length,
           status: "uploading",
         })
         .select()
@@ -113,7 +171,7 @@ export function useCreateGalleryFlow() {
 
       // 3. Upload images, streaming completed batches into AI processing.
       const streamed = new Set<string>();
-      const imageIds = await uploadImages(gallery.id, user.id, params.files, {
+      const imageIds = await uploadImages(gallery.id, user.id, files, {
         onBatchInserted: (newIds) => {
           if (params.styleIds.length === 0 || newIds.length === 0) return;
           const fresh = newIds.filter((id) => !streamed.has(id));
