@@ -87,7 +87,8 @@ export default function AuthPage() {
     }
   };
 
-  const [isLogin, setIsLogin] = useState(true);
+  // Honor ?mode=signup (e.g. from the marketing site "Start free" CTAs).
+  const [isLogin, setIsLogin] = useState(searchParams.get("mode") !== "signup");
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

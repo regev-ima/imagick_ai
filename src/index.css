@@ -459,6 +459,21 @@
   .aura-orb-halo { animation: aura-breathe 3.6s ease-in-out infinite reverse; }
   .aura-led-pulse { animation: aura-led 2.2s ease-in-out infinite; }
 }
+/* ── Before/After reveal slider — invisible track, grip = the handle ── */
+.ba-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 40px; height: 100%; cursor: ew-resize;
+  background: transparent; border: none;
+}
+.ba-range::-moz-range-thumb {
+  width: 40px; height: 9999px; cursor: ew-resize;
+  background: transparent; border: none;
+}
+.ba-range::-webkit-slider-runnable-track { background: transparent; }
+.ba-range::-moz-range-track { background: transparent; }
+.ba-range:focus-visible { outline: none; }
+.ba-range:focus-visible + * { /* no-op safeguard */ }
+
 @keyframes aura-spin-angle { to { --aura-angle: 360deg; } }
 @keyframes aura-rotate { to { transform: rotate(360deg); } }
 @keyframes aura-breathe { 0%,100% { opacity: 0.85; transform: scale(0.96); } 50% { opacity: 1; transform: scale(1.05); } }

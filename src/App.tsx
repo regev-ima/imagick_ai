@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { useAuth } from "./hooks/useAuth";
 import { useSessionTracker } from "./hooks/useSessionTracker";
@@ -21,6 +21,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const DashboardLayout = lazy(() => import("./components/layout/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
@@ -106,8 +108,9 @@ const App = () => (
             <SessionTrackerProvider>
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
-                {/* Redirect home to auth - no landing page */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                {/* Public marketing site */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/unsubscribe" element={<UnsubscribePage />} />
