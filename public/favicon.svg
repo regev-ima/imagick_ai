@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+
+  <!-- Blue AI scan frame -->
+  <g fill="none" stroke="#1F44FF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <!-- top edge + top-left corner + left side + bottom-left corner + bottom edge -->
+    <path d="M300 104 H170 A66 66 0 0 0 104 170 V356 A66 66 0 0 0 170 422 H252"/>
+    <!-- bottom edge (right of gap) + bottom-right corner + right side -->
+    <path d="M300 422 H342 A66 66 0 0 0 408 356 V232"/>
+    <!-- detached top-right vertical accent -->
+    <path d="M408 150 V200"/>
+  </g>
+
+  <!-- Sparkle -->
+  <path d="M404 68 C410 104 420 114 456 120 C420 126 410 136 404 172 C398 136 388 126 352 120 C388 114 398 104 404 68 Z" fill="#1F44FF"/>
+
+  <!-- Ai wordmark -->
+  <g fill="#0B1A3F">
+    <!-- A -->
+    <path fill-rule="evenodd" d="M248 164 L160 362 L336 362 Z M248 214 L226 300 L270 300 Z M218 330 L278 330 L290 362 L206 362 Z"/>
+    <!-- i stem -->
+    <rect x="338" y="232" width="34" height="130" rx="6"/>
+    <!-- i dot -->
+    <rect x="338" y="168" width="34" height="40" rx="11"/>
+  </g>
+</svg>
