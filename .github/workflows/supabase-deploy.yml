@@ -59,3 +59,13 @@ jobs:
       - name: Deploy edge functions
         if: ${{ inputs.skip_functions != true }}
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID"
+
+      # Drive functions do their own Bearer-token / webhook-secret auth, so the
+      # platform JWT gate must be OFF — otherwise it blocks the unauthenticated
+      # CORS preflight (503/null execution) and breaks Google Drive imports.
+      # Re-assert it explicitly in case the gateway setting drifted from config.toml.
+      - name: Force-disable JWT gate on Drive functions
+        if: ${{ inputs.skip_functions != true }}
+        run: |
+          supabase functions deploy gd-transfer --no-verify-jwt --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy gd-transfer-webhook --no-verify-jwt --project-ref "$SUPABASE_PROJECT_ID"

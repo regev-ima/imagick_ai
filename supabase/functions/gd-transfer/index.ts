@@ -311,49 +311,11 @@ serve(async (req) => {
       });
     });
 
-    // Send "import started" email (fire and forget)
-    if (galleryId && !isStyleTransfer) {
-      try {
-        const supabaseAdmin = createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
-        const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
-        if (authUser?.email) {
-          const { data: gallery } = await supabaseAdmin
-            .from("galleries")
-            .select("name")
-            .eq("id", galleryId)
-            .single();
-          const galleryName = gallery?.name || "Untitled Gallery";
-          const userName = authUser.user_metadata?.full_name || authUser.email.split("@")[0];
-          const studioUrl = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
-          const galleryUrl = `${studioUrl}/dashboard/galleries/${galleryId}`;
-          // Dynamic imports — loaded only now, never at module boot.
-          const { sendEmail } = await import("../_shared/email-sender.ts");
-          const { gdImportStartedTemplate } = await import("../_shared/email-templates.ts");
-          const { sendWhatsAppNotification } = await import("../_shared/whatsapp.ts");
-          const { subject, html } = gdImportStartedTemplate(galleryName, totalImageCount || links.length, galleryUrl);
-          sendEmail({
-            to: authUser.email,
-            subject,
-            html,
-            emailType: "gd_import_started",
-            userId,
-            metadata: { galleryId, foldersCount: links.length },
-            supabaseAdmin,
-          }).catch(err => console.error("Failed to send gd_import_started email:", err));
-
-          // WhatsApp notification
-          const now = new Date();
-          const dateStr = `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1).toString().padStart(2, "0")}/${now.getFullYear()} ${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-          const waMsg = `📂 Google Drive Import Started\nUser: ${userName}\nEmail: ${authUser.email}\nGallery: ${galleryName}\nFolders: ${links.length}\nImages: ${totalImageCount || "unknown"}\nDate: ${dateStr}`;
-          sendWhatsAppNotification(waMsg).catch(() => {});
-        }
-      } catch (emailErr) {
-        console.error("Error sending import started email:", emailErr);
-      }
-    }
+    // NOTE: the "import started" email + WhatsApp notification were removed
+    // from here. Importing the email-template / Resend / WhatsApp chain (even
+    // dynamically) was implicated in a worker boot crash that 503'd the OPTIONS
+    // preflight and blocked ALL Drive imports. The gallery status still updates
+    // in-app; we can re-add notifications later via a dedicated lightweight path.
 
     // Return immediately without waiting for transfers to complete
     return new Response(
