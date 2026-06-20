@@ -59,6 +59,11 @@ const LeadCampaignsPage = lazy(() => import("./pages/dashboard/admin/LeadCampaig
 const LeadTemplatesPage = lazy(() => import("./pages/dashboard/admin/LeadTemplatesPage"));
 const LeadAnalyticsPage = lazy(() => import("./pages/dashboard/admin/LeadAnalyticsPage"));
 const UserDetailPage = lazy(() => import("./pages/dashboard/admin/UserDetailPage"));
+// Internal design exploration — "create a new collection" concepts (static mocks).
+const CreateConceptIndex = lazy(() => import("./pages/preview/CreateConceptIndex"));
+const CreateConceptPlan = lazy(() => import("./pages/preview/CreateConceptPlan"));
+const CreateConceptChat = lazy(() => import("./pages/preview/CreateConceptChat"));
+const CreateConceptCanvas = lazy(() => import("./pages/preview/CreateConceptCanvas"));
 
 const RouteFallback = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -110,6 +115,11 @@ const App = () => (
                 <Route path="/legal/terms" element={<TermsPage />} />
                 <Route path="/g/:shortId" element={<ShortLinkRedirect />} />
                 <Route path="/gallery/:galleryId" element={<ClientGalleryPage />} />
+                {/* Internal design exploration — create-collection concepts (wired to the real backend; auth required) */}
+                <Route path="/preview/create" element={<ProtectedRoute><CreateConceptIndex /></ProtectedRoute>} />
+                <Route path="/preview/create-a" element={<ProtectedRoute><CreateConceptPlan /></ProtectedRoute>} />
+                <Route path="/preview/create-b" element={<ProtectedRoute><CreateConceptChat /></ProtectedRoute>} />
+                <Route path="/preview/create-c" element={<ProtectedRoute><CreateConceptCanvas /></ProtectedRoute>} />
                 <Route
                   path="/dashboard"
                   element={(
