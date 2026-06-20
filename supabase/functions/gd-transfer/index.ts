@@ -1,8 +1,11 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendEmail } from "../_shared/email-sender.ts";
-import { gdImportStartedTemplate } from "../_shared/email-templates.ts";
-import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+// The email-template / Resend / WhatsApp helpers are imported *dynamically*
+// inside the transfer branch (see below) so they never evaluate at module
+// load. This keeps the worker's cold-start/boot path minimal and identical to
+// the core functions — a heavy module here was crashing the worker at boot
+// (503 on the OPTIONS preflight, no execution), which broke Drive imports.
 
 const GD_TO_B2_URL = "https://us-central1-wesnapp-editing-server.cloudfunctions.net/gd-to-b2";
 
@@ -28,7 +31,7 @@ interface MetadataResponse {
   file_names: string[];
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -326,6 +329,10 @@ Deno.serve(async (req) => {
           const userName = authUser.user_metadata?.full_name || authUser.email.split("@")[0];
           const studioUrl = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
           const galleryUrl = `${studioUrl}/dashboard/galleries/${galleryId}`;
+          // Dynamic imports — loaded only now, never at module boot.
+          const { sendEmail } = await import("../_shared/email-sender.ts");
+          const { gdImportStartedTemplate } = await import("../_shared/email-templates.ts");
+          const { sendWhatsAppNotification } = await import("../_shared/whatsapp.ts");
           const { subject, html } = gdImportStartedTemplate(galleryName, totalImageCount || links.length, galleryUrl);
           sendEmail({
             to: authUser.email,
