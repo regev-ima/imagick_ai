@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { appHref } from "@/lib/domains";
+import { AppCta } from "@/components/marketing/AppCta";
 import { Check, Minus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarketingNav } from "@/components/marketing/MarketingNav";
@@ -177,7 +178,7 @@ export default function PricingPage() {
                         {p.slug === "studio" ? (
                           <a href={`mailto:${SITE.email}?subject=Imagick.ai%20Studio`}>{p.cta}</a>
                         ) : (
-                          <Link to="/auth?mode=signup">{p.cta}</Link>
+                          <a href={appHref("/auth?mode=signup")}>{p.cta}</a>
                         )}
                       </Button>
                     </td>
@@ -211,9 +212,9 @@ export default function PricingPage() {
                 3,000 AI edits, no credit card. See your style come back in seconds.
               </p>
               <Button asChild variant="glow" size="lg" className="mt-7">
-                <Link to="/auth?mode=signup">
+                <AppCta to="/auth?mode=signup">
                   Start for free <ArrowRight className="h-4 w-4" />
-                </Link>
+                </AppCta>
               </Button>
             </div>
           </div>

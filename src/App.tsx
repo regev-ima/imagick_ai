@@ -10,6 +10,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminRoute } from "./components/AdminRoute";
 import { ImpersonationProvider } from "./hooks/useImpersonation";
 import { TrackingTags } from "./components/TrackingTags";
+import { DomainGuard } from "./components/DomainGuard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,6 +106,7 @@ const App = () => (
           }}
         />
         <BrowserRouter>
+          <DomainGuard />
           <ImpersonationProvider>
             <SessionTrackerProvider>
               <Suspense fallback={<RouteFallback />}>

@@ -10,6 +10,7 @@ import { Reveal, Kicker, EASE } from "@/components/marketing/Reveal";
 import { BeforeAfter } from "@/components/marketing/BeforeAfter";
 import { ClientGalleryMockup } from "@/components/marketing/ProductMockups";
 import { PricingTiers } from "@/components/marketing/PricingTiers";
+import { AppCta } from "@/components/marketing/AppCta";
 import { getUseCase, USE_CASES } from "@/components/marketing/content";
 import { SITE } from "@/components/marketing/data";
 import hero1 from "@/assets/hero-gallery-1.jpg";
@@ -65,9 +66,9 @@ export default function UseCasePage() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button asChild variant="glow" size="lg" className="w-full sm:w-auto">
-                <Link to="/auth?mode=signup">
+                <AppCta to="/auth?mode=signup">
                   Start for free <ArrowRight className="h-4 w-4" />
-                </Link>
+                </AppCta>
               </Button>
               <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
                 <Link to="/pricing">View pricing</Link>

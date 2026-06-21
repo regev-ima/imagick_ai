@@ -1,5 +1,20 @@
 {
   "buildCommand": "vite build && node scripts/prerender.mjs",
+  "redirects": [
+    { "source": "/:path*", "has": [{ "type": "host", "value": "www.imagick.ai" }], "destination": "https://imagick.ai/:path*", "permanent": true },
+
+    { "source": "/", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "/dashboard", "permanent": false },
+    { "source": "/pricing", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/pricing", "permanent": false },
+    { "source": "/blog", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/blog", "permanent": false },
+    { "source": "/blog/:path*", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/blog/:path*", "permanent": false },
+    { "source": "/for/:path*", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/for/:path*", "permanent": false },
+
+    { "source": "/dashboard", "has": [{ "type": "host", "value": "imagick.ai" }], "destination": "https://app.imagick.ai/dashboard", "permanent": false },
+    { "source": "/dashboard/:path*", "has": [{ "type": "host", "value": "imagick.ai" }], "destination": "https://app.imagick.ai/dashboard/:path*", "permanent": false },
+    { "source": "/auth", "has": [{ "type": "host", "value": "imagick.ai" }], "destination": "https://app.imagick.ai/auth", "permanent": false },
+    { "source": "/reset-password", "has": [{ "type": "host", "value": "imagick.ai" }], "destination": "https://app.imagick.ai/reset-password", "permanent": false },
+    { "source": "/unsubscribe", "has": [{ "type": "host", "value": "imagick.ai" }], "destination": "https://app.imagick.ai/unsubscribe", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],

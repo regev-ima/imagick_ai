@@ -7,6 +7,7 @@ import { useBrandLogo } from "@/hooks/useBrandLogo";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkle } from "./Sparkle";
+import { AppCta } from "./AppCta";
 
 type NavItem = { label: string; id?: string; to?: string };
 
@@ -113,19 +114,19 @@ export function MarketingNav() {
           <ThemeToggle />
           {isAuthenticated ? (
             <Button asChild variant="glow" size="sm" className="h-9">
-              <Link to="/dashboard">
+              <AppCta to="/dashboard">
                 Open dashboard <ArrowRight className="h-4 w-4" />
-              </Link>
+              </AppCta>
             </Button>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm" className="h-9">
-                <Link to="/auth">Sign in</Link>
+                <AppCta to="/auth">Sign in</AppCta>
               </Button>
               <Button asChild variant="glow" size="sm" className="h-9">
-                <Link to="/auth?mode=signup">
+                <AppCta to="/auth?mode=signup">
                   Start free <ArrowRight className="h-4 w-4" />
-                </Link>
+                </AppCta>
               </Button>
             </>
           )}
@@ -162,21 +163,21 @@ export function MarketingNav() {
             <div className="mt-3 grid gap-2 border-t border-border pt-3">
               {isAuthenticated ? (
                 <Button asChild variant="glow" className="w-full">
-                  <Link to="/dashboard" onClick={() => setOpen(false)}>
+                  <AppCta to="/dashboard" onClick={() => setOpen(false)}>
                     Open dashboard <ArrowRight className="h-4 w-4" />
-                  </Link>
+                  </AppCta>
                 </Button>
               ) : (
                 <>
                   <Button asChild variant="outline" className="w-full">
-                    <Link to="/auth" onClick={() => setOpen(false)}>
+                    <AppCta to="/auth" onClick={() => setOpen(false)}>
                       Sign in
-                    </Link>
+                    </AppCta>
                   </Button>
                   <Button asChild variant="glow" className="w-full">
-                    <Link to="/auth?mode=signup" onClick={() => setOpen(false)}>
+                    <AppCta to="/auth?mode=signup" onClick={() => setOpen(false)}>
                       Start free <Sparkle size={13} className="text-primary-foreground" />
-                    </Link>
+                    </AppCta>
                   </Button>
                 </>
               )}

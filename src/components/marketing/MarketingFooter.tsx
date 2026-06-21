@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useBrandLogo } from "@/hooks/useBrandLogo";
+import { appHref } from "@/lib/domains";
 import { Sparkle } from "./Sparkle";
 import { SITE } from "./data";
 import { USE_CASES } from "./content";
@@ -17,8 +18,8 @@ const useCaseLinks = USE_CASES.map((u) => ({
 }));
 
 const resourceLinks = [
-  { label: "Sign in", to: "/auth" },
-  { label: "Start free", to: "/auth?mode=signup" },
+  { label: "Sign in", href: appHref("/auth") },
+  { label: "Start free", href: appHref("/auth?mode=signup") },
   { label: "Contact", href: `mailto:${SITE.email}` },
 ];
 

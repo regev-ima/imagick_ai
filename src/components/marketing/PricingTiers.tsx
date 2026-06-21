@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { appHref } from "@/lib/domains";
 import { Sparkle } from "./Sparkle";
 import { PLANS, SITE, type Plan } from "./data";
 
@@ -98,11 +98,7 @@ export function PricingTiers({ idPrefix = "pricing" }: { idPrefix?: string }) {
                 variant={plan.highlight ? "glow" : "outline"}
                 className="mt-5 w-full"
               >
-                {external ? (
-                  <a href={target}>{plan.cta}</a>
-                ) : (
-                  <Link to={target}>{plan.cta}</Link>
-                )}
+                <a href={external ? target : appHref(target)}>{plan.cta}</a>
               </Button>
 
               <ul className="mt-6 space-y-2.5">

@@ -6,6 +6,7 @@ import { MarketingNav } from "@/components/marketing/MarketingNav";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { Seo } from "@/components/marketing/Seo";
 import { Sparkle } from "@/components/marketing/Sparkle";
+import { AppCta } from "@/components/marketing/AppCta";
 import { getPost, type Block } from "@/components/marketing/content";
 import { SITE } from "@/components/marketing/data";
 
@@ -131,9 +132,9 @@ export default function BlogPostPage() {
             to start.
           </p>
           <Button asChild variant="glow" size="lg" className="mt-6">
-            <Link to="/auth?mode=signup">
+            <AppCta to="/auth?mode=signup">
               Start for free <ArrowRight className="h-4 w-4" />
-            </Link>
+            </AppCta>
           </Button>
         </div>
       </main>

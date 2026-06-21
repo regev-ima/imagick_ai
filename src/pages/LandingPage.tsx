@@ -22,6 +22,7 @@ import { BeforeAfter } from "@/components/marketing/BeforeAfter";
 import { PricingTiers } from "@/components/marketing/PricingTiers";
 import { Testimonials } from "@/components/marketing/Testimonials";
 import { Faq } from "@/components/marketing/Faq";
+import { AppCta } from "@/components/marketing/AppCta";
 import {
   EditorMockup,
   CullingMockup,
@@ -139,9 +140,9 @@ function Hero() {
           className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
           <Button asChild variant="glow" size="lg" className="w-full sm:w-auto">
-            <Link to="/auth?mode=signup">
+            <AppCta to="/auth?mode=signup">
               Start for free <ArrowRight className="h-4 w-4" />
-            </Link>
+            </AppCta>
           </Button>
           <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
             <a href="#showcase">
@@ -563,9 +564,9 @@ function FinalCta() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button asChild variant="glow" size="lg" className="w-full sm:w-auto">
-                <Link to="/auth?mode=signup">
+                <AppCta to="/auth?mode=signup">
                   Start for free <ArrowRight className="h-4 w-4" />
-                </Link>
+                </AppCta>
               </Button>
               <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
                 <Link to="/pricing">View pricing</Link>

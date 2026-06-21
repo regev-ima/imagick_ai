@@ -4,21 +4,37 @@ This repo now ships a full public sales site (landing, pricing, niche pages,
 blog) plus an admin-managed tracking system, built in the LIGHTROOM design.
 This is the checklist to take it live on **imagick.ai**.
 
-## 1. Point the domain (Vercel)
+## 1. Two domains, one deployment (Vercel)
 
-The Vercel project (`imagick-ai`) already builds this repo. To serve it on the
-apex domain:
+The site and the app are one codebase / one Vercel project, **separated by
+host**:
 
-1. Vercel → Project → **Settings → Domains** → add `imagick.ai` (and
-   `www.imagick.ai`, redirecting to the apex).
-2. At your DNS provider, add the records Vercel shows (an `A`/`ALIAS` for the
-   apex, a `CNAME` for `www`).
-3. Production deploys come from the `main` branch — merge this PR to publish.
+| Domain | Serves |
+| --- | --- |
+| `imagick.ai` | the public marketing site (landing, pricing, blog, niche pages) |
+| `app.imagick.ai` | the application (dashboard, auth, galleries) |
 
-The build command is set in `vercel.json`:
+**Setup:**
+
+1. Vercel → Project (`imagick-ai`) → **Settings → Domains** → attach **both**
+   `imagick.ai` and `app.imagick.ai` (and `www.imagick.ai` → redirects to apex).
+2. Add the DNS records Vercel shows for each.
+3. Production deploys come from `main` — merge this PR to publish.
+
+**How the separation works (no extra config needed):** `vercel.json` contains
+host-aware `redirects` so `app.imagick.ai/pricing` → `imagick.ai/pricing`,
+`imagick.ai/dashboard` → `app.imagick.ai/dashboard`, `app.imagick.ai/` →
+`/dashboard`, etc. — at the edge, no flash. The app also ships a client-side
+`DomainGuard` as a safety net, and every marketing "Sign in / Start free /
+Dashboard" CTA links straight to `app.imagick.ai`. On localhost and Vercel
+previews both halves stay reachable on one host ("combined" mode), so
+development and preview are unaffected. To change the hostnames, edit
+`src/lib/domains.ts`.
+
+The build command in `vercel.json` is
 `vite build && node scripts/prerender.mjs` (prerender is best-effort and never
-fails the deploy). Canonical URLs, `robots.txt` and `sitemap.xml` already point
-at `https://imagick.ai`.
+fails the deploy). Canonical URLs, `robots.txt` and `sitemap.xml` point at
+`https://imagick.ai`.
 
 ## 2. Environment variables
 
