@@ -90,6 +90,13 @@ const adminGroups: AdminGroup[] = [
       { title: "Onboarding Insights", description: "Questionnaire responses and segment data", icon: Activity, href: "/dashboard/admin/onboarding-insights" },
     ],
   },
+  {
+    title: "Marketing & Growth",
+    icon: Megaphone,
+    sections: [
+      { title: "Tracking & Tags", description: "GTM, GA4, Clarity, and ad pixels for the public site", icon: BarChart3, href: "/dashboard/admin/marketing" },
+    ],
+  },
 ];
 
 /** The AI mark — a 4-point sparkle. Tinted via currentColor. */

@@ -9,6 +9,7 @@ import { useSessionTracker } from "./hooks/useSessionTracker";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminRoute } from "./components/AdminRoute";
 import { ImpersonationProvider } from "./hooks/useImpersonation";
+import { TrackingTags } from "./components/TrackingTags";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +62,7 @@ const LeadCampaignsPage = lazy(() => import("./pages/dashboard/admin/LeadCampaig
 const LeadTemplatesPage = lazy(() => import("./pages/dashboard/admin/LeadTemplatesPage"));
 const LeadAnalyticsPage = lazy(() => import("./pages/dashboard/admin/LeadAnalyticsPage"));
 const UserDetailPage = lazy(() => import("./pages/dashboard/admin/UserDetailPage"));
+const MarketingToolsPage = lazy(() => import("./pages/dashboard/admin/MarketingToolsPage"));
 
 const RouteFallback = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -81,6 +83,7 @@ const App = () => (
   <ThemeProvider defaultTheme="dark" storageKey="imagick-ui-theme">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <TrackingTags />
         <Sonner
           position="bottom-right"
           toastOptions={{
@@ -147,6 +150,7 @@ const App = () => (
                   <Route path="admin/onboarding-insights" element={<AdminRoute><OnboardingInsightsPage /></AdminRoute>} />
                   <Route path="admin/subscribers" element={<AdminRoute><SubscribersManagement /></AdminRoute>} />
                   <Route path="admin/paypal" element={<AdminRoute><PayPalSettingsPage /></AdminRoute>} />
+                  <Route path="admin/marketing" element={<AdminRoute><MarketingToolsPage /></AdminRoute>} />
                   <Route path="admin/lead-imports" element={<AdminRoute><LeadImportsPage /></AdminRoute>} />
                   <Route path="admin/lead-campaigns" element={<AdminRoute><LeadCampaignsPage /></AdminRoute>} />
                   <Route path="admin/lead-templates" element={<AdminRoute><LeadTemplatesPage /></AdminRoute>} />
