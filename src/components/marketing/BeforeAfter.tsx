@@ -34,6 +34,8 @@ export function BeforeAfter({
         src={src}
         alt={alt}
         draggable={false}
+        loading="lazy"
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover"
       />
 
@@ -43,6 +45,8 @@ export function BeforeAfter({
         alt=""
         aria-hidden="true"
         draggable={false}
+        loading="lazy"
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover"
         style={{ filter: beforeFilter, clipPath: `inset(0 ${100 - pos}% 0 0)` }}
       />

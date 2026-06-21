@@ -24,6 +24,9 @@ const queryClient = new QueryClient({
 });
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
+const UseCasePage = lazy(() => import("./pages/marketing/UseCasePage"));
+const BlogIndexPage = lazy(() => import("./pages/marketing/BlogIndexPage"));
+const BlogPostPage = lazy(() => import("./pages/marketing/BlogPostPage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const DashboardLayout = lazy(() => import("./components/layout/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
@@ -109,6 +112,9 @@ const App = () => (
                 {/* Public marketing site */}
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/for/:slug" element={<UseCasePage />} />
+                <Route path="/blog" element={<BlogIndexPage />} />
+                <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/unsubscribe" element={<UnsubscribePage />} />

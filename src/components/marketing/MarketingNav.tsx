@@ -15,6 +15,7 @@ const NAV: NavItem[] = [
   { label: "How it works", id: "how" },
   { label: "Showcase", id: "showcase" },
   { label: "Pricing", to: "/pricing" },
+  { label: "Blog", to: "/blog" },
   { label: "FAQ", id: "faq" },
 ];
 

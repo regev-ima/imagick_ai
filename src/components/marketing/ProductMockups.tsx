@@ -141,7 +141,9 @@ export function EditorMockup() {
                   <img
                     src={SHOTS[i % SHOTS.length]}
                     alt=""
-                    className="h-full w-full object-cover"
+                    loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
                     style={{ objectPosition: `${(i * 23) % 100}% 30%` }}
                   />
                   <span className="absolute left-1 top-1 rounded bg-black/55 px-1 py-0.5 backdrop-blur-sm">
@@ -261,7 +263,9 @@ export function CullingMockup() {
                 <img
                   src={SHOTS[i % SHOTS.length]}
                   alt=""
-                  className="h-full w-full object-cover"
+                  loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
                   style={{ objectPosition: `${(i * 37) % 100}% 35%` }}
                 />
                 <span className="absolute left-1 top-1 rounded bg-black/55 px-1 py-0.5 backdrop-blur-sm">
@@ -319,6 +323,8 @@ export function ClientGalleryMockup() {
                   key={i}
                   src={s}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="h-7 w-7 rounded-full border-2 border-surface-1 object-cover"
                   style={{ objectPosition: "50% 25%" }}
                 />
@@ -355,7 +361,9 @@ export function ClientGalleryMockup() {
                   <img
                     src={SHOTS[i % SHOTS.length]}
                     alt=""
-                    className="h-full w-full object-cover"
+                    loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
                     style={{ objectPosition: `${(i * 41) % 100}% 30%` }}
                   />
                   <span

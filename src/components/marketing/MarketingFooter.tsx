@@ -2,18 +2,23 @@ import { Link, useNavigate } from "react-router-dom";
 import { useBrandLogo } from "@/hooks/useBrandLogo";
 import { Sparkle } from "./Sparkle";
 import { SITE } from "./data";
+import { USE_CASES } from "./content";
 
 const productLinks = [
   { label: "Features", id: "features" },
   { label: "How it works", id: "how" },
-  { label: "Showcase", id: "showcase" },
   { label: "Pricing", to: "/pricing" },
+  { label: "Blog", to: "/blog" },
 ];
+
+const useCaseLinks = USE_CASES.map((u) => ({
+  label: `${u.niche} photographers`,
+  to: `/for/${u.slug}`,
+}));
 
 const resourceLinks = [
   { label: "Sign in", to: "/auth" },
   { label: "Start free", to: "/auth?mode=signup" },
-  { label: "FAQ", id: "faq" },
   { label: "Contact", href: `mailto:${SITE.email}` },
 ];
 
@@ -67,9 +72,9 @@ export function MarketingFooter() {
   return (
     <footer className="relative border-t border-border bg-background">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr]">
           {/* Brand */}
-          <div>
+          <div className="col-span-2 md:col-span-1">
             <Link to="/" className="inline-flex items-center" aria-label="Imagick.ai home">
               <img src={logo} alt="Imagick.ai" className="h-7 w-auto" />
             </Link>
@@ -87,6 +92,10 @@ export function MarketingFooter() {
           <div>
             <div className="aura-microlabel mb-4">Product</div>
             <div className="flex flex-col gap-3">{productLinks.map(renderLink)}</div>
+          </div>
+          <div>
+            <div className="aura-microlabel mb-4">Use cases</div>
+            <div className="flex flex-col gap-3">{useCaseLinks.map(renderLink)}</div>
           </div>
           <div>
             <div className="aura-microlabel mb-4">Get started</div>
