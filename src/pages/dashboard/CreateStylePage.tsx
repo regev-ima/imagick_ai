@@ -431,7 +431,7 @@ export default function CreateStylePage() {
         const afterDir = `styles/${user.id}/${styleId}/after/`;
 
         if (beforeDriveLinks.length > 0) {
-          supabase.functions.invoke("gd-transfer", {
+          supabase.functions.invoke("gd-import", {
             body: {
               driveLinks: beforeDriveLinks,
               styleId,
@@ -443,7 +443,7 @@ export default function CreateStylePage() {
         }
 
         if (afterDriveLinks.length > 0) {
-          supabase.functions.invoke("gd-transfer", {
+          supabase.functions.invoke("gd-import", {
             body: {
               driveLinks: afterDriveLinks,
               styleId,

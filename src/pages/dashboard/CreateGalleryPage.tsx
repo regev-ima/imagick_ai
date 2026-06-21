@@ -369,7 +369,7 @@ export default function CreateGalleryPage() {
         }
 
         // 3. Start the transfer from Google Drive (supports multiple folders)
-        const response = await supabase.functions.invoke("gd-transfer", {
+        const response = await supabase.functions.invoke("gd-import", {
           body: {
             driveLinks,
             galleryId: gallery.id,

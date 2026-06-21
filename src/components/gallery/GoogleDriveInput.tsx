@@ -67,7 +67,7 @@ export function GoogleDriveInput({
         throw new Error("Please sign in to continue");
       }
 
-      const response = await supabase.functions.invoke("gd-transfer", {
+      const response = await supabase.functions.invoke("gd-import", {
         body: {
           driveLink: link,
           metadataOnly: true,
