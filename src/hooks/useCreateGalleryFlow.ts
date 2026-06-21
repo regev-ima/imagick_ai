@@ -121,7 +121,7 @@ export function useCreateGalleryFlow() {
         if (params.styleIds.length > 0) updatePayload.selected_style_ids = params.styleIds;
         await supabase.from("galleries").update(updatePayload).eq("id", gallery.id);
 
-        const response = await supabase.functions.invoke("gd-transfer", {
+        const response = await supabase.functions.invoke("gd-import", {
           body: {
             driveLinks: source.links,
             galleryId: gallery.id,

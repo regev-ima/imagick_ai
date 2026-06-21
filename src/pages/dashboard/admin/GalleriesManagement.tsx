@@ -130,7 +130,7 @@ export default function GalleriesManagement() {
 
       // 2. If there are GD links, trigger the import
       if (gallery.source_drive_links?.length) {
-        const response = await supabase.functions.invoke("gd-transfer", {
+        const response = await supabase.functions.invoke("gd-import", {
           body: {
             driveLinks: gallery.source_drive_links,
             galleryId: newGallery.id,
