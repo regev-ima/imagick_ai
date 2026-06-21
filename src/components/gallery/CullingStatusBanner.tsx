@@ -28,6 +28,9 @@ interface CullingStatusBannerProps {
    *  When set we never show the banner — the run actually finished even
    *  if gallery.culling_status was never updated by the webhook. */
   hasCullingData?: boolean;
+  /** When provided AND the run is healthy (not stuck), the banner turns
+   *  into a button that reopens the minimized "AI is working" overlay. */
+  onReopenProgress?: () => void;
   className?: string;
 }
 
@@ -51,6 +54,7 @@ export function CullingStatusBanner({
   imageCount = 0,
   isStuck = false,
   hasCullingData = false,
+  onReopenProgress,
   className,
 }: CullingStatusBannerProps) {
   // Tick once a minute so the elapsed-time text stays current.
@@ -81,6 +85,12 @@ export function CullingStatusBanner({
   const remainingMs = Math.max(0, etaMs - elapsedMs);
   const remainingText = remainingMs > 0 ? `~${formatDuration(remainingMs)} remaining` : "wrapping up…";
 
+  // While the run is healthy and an overlay-reopen handler is wired, the
+  // whole banner is a button that brings the live "AI is working" view
+  // back. We don't do this when stuck — the action there is "retry",
+  // which lives in the sidebar.
+  const canReopen = !isStuck && !!onReopenProgress;
+
   return (
     <div
       className={cn(
@@ -88,10 +98,23 @@ export function CullingStatusBanner({
         isStuck
           ? "bg-rating/10 border-rating/30 text-rating"
           : "bg-primary/10 border-primary/30 text-foreground",
+        canReopen && "cursor-pointer hover:bg-primary/[0.16] transition-colors",
         className,
       )}
-      role="status"
+      role={canReopen ? "button" : "status"}
+      tabIndex={canReopen ? 0 : undefined}
       aria-live="polite"
+      onClick={canReopen ? onReopenProgress : undefined}
+      onKeyDown={
+        canReopen
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onReopenProgress?.();
+              }
+            }
+          : undefined
+      }
     >
       <div className="relative shrink-0 flex items-center justify-center">
         {isStuck ? (
@@ -122,6 +145,12 @@ export function CullingStatusBanner({
           )}
         </p>
       </div>
+
+      {canReopen && (
+        <span className="shrink-0 text-xs font-medium text-primary border border-primary/40 rounded-sm px-2 py-1">
+          View progress
+        </span>
+      )}
     </div>
   );
 }

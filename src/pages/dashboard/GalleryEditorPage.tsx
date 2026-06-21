@@ -62,6 +62,7 @@ import { FailedImagesProvider } from "@/components/gallery/FailedImagesContext";
 import { ProblemImagesSection } from "@/components/gallery/ProblemImagesSection";
 import { VirtualizedImageGrid } from "@/components/gallery/VirtualizedImageGrid";
 import { CullingStatusBanner } from "@/components/gallery/CullingStatusBanner";
+import { CullingProgressOverlay } from "@/components/gallery/CullingProgressOverlay";
 import { type CatalogMode } from "@/components/gallery/CatalogModeSelector";
 import { FaceGallery } from "@/components/gallery/FaceGallery";
 import { FaceClusterImages } from "@/components/gallery/FaceClusterImages";
@@ -126,6 +127,9 @@ export default function GalleryEditorPage() {
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [showAICullingModal, setShowAICullingModal] = useState(false);
   const [cullingRequiredNote, setCullingRequiredNote] = useState(false);
+  // When true the user has tucked the "AI is working" overlay away to
+  // keep editing; the run continues and the banner offers to reopen it.
+  const [cullingProgressMinimized, setCullingProgressMinimized] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAddImagesModal, setShowAddImagesModal] = useState(false);
   const [pendingUploadCount, setPendingUploadCount] = useState(0);
@@ -853,6 +857,22 @@ export default function GalleryEditorPage() {
     return images.some(img => (img as any).culling_score !== null && (img as any).culling_score !== undefined);
   }, [images]);
 
+  // A small representative strip of original thumbnails for the AI
+  // Culling progress overlay to "scan". We only need a handful; sampling
+  // evenly across the gallery keeps the preview varied for big shoots.
+  const cullingPreviewThumbnails = useMemo(() => {
+    const ready = images.filter(img => img.status === "ready" || img.original_url);
+    const source = ready.length > 0 ? ready : images;
+    if (source.length === 0) return [];
+    const want = 7;
+    const step = Math.max(1, Math.floor(source.length / want));
+    const picked: string[] = [];
+    for (let i = 0; i < source.length && picked.length < want; i += step) {
+      picked.push(getThumbnailUrl(source[i].original_url));
+    }
+    return picked;
+  }, [images]);
+
   // Count images per star rating for sidebar
   const cullingCounts = useMemo(() => {
     const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -1115,28 +1135,53 @@ export default function GalleryEditorPage() {
     }
   });
 
-  // Detect stuck culling — threshold scales with gallery size so a
-  // 3000-photo gallery isn't called "stuck" before its realistic
-  // completion window has even closed. See lib/cullingEta.ts.
+  // Once a run is no longer processing, clear the "minimized" flag so the
+  // next run (this tab, another tab, or after a stuck retry) surfaces its
+  // overlay automatically instead of staying hidden.
+  useEffect(() => {
+    if (gallery?.culling_status !== "processing") setCullingProgressMinimized(false);
+  }, [gallery?.culling_status]);
+
+  // Heartbeat while culling is running so the "stuck" check and the
+  // overlay countdown stay live. React Query's structural sharing keeps
+  // the gallery row reference stable across the 5s polls, so without our
+  // own clock the time-based memo below would never re-evaluate and a
+  // run could neither cross into "stuck" nor count down.
+  const [cullingNow, setCullingNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (gallery?.culling_status !== "processing") return;
+    const t = setInterval(() => setCullingNow(Date.now()), 5_000);
+    return () => clearInterval(t);
+  }, [gallery?.culling_status]);
+
+  // Detect stuck culling — the threshold is the full expected window
+  // (5 min + 10s/photo, see lib/cullingEta.ts), so a large gallery is
+  // never called "stuck" before its realistic completion window closes.
   //
-  // Also: if hasCullingData is already true, the run actually finished
-  // (we have ratings + labels in the rows) and the only thing wrong
-  // is the gallery.culling_status flag — so we don't show "stuck"
-  // even though the timer is past the threshold.
+  // Two states we explicitly DON'T treat as stuck:
+  //   • hasCullingData → the run actually finished (ratings + labels are
+  //     on the rows); only the culling_status flag is stale. The
+  //     self-healer below repairs it.
+  //   • no culling_started_at yet → we have no reference clock, so we
+  //     can't claim it's overdue. We back-fill the timestamp (below)
+  //     rather than flashing an instant, false "stuck — 0s elapsed".
   const isCullingStuck = useMemo(() => {
     if (gallery?.culling_status !== "processing") return false;
     if (hasCullingData) return false;
     const startedAt = gallery?.culling_started_at;
-    if (!startedAt) return true; // legacy, pre-migration
-    const elapsed = Date.now() - new Date(startedAt).getTime();
+    if (!startedAt) return false;
+    const elapsed = cullingNow - new Date(startedAt).getTime();
     return elapsed > stuckThresholdMs(images.length);
-  }, [gallery?.culling_status, gallery?.culling_started_at, images.length, hasCullingData]);
+  }, [gallery?.culling_status, gallery?.culling_started_at, images.length, hasCullingData, cullingNow]);
 
-  // Self-healing: when culling data is present but the gallery row
-  // still says culling_status='processing' (the webhook missed an
-  // update), patch it to 'ready' so the banner clears for everyone
-  // who opens the gallery, not just this user. Runs once per render
-  // when the inconsistency is detected.
+  // Self-healing for inconsistent culling rows:
+  //   1. data present but status still 'processing' → flip to 'ready' so
+  //      the banner clears for everyone who opens the gallery.
+  //   2. status 'processing' but no culling_started_at (legacy / a run
+  //      that pre-dates the timestamp column) → back-fill it to now so
+  //      the run gets a proper countdown and a correct, delayed "stuck"
+  //      window instead of being flagged stuck immediately.
+  // Runs once per render when the inconsistency is detected.
   useEffect(() => {
     if (!gallery?.id) return;
     if (gallery.culling_status === "processing" && hasCullingData) {
@@ -1147,8 +1192,18 @@ export default function GalleryEditorPage() {
         .then(() => {
           queryClient.invalidateQueries({ queryKey: ["gallery", id] });
         });
+      return;
     }
-  }, [gallery?.id, gallery?.culling_status, hasCullingData, id, queryClient]);
+    if (gallery.culling_status === "processing" && !hasCullingData && !gallery.culling_started_at) {
+      supabase
+        .from("galleries")
+        .update({ culling_started_at: new Date().toISOString() } as any)
+        .eq("id", gallery.id)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["gallery", id] });
+        });
+    }
+  }, [gallery?.id, gallery?.culling_status, gallery?.culling_started_at, hasCullingData, id, queryClient]);
 
   // AI Culling mutation - calls the start-grouping function
   const runAICulling = useMutation({
@@ -1210,8 +1265,19 @@ export default function GalleryEditorPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery", id] });
     },
-    onError: (error) => {
+    onError: async (error) => {
       console.error("AI Culling error:", error);
+      // A 409 means the backend already has a run in flight (e.g. a
+      // second tab raced us). That's not a failure — re-sync so the live
+      // overlay shows, and reassure rather than alarm.
+      const err = error as { context?: { status?: number }; status?: number };
+      const status = err?.context?.status ?? err?.status;
+      if (status === 409) {
+        queryClient.invalidateQueries({ queryKey: ["gallery", id] });
+        setCullingProgressMinimized(false);
+        toast.info("AI Culling is already running for this gallery.");
+        return;
+      }
       toast.error("Failed to start AI culling. Please try again.");
     }
   });
@@ -1993,6 +2059,9 @@ export default function GalleryEditorPage() {
             imageCount={images.length}
             isStuck={isCullingStuck}
             hasCullingData={hasCullingData}
+            onReopenProgress={
+              cullingProgressMinimized ? () => setCullingProgressMinimized(false) : undefined
+            }
           />
         </div>
         <div className="p-4 lg:p-6">
@@ -2934,6 +3003,9 @@ export default function GalleryEditorPage() {
             onConfirm={(tags) => {
               setShowAICullingModal(false);
               setCullingRequiredNote(false);
+              // Surface the live "AI is working" overlay for this run even
+              // if a previous run had been minimized away.
+              setCullingProgressMinimized(false);
               toast.success("Starting AI Culling... We'll update you when it's done in a few minutes.");
               runAICulling.mutate(tags);
             }}
@@ -2949,6 +3021,28 @@ export default function GalleryEditorPage() {
             hasCompletedCulling={hasCullingData}
           />
         )}
+      </AnimatePresence>
+
+      {/* AI Culling — "engine is working" overlay. Shown automatically
+          while a run is genuinely in flight (processing, not stuck, no
+          data yet) and not minimized. It's purely a live view: real
+          completion / stuck transitions are driven by gallery state, so
+          this closes itself the moment the run lands or the window
+          elapses. Blocks a second run by occupying the screen, and the
+          sidebar/banner trigger is guarded while processing. */}
+      <AnimatePresence>
+        {gallery?.culling_status === "processing" &&
+          !isCullingStuck &&
+          !hasCullingData &&
+          !cullingProgressMinimized && (
+            <CullingProgressOverlay
+              isOpen
+              imageCount={images.length}
+              thumbnails={cullingPreviewThumbnails}
+              startedAt={gallery?.culling_started_at as string | null | undefined}
+              onMinimize={() => setCullingProgressMinimized(true)}
+            />
+          )}
       </AnimatePresence>
 
       {/* Gallery Settings Modal */}
