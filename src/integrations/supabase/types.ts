@@ -411,6 +411,9 @@ export type Database = {
           import_folders_completed: number
           import_folders_total: number
           name: string
+          published_at: string | null
+          last_published_at: string | null
+          grouping_mode: string | null
           processed_images: number
           processing_completed_at: string | null
           processing_started_at: string | null
@@ -450,6 +453,9 @@ export type Database = {
           import_folders_completed?: number
           import_folders_total?: number
           name: string
+          published_at?: string | null
+          last_published_at?: string | null
+          grouping_mode?: string | null
           processed_images?: number
           processing_completed_at?: string | null
           processing_started_at?: string | null
@@ -489,6 +495,9 @@ export type Database = {
           import_folders_completed?: number
           import_folders_total?: number
           name?: string
+          published_at?: string | null
+          last_published_at?: string | null
+          grouping_mode?: string | null
           processed_images?: number
           processing_completed_at?: string | null
           processing_started_at?: string | null
@@ -533,6 +542,9 @@ export type Database = {
           last_processing_attempt_at: string | null
           last_processing_error: string | null
           lens_model: string | null
+          in_collection: boolean | null
+          collection_sort: number | null
+          section_id: string | null
           original_url: string
           processing_attempts: number
           shutter_speed: string | null
@@ -575,6 +587,9 @@ export type Database = {
           last_processing_attempt_at?: string | null
           last_processing_error?: string | null
           lens_model?: string | null
+          in_collection?: boolean | null
+          collection_sort?: number | null
+          section_id?: string | null
           original_url: string
           processing_attempts?: number
           shutter_speed?: string | null
@@ -617,6 +632,9 @@ export type Database = {
           last_processing_attempt_at?: string | null
           last_processing_error?: string | null
           lens_model?: string | null
+          in_collection?: boolean | null
+          collection_sort?: number | null
+          section_id?: string | null
           original_url?: string
           processing_attempts?: number
           shutter_speed?: string | null

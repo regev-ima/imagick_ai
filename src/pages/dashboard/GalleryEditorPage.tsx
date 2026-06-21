@@ -56,6 +56,7 @@ import { AICullingModal } from "@/components/gallery/AICullingModal";
 import { GallerySettingsModal } from "@/components/gallery/GallerySettingsModal";
 import { FilterOptions, defaultFilters } from "@/components/gallery/filter-types";
 import { ShareGalleryModal } from "@/components/gallery/ShareGalleryModal";
+import { DeliveryModal } from "@/components/gallery/DeliveryModal";
 import { StyleComparison } from "@/components/gallery/StyleSelector";
 import { ImageCard } from "@/components/gallery/ImageCard";
 import { FailedImagesProvider } from "@/components/gallery/FailedImagesContext";
@@ -120,6 +121,7 @@ export default function GalleryEditorPage() {
     () => (localStorage.getItem("imagick-gallery-compare-mode") as "slider" | "edited" | "side-by-side") || "slider"
   );
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showReEditModal, setShowReEditModal] = useState(false);
   const [showDetailsPanel, setShowDetailsPanel] = useState(false);
   const [holdingOriginal, setHoldingOriginal] = useState(false);
@@ -2440,6 +2442,7 @@ export default function GalleryEditorPage() {
           onOpenFaceSearch={() => setCatalogMode("faces")}
           faceSearchStatus={isFaceDetectionRunning ? "processing" : faceSearchStatus}
           onShare={() => setShowShareModal(true)}
+          onChooseClientPhotos={() => setShowDeliveryModal(true)}
            onOpenSettings={() => setShowSettingsModal(true)}
            onDownload={() => setShowDownloadModal(true)}
           onToggleLikedFilter={() => setFilters(prev => ({ ...prev, showLikedOnly: !prev.showLikedOnly }))}
@@ -2480,6 +2483,7 @@ export default function GalleryEditorPage() {
             onOpenFaceSearch={() => { setCatalogMode("faces"); setShowMobileSidebar(false); }}
             faceSearchStatus={isFaceDetectionRunning ? "processing" : faceSearchStatus}
             onShare={() => { setShowShareModal(true); setShowMobileSidebar(false); }}
+            onChooseClientPhotos={() => { setShowDeliveryModal(true); setShowMobileSidebar(false); }}
              onOpenSettings={() => { setShowSettingsModal(true); setShowMobileSidebar(false); }}
              onDownload={() => { setShowDownloadModal(true); setShowMobileSidebar(false); }}
             onToggleLikedFilter={() => { setFilters(prev => ({ ...prev, showLikedOnly: !prev.showLikedOnly })); }}
@@ -2955,6 +2959,17 @@ export default function GalleryEditorPage() {
         gallery={gallery}
         onUpdate={() => queryClient.invalidateQueries({ queryKey: ["gallery", id] })}
       />
+
+      {/* Choose client photos (delivery selection) */}
+      {gallery && id && (
+        <DeliveryModal
+          open={showDeliveryModal}
+          onOpenChange={setShowDeliveryModal}
+          galleryId={id}
+          galleryName={gallery.name}
+          clientLink={gallery.client_link}
+        />
+      )}
 
       {/* Re-Edit Modal */}
       <AnimatePresence>
