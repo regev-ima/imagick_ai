@@ -27,6 +27,7 @@ import {
   MARKETING_TAGS_QUERY_KEY,
   type MarketingTags,
 } from "@/lib/marketingTags";
+import { ServiceLogo } from "@/components/marketing/ServiceLogo";
 
 type FieldDef = {
   key: keyof MarketingTags;
@@ -184,7 +185,8 @@ export default function MarketingToolsPage() {
                 <div className="grid gap-4 p-4 sm:grid-cols-2">
                   {section.fields.map((field) => (
                     <div key={String(field.key)} className="space-y-1.5">
-                      <label htmlFor={String(field.key)} className="caption block">
+                      <label htmlFor={String(field.key)} className="caption mb-1.5 flex items-center gap-2">
+                        <ServiceLogo brand={String(field.key)} className="h-5 w-5 shrink-0" />
                         {field.label}
                       </label>
                       <Input
