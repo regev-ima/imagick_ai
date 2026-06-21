@@ -6,7 +6,8 @@
 > Gallery**"). It is grounded in the real schema and components — every column,
 > RPC and file referenced below exists today unless marked **NEW**.
 
-**Status:** design / decision-grade spec. No code shipped by this doc.
+**Status:** design / decision-grade spec. The v1 *foundation* and a clickable
+concept are now on this branch — see [§11 Shipped on this branch](#11-shipped-on-this-branch).
 
 ---
 
@@ -388,6 +389,57 @@ Vertical slices, each shippable and each useful on its own.
 4. **Watermark on downloads:** never (downloads are the deliverable) vs always
    unless a paid/unlocked flag. Recommend **watermark preview, clean download**
    gated by `download_enabled`, matching client expectations.
+
+---
+
+## 11. Shipped on this branch
+
+Two slices landed alongside this spec — the safe foundation and a thing you can
+actually click. Both are verified green locally (lint + `vite build` + vitest).
+
+### Clickable concept — `/preview/deliver`
+
+`src/pages/preview/DeliverConcept.tsx`, routed like the existing
+`/preview/create-*` concepts (auth-required, static mock, no Supabase). Open it
+on the branch preview. It demonstrates the two new ideas end to end:
+
+- **Delivery mode** — a grid where each frame toggles *in / out* of the
+  collection, a **smart-fill** bar (Keepers / My likes / Edited / Everything) in
+  Aura's voice, and a sticky **“N of 24 in this collection”** footer with the
+  grouping selector and a **Publish** button.
+- **Preview as client** — flips the same selection into the client view, led by
+  an anonymous **“Find your photos”** face row (tap a face → filter), with the
+  crew cluster hidden, proving the include/exclude and self-ID model visually.
+
+### Backend foundation — `supabase/migrations/20260621120000_deliver_collection_v1.sql`
+
+Additive and backward-compatible:
+
+- Columns: `gallery_images.in_collection`, `.collection_sort`, `.section_id`;
+  `galleries.published_at`, `.last_published_at`, `.grouping_mode`;
+  `face_clusters.is_spotlit`, `.is_hidden`. Partial index on the delivered set.
+- `get_client_gallery_images` now filters `COALESCE(in_collection, true) = true`
+  and orders by `collection_sort` — so **a gallery nobody has curated still
+  shows everything**, exactly as today, and the moment a photographer pulls a
+  frame out it stops reaching the client.
+- `published_at` is provisioned and back-filled (`= created_at` for every shared
+  gallery) but **deliberately not yet enforced** in the RPC.
+
+### The one sequencing decision baked in
+
+The publish gate is *not* switched on in this slice. Enforcing
+`published_at IS NOT NULL` before a **Publish** control exists would make every
+newly created gallery dark (the `client_link` trigger fires at insert, nothing
+would set `published_at`) and break the live share flow. The gate flips on in
+the same slice that ships the publish UI — that pairing is the safe order.
+
+### What's intentionally *not* in this slice
+
+The producer side: wiring **Delivery mode into the real
+`GalleryEditorPage`** (so the editor writes `in_collection`) and the **Publish
+sheet** in `ShareGalleryModal`. That work belongs where it can be run and
+clicked against real data; the schema and the client RPC are already waiting for
+it.
 
 ---
 
