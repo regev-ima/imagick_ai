@@ -82,6 +82,7 @@ interface GalleryRightSidebarProps {
 
   // New props
   onShare?: () => void;
+  onChooseClientPhotos?: () => void;
   onToggleLikedFilter?: () => void;
   isLikedFilterActive?: boolean;
   onOpenSettings?: () => void;
@@ -141,6 +142,7 @@ export function GalleryRightSidebar({
   onOpenFaceSearch,
   faceSearchStatus,
   onShare,
+  onChooseClientPhotos,
   onToggleLikedFilter,
   isLikedFilterActive,
   onOpenSettings,
@@ -240,6 +242,12 @@ export function GalleryRightSidebar({
                 <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onOpenFaceSearch}>
                   {faceSearchStatus === "processing" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanFace className="w-3.5 h-3.5" />}
                   Faces
+                </Button>
+              )}
+              {onChooseClientPhotos && (
+                <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onChooseClientPhotos}>
+                  <Images className="w-3.5 h-3.5" />
+                  Client photos
                 </Button>
               )}
               {onShare && (
@@ -415,6 +423,9 @@ export function GalleryRightSidebar({
               label="Faces"
               onClick={onOpenFaceSearch}
             />
+          )}
+          {onChooseClientPhotos && (
+            <ActionButton icon={<Images className="w-3 h-3" />} label="Client" onClick={onChooseClientPhotos} />
           )}
           {onShare && (
             <ActionButton icon={<Share2 className="w-3 h-3" />} label="Share" onClick={onShare} />
