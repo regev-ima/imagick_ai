@@ -1,4 +1,5 @@
 {
+  "buildCommand": "vite build && node scripts/prerender.mjs",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],

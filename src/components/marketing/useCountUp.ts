@@ -6,7 +6,9 @@ import { useEffect, useRef, useState } from "react";
  */
 export function useCountUp(target: number, durationMs = 1400) {
   const ref = useRef<HTMLSpanElement | null>(null);
-  const [value, setValue] = useState(0);
+  // Render the final number during SSR/prerender so crawlers see real stats;
+  // the client starts from 0 and animates up.
+  const [value, setValue] = useState(typeof window === "undefined" ? target : 0);
   const started = useRef(false);
 
   useEffect(() => {
