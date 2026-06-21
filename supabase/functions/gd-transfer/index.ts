@@ -264,6 +264,14 @@ serve(async (req) => {
         .eq("id", galleryId);
     }
 
+    // Import the webhook-auth helper once, here in the async handler. It must
+    // NOT be awaited inside the synchronous links.forEach() callback below —
+    // `await` in a non-async callback is a SyntaxError that prevents the module
+    // from loading, crashing the worker at boot (503 on the OPTIONS preflight).
+    // That is exactly what surfaced as "Failed to send a request to the Edge
+    // Function" / "Cannot access folder" on every Drive import.
+    const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
+
     // Fire and forget - start transfers without waiting for completion
     // Every folder gets a callback so the webhook can register all images
     links.forEach((link, index) => {
@@ -273,7 +281,6 @@ serve(async (req) => {
         use_uuid4: true,
       };
 
-      const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
       if (isStyleTransfer && styleId) {
         gcpRequestBody.callback_url = appendWebhookSecret(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/train-webhook`
