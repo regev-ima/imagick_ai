@@ -100,6 +100,19 @@ export const PLANS: Plan[] = [
   },
 ];
 
+// Marketing-only copy per plan slug (blurb, CTA, highlight, badge) + a feature
+// fallback. Merged with the live subscription_plans rows by useMarketingPlans,
+// so the platform stays the source of truth for price & features.
+export const PLAN_META: Record<
+  string,
+  Pick<Plan, "blurb" | "cta" | "highlight" | "badge" | "features">
+> = Object.fromEntries(
+  PLANS.map((p) => [
+    p.slug,
+    { blurb: p.blurb, cta: p.cta, highlight: p.highlight, badge: p.badge, features: p.features },
+  ]),
+);
+
 export const STATS = [
   { value: 10, suffix: "+", label: "Hours saved / week" },
   { value: 90, suffix: "%", label: "Faster culling" },

@@ -4,7 +4,8 @@ import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { appHref } from "@/lib/domains";
 import { Sparkle } from "./Sparkle";
-import { PLANS, SITE, type Plan } from "./data";
+import { SITE, type Plan } from "./data";
+import { useMarketingPlans } from "./useMarketingPlans";
 
 function priceFor(plan: Plan, annual: boolean) {
   if (plan.monthly === 0) return { big: "$0", sub: "free forever" };
@@ -23,6 +24,7 @@ function ctaTarget(plan: Plan) {
 
 export function PricingTiers({ idPrefix = "pricing" }: { idPrefix?: string }) {
   const [annual, setAnnual] = useState(true);
+  const plans = useMarketingPlans();
 
   return (
     <div>
@@ -55,7 +57,7 @@ export function PricingTiers({ idPrefix = "pricing" }: { idPrefix?: string }) {
 
       {/* Cards */}
       <div className="grid gap-5 lg:grid-cols-4">
-        {PLANS.map((plan, i) => {
+        {plans.map((plan, i) => {
           const price = priceFor(plan, annual);
           const target = ctaTarget(plan);
           const external = target.startsWith("mailto:");
