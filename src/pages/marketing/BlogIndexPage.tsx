@@ -63,8 +63,20 @@ export default function BlogIndexPage() {
               <Reveal key={p.slug} delay={(i % 2) * 0.08}>
                 <Link
                   to={`/blog/${p.slug}`}
-                  className="group flex h-full flex-col rounded-xl border border-border bg-card/60 p-6 transition-colors hover:border-primary/40"
+                  className="group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card/60 transition-colors hover:border-primary/40"
                 >
+                  {p.cover && (
+                    <div className="aspect-[16/9] overflow-hidden border-b border-border">
+                      <img
+                        src={p.cover}
+                        alt={p.coverAlt ?? p.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                      />
+                    </div>
+                  )}
+                  <div className="flex flex-1 flex-col p-6">
                   <div className="flex items-center gap-3 caption">
                     <span className="rounded-full bg-primary/12 px-2 py-0.5 !text-primary">{p.tag}</span>
                     <span className="inline-flex items-center gap-1">
@@ -84,6 +96,7 @@ export default function BlogIndexPage() {
                     <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
                       Read <ArrowUpRight className="h-4 w-4" />
                     </span>
+                  </div>
                   </div>
                 </Link>
               </Reveal>

@@ -152,10 +152,17 @@ export type BlogPost = {
   slug: string;
   title: string;
   description: string;
-  date: string; // ISO
+  date: string; // ISO (published)
+  updated?: string; // ISO (last modified)
   readMins: number;
   tag: string;
-  body: Block[];
+  category?: string;
+  keywords?: string[];
+  cover?: string; // public path, e.g. "/blog/slug.jpg"
+  coverAlt?: string;
+  author?: string;
+  body?: Block[]; // authored structured content
+  contentHtml?: string; // imported HTML (e.g. from WordPress)
 };
 
 export const BLOG_POSTS: BlogPost[] = [
@@ -167,6 +174,17 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "2026-06-10",
     readMins: 6,
     tag: "Workflow",
+    category: "Workflow",
+    author: "Imagick.ai",
+    cover: "/blog/cull-wedding-gallery-faster-with-ai.jpg",
+    coverAlt: "A wedding gallery being culled with AI ratings",
+    keywords: [
+      "wedding photo culling",
+      "AI culling",
+      "cull photos faster",
+      "photography workflow",
+      "wedding gallery editing",
+    ],
     body: [
       { type: "p", text: "Culling is the part of wedding photography nobody books you for, yet it quietly eats more hours than the shoot itself. A single wedding can produce four to six thousand frames, and the difference between a keeper and a reject is often a half-blink. Here's a workflow that keeps your judgement in the loop while letting AI do the brutal first pass." },
       { type: "h2", text: "1. Import the whole day, untouched" },
@@ -193,6 +211,17 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "2026-05-28",
     readMins: 5,
     tag: "Editing",
+    category: "Editing",
+    author: "Imagick.ai",
+    cover: "/blog/ai-photo-editing-vs-presets.jpg",
+    coverAlt: "A landscape photo before and after a custom AI edit",
+    keywords: [
+      "AI photo editing",
+      "AI vs presets",
+      "Lightroom presets",
+      "custom AI editing style",
+      "consistent photo editing",
+    ],
     body: [
       { type: "p", text: "Presets promised one-click consistency and never quite delivered. Drag a preset across a gallery and you'll spend the next hour fixing every frame it didn't fit. The reason is simple: a preset is a fixed set of numbers, and your photos aren't a fixed set of conditions." },
       { type: "h2", text: "What a preset actually does" },
@@ -218,6 +247,17 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "2026-05-12",
     readMins: 5,
     tag: "Business",
+    category: "Business",
+    author: "Imagick.ai",
+    cover: "/blog/faster-client-delivery-guide.jpg",
+    coverAlt: "A photographer delivering a client gallery",
+    keywords: [
+      "faster photo delivery",
+      "client gallery",
+      "photography turnaround time",
+      "photo proofing",
+      "deliver wedding photos faster",
+    ],
     body: [
       { type: "p", text: "Ask a couple what they remember about hiring their photographer and 'fast delivery' comes up more than you'd think. Turnaround isn't just a courtesy — it's a referral engine. The faster the gallery lands while the emotion is high, the more it gets shared. Here's where the days actually go, and how to win them back." },
       { type: "h2", text: "The three time sinks" },

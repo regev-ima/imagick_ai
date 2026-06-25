@@ -66,8 +66,12 @@ export default function BlogPostPage() {
       headline: post.title,
       description: post.description,
       datePublished: post.date,
-      dateModified: post.date,
-      author: { "@type": "Organization", name: SITE.name },
+      dateModified: post.updated ?? post.date,
+      ...(post.cover ? { image: [`${SITE.url}${post.cover}`] } : {}),
+      ...(post.keywords?.length ? { keywords: post.keywords.join(", ") } : {}),
+      ...(post.category ? { articleSection: post.category } : {}),
+      inLanguage: "en",
+      author: { "@type": "Organization", name: post.author ?? SITE.name },
       publisher: {
         "@type": "Organization",
         name: SITE.name,
@@ -89,7 +93,13 @@ export default function BlogPostPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Seo title={`${post.title} | Imagick.ai`} description={post.description} path={`/blog/${post.slug}`} jsonLd={jsonLd} />
+      <Seo
+        title={`${post.title} | Imagick.ai`}
+        description={post.description}
+        path={`/blog/${post.slug}`}
+        image={post.cover}
+        jsonLd={jsonLd}
+      />
       <MarketingNav />
 
       <main className="mx-auto max-w-2xl px-4 pt-32 pb-20 sm:px-6 sm:pt-40">
@@ -114,9 +124,28 @@ export default function BlogPostPage() {
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{post.description}</p>
 
+          {post.cover && (
+            <figure className="mt-7 overflow-hidden rounded-xl border border-border">
+              <img
+                src={post.cover}
+                alt={post.coverAlt ?? post.title}
+                className="aspect-[16/9] w-full object-cover"
+                loading="eager"
+                decoding="async"
+              />
+            </figure>
+          )}
+
           <hr className="aura-hairline my-8" />
 
-          <div>{post.body.map(renderBlock)}</div>
+          {post.contentHtml ? (
+            <div
+              className="prose prose-lg max-w-none dark:prose-invert prose-headings:tracking-tight prose-img:rounded-lg prose-a:text-primary"
+              dangerouslySetInnerHTML={{ __html: post.contentHtml }}
+            />
+          ) : (
+            <div>{post.body?.map(renderBlock)}</div>
+          )}
         </article>
 
         {/* CTA */}
