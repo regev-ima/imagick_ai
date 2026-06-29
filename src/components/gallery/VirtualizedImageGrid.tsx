@@ -71,11 +71,14 @@ export function VirtualizedImageGrid<T>({
     const el = innerRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? 0;
-      if (w > 0) setContainerWidth(w);
+      const w = Math.round(entries[0]?.contentRect.width ?? 0);
+      // Only commit meaningful changes (>1px). Sub-pixel jitter and tiny
+      // oscillations would otherwise re-render → relayout → re-fire here,
+      // a feedback loop that resizes every cell ~60fps (screen flicker).
+      if (w > 0) setContainerWidth((prev) => (Math.abs(prev - w) > 1 ? w : prev));
     });
     observer.observe(el);
-    setContainerWidth(el.getBoundingClientRect().width);
+    setContainerWidth(Math.round(el.getBoundingClientRect().width));
     return () => observer.disconnect();
   }, []);
 
