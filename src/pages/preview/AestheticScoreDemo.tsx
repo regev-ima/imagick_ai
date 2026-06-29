@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, Upload, Loader2, LayoutGrid, Layers, Wand2 } from "lucide-react";
 import { analyzeImages, CLUSTER_LEVELS, type ScoredImage } from "@/lib/aesthetic/clipScorer";
-import { scoreImagePro, VISION_MODELS, type ProScore } from "@/lib/aesthetic/visionScorer";
+import { scoreImagePro, fetchVisionModels, VISION_MODELS, type VisionModelOption, type ProScore } from "@/lib/aesthetic/visionScorer";
 
 /**
  * AI image-scoring demo.
@@ -42,8 +42,21 @@ export default function AestheticScoreDemo() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Professional (vision-LLM) pass state.
+  const [models, setModels] = useState<VisionModelOption[]>(VISION_MODELS);
   const [proModel, setProModel] = useState(VISION_MODELS[0].id);
   const [proCount, setProCount] = useState(10);
+
+  // Load the live, image-capable model list from OpenRouter (ids stay current).
+  useEffect(() => {
+    fetchVisionModels()
+      .then((ms) => {
+        if (ms.length) {
+          setModels(ms);
+          setProModel(ms[0].id);
+        }
+      })
+      .catch(() => { /* keep static fallback */ });
+  }, []);
   const [proBusy, setProBusy] = useState(false);
   const [proProgress, setProProgress] = useState<{ done: number; total: number } | null>(null);
   const [proError, setProError] = useState("");
@@ -203,9 +216,9 @@ export default function AestheticScoreDemo() {
               value={proModel}
               onChange={(e) => setProModel(e.target.value)}
               disabled={proBusy}
-              className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
+              className="max-w-[260px] rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
             >
-              {VISION_MODELS.map((m) => (
+              {models.map((m) => (
                 <option key={m.id} value={m.id}>{m.label}</option>
               ))}
             </select>
