@@ -38,11 +38,17 @@ export const VISION_MODELS: VisionModelOption[] = [
 /** Fetches the live, image-capable model list from OpenRouter (via our function). */
 export async function fetchVisionModels(): Promise<VisionModelOption[]> {
   const res = await fetch("/api/list-models");
-  const json = await res.json();
+  const text = await res.text();
+  let json: { models?: VisionModelOption[]; message?: string; error?: string };
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(`תשובת שרת לא תקינה (${res.status})`);
+  }
   if (!res.ok || !Array.isArray(json.models)) {
     throw new Error(json?.message || json?.error || `שגיאה (${res.status})`);
   }
-  return json.models as VisionModelOption[];
+  return json.models;
 }
 
 /** Draws the image to a canvas at <=maxPx on the long edge and returns a JPEG data URL. */
@@ -72,9 +78,18 @@ export async function scoreImagePro(imageUrl: string, model: string, tags?: stri
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image: dataUrl, model, tags }),
   });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json?.message || json?.error || `שגיאה (${res.status})`);
+  // Read as text first: on a timeout/crash the server may return a non-JSON
+  // body (e.g. "An error occurred…"), which would otherwise throw a cryptic
+  // "Unexpected token" JSON error.
+  const text = await res.text();
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(`תשובת שרת לא תקינה (${res.status}) — ייתכן timeout. ${text.slice(0, 100)}`);
   }
-  return json as ProScore;
+  if (!res.ok) {
+    throw new Error((json?.message as string) || (json?.error as string) || `שגיאה (${res.status})`);
+  }
+  return json as unknown as ProScore;
 }

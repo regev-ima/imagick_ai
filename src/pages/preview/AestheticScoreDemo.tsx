@@ -1,24 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, Upload, Loader2, LayoutGrid, Layers, Wand2 } from "lucide-react";
+import { Sparkles, Upload, Loader2, LayoutGrid, Layers, Wand2, X } from "lucide-react";
 import { analyzeImages, CLUSTER_LEVELS, type ScoredImage } from "@/lib/aesthetic/clipScorer";
 import { scoreImagePro, fetchVisionModels, VISION_MODELS, type VisionModelOption, type ProScore } from "@/lib/aesthetic/visionScorer";
 import { CullingTags, defaultCullingTags } from "./CullingTags";
 
-const PRO_CONCURRENCY = 6; // how many vision-LLM calls run at once
-
 /**
- * AI image-scoring demo.
+ * AI image-scoring demo with a model-comparison table.
  *
- * Two scoring paths, side by side:
- *  1. Fast pass (CLIP, in-browser, free): aesthetic score + similarity clusters
- *     for every image, instantly. Great for clustering and a first ranking.
- *  2. Professional pass (vision LLM via OpenRouter, server-side): context-aware
- *     scoring against a professional rubric — understands intent (closed eyes
- *     while praying = a moment, not a flaw), recognizes deliberate styles, and
- *     explains itself. Run only on the top candidates to keep cost tiny.
- *
- * This is the planned hybrid pipeline (cheap pass everywhere → smart pass on
- * candidates), shrunk to a demo so it's viewable in the Vercel preview.
+ *  - Fast pass (CLIP, in-browser, free): aesthetic score + similarity clusters.
+ *  - Compare pass: run up to 5 vision LLMs (via OpenRouter) on the same top-N
+ *    images, side by side in a table — context-aware score, Hebrew tags, cost —
+ *    so you can judge which model matches your eye. Click any image to enlarge.
  */
 
 const CLUSTER_COLORS = [
@@ -26,12 +18,18 @@ const CLUSTER_COLORS = [
   "#d17fae", "#7fd189", "#d1b67f", "#7fc4d1", "#9b9b9b",
 ];
 
-// Typical wedding/event gallery size, used to extrapolate measured cost.
+const PRO_CONCURRENCY = 6;     // vision-LLM calls running at once
+const MAX_COMPARE_MODELS = 5;  // how many models can be compared together
 const GALLERY_SIZE = 3000;
-const HYBRID_FRACTION = 0.1; // hybrid pipeline sends only ~10% (candidates) to the LLM
+const HYBRID_FRACTION = 0.1;
+
+type CellResult = ProScore | { error: string };
+function isError(c: CellResult | undefined): c is { error: string } {
+  return !!c && "error" in c;
+}
 
 function scoreColor(s: number): string {
-  const hue = Math.round(s * 130); // 0=red → 130=green
+  const hue = Math.round(s * 130);
   return `hsl(${hue} 70% 45%)`;
 }
 
@@ -40,40 +38,40 @@ export default function AestheticScoreDemo() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [level, setLevel] = useState(1); // index into CLUSTER_LEVELS (default: medium)
+  const [level, setLevel] = useState(1);
   const [groupView, setGroupView] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Professional (vision-LLM) pass state.
+  // Compare pass.
   const [models, setModels] = useState<VisionModelOption[]>(VISION_MODELS);
-  const [proModel, setProModel] = useState(VISION_MODELS[0].id);
+  const [selected, setSelected] = useState<string[]>([VISION_MODELS[0].id]);
   const [proCount, setProCount] = useState(10);
+  const [proBusy, setProBusy] = useState(false);
+  const [proProgress, setProProgress] = useState<{ done: number; total: number } | null>(null);
+  const [proError, setProError] = useState("");
+  // results[imageUrl][modelId] = ProScore | {error}
+  const [results, setResults] = useState<Map<string, Map<string, CellResult>>>(new Map());
+  const [tags, setTags] = useState<string[]>(() => defaultCullingTags("wedding", "he"));
+  const [showTags, setShowTags] = useState(false);
 
-  // Load the live, image-capable model list from OpenRouter (ids stay current).
   useEffect(() => {
     fetchVisionModels()
       .then((ms) => {
         if (ms.length) {
           setModels(ms);
-          setProModel(ms[0].id);
+          setSelected([ms[0].id]);
         }
       })
       .catch(() => { /* keep static fallback */ });
   }, []);
-  const [proBusy, setProBusy] = useState(false);
-  const [proProgress, setProProgress] = useState<{ done: number; total: number } | null>(null);
-  const [proError, setProError] = useState("");
-  const [proResults, setProResults] = useState<Map<string, ProScore>>(new Map());
-  // Tags to check per image — default to the Hebrew wedding set from the app.
-  const [tags, setTags] = useState<string[]>(() => defaultCullingTags("wedding", "he"));
-  const [showTags, setShowTags] = useState(false);
 
   const run = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
     setBusy(true);
     setImages([]);
     setProgress(null);
-    setProResults(new Map());
+    setResults(new Map());
     setProError("");
     try {
       const items = files.map((f) => ({ url: URL.createObjectURL(f), name: f.name }));
@@ -91,43 +89,55 @@ export default function AestheticScoreDemo() {
     }
   }, []);
 
-  // Professional pass over the top-N ranked images, run in parallel (a small
-  // worker pool) so a big batch finishes fast instead of one-at-a-time.
-  const runPro = useCallback(async () => {
+  const toggleModel = (id: string) =>
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < MAX_COMPARE_MODELS ? [...prev, id] : prev,
+    );
+
+  // Run every (image × selected-model) pair through a worker pool.
+  const runCompare = useCallback(async () => {
     const top = images.slice(0, proCount);
-    if (top.length === 0) return;
+    if (top.length === 0 || selected.length === 0) return;
     setProBusy(true);
     setProError("");
-    setProProgress({ done: 0, total: top.length });
-    const next = new Map(proResults);
+    const jobs: { url: string; model: string }[] = [];
+    for (const img of top) for (const m of selected) jobs.push({ url: img.url, model: m });
+    setProProgress({ done: 0, total: jobs.length });
+
+    const next = new Map(results);
+    const setCell = (url: string, model: string, cell: CellResult) => {
+      const row = next.get(url) ?? new Map<string, CellResult>();
+      row.set(model, cell);
+      next.set(url, row);
+      setResults(new Map(next));
+    };
+
     let done = 0;
     let cursor = 0;
     const worker = async () => {
-      while (cursor < top.length) {
-        const i = cursor++;
+      while (cursor < jobs.length) {
+        const j = jobs[cursor++];
         try {
-          const score = await scoreImagePro(top[i].url, proModel, tags);
-          next.set(top[i].url, score);
-          setProResults(new Map(next));
+          const score = await scoreImagePro(j.url, j.model, tags);
+          setCell(j.url, j.model, score);
         } catch (err) {
-          setProError(err instanceof Error ? err.message : "שגיאה בניקוד המקצועי");
+          const msg = err instanceof Error ? err.message : "שגיאה";
+          setCell(j.url, j.model, { error: msg });
+          setProError(msg);
         }
         done++;
-        setProProgress({ done, total: top.length });
+        setProProgress({ done, total: jobs.length });
       }
     };
     try {
-      await Promise.all(
-        Array.from({ length: Math.min(PRO_CONCURRENCY, top.length) }, worker),
-      );
+      await Promise.all(Array.from({ length: Math.min(PRO_CONCURRENCY, jobs.length) }, worker));
     } finally {
       setProBusy(false);
     }
-  }, [images, proModel, proCount, proResults, tags]);
+  }, [images, proCount, selected, results, tags]);
 
-  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) =>
     run(Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/")));
-  };
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     run(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/")));
@@ -137,50 +147,43 @@ export default function AestheticScoreDemo() {
     const map = new Map<number, ScoredImage[]>();
     for (const img of images) {
       const c = img.clusters[level];
-      const arr = map.get(c) ?? [];
-      arr.push(img);
-      map.set(c, arr);
+      (map.get(c) ?? map.set(c, []).get(c)!).push(img);
     }
     return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
   }, [images, level]);
 
-  // Real measured cost from OpenRouter, summed across this run.
-  const cost = useMemo(() => {
-    const scored = [...proResults.values()];
-    const priced = scored.filter((r) => typeof r.usage?.cost === "number");
-    const total = priced.reduce((s, r) => s + (r.usage!.cost as number), 0);
-    const promptTok = scored.reduce((s, r) => s + (r.usage?.prompt_tokens ?? 0), 0);
-    const n = priced.length;
-    const avg = n ? total / n : 0;
-    return {
-      n,
-      total,
-      avg,
-      promptTok,
-      fullGallery: avg * GALLERY_SIZE,
-      hybridGallery: avg * GALLERY_SIZE * HYBRID_FRACTION,
-    };
-  }, [proResults]);
-
-  // Per-model pricing (USD / 1M tokens), keyed by model id, for per-image breakdown.
   const priceByModel = useMemo(() => {
     const m = new Map<string, VisionModelOption>();
     for (const opt of models) m.set(opt.id, opt);
     return m;
   }, [models]);
 
+  const cost = useMemo(() => {
+    let total = 0, n = 0, promptTok = 0;
+    for (const row of results.values())
+      for (const cell of row.values())
+        if (!isError(cell) && typeof cell.usage?.cost === "number") {
+          total += cell.usage.cost; n++; promptTok += cell.usage.prompt_tokens ?? 0;
+        }
+    const avg = n ? total / n : 0;
+    return { n, total, avg, promptTok, fullGallery: avg * GALLERY_SIZE, hybridGallery: avg * GALLERY_SIZE * HYBRID_FRACTION };
+  }, [results]);
+
+  const topImages = images.slice(0, proCount);
+  const modelShort = (id: string) => (priceByModel.get(id)?.label ?? id).split(" · ")[0];
+
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-7xl px-4 py-8">
         <header className="mb-6">
           <div className="flex items-center gap-2 text-primary">
             <Sparkles className="h-5 w-5" />
-            <h1 className="text-xl font-semibold">ניקוד תמונות AI — ניסוי</h1>
+            <h1 className="text-xl font-semibold">ניקוד תמונות AI — השוואת מודלים</h1>
           </div>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            שלב מהיר (CLIP, בדפדפן, חינם): ציון וקיבוץ לכל התמונות. שלב מקצועי (Vision LLM):
-            ניקוד מודע-הקשר עם הסבר — מבין שעיניים עצומות בתפילה זה רגע, לא פגם — שרץ רק על
-            המועמדות המובילות כדי לשמור על עלות נמוכה.
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            שלב מהיר (CLIP, בדפדפן): ציון וקיבוץ לכל התמונות. השוואה: בחר עד {MAX_COMPARE_MODELS} מודלים
+            והרץ אותם במקביל על אותן תמונות — ציון מודע-הקשר, תגיות בעברית ועלות, זה לצד זה.
+            לחיצה על תמונה מגדילה אותה לבדיקה.
           </p>
         </header>
 
@@ -189,116 +192,83 @@ export default function AestheticScoreDemo() {
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
           onClick={() => inputRef.current?.click()}
-          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-2 px-6 py-10 text-center transition-colors hover:border-primary/50"
+          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-2 px-6 py-8 text-center transition-colors hover:border-primary/50"
         >
           <Upload className="h-6 w-6 text-muted-foreground" />
           <div className="text-sm font-medium">גרור לכאן תמונות, או לחץ לבחירה</div>
-          <div className="text-xs text-muted-foreground">מומלץ 50–200 תמונות. ככל שיותר — איטי יותר בדפדפן.</div>
           <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={onPick} />
         </div>
 
-        {/* Controls */}
+        {/* Compare controls */}
         {images.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            <button
-              onClick={() => setGroupView((v) => !v)}
-              className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium hover:text-primary"
-            >
-              {groupView ? <LayoutGrid className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
-              {groupView ? "תצוגה ממוינת לפי ציון" : "תצוגה לפי קבוצות"}
-            </button>
-
-            {/* Clustering level — like the legacy loose/medium/strict similarity groups. */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              דרגת קיבוץ:
-              <div className="flex overflow-hidden rounded-md border border-border">
-                {CLUSTER_LEVELS.map((lvl, i) => (
+          <div className="mt-4 space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <Wand2 className="h-4 w-4 text-amber-500" />
+              בחר מודלים להשוואה ({selected.length}/{MAX_COMPARE_MODELS}):
+            </div>
+            <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+              {models.map((m) => {
+                const on = selected.includes(m.id);
+                const locked = !on && selected.length >= MAX_COMPARE_MODELS;
+                return (
                   <button
-                    key={lvl.key}
-                    onClick={() => setLevel(i)}
-                    className={`px-2.5 py-1 font-medium transition-colors ${
-                      level === i ? "bg-primary/15 text-primary" : "bg-surface-2 text-muted-foreground hover:text-foreground"
-                    } ${i > 0 ? "border-r border-border" : ""}`}
+                    key={m.id}
+                    onClick={() => toggleModel(m.id)}
+                    disabled={locked || proBusy}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      on ? "border-amber-500/60 bg-amber-500/15 text-foreground" : "border-border bg-surface-2 text-muted-foreground hover:text-foreground"
+                    } ${locked ? "cursor-not-allowed opacity-40" : ""}`}
                   >
-                    {lvl.label}
+                    {m.label}
                   </button>
-                ))}
-              </div>
-              <span className="tabular-nums">{groups.length} קבוצות</span>
+                );
+              })}
             </div>
-          </div>
-        )}
 
-        {/* Professional pass */}
-        {images.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
-            <Wand2 className="h-4 w-4 text-amber-500" />
-            <span className="text-xs font-medium">ניקוד מקצועי (Vision LLM):</span>
-            <select
-              value={proModel}
-              onChange={(e) => setProModel(e.target.value)}
-              disabled={proBusy}
-              className="max-w-[260px] rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
-            >
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </select>
-            <select
-              value={proCount}
-              onChange={(e) => setProCount(Number(e.target.value))}
-              disabled={proBusy}
-              className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
-            >
-              {[5, 10, 25, 50].map((n) => <option key={n} value={n}>{n} מובילות</option>)}
-            </select>
-            <button
-              onClick={runPro}
-              disabled={proBusy}
-              className="flex items-center gap-1.5 rounded-md bg-amber-500/90 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-500 disabled:opacity-50"
-            >
-              {proBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              נקד מקצועית
-            </button>
-            {proProgress && proBusy && (
-              <span className="tabular-nums text-xs text-muted-foreground">{proProgress.done}/{proProgress.total}</span>
-            )}
-            {proError && <span className="w-full rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">{proError}</span>}
-
-            {/* Tags to check on every image (default: Hebrew wedding set) */}
-            <div className="w-full border-t border-amber-500/20 pt-2">
-              <button
-                onClick={() => setShowTags((v) => !v)}
-                className="text-xs font-medium text-muted-foreground hover:text-foreground"
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={proCount}
+                onChange={(e) => setProCount(Number(e.target.value))}
+                disabled={proBusy}
+                className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
               >
-                תגיות לבדיקה: <b className="text-foreground">{tags.length}</b> {showTags ? "▲" : "▼"}
+                {[5, 10, 25, 50].map((n) => <option key={n} value={n}>{n} מובילות</option>)}
+              </select>
+              <button
+                onClick={runCompare}
+                disabled={proBusy || selected.length === 0}
+                className="flex items-center gap-1.5 rounded-md bg-amber-500/90 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-500 disabled:opacity-50"
+              >
+                {proBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                השווה {selected.length} מודלים
               </button>
-              {showTags && (
-                <div className="mt-2">
-                  <CullingTags galleryType="wedding" language="he" value={tags} onChange={setTags} />
-                </div>
+              {proProgress && proBusy && (
+                <span className="tabular-nums text-xs text-muted-foreground">{proProgress.done}/{proProgress.total}</span>
               )}
+              <button onClick={() => setShowTags((v) => !v)} className="text-xs text-muted-foreground hover:text-foreground">
+                תגיות: <b className="text-foreground">{tags.length}</b> {showTags ? "▲" : "▼"}
+              </button>
             </div>
 
-            {/* Real measured cost */}
+            {showTags && <CullingTags galleryType="wedding" language="he" value={tags} onChange={setTags} />}
+            {proError && <div className="rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">{proError}</div>}
+
             {cost.n > 0 && (
-              <div className="w-full border-t border-amber-500/20 pt-2 text-xs">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span>נוקדו <b>{cost.n}</b> תמונות</span>
+              <div className="border-t border-amber-500/20 pt-2 text-xs">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <span>נוקדו <b>{cost.n}</b> (תמונה×מודל)</span>
                   <span>עלות בפועל: <b className="text-amber-600 dark:text-amber-400">${cost.total.toFixed(5)}</b></span>
-                  <span>ממוצע לתמונה: <b>${cost.avg.toFixed(6)}</b></span>
-                  <span className="text-muted-foreground">({cost.promptTok.toLocaleString()} טוקני קלט)</span>
+                  <span>ממוצע: <b>${cost.avg.toFixed(6)}</b></span>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-4 text-muted-foreground">
-                  <span>→ גלריה של {GALLERY_SIZE.toLocaleString()} (הכול ב-LLM): <b className="text-foreground">${cost.fullGallery.toFixed(2)}</b></span>
-                  <span>→ היברידי (~{Math.round(HYBRID_FRACTION * 100)}% מועמדות): <b className="text-foreground">${cost.hybridGallery.toFixed(2)}</b></span>
+                  <span>→ גלריה {GALLERY_SIZE.toLocaleString()} (הכול): <b className="text-foreground">${cost.fullGallery.toFixed(2)}</b></span>
+                  <span>→ היברידי (~{Math.round(HYBRID_FRACTION * 100)}%): <b className="text-foreground">${cost.hybridGallery.toFixed(2)}</b></span>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Status */}
         {busy && (
           <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -308,105 +278,157 @@ export default function AestheticScoreDemo() {
         )}
         {!busy && status && <div className="mt-6 text-sm text-destructive">{status}</div>}
 
-        {/* Results — sorted */}
-        {!groupView && images.length > 0 && (
-          <>
-            <div className="mt-6 text-xs text-muted-foreground">{images.length} תמונות · ממוינות מהטוב לפחות</div>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {images.map((img) => (
-                <Card key={img.url} img={img} cluster={img.clusters[level]} pro={proResults.get(img.url)} prices={priceByModel} />
-              ))}
-            </div>
-          </>
+        {/* Comparison table */}
+        {results.size > 0 && selected.length > 0 && (
+          <div className="mt-6 overflow-x-auto rounded-lg border border-border">
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="bg-surface-2">
+                  <th className="sticky right-0 z-10 bg-surface-2 p-2 text-right font-medium">תמונה</th>
+                  {selected.map((id) => (
+                    <th key={id} className="min-w-[180px] border-r border-border p-2 text-right font-medium">
+                      {modelShort(id)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {topImages.map((img) => (
+                  <tr key={img.url} className="border-t border-border align-top">
+                    <td className="sticky right-0 z-10 bg-background p-2">
+                      <img
+                        src={img.url}
+                        alt={img.name}
+                        onClick={() => setLightbox(img.url)}
+                        className="h-20 w-28 cursor-zoom-in rounded object-cover"
+                      />
+                      <div className="mt-1 max-w-[112px] truncate text-[10px] text-muted-foreground">{img.name}</div>
+                      <div className="text-[10px] text-muted-foreground">CLIP {(img.score01 * 5).toFixed(1)}</div>
+                    </td>
+                    {selected.map((id) => (
+                      <td key={id} className="border-r border-border p-2">
+                        <Cell cell={results.get(img.url)?.get(id)} price={priceByModel.get(id)} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
-        {/* Results — grouped */}
-        {groupView && images.length > 0 && (
-          <div className="mt-6 space-y-6">
-            {groups.map(([id, items]) => (
-              <div key={id}>
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: CLUSTER_COLORS[id % CLUSTER_COLORS.length] }} />
-                  קבוצה {id} · {items.length} תמונות
+        {/* CLIP clustering grid */}
+        {images.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-3 flex flex-wrap items-center gap-4">
+              <h2 className="text-sm font-semibold">קיבוץ (CLIP)</h2>
+              <button
+                onClick={() => setGroupView((v) => !v)}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium hover:text-primary"
+              >
+                {groupView ? <LayoutGrid className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
+                {groupView ? "ממוין לפי ציון" : "לפי קבוצות"}
+              </button>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                דרגה:
+                <div className="flex overflow-hidden rounded-md border border-border">
+                  {CLUSTER_LEVELS.map((lvl, i) => (
+                    <button
+                      key={lvl.key}
+                      onClick={() => setLevel(i)}
+                      className={`px-2.5 py-1 font-medium ${level === i ? "bg-primary/15 text-primary" : "bg-surface-2 text-muted-foreground hover:text-foreground"} ${i > 0 ? "border-r border-border" : ""}`}
+                    >
+                      {lvl.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                  {items.map((img) => <Card key={img.url} img={img} cluster={id} pro={proResults.get(img.url)} prices={priceByModel} />)}
-                </div>
+                <span className="tabular-nums">{groups.length} קבוצות</span>
               </div>
-            ))}
+            </div>
+
+            {!groupView ? (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                {images.map((img) => <Thumb key={img.url} img={img} cluster={img.clusters[level]} onOpen={setLightbox} />)}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {groups.map(([id, items]) => (
+                  <div key={id}>
+                    <div className="mb-1.5 flex items-center gap-2 text-xs font-medium">
+                      <span className="inline-block h-3 w-3 rounded-full" style={{ background: CLUSTER_COLORS[id % CLUSTER_COLORS.length] }} />
+                      קבוצה {id} · {items.length}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                      {items.map((img) => <Thumb key={img.url} img={img} cluster={id} onOpen={setLightbox} />)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+        >
+          <button className="absolute right-4 top-4 text-white/80 hover:text-white" onClick={() => setLightbox(null)}>
+            <X className="h-7 w-7" />
+          </button>
+          <img src={lightbox} alt="" className="max-h-full max-w-full object-contain" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }
 
-function Card({ img, cluster, pro, prices }: { img: ScoredImage; cluster: number; pro?: ProScore; prices?: Map<string, VisionModelOption> }) {
-  const five = img.score01 * 5;
-  // Per-image token + cost breakdown (input/output split via the model's 1M rates).
-  const price = pro ? prices?.get(pro.model) : undefined;
-  const inTok = pro?.usage?.prompt_tokens ?? null;
-  const outTok = pro?.usage?.completion_tokens ?? null;
-  const inCost = inTok != null && price?.promptPerM != null ? (inTok * price.promptPerM) / 1e6 : null;
-  const outCost = outTok != null && price?.completionPerM != null ? (outTok * price.completionPerM) / 1e6 : null;
+function Thumb({ img, cluster, onOpen }: { img: ScoredImage; cluster: number; onOpen: (url: string) => void }) {
   return (
     <figure className="overflow-hidden rounded-lg bg-surface-2">
       <div className="relative aspect-[4/3]">
-        <img src={img.url} alt={img.name} loading="lazy" className="h-full w-full object-cover" />
-        {/* CLIP fast score (top-right) */}
-        <span
-          className="absolute right-1.5 top-1.5 rounded-md px-1.5 py-0.5 text-xs font-bold text-white shadow"
-          style={{ background: scoreColor(img.score01) }}
-        >
-          {five.toFixed(1)}
+        <img src={img.url} alt={img.name} loading="lazy" onClick={() => onOpen(img.url)} className="h-full w-full cursor-zoom-in object-cover" />
+        <span className="absolute right-1 top-1 rounded px-1 py-0.5 text-[10px] font-bold text-white" style={{ background: scoreColor(img.score01) }}>
+          {(img.score01 * 5).toFixed(1)}
         </span>
-        {/* Professional score (top-left, gold) when available */}
-        {pro && (
-          <span className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-black shadow">
-            <Wand2 className="h-3 w-3" />{Number(pro.overall).toFixed(1)}
-          </span>
-        )}
+        <span className="absolute bottom-1 right-1 rounded-full px-1.5 text-[9px]" style={{ background: CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] + "cc" }}>
+          ק{cluster}
+        </span>
       </div>
-      <figcaption className="px-2 py-1.5 text-[11px] text-muted-foreground">
-        <div className="flex items-center justify-between">
-          <span className="truncate">{img.name}</span>
-          <span className="ml-1 shrink-0 rounded-full px-1.5" style={{ background: CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] + "33" }}>
-            ק{cluster}
-          </span>
-        </div>
-        {pro && (
-          <div className="mt-1 space-y-0.5 border-t border-border pt-1 text-[10.5px] leading-snug text-foreground/80">
-            <div className="flex flex-wrap gap-x-2 text-muted-foreground">
-              <span>טכני {Number(pro.technical).toFixed(1)}</span>
-              <span>קומפ׳ {Number(pro.composition).toFixed(1)}</span>
-              <span>רגע {Number(pro.moment).toFixed(1)}</span>
-              <span>השפעה {Number(pro.impact).toFixed(1)}</span>
-            </div>
-            {pro.tags && pro.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 pt-0.5">
-                {pro.tags.map((t) => (
-                  <span key={t} className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{t}</span>
-                ))}
-              </div>
-            )}
-            {pro.style_note && <div className="text-amber-600 dark:text-amber-400">{pro.style_note}</div>}
-            {pro.explanation && <div>{pro.explanation}</div>}
-            {/* Token + cost breakdown */}
-            {pro.usage && (
-              <div className="mt-1 border-t border-border pt-1 text-[10px] text-muted-foreground">
-                <div>קלט: {inTok ?? "—"} טוק׳{inCost != null && <> · ${inCost.toFixed(6)}</>}</div>
-                <div>פלט: {outTok ?? "—"} טוק׳{outCost != null && <> · ${outCost.toFixed(6)}</>}</div>
-                {typeof pro.usage.cost === "number" && (
-                  <div className="text-foreground/80">סה״כ: ${pro.usage.cost.toFixed(6)}</div>
-                )}
-                {price && (price.promptPerM != null) && (
-                  <div className="text-[9.5px]">מחיר מודל: ${price.promptPerM.toFixed(2)}/${price.completionPerM?.toFixed(2)} ל-1M</div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </figcaption>
     </figure>
+  );
+}
+
+function Cell({ cell, price }: { cell?: CellResult; price?: VisionModelOption }) {
+  if (!cell) return <div className="text-muted-foreground">—</div>;
+  if (isError(cell)) return <div className="text-[10px] text-destructive">{cell.error}</div>;
+
+  const inTok = cell.usage?.prompt_tokens ?? null;
+  const outTok = cell.usage?.completion_tokens ?? null;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1">
+        <span className="rounded px-1.5 py-0.5 text-sm font-bold text-white" style={{ background: scoreColor(Number(cell.overall) / 5) }}>
+          {Number(cell.overall).toFixed(1)}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          ט {Number(cell.technical).toFixed(1)} · ק {Number(cell.composition).toFixed(1)} · ר {Number(cell.moment).toFixed(1)} · ה {Number(cell.impact).toFixed(1)}
+        </span>
+      </div>
+      {cell.tags && cell.tags.length > 0 && (
+        <div className="flex flex-wrap gap-0.5">
+          {cell.tags.map((t) => <span key={t} className="rounded bg-primary/10 px-1 text-[9.5px] text-primary">{t}</span>)}
+        </div>
+      )}
+      {cell.style_note && <div className="text-[10px] text-amber-600 dark:text-amber-400">{cell.style_note}</div>}
+      {cell.explanation && <div className="text-[10px] text-foreground/80">{cell.explanation}</div>}
+      <div className="text-[9.5px] text-muted-foreground">
+        {typeof cell.usage?.cost === "number" && <span>${cell.usage.cost.toFixed(6)} · </span>}
+        קלט {inTok ?? "—"} · פלט {outTok ?? "—"}
+        {price?.promptPerM != null && <span> · ${price.promptPerM.toFixed(2)}/${price.completionPerM?.toFixed(2)} ל-1M</span>}
+      </div>
+    </div>
   );
 }
