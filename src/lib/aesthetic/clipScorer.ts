@@ -93,12 +93,26 @@ async function loadModels(onStatus?: (s: string) => void): Promise<Models> {
     const lib: any = await import(/* @vite-ignore */ TF_CDN);
     lib.env.allowLocalModels = false; // always fetch from the HF hub
 
-    const [tokenizer, textModel, processor, visionModel] = await Promise.all([
+    const [tokenizer, processor] = await Promise.all([
       lib.AutoTokenizer.from_pretrained(CLIP_MODEL),
-      lib.CLIPTextModelWithProjection.from_pretrained(CLIP_MODEL),
       lib.AutoProcessor.from_pretrained(CLIP_MODEL),
-      lib.CLIPVisionModelWithProjection.from_pretrained(CLIP_MODEL),
     ]);
+
+    // Run the neural nets on WebGPU when available — a big speedup over WASM
+    // for hundreds of images. Fall back to WASM if WebGPU isn't supported.
+    const loadNets = (device: string) => Promise.all([
+      lib.CLIPTextModelWithProjection.from_pretrained(CLIP_MODEL, { device }),
+      lib.CLIPVisionModelWithProjection.from_pretrained(CLIP_MODEL, { device }),
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hasWebGPU = typeof navigator !== "undefined" && (navigator as any).gpu;
+    let textModel, visionModel;
+    try {
+      [textModel, visionModel] = await loadNets(hasWebGPU ? "webgpu" : "wasm");
+    } catch (e) {
+      console.warn("WebGPU load failed, falling back to WASM", e);
+      [textModel, visionModel] = await loadNets("wasm");
+    }
 
     // Embed every axis prompt in one pass (good poles first, then bad poles).
     const prompts = [...QUALITY_AXES.map((a) => a.good), ...QUALITY_AXES.map((a) => a.bad)];
