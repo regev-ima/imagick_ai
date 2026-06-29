@@ -13,6 +13,7 @@ export interface ProScore {
   impact: number;
   style_note: string;
   explanation: string;
+  tags?: string[];
   model: string;
   usage?: {
     prompt_tokens: number | null;
@@ -64,12 +65,12 @@ async function downscale(url: string, maxPx = 512): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.8);
 }
 
-export async function scoreImagePro(imageUrl: string, model: string): Promise<ProScore> {
+export async function scoreImagePro(imageUrl: string, model: string, tags?: string[]): Promise<ProScore> {
   const dataUrl = await downscale(imageUrl);
   const res = await fetch("/api/score-vision", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: dataUrl, model }),
+    body: JSON.stringify({ image: dataUrl, model, tags }),
   });
   const json = await res.json();
   if (!res.ok) {

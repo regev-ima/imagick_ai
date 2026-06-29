@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, Upload, Loader2, LayoutGrid, Layers, Wand2 } from "lucide-react";
 import { analyzeImages, CLUSTER_LEVELS, type ScoredImage } from "@/lib/aesthetic/clipScorer";
 import { scoreImagePro, fetchVisionModels, VISION_MODELS, type VisionModelOption, type ProScore } from "@/lib/aesthetic/visionScorer";
+import { CullingTags, defaultCullingTags } from "./CullingTags";
+
+const PRO_CONCURRENCY = 6; // how many vision-LLM calls run at once
 
 /**
  * AI image-scoring demo.
@@ -61,6 +64,9 @@ export default function AestheticScoreDemo() {
   const [proProgress, setProProgress] = useState<{ done: number; total: number } | null>(null);
   const [proError, setProError] = useState("");
   const [proResults, setProResults] = useState<Map<string, ProScore>>(new Map());
+  // Tags to check per image — default to the Hebrew wedding set from the app.
+  const [tags, setTags] = useState<string[]>(() => defaultCullingTags("wedding", "he"));
+  const [showTags, setShowTags] = useState(false);
 
   const run = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -85,7 +91,8 @@ export default function AestheticScoreDemo() {
     }
   }, []);
 
-  // Professional pass over the top-N ranked images, sequentially (gentle on rate limits).
+  // Professional pass over the top-N ranked images, run in parallel (a small
+  // worker pool) so a big batch finishes fast instead of one-at-a-time.
   const runPro = useCallback(async () => {
     const top = images.slice(0, proCount);
     if (top.length === 0) return;
@@ -93,22 +100,30 @@ export default function AestheticScoreDemo() {
     setProError("");
     setProProgress({ done: 0, total: top.length });
     const next = new Map(proResults);
-    try {
-      for (let i = 0; i < top.length; i++) {
+    let done = 0;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < top.length) {
+        const i = cursor++;
         try {
-          const score = await scoreImagePro(top[i].url, proModel);
+          const score = await scoreImagePro(top[i].url, proModel, tags);
           next.set(top[i].url, score);
           setProResults(new Map(next));
         } catch (err) {
           setProError(err instanceof Error ? err.message : "שגיאה בניקוד המקצועי");
-          break;
         }
-        setProProgress({ done: i + 1, total: top.length });
+        done++;
+        setProProgress({ done, total: top.length });
       }
+    };
+    try {
+      await Promise.all(
+        Array.from({ length: Math.min(PRO_CONCURRENCY, top.length) }, worker),
+      );
     } finally {
       setProBusy(false);
     }
-  }, [images, proModel, proCount, proResults]);
+  }, [images, proModel, proCount, proResults, tags]);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     run(Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/")));
@@ -250,6 +265,21 @@ export default function AestheticScoreDemo() {
             )}
             {proError && <span className="w-full rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">{proError}</span>}
 
+            {/* Tags to check on every image (default: Hebrew wedding set) */}
+            <div className="w-full border-t border-amber-500/20 pt-2">
+              <button
+                onClick={() => setShowTags((v) => !v)}
+                className="text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                תגיות לבדיקה: <b className="text-foreground">{tags.length}</b> {showTags ? "▲" : "▼"}
+              </button>
+              {showTags && (
+                <div className="mt-2">
+                  <CullingTags galleryType="wedding" language="he" value={tags} onChange={setTags} />
+                </div>
+              )}
+            </div>
+
             {/* Real measured cost */}
             {cost.n > 0 && (
               <div className="w-full border-t border-amber-500/20 pt-2 text-xs">
@@ -352,6 +382,13 @@ function Card({ img, cluster, pro, prices }: { img: ScoredImage; cluster: number
               <span>רגע {Number(pro.moment).toFixed(1)}</span>
               <span>השפעה {Number(pro.impact).toFixed(1)}</span>
             </div>
+            {pro.tags && pro.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {pro.tags.map((t) => (
+                  <span key={t} className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{t}</span>
+                ))}
+              </div>
+            )}
             {pro.style_note && <div className="text-amber-600 dark:text-amber-400">{pro.style_note}</div>}
             {pro.explanation && <div>{pro.explanation}</div>}
             {/* Token + cost breakdown */}

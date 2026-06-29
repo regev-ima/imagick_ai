@@ -61,6 +61,16 @@ export default async function handler(req: any, res: any) {
       res.status(400).json({ error: "bad_request", message: "missing image (data URL or https URL)" });
       return;
     }
+
+    // Optional tagging: caller supplies an exact tag list (e.g. Hebrew wedding
+    // tags) and the model returns which of them genuinely apply — same call,
+    // no extra cost.
+    const tagList: string[] = Array.isArray(body?.tags)
+      ? body.tags.filter((t: unknown) => typeof t === "string").slice(0, 40)
+      : [];
+    const system = tagList.length
+      ? `${SYSTEM_RUBRIC}\n\nTAGGING: From EXACTLY this list (verbatim, do not invent new tags), add a "tags" array with every tag that genuinely applies to the photo (0 or more):\n${JSON.stringify(tagList)}`
+      : SYSTEM_RUBRIC;
     // Remap ids OpenRouter has retired, so old/cached clients keep working.
     const DEPRECATED_MODELS: Record<string, string> = {
       "google/gemini-flash-1.5": DEFAULT_MODEL,
@@ -79,7 +89,7 @@ export default async function handler(req: any, res: any) {
       body: JSON.stringify({
         model: chosenModel,
         messages: [
-          { role: "system", content: SYSTEM_RUBRIC },
+          { role: "system", content: system },
           {
             role: "user",
             content: [
