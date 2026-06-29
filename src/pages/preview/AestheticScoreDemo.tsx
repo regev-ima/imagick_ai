@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Sparkles, Upload, Loader2, LayoutGrid, Layers } from "lucide-react";
-import { analyzeImages, type ScoredImage } from "@/lib/aesthetic/clipScorer";
+import { analyzeImages, CLUSTER_LEVELS, type ScoredImage } from "@/lib/aesthetic/clipScorer";
 
 /**
  * In-browser AI image-scoring demo. Everything runs client-side via CLIP
@@ -27,7 +27,7 @@ export default function AestheticScoreDemo() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [threshold, setThreshold] = useState(0.9);
+  const [level, setLevel] = useState(1); // index into CLUSTER_LEVELS (default: medium)
   const [groupView, setGroupView] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -39,7 +39,6 @@ export default function AestheticScoreDemo() {
     try {
       const items = files.map((f) => ({ url: URL.createObjectURL(f), name: f.name }));
       const scored = await analyzeImages(items, {
-        clusterThreshold: threshold,
         onStatus: setStatus,
         onProgress: (done, total) => setProgress({ done, total }),
       });
@@ -53,7 +52,7 @@ export default function AestheticScoreDemo() {
     } finally {
       setBusy(false);
     }
-  }, [threshold]);
+  }, []);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
@@ -65,16 +64,17 @@ export default function AestheticScoreDemo() {
     run(files);
   };
 
-  // Group view: bucket by cluster, each bucket sorted by score (already sorted globally).
+  // Group view: bucket by the selected level's cluster id; images stay score-sorted.
   const groups = useMemo(() => {
     const map = new Map<number, ScoredImage[]>();
     for (const img of images) {
-      const arr = map.get(img.cluster) ?? [];
+      const c = img.clusters[level];
+      const arr = map.get(c) ?? [];
       arr.push(img);
-      map.set(img.cluster, arr);
+      map.set(c, arr);
     }
     return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
-  }, [images]);
+  }, [images, level]);
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
@@ -105,17 +105,8 @@ export default function AestheticScoreDemo() {
         </div>
 
         {/* Controls */}
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            סף קיבוץ
-            <input
-              type="range" min={0.8} max={0.97} step={0.01} value={threshold}
-              disabled={busy}
-              onChange={(e) => setThreshold(parseFloat(e.target.value))}
-            />
-            <span className="tabular-nums text-foreground">{threshold.toFixed(2)}</span>
-          </label>
-          {images.length > 0 && (
+        {images.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-4">
             <button
               onClick={() => setGroupView((v) => !v)}
               className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium hover:text-primary"
@@ -123,8 +114,29 @@ export default function AestheticScoreDemo() {
               {groupView ? <LayoutGrid className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
               {groupView ? "תצוגה ממוינת לפי ציון" : "תצוגה לפי קבוצות"}
             </button>
-          )}
-        </div>
+
+            {/* Clustering level — like the legacy loose/medium/strict similarity groups. */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              דרגת קיבוץ:
+              <div className="flex overflow-hidden rounded-md border border-border">
+                {CLUSTER_LEVELS.map((lvl, i) => (
+                  <button
+                    key={lvl.key}
+                    onClick={() => setLevel(i)}
+                    className={`px-2.5 py-1 font-medium transition-colors ${
+                      level === i
+                        ? "bg-primary/15 text-primary"
+                        : "bg-surface-2 text-muted-foreground hover:text-foreground"
+                    } ${i > 0 ? "border-r border-border" : ""}`}
+                  >
+                    {lvl.label}
+                  </button>
+                ))}
+              </div>
+              <span className="tabular-nums">{groups.length} קבוצות</span>
+            </div>
+          </div>
+        )}
 
         {/* Status */}
         {busy && (
@@ -144,7 +156,7 @@ export default function AestheticScoreDemo() {
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {images.map((img) => (
-                <Card key={img.url} img={img} />
+                <Card key={img.url} img={img} cluster={img.clusters[level]} />
               ))}
             </div>
           </>
@@ -159,7 +171,7 @@ export default function AestheticScoreDemo() {
                   קבוצה {id} · {items.length} תמונות
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                  {items.map((img) => <Card key={img.url} img={img} />)}
+                  {items.map((img) => <Card key={img.url} img={img} cluster={id} />)}
                 </div>
               </div>
             ))}
@@ -170,7 +182,7 @@ export default function AestheticScoreDemo() {
   );
 }
 
-function Card({ img }: { img: ScoredImage }) {
+function Card({ img, cluster }: { img: ScoredImage; cluster: number }) {
   const five = img.score01 * 5;
   return (
     <figure className="overflow-hidden rounded-lg bg-surface-2">
@@ -187,9 +199,9 @@ function Card({ img }: { img: ScoredImage }) {
         <span className="truncate">{img.name}</span>
         <span
           className="ml-1 shrink-0 rounded-full px-1.5"
-          style={{ background: CLUSTER_COLORS[img.cluster % CLUSTER_COLORS.length] + "33" }}
+          style={{ background: CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] + "33" }}
         >
-          ק{img.cluster}
+          ק{cluster}
         </span>
       </figcaption>
     </figure>

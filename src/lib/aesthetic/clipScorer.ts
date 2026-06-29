@@ -26,11 +26,22 @@ const BAD_PROMPTS = [
   "a dark, noisy, poorly lit low quality photo",
 ];
 
+/**
+ * Multiple similarity-grouping levels, like the legacy similarity_group_1/2/3.
+ * Higher threshold → stricter (only near-duplicates group); lower → looser
+ * (whole scenes group). Tuned for CLIP ViT-B/32 image-image cosine.
+ */
+export const CLUSTER_LEVELS = [
+  { key: "loose", label: "רופף", threshold: 0.80 },
+  { key: "medium", label: "בינוני", threshold: 0.87 },
+  { key: "strict", label: "מהודק", threshold: 0.93 },
+] as const;
+
 export interface ScoredImage {
   url: string;        // object URL for display
   name: string;
   score01: number;    // 0..1 (min-max normalized across this batch)
-  cluster: number;    // similarity group id
+  clusters: number[]; // similarity group id per CLUSTER_LEVELS entry (same order)
 }
 
 type Vec = Float32Array;
@@ -126,20 +137,20 @@ function cluster(vecs: Vec[], threshold: number): number[] {
 }
 
 export interface AnalyzeOptions {
-  clusterThreshold?: number;
   onStatus?: (s: string) => void;
   onProgress?: (done: number, total: number) => void;
 }
 
 /**
  * Scores + clusters a set of images entirely in the browser.
- * Returns them sorted best → worst.
+ * Clusters at every CLUSTER_LEVELS threshold (cheap — embeddings computed once),
+ * so the UI can switch grouping levels instantly. Returns sorted best → worst.
  */
 export async function analyzeImages(
   files: { url: string; name: string }[],
   opts: AnalyzeOptions = {},
 ): Promise<ScoredImage[]> {
-  const { clusterThreshold = 0.9, onStatus, onProgress } = opts;
+  const { onStatus, onProgress } = opts;
   const m = await loadModels(onStatus);
 
   onStatus?.("מנתח תמונות…");
@@ -155,14 +166,16 @@ export async function analyzeImages(
   // Min-max normalize the raw aesthetic axis across this batch for a clean spread.
   const lo = Math.min(...raw), hi = Math.max(...raw);
   const span = hi - lo || 1;
-  const labels = cluster(vecs, clusterThreshold);
+
+  // Cluster once per level — embeddings are reused, so this is essentially free.
+  const labelsByLevel = CLUSTER_LEVELS.map((lvl) => cluster(vecs, lvl.threshold));
 
   return files
     .map((f, i) => ({
       url: f.url,
       name: f.name,
       score01: (raw[i] - lo) / span,
-      cluster: labels[i],
+      clusters: labelsByLevel.map((labels) => labels[i]),
     }))
     .sort((a, b) => b.score01 - a.score01);
 }
