@@ -228,8 +228,7 @@ export default function AestheticScoreDemo() {
             {proProgress && proBusy && (
               <span className="tabular-nums text-xs text-muted-foreground">{proProgress.done}/{proProgress.total}</span>
             )}
-            <span className="text-[11px] text-muted-foreground">דורש OPENROUTER_API_KEY ב-Vercel</span>
-            {proError && <span className="w-full text-xs text-destructive">{proError}</span>}
+            {proError && <span className="w-full rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">{proError}</span>}
 
             {/* Real measured cost */}
             {cost.n > 0 && (

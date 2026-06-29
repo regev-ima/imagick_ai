@@ -15,7 +15,7 @@
 
 export const config = { maxDuration: 60 };
 
-const DEFAULT_MODEL = "google/gemini-flash-1.5";
+const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
 // The professional rubric. Encodes what photographers actually judge, and —
 // crucially — tells the model to read intent/context before penalizing.
@@ -82,7 +82,6 @@ export default async function handler(req: any, res: any) {
             ],
           },
         ],
-        response_format: { type: "json_object" },
         max_tokens: 400,
         temperature: 0.2,
         usage: { include: true }, // ask OpenRouter for real token counts + cost
@@ -91,7 +90,19 @@ export default async function handler(req: any, res: any) {
 
     if (!orRes.ok) {
       const text = await orRes.text();
-      res.status(502).json({ error: "openrouter_error", status: orRes.status, detail: text.slice(0, 500) });
+      const hints: Record<number, string> = {
+        401: "המפתח (OPENROUTER_API_KEY) לא תקין.",
+        402: "אין מספיק יתרת קרדיט ב-OpenRouter. טען יתרה ב-openrouter.ai/settings/credits ונסה שוב.",
+        400: "ייתכן מזהה מודל לא תקין — בחר מודל אחר מהרשימה.",
+        404: "המודל לא נמצא — בחר מודל אחר מהרשימה.",
+        429: "חריגת קצב בקשות. המתן רגע ונסה שוב (או טען קרדיט).",
+      };
+      const hint = hints[orRes.status] || "";
+      res.status(502).json({
+        error: "openrouter_error",
+        status: orRes.status,
+        message: `OpenRouter החזיר ${orRes.status}. ${hint} ${text.slice(0, 200)}`.trim(),
+      });
       return;
     }
 
