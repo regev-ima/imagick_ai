@@ -1,14 +1,21 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Sparkles, Upload, Loader2, LayoutGrid, Layers } from "lucide-react";
+import { Sparkles, Upload, Loader2, LayoutGrid, Layers, Wand2 } from "lucide-react";
 import { analyzeImages, CLUSTER_LEVELS, type ScoredImage } from "@/lib/aesthetic/clipScorer";
+import { scoreImagePro, VISION_MODELS, type ProScore } from "@/lib/aesthetic/visionScorer";
 
 /**
- * In-browser AI image-scoring demo. Everything runs client-side via CLIP
- * (transformers.js loaded from CDN) — no server, no upload, no cost. Drag in
- * photos and see them ranked by an aesthetic score, grouped by similarity.
+ * AI image-scoring demo.
  *
- * This is a proof-of-concept page for the planned scoring/tagging/clustering
- * feature; it deliberately touches no backend so it can ship to the preview.
+ * Two scoring paths, side by side:
+ *  1. Fast pass (CLIP, in-browser, free): aesthetic score + similarity clusters
+ *     for every image, instantly. Great for clustering and a first ranking.
+ *  2. Professional pass (vision LLM via OpenRouter, server-side): context-aware
+ *     scoring against a professional rubric — understands intent (closed eyes
+ *     while praying = a moment, not a flaw), recognizes deliberate styles, and
+ *     explains itself. Run only on the top candidates to keep cost tiny.
+ *
+ * This is the planned hybrid pipeline (cheap pass everywhere → smart pass on
+ * candidates), shrunk to a demo so it's viewable in the Vercel preview.
  */
 
 const CLUSTER_COLORS = [
@@ -16,9 +23,10 @@ const CLUSTER_COLORS = [
   "#d17fae", "#7fd189", "#d1b67f", "#7fc4d1", "#9b9b9b",
 ];
 
+const PRO_TOP_N = 8; // how many top-ranked images the professional pass scores
+
 function scoreColor(s: number): string {
-  // red (low) → amber → green (high)
-  const hue = Math.round(s * 130); // 0=red, 130=green
+  const hue = Math.round(s * 130); // 0=red → 130=green
   return `hsl(${hue} 70% 45%)`;
 }
 
@@ -31,11 +39,20 @@ export default function AestheticScoreDemo() {
   const [groupView, setGroupView] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Professional (vision-LLM) pass state.
+  const [proModel, setProModel] = useState(VISION_MODELS[0].id);
+  const [proBusy, setProBusy] = useState(false);
+  const [proProgress, setProProgress] = useState<{ done: number; total: number } | null>(null);
+  const [proError, setProError] = useState("");
+  const [proResults, setProResults] = useState<Map<string, ProScore>>(new Map());
+
   const run = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
     setBusy(true);
     setImages([]);
     setProgress(null);
+    setProResults(new Map());
+    setProError("");
     try {
       const items = files.map((f) => ({ url: URL.createObjectURL(f), name: f.name }));
       const scored = await analyzeImages(items, {
@@ -46,25 +63,45 @@ export default function AestheticScoreDemo() {
       setStatus("");
     } catch (err) {
       console.error(err);
-      setStatus(
-        "שגיאה בטעינת המודל. ודא חיבור אינטרנט (המודל נטען מ-huggingface). פרטים ב-console.",
-      );
+      setStatus("שגיאה בטעינת המודל. ודא חיבור אינטרנט (המודל נטען מ-huggingface). פרטים ב-console.");
     } finally {
       setBusy(false);
     }
   }, []);
 
+  // Professional pass over the top-N ranked images, sequentially (gentle on rate limits).
+  const runPro = useCallback(async () => {
+    const top = images.slice(0, PRO_TOP_N);
+    if (top.length === 0) return;
+    setProBusy(true);
+    setProError("");
+    setProProgress({ done: 0, total: top.length });
+    const next = new Map(proResults);
+    try {
+      for (let i = 0; i < top.length; i++) {
+        try {
+          const score = await scoreImagePro(top[i].url, proModel);
+          next.set(top[i].url, score);
+          setProResults(new Map(next));
+        } catch (err) {
+          setProError(err instanceof Error ? err.message : "שגיאה בניקוד המקצועי");
+          break;
+        }
+        setProProgress({ done: i + 1, total: top.length });
+      }
+    } finally {
+      setProBusy(false);
+    }
+  }, [images, proModel, proResults]);
+
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
-    run(files);
+    run(Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/")));
   };
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
-    run(files);
+    run(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/")));
   };
 
-  // Group view: bucket by the selected level's cluster id; images stay score-sorted.
   const groups = useMemo(() => {
     const map = new Map<number, ScoredImage[]>();
     for (const img of images) {
@@ -85,9 +122,9 @@ export default function AestheticScoreDemo() {
             <h1 className="text-xl font-semibold">ניקוד תמונות AI — ניסוי</h1>
           </div>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            גורר תמונות → כל אחת מקבלת ציון אסתטי (0–5) ומשויכת לקבוצת דמיון. הכול
-            רץ <b className="text-foreground">בדפדפן שלך בלבד</b> — בלי שרת, בלי העלאה, בלי עלות.
-            זו הוכחת היתכנות; בפרודקשן המודל ירוץ ב-Cloudflare ויכוון על הדירוגים שלך.
+            שלב מהיר (CLIP, בדפדפן, חינם): ציון וקיבוץ לכל התמונות. שלב מקצועי (Vision LLM):
+            ניקוד מודע-הקשר עם הסבר — מבין שעיניים עצומות בתפילה זה רגע, לא פגם — שרץ רק על
+            המועמדות המובילות כדי לשמור על עלות נמוכה.
           </p>
         </header>
 
@@ -124,9 +161,7 @@ export default function AestheticScoreDemo() {
                     key={lvl.key}
                     onClick={() => setLevel(i)}
                     className={`px-2.5 py-1 font-medium transition-colors ${
-                      level === i
-                        ? "bg-primary/15 text-primary"
-                        : "bg-surface-2 text-muted-foreground hover:text-foreground"
+                      level === i ? "bg-primary/15 text-primary" : "bg-surface-2 text-muted-foreground hover:text-foreground"
                     } ${i > 0 ? "border-r border-border" : ""}`}
                   >
                     {lvl.label}
@@ -135,6 +170,37 @@ export default function AestheticScoreDemo() {
               </div>
               <span className="tabular-nums">{groups.length} קבוצות</span>
             </div>
+          </div>
+        )}
+
+        {/* Professional pass */}
+        {images.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+            <Wand2 className="h-4 w-4 text-amber-500" />
+            <span className="text-xs font-medium">ניקוד מקצועי (Vision LLM):</span>
+            <select
+              value={proModel}
+              onChange={(e) => setProModel(e.target.value)}
+              disabled={proBusy}
+              className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
+            >
+              {VISION_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={runPro}
+              disabled={proBusy}
+              className="flex items-center gap-1.5 rounded-md bg-amber-500/90 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-500 disabled:opacity-50"
+            >
+              {proBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              נקד את {PRO_TOP_N} המובילות
+            </button>
+            {proProgress && proBusy && (
+              <span className="tabular-nums text-xs text-muted-foreground">{proProgress.done}/{proProgress.total}</span>
+            )}
+            <span className="text-[11px] text-muted-foreground">דורש OPENROUTER_API_KEY ב-Vercel</span>
+            {proError && <span className="w-full text-xs text-destructive">{proError}</span>}
           </div>
         )}
 
@@ -148,20 +214,19 @@ export default function AestheticScoreDemo() {
         )}
         {!busy && status && <div className="mt-6 text-sm text-destructive">{status}</div>}
 
-        {/* Results */}
+        {/* Results — sorted */}
         {!groupView && images.length > 0 && (
           <>
-            <div className="mt-6 text-xs text-muted-foreground">
-              {images.length} תמונות · ממוינות מהטוב לפחות
-            </div>
+            <div className="mt-6 text-xs text-muted-foreground">{images.length} תמונות · ממוינות מהטוב לפחות</div>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {images.map((img) => (
-                <Card key={img.url} img={img} cluster={img.clusters[level]} />
+                <Card key={img.url} img={img} cluster={img.clusters[level]} pro={proResults.get(img.url)} />
               ))}
             </div>
           </>
         )}
 
+        {/* Results — grouped */}
         {groupView && images.length > 0 && (
           <div className="mt-6 space-y-6">
             {groups.map(([id, items]) => (
@@ -171,7 +236,7 @@ export default function AestheticScoreDemo() {
                   קבוצה {id} · {items.length} תמונות
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                  {items.map((img) => <Card key={img.url} img={img} cluster={id} />)}
+                  {items.map((img) => <Card key={img.url} img={img} cluster={id} pro={proResults.get(img.url)} />)}
                 </div>
               </div>
             ))}
@@ -182,27 +247,45 @@ export default function AestheticScoreDemo() {
   );
 }
 
-function Card({ img, cluster }: { img: ScoredImage; cluster: number }) {
+function Card({ img, cluster, pro }: { img: ScoredImage; cluster: number; pro?: ProScore }) {
   const five = img.score01 * 5;
   return (
     <figure className="overflow-hidden rounded-lg bg-surface-2">
       <div className="relative aspect-[4/3]">
         <img src={img.url} alt={img.name} loading="lazy" className="h-full w-full object-cover" />
+        {/* CLIP fast score (top-right) */}
         <span
           className="absolute right-1.5 top-1.5 rounded-md px-1.5 py-0.5 text-xs font-bold text-white shadow"
           style={{ background: scoreColor(img.score01) }}
         >
           {five.toFixed(1)}
         </span>
+        {/* Professional score (top-left, gold) when available */}
+        {pro && (
+          <span className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-black shadow">
+            <Wand2 className="h-3 w-3" />{Number(pro.overall).toFixed(1)}
+          </span>
+        )}
       </div>
-      <figcaption className="flex items-center justify-between px-2 py-1.5 text-[11px] text-muted-foreground">
-        <span className="truncate">{img.name}</span>
-        <span
-          className="ml-1 shrink-0 rounded-full px-1.5"
-          style={{ background: CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] + "33" }}
-        >
-          ק{cluster}
-        </span>
+      <figcaption className="px-2 py-1.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between">
+          <span className="truncate">{img.name}</span>
+          <span className="ml-1 shrink-0 rounded-full px-1.5" style={{ background: CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] + "33" }}>
+            ק{cluster}
+          </span>
+        </div>
+        {pro && (
+          <div className="mt-1 space-y-0.5 border-t border-border pt-1 text-[10.5px] leading-snug text-foreground/80">
+            <div className="flex flex-wrap gap-x-2 text-muted-foreground">
+              <span>טכני {Number(pro.technical).toFixed(1)}</span>
+              <span>קומפ׳ {Number(pro.composition).toFixed(1)}</span>
+              <span>רגע {Number(pro.moment).toFixed(1)}</span>
+              <span>השפעה {Number(pro.impact).toFixed(1)}</span>
+            </div>
+            {pro.style_note && <div className="text-amber-600 dark:text-amber-400">{pro.style_note}</div>}
+            {pro.explanation && <div>{pro.explanation}</div>}
+          </div>
+        )}
       </figcaption>
     </figure>
   );
