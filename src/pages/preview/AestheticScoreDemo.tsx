@@ -54,6 +54,7 @@ export default function AestheticScoreDemo() {
   const [results, setResults] = useState<Map<string, Map<string, CellResult>>>(new Map());
   const [tags, setTags] = useState<string[]>(() => defaultCullingTags("wedding", "he"));
   const [showTags, setShowTags] = useState(false);
+  const [verbose, setVerbose] = useState(false); // off = cheapest (no prose output)
 
   useEffect(() => {
     fetchVisionModels()
@@ -118,7 +119,7 @@ export default function AestheticScoreDemo() {
       while (cursor < jobs.length) {
         const j = jobs[cursor++];
         try {
-          const score = await scoreImagePro(j.url, j.model, tags);
+          const score = await scoreImagePro(j.url, j.model, tags, verbose);
           setCell(j.url, j.model, score);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "שגיאה";
@@ -134,7 +135,7 @@ export default function AestheticScoreDemo() {
     } finally {
       setProBusy(false);
     }
-  }, [images, proCount, selected, results, tags]);
+  }, [images, proCount, selected, results, tags, verbose]);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) =>
     run(Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/")));
@@ -248,6 +249,10 @@ export default function AestheticScoreDemo() {
               <button onClick={() => setShowTags((v) => !v)} className="text-xs text-muted-foreground hover:text-foreground">
                 תגיות: <b className="text-foreground">{tags.length}</b> {showTags ? "▲" : "▼"}
               </button>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                <input type="checkbox" checked={verbose} onChange={(e) => setVerbose(e.target.checked)} disabled={proBusy} />
+                הסברים מילוליים <span className="text-[10px]">(יקר יותר)</span>
+              </label>
             </div>
 
             {showTags && <CullingTags galleryType="wedding" language="he" value={tags} onChange={setTags} />}

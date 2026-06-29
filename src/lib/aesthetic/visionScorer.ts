@@ -71,12 +71,12 @@ async function downscale(url: string, maxPx = 512): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.8);
 }
 
-export async function scoreImagePro(imageUrl: string, model: string, tags?: string[]): Promise<ProScore> {
+export async function scoreImagePro(imageUrl: string, model: string, tags?: string[], verbose = false): Promise<ProScore> {
   const dataUrl = await downscale(imageUrl);
   const res = await fetch("/api/score-vision", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: dataUrl, model, tags }),
+    body: JSON.stringify({ image: dataUrl, model, tags, verbose }),
   });
   // Read as text first: on a timeout/crash the server may return a non-JSON
   // body (e.g. "An error occurred…"), which would otherwise throw a cryptic

@@ -32,12 +32,17 @@ CRITICAL — judge intent, not surface features:
 - Recognize deliberate techniques as choices, not flaws: motion blur, panning, silhouette, lens flare, high-key/low-key, shallow depth of field/bokeh, intentional grain, candid imperfection.
 - Reward authentic moments over stiff, technically-perfect-but-lifeless shots.
 
-Compute overall as a holistic 0–5 (not a strict average — a stunning moment can outweigh a minor technical flaw).
+Compute overall as a holistic 0–5 (not a strict average — a stunning moment can outweigh a minor technical flaw).`;
 
-Respond with ONLY a JSON object, no prose:
+// JSON output spec appended per request. Concise mode drops the prose fields
+// (style_note/explanation) — those are output tokens, which cost ~4x input,
+// so omitting them is a real saving at scale. Verbose mode adds them back.
+const JSON_VERBOSE = `\n\nRespond with ONLY a JSON object, no prose around it:
 {"overall":number,"technical":number,"composition":number,"moment":number,"impact":number,"style_note":string,"explanation":string}
-"style_note": short — any intentional technique or context you detected (or "" if none).
-"explanation": one short sentence in HEBREW explaining the overall score.`;
+"style_note": short — any intentional technique/context (or "").
+"explanation": ONE short sentence in HEBREW.`;
+const JSON_CONCISE = `\n\nRespond with ONLY this JSON object — numbers only, NO style_note, NO explanation, NO prose:
+{"overall":number,"technical":number,"composition":number,"moment":number,"impact":number}`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default async function handler(req: any, res: any) {
@@ -68,9 +73,12 @@ export default async function handler(req: any, res: any) {
     const tagList: string[] = Array.isArray(body?.tags)
       ? body.tags.filter((t: unknown) => typeof t === "string").slice(0, 40)
       : [];
-    const system = tagList.length
-      ? `${SYSTEM_RUBRIC}\n\nTAGGING: From EXACTLY this list (verbatim, do not invent new tags), add a "tags" array with every tag that genuinely applies to the photo (0 or more):\n${JSON.stringify(tagList)}`
-      : SYSTEM_RUBRIC;
+    // Concise by default (cheap); verbose only when the client asks for prose.
+    const verbose = body?.verbose === true;
+    let system = SYSTEM_RUBRIC + (verbose ? JSON_VERBOSE : JSON_CONCISE);
+    if (tagList.length) {
+      system += `\n\nTAGGING: From EXACTLY this list (verbatim, do not invent new tags), add a "tags" array with every tag that genuinely applies to the photo (0 or more):\n${JSON.stringify(tagList)}`;
+    }
     // Remap ids OpenRouter has retired, so old/cached clients keep working.
     const DEPRECATED_MODELS: Record<string, string> = {
       "google/gemini-flash-1.5": DEFAULT_MODEL,
@@ -98,7 +106,7 @@ export default async function handler(req: any, res: any) {
             ],
           },
         ],
-        max_tokens: 400,
+        max_tokens: verbose ? 400 : 150, // concise mode needs far fewer output tokens
         temperature: 0.2,
         usage: { include: true }, // ask OpenRouter for real token counts + cost
       }),
