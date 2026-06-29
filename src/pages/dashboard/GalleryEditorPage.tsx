@@ -77,6 +77,7 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useEffectiveUser } from "@/hooks/useImpersonation";
 import { useImageProcessing } from "@/hooks/useImageProcessing";
+import { useGalleryRealtime } from "@/hooks/useGalleryRealtime";
 import { getThumbnailUrl, getPreviewUrl, getEditedThumbnailUrl, getEditedPreviewUrl } from "@/lib/imageUrls";
 import { stuckThresholdMs } from "@/lib/cullingEta";
 import { useJustifiedLayout } from "@/hooks/useJustifiedLayout";
@@ -100,6 +101,8 @@ function Sparkle({ size = 14, className }: { size?: number; className?: string }
 export default function GalleryEditorPage() {
   const { id } = useParams();
   const { effectiveUserId } = useEffectiveUser();
+  // Live updates: imported photos + status changes land instantly (no refresh).
+  useGalleryRealtime(id);
   const isMobile = useIsMobile();
   const { canViewAnalytics } = useUserRole();
   const queryClient = useQueryClient();

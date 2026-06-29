@@ -38,6 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEffectiveUser } from "@/hooks/useImpersonation";
+import { useGalleriesRealtime } from "@/hooks/useGalleryRealtime";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { Orb } from "@/components/aura/Orb";
 
@@ -93,6 +94,8 @@ const dynamicVars = (color: string | null): CSSProperties =>
 
 export default function GalleriesPage() {
   const { effectiveUserId } = useEffectiveUser();
+  // Live status badges (transferring → processing → ready) without a refresh.
+  useGalleriesRealtime(effectiveUserId);
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
