@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, Upload, Loader2, LayoutGrid, Layers, Wand2, X } from "lucide-react";
+import { Sparkles, Upload, Loader2, LayoutGrid, Layers, Wand2, X, Users } from "lucide-react";
 import { analyzeImages, CLUSTER_LEVELS, type ScoredImage } from "@/lib/aesthetic/clipScorer";
 import { scoreImagePro, fetchVisionModels, VISION_MODELS, type VisionModelOption, type ProScore } from "@/lib/aesthetic/visionScorer";
+import { groupFaces, type Person } from "@/lib/aesthetic/faceGrouping";
 import { CullingTags, defaultCullingTags } from "./CullingTags";
 
 /**
@@ -56,6 +57,13 @@ export default function AestheticScoreDemo() {
   const [showTags, setShowTags] = useState(false);
   const [verbose, setVerbose] = useState(false); // off = cheapest (no prose output)
 
+  // Face grouping.
+  const [faceBusy, setFaceBusy] = useState(false);
+  const [faceStatus, setFaceStatus] = useState("");
+  const [faceProgress, setFaceProgress] = useState<{ done: number; total: number; faces: number } | null>(null);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [faceError, setFaceError] = useState("");
+
   useEffect(() => {
     fetchVisionModels()
       .then((ms) => {
@@ -74,6 +82,8 @@ export default function AestheticScoreDemo() {
     setProgress(null);
     setResults(new Map());
     setProError("");
+    setPeople([]);
+    setFaceError("");
     try {
       const items = files.map((f) => ({ url: URL.createObjectURL(f), name: f.name }));
       const scored = await analyzeImages(items, {
@@ -136,6 +146,29 @@ export default function AestheticScoreDemo() {
       setProBusy(false);
     }
   }, [images, proCount, selected, results, tags, verbose]);
+
+  const runFaces = useCallback(async () => {
+    if (images.length === 0) return;
+    setFaceBusy(true);
+    setFaceError("");
+    setPeople([]);
+    try {
+      const { people: ppl } = await groupFaces(
+        images.map((img) => ({ url: img.url, name: img.name })),
+        {
+          onStatus: setFaceStatus,
+          onProgress: (done, total, faces) => setFaceProgress({ done, total, faces }),
+        },
+      );
+      setPeople(ppl);
+      setFaceStatus("");
+    } catch (err) {
+      console.error(err);
+      setFaceError(err instanceof Error ? err.message : "שגיאה בזיהוי פרצופים");
+    } finally {
+      setFaceBusy(false);
+    }
+  }, [images]);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) =>
     run(Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/")));
@@ -319,6 +352,57 @@ export default function AestheticScoreDemo() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Face grouping */}
+        {images.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                <Users className="h-4 w-4 text-primary" /> קיבוץ פרצופים
+              </h2>
+              <button
+                onClick={runFaces}
+                disabled={faceBusy}
+                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {faceBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                זהה וקבץ פרצופים
+              </button>
+              {faceBusy && (
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {faceStatus}
+                  {faceProgress && <span className="tabular-nums">{faceProgress.done}/{faceProgress.total} · {faceProgress.faces} פרצופים</span>}
+                </span>
+              )}
+              {people.length > 0 && <span className="text-xs text-muted-foreground">{people.length} אנשים זוהו</span>}
+            </div>
+            {faceError && <div className="mb-3 rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">{faceError}</div>}
+
+            <div className="space-y-4">
+              {people.map((p) => (
+                <div key={p.id} className="rounded-lg border border-border bg-surface-2 p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <img src={p.faces[0].crop} alt="" className="h-12 w-12 rounded-full object-cover" />
+                    <div className="text-sm font-medium">אדם {p.id + 1} <span className="text-muted-foreground">· {p.images.length} תמונות</span></div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+                    {p.images.map((url) => (
+                      <img
+                        key={url}
+                        src={url}
+                        alt=""
+                        loading="lazy"
+                        onClick={() => setLightbox(url)}
+                        className="aspect-square w-full cursor-zoom-in rounded object-cover"
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
