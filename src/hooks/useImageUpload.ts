@@ -3,6 +3,7 @@ import Uppy, { type UppyFile } from "@uppy/core";
 import XHRUpload from "@uppy/xhr-upload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { IMAGE_ACCEPT_TYPES } from "@/lib/imageFileTypes";
 
 /**
  * Image upload hook backed by Uppy (transloadit/uppy).
@@ -110,10 +111,9 @@ export function useImageUpload() {
       autoProceed: false,
       allowMultipleUploadBatches: true,
       restrictions: {
-        allowedFileTypes: [
-          "image/*",
-          ".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".rw2", ".orf",
-        ],
+        // Images only (raster + camera RAW + HEIC/HEIF). Blocks video, PDF,
+        // and everything else. Single source of truth in @/lib/imageFileTypes.
+        allowedFileTypes: IMAGE_ACCEPT_TYPES,
       },
     }).use(XHRUpload, {
       // We use the generic XHR uploader, NOT @uppy/aws-s3, because the

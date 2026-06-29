@@ -9,6 +9,7 @@ import { CullingTags, defaultCullingTags } from "./CullingTags";
 import { UploadProgress, isPreviewable } from "./UploadProgress";
 import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
+import { isImageFile as isImage, IMAGE_ACCEPT } from "@/lib/imageFileTypes";
 
 function Sparkle({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -20,9 +21,6 @@ function Sparkle({ size = 16, className = "" }: { size?: number; className?: str
 
 type Phase = "drop" | "analyzing" | "plan";
 type FileWithPath = File & { webkitRelativePath?: string };
-
-const IMAGE_RE = /\.(jpe?g|png|heic|heif|tiff?|webp|cr2|cr3|nef|arw|raf|rw2|dng|orf|srw|pef)$/i;
-const isImage = (f: File) => f.type.startsWith("image/") || IMAGE_RE.test(f.name);
 
 const TYPES: { value: string; label: string }[] = [
   { value: "wedding", label: "Wedding" },
@@ -186,7 +184,7 @@ export default function CreateConceptPlan() {
         ref={inputRef}
         type="file"
         multiple
-        accept="image/*,.cr2,.cr3,.nef,.arw,.raf,.rw2,.dng,.orf,.srw,.pef"
+        accept={IMAGE_ACCEPT}
         className="hidden"
         onChange={(e) => ingest(e.target.files)}
       />

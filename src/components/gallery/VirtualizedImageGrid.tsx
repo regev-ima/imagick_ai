@@ -70,13 +70,27 @@ export function VirtualizedImageGrid<T>({
   useEffect(() => {
     const el = innerRef.current;
     if (!el) return;
+    let rafId = 0;
     const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? 0;
-      if (w > 0) setContainerWidth(w);
+      const w = Math.round(entries[0]?.contentRect.width ?? 0);
+      if (w <= 0) return;
+      // ResizeObserver callbacks run synchronously inside the browser's
+      // layout step, so calling setState here can re-enter layout in the same
+      // tick and oscillate (the "ResizeObserver loop" that strobes the grid
+      // during a window resize). Defer to the next frame — this both breaks
+      // the synchronous loop and coalesces a burst of resize callbacks into a
+      // single update per frame. The >1px guard drops sub-pixel jitter.
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        setContainerWidth((prev) => (Math.abs(prev - w) > 1 ? w : prev));
+      });
     });
     observer.observe(el);
-    setContainerWidth(el.getBoundingClientRect().width);
-    return () => observer.disconnect();
+    setContainerWidth(Math.round(el.getBoundingClientRect().width));
+    return () => {
+      observer.disconnect();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   // Track scroll velocity on the parent scroll container.
