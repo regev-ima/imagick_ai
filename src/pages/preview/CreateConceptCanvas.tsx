@@ -198,10 +198,10 @@ export default function CreateConceptCanvas() {
                     key={t.value}
                     type="button"
                     onClick={() => changeType(t.value)}
-                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                    className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition-all active:scale-95 ${
                       type === t.value
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border bg-surface-2 text-muted-foreground hover:text-foreground"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "border border-border bg-surface-2 text-foreground/80 hover:border-primary/50 hover:text-foreground"
                     }`}
                   >
                     {t.label}

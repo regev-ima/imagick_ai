@@ -285,8 +285,10 @@ export default function CreateConceptPlan() {
                     <div className="flex flex-wrap gap-1.5">
                       {TYPES.map((t) => (
                         <button key={t.value} type="button" onClick={() => changeType(t.value)}
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                            galleryType === t.value ? "bg-primary text-primary-foreground" : "border border-border bg-surface-2 text-muted-foreground hover:text-foreground"
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 ${
+                            galleryType === t.value
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "border border-border bg-surface-2 text-foreground/80 hover:border-primary/50 hover:text-foreground"
                           }`}>
                           {t.label}
                         </button>

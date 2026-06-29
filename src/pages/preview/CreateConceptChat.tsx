@@ -462,8 +462,8 @@ function Chip({ children, onClick, muted = false }: { children: React.ReactNode;
       type="button"
       onClick={onClick}
       className={muted
-        ? "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        : "rounded-full border border-primary/30 bg-primary/5 px-3.5 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"}
+        ? "inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-4 py-2.5 text-sm font-medium text-foreground/80 transition-all hover:border-foreground/40 hover:text-foreground active:scale-95"
+        : "rounded-full border border-primary/60 bg-primary/15 px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all hover:bg-primary hover:text-primary-foreground hover:shadow-[0_0_18px_-6px_hsl(var(--primary)/0.7)] active:scale-95"}
     >
       {children}
     </button>
