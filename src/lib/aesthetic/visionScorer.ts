@@ -24,12 +24,14 @@ export interface ProScore {
 export interface VisionModelOption {
   id: string;
   label: string;
+  promptPerM?: number;     // USD per 1M input tokens
+  completionPerM?: number; // USD per 1M output tokens
 }
 
 // Static fallback used only if the live OpenRouter list can't be fetched.
 // IDs go stale over time — the live list (fetchVisionModels) is preferred.
 export const VISION_MODELS: VisionModelOption[] = [
-  { id: "openai/gpt-4o-mini", label: "GPT-4o-mini" },
+  { id: "openai/gpt-4o-mini", label: "GPT-4o-mini · $0.15/$0.60 ל-1M", promptPerM: 0.15, completionPerM: 0.6 },
 ];
 
 /** Fetches the live, image-capable model list from OpenRouter (via our function). */

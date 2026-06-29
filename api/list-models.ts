@@ -30,16 +30,22 @@ export default async function handler(req: any, res: any) {
       .filter((m: any) => typeof m.id === "string" && !m.id.endsWith(":free"))
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((m: any) => {
-        const prompt = Number(m?.pricing?.prompt) || 0; // USD per input token
-        return { id: m.id, name: m.name || m.id, pricePerM: prompt * 1_000_000 };
+        const promptPerM = (Number(m?.pricing?.prompt) || 0) * 1_000_000; // USD / 1M input
+        const completionPerM = (Number(m?.pricing?.completion) || 0) * 1_000_000; // USD / 1M output
+        return { id: m.id, name: m.name || m.id, promptPerM, completionPerM };
       })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((m: any) => m.pricePerM > 0)
+      .filter((m: any) => m.promptPerM > 0)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .sort((a: any, b: any) => a.pricePerM - b.pricePerM)
+      .sort((a: any, b: any) => a.promptPerM - b.promptPerM)
       .slice(0, 30)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((m: any) => ({ id: m.id, label: `${m.name} · $${m.pricePerM.toFixed(2)}/1M` }));
+      .map((m: any) => ({
+        id: m.id,
+        label: `${m.name} · $${m.promptPerM.toFixed(2)}/$${m.completionPerM.toFixed(2)} ל-1M`,
+        promptPerM: m.promptPerM,
+        completionPerM: m.completionPerM,
+      }));
 
     res.status(200).json({ models });
   } catch (err: unknown) {

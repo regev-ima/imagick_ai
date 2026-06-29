@@ -147,6 +147,13 @@ export default function AestheticScoreDemo() {
     };
   }, [proResults]);
 
+  // Per-model pricing (USD / 1M tokens), keyed by model id, for per-image breakdown.
+  const priceByModel = useMemo(() => {
+    const m = new Map<string, VisionModelOption>();
+    for (const opt of models) m.set(opt.id, opt);
+    return m;
+  }, [models]);
+
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -277,7 +284,7 @@ export default function AestheticScoreDemo() {
             <div className="mt-6 text-xs text-muted-foreground">{images.length} תמונות · ממוינות מהטוב לפחות</div>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {images.map((img) => (
-                <Card key={img.url} img={img} cluster={img.clusters[level]} pro={proResults.get(img.url)} />
+                <Card key={img.url} img={img} cluster={img.clusters[level]} pro={proResults.get(img.url)} prices={priceByModel} />
               ))}
             </div>
           </>
@@ -293,7 +300,7 @@ export default function AestheticScoreDemo() {
                   קבוצה {id} · {items.length} תמונות
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                  {items.map((img) => <Card key={img.url} img={img} cluster={id} pro={proResults.get(img.url)} />)}
+                  {items.map((img) => <Card key={img.url} img={img} cluster={id} pro={proResults.get(img.url)} prices={priceByModel} />)}
                 </div>
               </div>
             ))}
@@ -304,8 +311,14 @@ export default function AestheticScoreDemo() {
   );
 }
 
-function Card({ img, cluster, pro }: { img: ScoredImage; cluster: number; pro?: ProScore }) {
+function Card({ img, cluster, pro, prices }: { img: ScoredImage; cluster: number; pro?: ProScore; prices?: Map<string, VisionModelOption> }) {
   const five = img.score01 * 5;
+  // Per-image token + cost breakdown (input/output split via the model's 1M rates).
+  const price = pro ? prices?.get(pro.model) : undefined;
+  const inTok = pro?.usage?.prompt_tokens ?? null;
+  const outTok = pro?.usage?.completion_tokens ?? null;
+  const inCost = inTok != null && price?.promptPerM != null ? (inTok * price.promptPerM) / 1e6 : null;
+  const outCost = outTok != null && price?.completionPerM != null ? (outTok * price.completionPerM) / 1e6 : null;
   return (
     <figure className="overflow-hidden rounded-lg bg-surface-2">
       <div className="relative aspect-[4/3]">
@@ -341,6 +354,19 @@ function Card({ img, cluster, pro }: { img: ScoredImage; cluster: number; pro?: 
             </div>
             {pro.style_note && <div className="text-amber-600 dark:text-amber-400">{pro.style_note}</div>}
             {pro.explanation && <div>{pro.explanation}</div>}
+            {/* Token + cost breakdown */}
+            {pro.usage && (
+              <div className="mt-1 border-t border-border pt-1 text-[10px] text-muted-foreground">
+                <div>קלט: {inTok ?? "—"} טוק׳{inCost != null && <> · ${inCost.toFixed(6)}</>}</div>
+                <div>פלט: {outTok ?? "—"} טוק׳{outCost != null && <> · ${outCost.toFixed(6)}</>}</div>
+                {typeof pro.usage.cost === "number" && (
+                  <div className="text-foreground/80">סה״כ: ${pro.usage.cost.toFixed(6)}</div>
+                )}
+                {price && (price.promptPerM != null) && (
+                  <div className="text-[9.5px]">מחיר מודל: ${price.promptPerM.toFixed(2)}/${price.completionPerM?.toFixed(2)} ל-1M</div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </figcaption>
