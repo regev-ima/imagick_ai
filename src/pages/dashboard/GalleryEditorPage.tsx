@@ -83,7 +83,6 @@ import { stuckThresholdMs } from "@/lib/cullingEta";
 import { useJustifiedLayout } from "@/hooks/useJustifiedLayout";
 import { useImageDimensions } from "@/hooks/useImageDimensions";
 import { useUserRole } from "@/hooks/useUserRole";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Orb } from "@/components/aura/Orb";
 
 /** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
@@ -1808,7 +1807,12 @@ export default function GalleryEditorPage() {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-20 left-0 right-0 z-30 flex justify-center px-4 pointer-events-none"
+            className={cn(
+              "fixed bottom-20 left-0 z-30 flex justify-center px-4 pointer-events-none",
+              // Center over the photo area, not the whole viewport — otherwise
+              // the 300px desktop sidebar pushes the pill visibly off-center.
+              isMobile ? "right-0" : "right-[300px]",
+            )}
           >
             <div className="pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-[--radius] glass-card border border-primary/25 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.3)] text-sm max-w-lg w-full">
               {gallery.status === "transferring" && (
@@ -2239,19 +2243,20 @@ export default function GalleryEditorPage() {
 
         {filteredImages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
-            {images.length === 0 && gallery.status === "transferring" ? (
+            {images.length === 0 &&
+            (gallery.status === "transferring" ||
+              gallery.status === "processing" ||
+              gallery.status === "uploading") ? (
+              // One calm state for the whole "still arriving" window — covers
+              // transferring AND the brief processing/uploading gap before the
+              // first rows land, so we never flash "No images yet" in between.
               <>
-                <div className="w-48 h-48">
-                  <DotLottieReact
-                    src="https://lottie.host/4db68bbd-31f6-4cd8-84eb-189de081159a/IGmMCqhzpt.lottie"
-                    loop
-                    autoplay
-                    className="w-full h-full"
-                  />
-                </div>
-                <h3 className="text-lg font-semibold">Importing Your Images</h3>
+                <Orb className="w-20 h-20" />
+                <h3 className="text-lg font-semibold">Importing your images</h3>
                 <p className="text-muted-foreground text-center max-w-sm">
-                  Your images are being imported from Google Drive. This may take a few minutes — please be patient.
+                  {gallery.status === "transferring"
+                    ? "We're bringing your photos over from Google Drive. This can take a few minutes — you can stay on this page."
+                    : "Getting your gallery ready…"}
                 </p>
               </>
             ) : (
