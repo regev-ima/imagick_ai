@@ -1205,6 +1205,22 @@ export default function CreateGalleryPage() {
                     )}
                   </div>
                 )}
+
+                {/* Smart culling plan — estimated keepers so the value is tangible */}
+                {imageCount > 0 && aiCulling && (
+                  <div className="rounded-md border border-primary/25 bg-primary/[0.05] p-4 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                        <Sparkle size={14} className="shrink-0 text-accent" />
+                        AI culling first — I'll surface the keepers before you edit
+                      </span>
+                      <span className="text-muted-foreground">
+                        ~<span className="font-mono font-semibold text-foreground">{Math.round(imageCount * 0.3)}</span> keepers
+                        <span className="text-muted-foreground/50"> est.</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
