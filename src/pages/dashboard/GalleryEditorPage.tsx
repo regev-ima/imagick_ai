@@ -2049,8 +2049,11 @@ export default function GalleryEditorPage() {
 
       {/* Main Content Area with Sidebar */}
       <div className="flex-1 flex overflow-hidden">
-      {/* Image Grid */}
-      <div ref={scrollContainerRef} className="flex-1 min-w-0 overflow-y-auto">
+      {/* Image Grid — scrollbar-gutter:stable reserves the scrollbar space so
+          its appearing/disappearing never changes content width, which would
+          otherwise drive a ResizeObserver↔scrollbar feedback loop that
+          re-justifies the grid ~60fps (the "whole screen flickers" bug). */}
+      <div ref={scrollContainerRef} className="flex-1 min-w-0 overflow-y-auto [scrollbar-gutter:stable]">
         {/* Persistent culling-status banner — shown only while
             gallery.culling_status === 'processing'. Sticky so it stays
             in view when the user scrolls down through 3000 thumbnails. */}
