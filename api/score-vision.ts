@@ -61,7 +61,13 @@ export default async function handler(req: any, res: any) {
       res.status(400).json({ error: "bad_request", message: "missing image (data URL or https URL)" });
       return;
     }
-    const chosenModel = typeof model === "string" && model ? model : DEFAULT_MODEL;
+    // Remap ids OpenRouter has retired, so old/cached clients keep working.
+    const DEPRECATED_MODELS: Record<string, string> = {
+      "google/gemini-flash-1.5": DEFAULT_MODEL,
+      "google/gemini-flash-1.5-8b": DEFAULT_MODEL,
+    };
+    const requested = typeof model === "string" && model ? model : DEFAULT_MODEL;
+    const chosenModel = DEPRECATED_MODELS[requested] || requested;
 
     const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
