@@ -14,6 +14,11 @@ export interface ProScore {
   style_note: string;
   explanation: string;
   model: string;
+  usage?: {
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    cost: number | null; // real USD for this single call, from OpenRouter
+  };
 }
 
 // OpenRouter model ids the demo can switch between. Edit freely — any

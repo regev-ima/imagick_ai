@@ -85,6 +85,7 @@ export default async function handler(req: any, res: any) {
         response_format: { type: "json_object" },
         max_tokens: 400,
         temperature: 0.2,
+        usage: { include: true }, // ask OpenRouter for real token counts + cost
       }),
     });
 
@@ -106,7 +107,15 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    res.status(200).json({ ...parsed, model: chosenModel });
+    // Real usage/cost as reported by OpenRouter (usage.include above).
+    const u = data?.usage ?? {};
+    const usage = {
+      prompt_tokens: u.prompt_tokens ?? null,
+      completion_tokens: u.completion_tokens ?? null,
+      cost: typeof u.cost === "number" ? u.cost : null, // USD for this single call
+    };
+
+    res.status(200).json({ ...parsed, model: chosenModel, usage });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "unknown error";
     res.status(500).json({ error: "server_error", message });

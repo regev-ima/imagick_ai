@@ -23,7 +23,9 @@ const CLUSTER_COLORS = [
   "#d17fae", "#7fd189", "#d1b67f", "#7fc4d1", "#9b9b9b",
 ];
 
-const PRO_TOP_N = 8; // how many top-ranked images the professional pass scores
+// Typical wedding/event gallery size, used to extrapolate measured cost.
+const GALLERY_SIZE = 3000;
+const HYBRID_FRACTION = 0.1; // hybrid pipeline sends only ~10% (candidates) to the LLM
 
 function scoreColor(s: number): string {
   const hue = Math.round(s * 130); // 0=red → 130=green
@@ -41,6 +43,7 @@ export default function AestheticScoreDemo() {
 
   // Professional (vision-LLM) pass state.
   const [proModel, setProModel] = useState(VISION_MODELS[0].id);
+  const [proCount, setProCount] = useState(10);
   const [proBusy, setProBusy] = useState(false);
   const [proProgress, setProProgress] = useState<{ done: number; total: number } | null>(null);
   const [proError, setProError] = useState("");
@@ -71,7 +74,7 @@ export default function AestheticScoreDemo() {
 
   // Professional pass over the top-N ranked images, sequentially (gentle on rate limits).
   const runPro = useCallback(async () => {
-    const top = images.slice(0, PRO_TOP_N);
+    const top = images.slice(0, proCount);
     if (top.length === 0) return;
     setProBusy(true);
     setProError("");
@@ -92,7 +95,7 @@ export default function AestheticScoreDemo() {
     } finally {
       setProBusy(false);
     }
-  }, [images, proModel, proResults]);
+  }, [images, proModel, proCount, proResults]);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     run(Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/")));
@@ -112,6 +115,24 @@ export default function AestheticScoreDemo() {
     }
     return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
   }, [images, level]);
+
+  // Real measured cost from OpenRouter, summed across this run.
+  const cost = useMemo(() => {
+    const scored = [...proResults.values()];
+    const priced = scored.filter((r) => typeof r.usage?.cost === "number");
+    const total = priced.reduce((s, r) => s + (r.usage!.cost as number), 0);
+    const promptTok = scored.reduce((s, r) => s + (r.usage?.prompt_tokens ?? 0), 0);
+    const n = priced.length;
+    const avg = n ? total / n : 0;
+    return {
+      n,
+      total,
+      avg,
+      promptTok,
+      fullGallery: avg * GALLERY_SIZE,
+      hybridGallery: avg * GALLERY_SIZE * HYBRID_FRACTION,
+    };
+  }, [proResults]);
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
@@ -188,19 +209,43 @@ export default function AestheticScoreDemo() {
                 <option key={m.id} value={m.id}>{m.label}</option>
               ))}
             </select>
+            <select
+              value={proCount}
+              onChange={(e) => setProCount(Number(e.target.value))}
+              disabled={proBusy}
+              className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
+            >
+              {[5, 10, 25, 50].map((n) => <option key={n} value={n}>{n} מובילות</option>)}
+            </select>
             <button
               onClick={runPro}
               disabled={proBusy}
               className="flex items-center gap-1.5 rounded-md bg-amber-500/90 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-500 disabled:opacity-50"
             >
               {proBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              נקד את {PRO_TOP_N} המובילות
+              נקד מקצועית
             </button>
             {proProgress && proBusy && (
               <span className="tabular-nums text-xs text-muted-foreground">{proProgress.done}/{proProgress.total}</span>
             )}
             <span className="text-[11px] text-muted-foreground">דורש OPENROUTER_API_KEY ב-Vercel</span>
             {proError && <span className="w-full text-xs text-destructive">{proError}</span>}
+
+            {/* Real measured cost */}
+            {cost.n > 0 && (
+              <div className="w-full border-t border-amber-500/20 pt-2 text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span>נוקדו <b>{cost.n}</b> תמונות</span>
+                  <span>עלות בפועל: <b className="text-amber-600 dark:text-amber-400">${cost.total.toFixed(5)}</b></span>
+                  <span>ממוצע לתמונה: <b>${cost.avg.toFixed(6)}</b></span>
+                  <span className="text-muted-foreground">({cost.promptTok.toLocaleString()} טוקני קלט)</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-4 text-muted-foreground">
+                  <span>→ גלריה של {GALLERY_SIZE.toLocaleString()} (הכול ב-LLM): <b className="text-foreground">${cost.fullGallery.toFixed(2)}</b></span>
+                  <span>→ היברידי (~{Math.round(HYBRID_FRACTION * 100)}% מועמדות): <b className="text-foreground">${cost.hybridGallery.toFixed(2)}</b></span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
