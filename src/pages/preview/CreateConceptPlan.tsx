@@ -346,8 +346,8 @@ export default function CreateConceptPlan() {
                       <Scissors className="h-4 w-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold">Cull first {culling ? "· on" : "· off"}</div>
-                      <div className="caption">{culling ? "Aura surfaces the keepers first" : "edit everything"}</div>
+                      <div className="text-sm font-semibold">Cull {culling ? "· on" : "· off"}</div>
+                      <div className="caption">{culling ? "Aura ranks every frame & surfaces your best shots" : "no culling — keep every frame"}</div>
                     </div>
                   </button>
                   <div className="glass-card flex items-center gap-3 rounded-[--radius] p-4">

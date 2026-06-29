@@ -270,8 +270,8 @@ export default function CreateConceptCanvas() {
                   <Scissors className="h-4 w-4" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold">Cull first {cull ? "· on" : "· off"}</div>
-                  <div className="caption">{cull ? "Aura ranks every frame and surfaces the keepers first" : "Edit every photo in the shoot"}</div>
+                  <div className="text-sm font-semibold">Cull {cull ? "· on" : "· off"}</div>
+                  <div className="caption">{cull ? "Aura ranks every frame & surfaces your best shots" : "no culling — keep every photo"}</div>
                 </div>
                 <span className={`h-6 w-11 rounded-full p-0.5 transition-colors ${cull ? "bg-primary" : "bg-muted"}`}>
                   <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cull ? "auto" : 0 }} />

@@ -211,7 +211,7 @@ export default function CreateConceptChat() {
       say("aura", `“${finalName}” it is. Since it's a ${typeLabel.toLowerCase()} shoot, here are the AI looks I'd start with — each one edits every photo in a trained style. Tap one to apply it, browse more, or skip editing. You can also train your own look from your past edits.`);
       setStep("style");
     } else {
-      say("aura", "“" + finalName + "” it is. You haven't trained a look yet, so I'll host these as-is for now — you can train your own AI look anytime and re-edit. Want me to cull first so you only keep the best frames?");
+      say("aura", "“" + finalName + "” it is. You haven't trained a look yet, so I'll host these as-is for now — you can train your own AI look anytime and re-edit. Want me to cull this set? I'll rank every frame and surface your strongest shots so the keepers are easy to find.");
       setStep("cull");
     }
     setInput("");
@@ -220,20 +220,20 @@ export default function CreateConceptChat() {
   const pickStyle = (label: string, id: string | null) => {
     setStyleId(id);
     say("user", label);
-    say("aura", "Good pick. Want me to cull first? I'll rank every frame and surface the keepers before any editing, so you only spend edits on the shots worth keeping.");
+    say("aura", "Good pick. Want me to cull this set too? I'll rank every frame and surface your strongest shots so the keepers are easy to find — separate from editing, which runs once your photos finish uploading.");
     setStep("cull");
   };
 
   const pickCull = (on: boolean) => {
     setCulling(on);
-    say("user", on ? "Yes, cull first" : "Edit everything");
+    say("user", on ? "Yes, cull them" : "No culling");
     if (on) {
       const typeLabel = TYPES.find((t) => t.value === galleryType)?.label ?? "this";
       setCategories(defaultCullingTags(galleryType, cullingLanguage));
       say("aura", `Here's what I'll look for in a ${typeLabel.toLowerCase()} — tap to add or remove anything, then we're set.`);
       setStep("cullTags");
     } else {
-      say("aura", "No problem — I'll keep every frame. Here's the plan; review and create when you're ready.");
+      say("aura", "No problem — I'll skip culling. Here's the plan; review and create when you're ready.");
       setStep("done");
     }
   };
@@ -346,7 +346,7 @@ export default function CreateConceptChat() {
                 <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {TYPES.find((t) => t.value === galleryType)?.label} · {photoCount.toLocaleString()} photos{uploadSource === "drive" ? " · from Drive" : ""}</li>
                   <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> Look: {selectedStyleName}{styleId ? ` · ${photoCount.toLocaleString()} edits` : ""}</li>
-                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Cull first — Aura keeps the best${categories.length ? ` · ${categories.length} tags` : ""}` : "Edit everything"}</li>
+                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Culling on${categories.length ? ` · ${categories.length} tags` : ""}` : "No culling"}</li>
                 </ul>
 
                 {busy ? (
@@ -441,8 +441,8 @@ export default function CreateConceptChat() {
 
             {step === "cull" && (
               <div className="flex flex-wrap gap-2">
-                <Chip onClick={() => pickCull(true)}>Yes, cull first</Chip>
-                <Chip muted onClick={() => pickCull(false)}>Edit everything</Chip>
+                <Chip onClick={() => pickCull(true)}>Yes, cull them</Chip>
+                <Chip muted onClick={() => pickCull(false)}>No culling</Chip>
               </div>
             )}
 
