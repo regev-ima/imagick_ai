@@ -16,14 +16,18 @@
 const TF_CDN = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3";
 const CLIP_MODEL = "Xenova/clip-vit-base-patch32";
 
-// Prompts whose average defines the "good" and "bad" poles in CLIP space.
-const GOOD_PROMPTS = [
-  "a stunning professional photograph, sharp focus, beautiful lighting, great composition",
-  "an award-winning high quality photo, crisp and well exposed",
-];
-const BAD_PROMPTS = [
-  "a blurry, out of focus, badly composed amateur snapshot",
-  "a dark, noisy, poorly lit low quality photo",
+/**
+ * Quality is scored along several concrete axes instead of one vague
+ * "good vs bad" — each axis is a contrastive good/bad prompt pair, and the
+ * final score is the mean of (cos(img,good) − cos(img,bad)) over all axes.
+ * This tracks real photo quality far better than a single generic prompt.
+ */
+const QUALITY_AXES: { good: string; bad: string }[] = [
+  { good: "a sharp, perfectly in-focus photograph", bad: "a blurry, out-of-focus, motion-blurred photograph" },
+  { good: "a well-lit photo with balanced natural exposure", bad: "a poorly lit photo, too dark or overexposed" },
+  { good: "a well-composed, nicely framed photograph", bad: "a badly composed, tilted or awkwardly cropped photo" },
+  { good: "a clean professional high-quality photograph", bad: "a noisy low-quality amateur snapshot" },
+  { good: "people with open eyes and natural flattering expressions", bad: "people with closed eyes, blinking or awkward expressions" },
 ];
 
 /**
@@ -52,8 +56,15 @@ interface Models {
   processor: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   visionModel: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   RawImage: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-  goodProto: Vec;
-  badProto: Vec;
+  axisGood: Vec[]; // normalized "good" pole per quality axis
+  axisBad: Vec[];  // normalized "bad" pole per quality axis
+}
+
+/** Mean of (cos(img,good_i) − cos(img,bad_i)) over all quality axes. */
+function aestheticAxis(v: Vec, m: Models): number {
+  let s = 0;
+  for (let i = 0; i < m.axisGood.length; i++) s += dot(v, m.axisGood[i]) - dot(v, m.axisBad[i]);
+  return s / m.axisGood.length;
 }
 
 let modelsPromise: Promise<Models> | null = null;
@@ -73,14 +84,7 @@ function dot(a: Vec, b: Vec): number {
   return s;
 }
 
-function mean(vecs: Vec[]): Vec {
-  const out = new Float32Array(vecs[0].length);
-  for (const v of vecs) for (let i = 0; i < v.length; i++) out[i] += v[i];
-  for (let i = 0; i < out.length; i++) out[i] /= vecs.length;
-  return out;
-}
-
-/** Loads CLIP once and precomputes the good/bad text prototypes. */
+/** Loads CLIP once and precomputes the per-axis good/bad text poles. */
 async function loadModels(onStatus?: (s: string) => void): Promise<Models> {
   if (modelsPromise) return modelsPromise;
   modelsPromise = (async () => {
@@ -96,19 +100,18 @@ async function loadModels(onStatus?: (s: string) => void): Promise<Models> {
       lib.CLIPVisionModelWithProjection.from_pretrained(CLIP_MODEL),
     ]);
 
-    // Embed all prompts in one pass, then split into good/bad prototypes.
-    const prompts = [...GOOD_PROMPTS, ...BAD_PROMPTS];
+    // Embed every axis prompt in one pass (good poles first, then bad poles).
+    const prompts = [...QUALITY_AXES.map((a) => a.good), ...QUALITY_AXES.map((a) => a.bad)];
     const textInputs = tokenizer(prompts, { padding: true, truncation: true });
     const { text_embeds } = await textModel(textInputs);
     const dim = text_embeds.dims[1];
     const flat = text_embeds.data as Float32Array;
-    const rows: Vec[] = prompts.map((_, i) =>
-      normalize(flat.slice(i * dim, (i + 1) * dim)),
-    );
-    const goodProto = normalize(mean(rows.slice(0, GOOD_PROMPTS.length)));
-    const badProto = normalize(mean(rows.slice(GOOD_PROMPTS.length)));
+    const rows: Vec[] = prompts.map((_, i) => normalize(flat.slice(i * dim, (i + 1) * dim)));
+    const n = QUALITY_AXES.length;
+    const axisGood = rows.slice(0, n);
+    const axisBad = rows.slice(n);
 
-    return { tokenizer, textModel, processor, visionModel, RawImage: lib.RawImage, goodProto, badProto };
+    return { tokenizer, textModel, processor, visionModel, RawImage: lib.RawImage, axisGood, axisBad };
   })();
   return modelsPromise;
 }
@@ -159,7 +162,7 @@ export async function analyzeImages(
   for (let i = 0; i < files.length; i++) {
     const v = await embedImage(m, files[i].url);
     vecs.push(v);
-    raw.push(dot(v, m.goodProto) - dot(v, m.badProto)); // aesthetic axis
+    raw.push(aestheticAxis(v, m)); // multi-axis aesthetic score
     onProgress?.(i + 1, files.length);
   }
 
