@@ -69,6 +69,24 @@ async function filesFromDataTransfer(dt: DataTransfer): Promise<File[]> {
   return out;
 }
 
+// Minimal File System Access API shapes (not in the default TS DOM lib).
+interface FsFileHandle { kind: "file"; getFile(): Promise<File>; }
+interface FsDirHandle { kind: "directory"; values(): AsyncIterableIterator<FsFileHandle | FsDirHandle>; }
+type DirectoryPicker = () => Promise<FsDirHandle>;
+
+// Recursively read every file out of a directory handle (showDirectoryPicker).
+async function filesFromDirHandle(dir: FsDirHandle): Promise<File[]> {
+  const out: File[] = [];
+  const walk = async (d: FsDirHandle): Promise<void> => {
+    for await (const entry of d.values()) {
+      if (entry.kind === "file") out.push(await entry.getFile());
+      else await walk(entry);
+    }
+  };
+  await walk(dir);
+  return out;
+}
+
 // Rank styles for the chosen shoot type: tag/category matches first, then
 // presets, then the rest — so Aura's first suggestions are relevant.
 function rankStyles(styles: StyleRow[], type: string): StyleRow[] {
@@ -146,6 +164,20 @@ export default function CreateConceptChat() {
     say("user", `Added ${imgs.length.toLocaleString()} photos`, { thumbs, more: more > 0 ? more : undefined });
     say("aura", `Lovely — ${imgs.length.toLocaleString()} photos loaded. What kind of shoot is this? It tells me which look to suggest and what to look for when I cull.`);
     setStep("type");
+  };
+
+  // Pick a folder without the browser's "Upload N files?" prompt: use the
+  // File System Access API where available (Chrome/Edge), and fall back to the
+  // <input webkitdirectory> picker (which does prompt) elsewhere.
+  const pickFolder = async () => {
+    const picker = (window as unknown as { showDirectoryPicker?: DirectoryPicker }).showDirectoryPicker;
+    if (!picker) { folderRef.current?.click(); return; }
+    try {
+      const dir = await picker();
+      ingest(await filesFromDirHandle(dir));
+    } catch {
+      /* user dismissed the picker — ignore */
+    }
   };
 
   // Best-guess name from whichever source is active.
@@ -343,7 +375,7 @@ export default function CreateConceptChat() {
                   <Button variant="glow" className="gap-2" onClick={() => photosRef.current?.click()}>
                     <UploadCloud className="h-4 w-4" /> Photos
                   </Button>
-                  <Button variant="outline" className="gap-2" onClick={() => folderRef.current?.click()}>
+                  <Button variant="outline" className="gap-2" onClick={pickFolder}>
                     <FolderOpen className="h-4 w-4" /> Folder
                   </Button>
                   <Button variant="outline" className="gap-2" onClick={() => setUploadSource("drive")}>
@@ -351,7 +383,7 @@ export default function CreateConceptChat() {
                   </Button>
                 </div>
                 <p className="mt-2 text-center text-xs text-muted-foreground/70">
-                  Best: <span className="text-foreground/80">drag a folder right into this chat</span> — no browser prompt. The “Folder” button uses Chrome's picker, which always shows a confirmation.
+                  Pick a folder in-app — no browser prompt on Chrome/Edge. You can also just drag a folder into the chat.
                 </p>
               </>
             )}
