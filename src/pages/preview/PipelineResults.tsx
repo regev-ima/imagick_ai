@@ -16,7 +16,7 @@ import { toast } from "sonner";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-interface GalleryRow { id: string; name: string; pipeline_status: string | null }
+interface GalleryRow { id: string; name: string }
 interface ImageRow { id: string; original_url: string; filename: string }
 interface Feature { image_id: string; aesthetic: number | null; visual_cluster: number | null }
 interface FaceDet { image_id: string; cluster_id: string | null }
@@ -30,8 +30,9 @@ export default function PipelineResults() {
   const galleries = useQuery({
     queryKey: ["pipeline-galleries"],
     queryFn: async (): Promise<GalleryRow[]> => {
+      // Only id/name so the picker works even before the pipeline migration runs.
       const { data, error } = await supabase
-        .from("galleries").select("id, name, pipeline_status").order("created_at", { ascending: false });
+        .from("galleries").select("id, name").order("created_at", { ascending: false });
       if (error) throw error;
       return (data as GalleryRow[]) ?? [];
     },
