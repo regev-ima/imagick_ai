@@ -51,13 +51,13 @@ export function CullingTags({ galleryType, language = "en", value, onChange }: {
               type="button"
               onClick={() => toggle(label)}
               disabled={locked}
-              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 ${
                 on
-                  ? "border-primary/50 bg-primary/10 text-foreground"
-                  : "border-border bg-surface-2 text-muted-foreground hover:text-foreground"
+                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                  : "border-border bg-surface-2 text-foreground/80 hover:border-primary/50 hover:text-foreground"
               } ${locked ? "cursor-not-allowed opacity-50" : ""}`}
             >
-              {on && <Check className="mr-1 inline h-3 w-3 text-primary" strokeWidth={2.5} />}
+              {on && <Check className="mr-1 inline h-3 w-3" strokeWidth={2.5} />}
               {label}
             </button>
           );
