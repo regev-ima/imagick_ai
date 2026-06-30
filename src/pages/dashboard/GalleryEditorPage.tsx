@@ -1176,6 +1176,19 @@ export default function GalleryEditorPage() {
     return elapsed > stuckThresholdMs(images.length);
   }, [gallery?.culling_status, gallery?.culling_started_at, images.length, hasCullingData, cullingNow]);
 
+  // Culling was opted-in at creation (ai_culling_enabled) and the backend
+  // auto-starts it the moment upload/processing finishes — so while photos are
+  // still arriving, culling is *queued*, not idle. Surface that instead of an
+  // actionable "Run AI Culling" that wrongly implies it hasn't been requested.
+  // Clears once it actually starts (culling_status → processing), finishes, or
+  // the gallery is fully ready without it (manual-run fallback).
+  const isCullingQueued = useMemo(() => {
+    if (!gallery?.ai_culling_enabled) return false;
+    if (hasCullingData) return false;
+    if (gallery.culling_status === "processing" || gallery.culling_status === "ready") return false;
+    return gallery.status === "uploading" || gallery.status === "processing" || gallery.status === "transferring";
+  }, [gallery?.ai_culling_enabled, gallery?.culling_status, gallery?.status, hasCullingData]);
+
   // Self-healing for inconsistent culling rows:
   //   1. data present but status still 'processing' → flip to 'ready' so
   //      the banner clears for everyone who opens the gallery.
@@ -2436,9 +2449,10 @@ export default function GalleryEditorPage() {
           onDuplicateLimitChange={setDuplicateLimit}
           groupCounts={sidebarGroupCounts}
           onAddImages={() => setShowAddImagesModal(true)}
-          onRunCulling={() => { if (gallery?.culling_status === "processing" && !isCullingStuck) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); }}
+          onRunCulling={() => { if (isCullingQueued || (gallery?.culling_status === "processing" && !isCullingStuck)) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); }}
           isCullingRunning={runAICulling.isPending || (gallery?.culling_status === "processing" && !isCullingStuck)}
           isCullingStuck={isCullingStuck}
+          isCullingQueued={isCullingQueued}
           cullingStartedAt={gallery?.culling_started_at as string | null | undefined}
           cullingImageCount={images.length}
           hasActiveFilters={hasActiveFilters}
@@ -2479,9 +2493,10 @@ export default function GalleryEditorPage() {
             onDuplicateLimitChange={setDuplicateLimit}
             groupCounts={sidebarGroupCounts}
             onAddImages={() => { setShowAddImagesModal(true); setShowMobileSidebar(false); }}
-            onRunCulling={() => { if (gallery?.culling_status === "processing" && !isCullingStuck) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); setShowMobileSidebar(false); }}
+            onRunCulling={() => { if (isCullingQueued || (gallery?.culling_status === "processing" && !isCullingStuck)) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); setShowMobileSidebar(false); }}
             isCullingRunning={runAICulling.isPending || (gallery?.culling_status === "processing" && !isCullingStuck)}
             isCullingStuck={isCullingStuck}
+            isCullingQueued={isCullingQueued}
             hasActiveFilters={hasActiveFilters}
             onOpenFaceSearch={() => { setCatalogMode("faces"); setShowMobileSidebar(false); }}
             faceSearchStatus={isFaceDetectionRunning ? "processing" : faceSearchStatus}
