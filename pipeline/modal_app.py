@@ -180,6 +180,21 @@ class Pipeline:
             for f in self.faces.get(bgr)
         ]
 
+    @modal.fastapi_endpoint(method="GET")
+    def health(self):
+        """Cheap status check — open in a browser to see if faces run on the GPU.
+
+        Spins up one container (a fraction of a cent) and reports the provider
+        WITHOUT processing any gallery, so you can confirm "GPU" before paying to
+        run a full run.
+        """
+        import onnxruntime as ort
+        return {
+            "faces_provider": getattr(self, "faces_provider", "?"),
+            "ort_providers": ort.get_available_providers(),
+            "gpu_ok": str(getattr(self, "faces_provider", "")).startswith("GPU"),
+        }
+
     @modal.fastapi_endpoint(method="POST")
     def process(self, data: dict):
         """
