@@ -68,7 +68,11 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1", "libglib2.0-0")
     .pip_install(
-        "fastapi[standard]", "torch>=2.4", "open_clip_torch", "insightface",
+        # torch is PINNED to a CUDA-12 build: torch>=2.4 resolved to 2.9 which ships
+        # CUDA *13* wheels (nvidia/cu13/lib/libcublasLt.so.13), but onnxruntime-gpu
+        # 1.22 needs CUDA 12 (libcublasLt.so.12) → version mismatch, CPU fallback.
+        # torch 2.6.0 ships CUDA 12.4 + cuDNN 9.1, matching onnxruntime 1.22.
+        "fastapi[standard]", "torch==2.6.0", "open_clip_torch", "insightface",
         "onnxruntime-gpu>=1.22,<1.23",   # >=1.21 required for preload_dlls(); 1.22 = CUDA12 + cuDNN9
         "pillow", "numpy", "requests",
     )
