@@ -41,17 +41,37 @@ def _download_models():
     )
 
 
+def _link_cuda_libs():
+    """Expose the CUDA libraries torch bundles so onnxruntime-gpu can find them.
+
+    torch ships its own copies of cuDNN/cuBLAS/etc. under site-packages/nvidia/*,
+    but onnxruntime's CUDA provider only looks in the standard loader path. Rather
+    than guess the site-packages location, find it for real and symlink every
+    nvidia .so into /usr/lib/x86_64-linux-gnu so the GPU provider loads (otherwise
+    it silently falls back to CPU and we pay GPU rates for CPU work).
+    """
+    import glob
+    import os
+    import site
+
+    target = "/usr/lib/x86_64-linux-gnu"
+    roots = list(site.getsitepackages()) + [site.getusersitepackages()]
+    for root in roots:
+        for so in glob.glob(os.path.join(root, "nvidia", "*", "lib", "*.so*")):
+            dst = os.path.join(target, os.path.basename(so))
+            if not os.path.exists(dst):
+                try:
+                    os.symlink(so, dst)
+                except OSError:
+                    pass
+
+
 # Keep the image SMALL so cold starts on a scale-to-zero GPU are fast and cheap.
 # A full CUDA devel image works but is several GB — every cold start then has to
 # pull all of it, which is slow, costly, and can even trip "not enough compute
 # resources". Instead we lean on the CUDA libraries that `torch` already bundles
-# and point LD_LIBRARY_PATH at them, so onnxruntime-gpu runs face detection on the
-# GPU instead of silently falling back to CPU. onnxruntime-gpu is pinned to a
-# build matching CUDA 12.x + cuDNN 9 (which current torch ships).
-NVIDIA_LIB_PATH = ":".join(
-    f"/usr/local/lib/python3.11/site-packages/nvidia/{pkg}/lib"
-    for pkg in ("cudnn", "cublas", "cuda_runtime", "cufft", "curand", "cuda_nvrtc", "nvjitlink")
-)
+# (symlinked into the loader path above) so onnxruntime-gpu runs face detection on
+# the GPU. onnxruntime-gpu is pinned to a build matching CUDA 12.x + cuDNN 9.
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1", "libglib2.0-0")
@@ -59,7 +79,7 @@ image = (
         "fastapi[standard]", "torch", "open_clip_torch", "insightface",
         "onnxruntime-gpu==1.20.1", "pillow", "numpy", "requests",
     )
-    .env({"LD_LIBRARY_PATH": NVIDIA_LIB_PATH})
+    .run_function(_link_cuda_libs)  # make torch's CUDA libs visible to onnxruntime
     .run_function(_download_models)  # bake CLIP + aesthetic + ArcFace weights in
 )
 
@@ -109,6 +129,12 @@ class Pipeline:
         self.head.load_state_dict(torch.hub.load_state_dict_from_url(AESTHETIC_URL, map_location="cpu"))
         self.head.eval()
 
+        # Does this onnxruntime build even have a loadable CUDA provider? If the
+        # CUDA libs aren't found, CUDAExecutionProvider won't appear here at all.
+        import onnxruntime as ort
+        avail = ort.get_available_providers()
+        print("[ort] available providers:", avail)
+
         # Only load detection + recognition — we never use gender/age or the two
         # landmark models, and skipping them removes most of the per-face cost.
         self.faces = FaceAnalysis(
@@ -118,14 +144,19 @@ class Pipeline:
         )
         self.faces.prepare(ctx_id=0, det_size=(640, 640))
         # Confirm the face models actually landed on the GPU (CPU fallback is the
-        # #1 cost trap here). Surface it in the response so we can verify without
-        # digging through Modal logs.
+        # #1 cost trap here). Surface a precise reason in the response so we can
+        # diagnose without digging through Modal logs.
         provs = set()
         for mod_name, model in self.faces.models.items():
             p = model.session.get_providers()[0]
             provs.add(p)
             print(f"[faces] {mod_name} -> {p}")
-        self.faces_provider = "GPU" if any("CUDA" in p for p in provs) else "CPU"
+        if any("CUDA" in p for p in provs):
+            self.faces_provider = "GPU"
+        elif "CUDAExecutionProvider" not in avail:
+            self.faces_provider = "CPU (no-cuda-ep)"  # onnxruntime can't load CUDA libs
+        else:
+            self.faces_provider = "CPU (fallback)"    # CUDA available but not used
 
     def _faces_for(self, pil):
         bgr = np.array(pil)[:, :, ::-1]
