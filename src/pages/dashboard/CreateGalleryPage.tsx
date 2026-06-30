@@ -188,6 +188,13 @@ export default function CreateGalleryPage() {
   const objectUrls = useRef<string[]>([]);
   useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
+  // Progressive disclosure — sections appear as the previous one is filled, and
+  // the page eases down to each newly revealed section so it never feels long.
+  const lookSectionRef = useRef<HTMLDivElement>(null);
+  const finalSectionRef = useRef<HTMLDivElement>(null);
+  const prevPhotos = useRef(0);
+  const prevTouched = useRef(false);
+
   // ── Prefills ───────────────────────────────────────────────────────────────
   // Aura hand-off (⌘K "start a collection named X") → ?name=
   const prefillName = searchParams.get("name");
@@ -241,6 +248,8 @@ export default function CreateGalleryPage() {
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
   const maxImages = isUnlimited || looksCount === 0 ? Infinity : Math.floor(availableEdits / looksCount);
   const typeLabel = galleryTypes.find((t) => t.value === type)?.label ?? type;
+  const remaining = Math.max(0, availableEdits - editsNeeded);
+  const usedPct = availableEdits > 0 ? Math.min(100, Math.round((editsNeeded / availableEdits) * 100)) : (editsNeeded > 0 ? 100 : 0);
   // The look isn't pre-picked — the photographer must explicitly choose a look
   // or "No editing", so styleTouched is part of completeness.
   const complete = name.trim().length > 0 && photos > 0 && !!type && styleTouched && !hasInsufficientEdits;
@@ -336,6 +345,26 @@ export default function CreateGalleryPage() {
 
   useEffect(() => { if (photos === 0) setReviewOpen(false); }, [photos]);
 
+  // Ease down to the look section the first time photos are added…
+  useEffect(() => {
+    const was = prevPhotos.current;
+    prevPhotos.current = photos;
+    if (was === 0 && photos > 0) {
+      const id = setTimeout(() => lookSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+      return () => clearTimeout(id);
+    }
+  }, [photos]);
+
+  // …and to the culling/credits/create section once a look choice is made.
+  useEffect(() => {
+    const was = prevTouched.current;
+    prevTouched.current = styleTouched;
+    if (!was && styleTouched) {
+      const id = setTimeout(() => finalSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+      return () => clearTimeout(id);
+    }
+  }, [styleTouched]);
+
   const pct = uploadProgress && uploadProgress.totalBytes > 0
     ? Math.round((uploadProgress.bytesUploaded / uploadProgress.totalBytes) * 100)
     : 0;
@@ -384,26 +413,10 @@ export default function CreateGalleryPage() {
             <Pill>{typeLabel}</Pill>
             <Pill>{looksLabel}</Pill>
             <Pill>{cull ? "Culling on" : "No culling"}</Pill>
-            <Pill accent>
-              <Sparkle size={11} /> {editsNeeded.toLocaleString()} edits{!isUnlimited ? ` / ${availableEdits.toLocaleString()}` : ""}
+            <Pill accent={!hasInsufficientEdits} danger={hasInsufficientEdits}>
+              <Sparkle size={11} /> {isUnlimited ? `${editsNeeded.toLocaleString()} edits` : `${editsNeeded.toLocaleString()} / ${availableEdits.toLocaleString()} edits`}
             </Pill>
           </div>
-
-          {!isUnlimited && hasInsufficientEdits && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[--radius] border border-destructive/40 bg-destructive/[0.06] p-3 text-sm">
-              <span className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                Not enough edits — max {Number.isFinite(maxImages) ? maxImages.toLocaleString() : "—"} photos with {looksCount} look{looksCount > 1 ? "s" : ""}.
-              </span>
-              <Button size="sm" variant="glow" className="shrink-0" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
-            </div>
-          )}
-          {!isUnlimited && !hasInsufficientEdits && isFreePlan && availableEdits === 0 && looksCount > 0 && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              You're on the free plan with no edits left — pick "No editing" to host &amp; share, or{" "}
-              <button className="text-primary hover:underline" onClick={() => navigate("/dashboard/billing")}>upgrade</button> to let Aura edit.
-            </p>
-          )}
         </div>
 
         {/* Controls */}
@@ -457,6 +470,14 @@ export default function CreateGalleryPage() {
             )}
           </div>
 
+          {photos > 0 && (
+          <motion.div
+            ref={lookSectionRef}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 0.61, 0.36, 1] }}
+            className="scroll-mt-24 space-y-5"
+          >
           {/* Shoot type */}
           <div className="glass-card rounded-[--radius] p-5">
             <div className="caption mb-2.5">Shoot type</div>
@@ -495,11 +516,21 @@ export default function CreateGalleryPage() {
               onHosting={pickHosting}
               max={MAX_LOOKS}
             />
-            {looksCount > 1 && (
-              <p className="caption mt-2.5">{photos.toLocaleString()} photos × {looksCount} looks = {editsNeeded.toLocaleString()} edits</p>
+            {looksCount >= 1 && (
+              <p className="caption mt-2.5">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
             )}
           </div>
+          </motion.div>
+          )}
 
+          {styleTouched && (
+          <motion.div
+            ref={finalSectionRef}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 0.61, 0.36, 1] }}
+            className="scroll-mt-24 space-y-5"
+          >
           {/* Culling */}
           <div className={cn("glass-card rounded-[--radius] transition-colors", cull && "border-primary/40")}>
             <button type="button" onClick={toggleCull} className="flex w-full items-center gap-3 p-5 text-left">
@@ -535,37 +566,78 @@ export default function CreateGalleryPage() {
             )}
           </div>
 
-        </div>
+          {/* Credits — make the cost tangible right where you decide */}
+          <div className="glass-card rounded-[--radius] p-5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-sm font-semibold"><Sparkle size={12} className="text-accent" /> Edits this collection will use</span>
+              <span className="font-mono text-sm font-semibold">{isUnlimited ? editsNeeded.toLocaleString() : `${editsNeeded.toLocaleString()} / ${availableEdits.toLocaleString()}`}</span>
+            </div>
+            {isUnlimited ? (
+              <p className="caption mt-2">Unlimited edits on your plan — edit as many as you like.</p>
+            ) : (
+              <>
+                <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div className={cn("h-full rounded-full transition-[width] duration-300", hasInsufficientEdits ? "bg-destructive" : "bg-primary")} style={{ width: `${usedPct}%` }} />
+                </div>
+                <p className="caption mt-2">
+                  {looksCount === 0 ? (
+                    "Hosting only — no edits used."
+                  ) : (
+                    <>{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = <span className="font-medium text-foreground">{editsNeeded.toLocaleString()} edits</span> · {remaining.toLocaleString()} left after</>
+                  )}
+                </p>
+              </>
+            )}
 
-        {/* Create — the final step, greyed out until everything above is chosen */}
-        {busy ? (
-          <div className="mt-6 space-y-3 rounded-[--radius] border border-border bg-card p-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2 text-foreground">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                {isUploading ? "Uploading your photos…" : "Creating collection…"}
-              </span>
-              <span className="font-mono text-primary">{isUploading && uploadProgress ? `${uploadProgress.uploaded}/${uploadProgress.total}` : ""}</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <motion.div className="h-full rounded-full bg-primary" initial={{ width: 0 }} animate={{ width: `${isUploading ? pct : 100}%` }} transition={{ ease: "easeOut", duration: 0.4 }} />
-            </div>
-            {isUploading && uploadProgress?.currentFile && (
-              <p className="truncate text-xs text-muted-foreground">Receiving {uploadProgress.currentFile} · {pct}%</p>
+            {!isUnlimited && hasInsufficientEdits && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[--radius] border border-destructive/40 bg-destructive/[0.06] p-3 text-sm">
+                <span className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Not enough edits — max {Number.isFinite(maxImages) ? maxImages.toLocaleString() : "—"} photos with {looksCount} look{looksCount > 1 ? "s" : ""}.
+                </span>
+                <Button size="sm" variant="glow" className="shrink-0" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
+              </div>
+            )}
+            {!isUnlimited && !hasInsufficientEdits && isFreePlan && availableEdits === 0 && looksCount > 0 && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                You're on the free plan with no edits left — pick "No editing" to host &amp; share, or{" "}
+                <button className="text-primary hover:underline" onClick={() => navigate("/dashboard/billing")}>upgrade</button> to let Aura edit.
+              </p>
             )}
           </div>
-        ) : (
-          <div className="mt-6">
-            <Button variant="glow" size="lg" disabled={!complete} className="w-full gap-2" onClick={handleCreate}>
-              <Zap className="h-4 w-4" /> Create &amp; start editing
-            </Button>
-            <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
-              {complete
-                ? "Creates a real collection & hands it to Aura"
-                : "Name it, add photos, pick a shoot type and a look to continue"}
-            </p>
-          </div>
-        )}
+
+          {/* Create — greyed out until everything above is chosen */}
+          {busy ? (
+            <div className="space-y-3 rounded-[--radius] border border-border bg-card p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 text-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  {isUploading ? "Uploading your photos…" : "Creating collection…"}
+                </span>
+                <span className="font-mono text-primary">{isUploading && uploadProgress ? `${uploadProgress.uploaded}/${uploadProgress.total}` : ""}</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <motion.div className="h-full rounded-full bg-primary" initial={{ width: 0 }} animate={{ width: `${isUploading ? pct : 100}%` }} transition={{ ease: "easeOut", duration: 0.4 }} />
+              </div>
+              {isUploading && uploadProgress?.currentFile && (
+                <p className="truncate text-xs text-muted-foreground">Receiving {uploadProgress.currentFile} · {pct}%</p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <Button variant="glow" size="lg" disabled={!complete} className="w-full gap-2" onClick={handleCreate}>
+                <Zap className="h-4 w-4" /> Create &amp; start editing
+              </Button>
+              <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
+                {complete
+                  ? "Creates a real collection & hands it to Aura"
+                  : "Finish the steps above to continue"}
+              </p>
+            </div>
+          )}
+          </motion.div>
+          )}
+        </div>
       </div>
 
       {reviewOpen && <SelectedPhotosModal items={items} count={photos} onRemove={removeAt} onClose={() => setReviewOpen(false)} />}
@@ -595,11 +667,15 @@ function Sparkle({ size = 16, className = "" }: { size?: number; className?: str
   );
 }
 
-function Pill({ children, accent = false }: { children: React.ReactNode; accent?: boolean }) {
+function Pill({ children, accent = false, danger = false }: { children: React.ReactNode; accent?: boolean; danger?: boolean }) {
   return (
     <span className={cn(
       "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
-      accent ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-surface-2 text-muted-foreground",
+      danger
+        ? "border-destructive/50 bg-destructive/10 text-destructive"
+        : accent
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border bg-surface-2 text-muted-foreground",
     )}>
       {children}
     </span>
