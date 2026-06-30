@@ -68,6 +68,8 @@ const CreateConceptCanvas = lazy(() => import("./pages/preview/CreateConceptCanv
 const DeliverConcept = lazy(() => import("./pages/preview/DeliverConcept"));
 // In-browser AI image-scoring proof-of-concept (no backend; public preview).
 const AestheticScoreDemo = lazy(() => import("./pages/preview/AestheticScoreDemo"));
+// Pipeline results (reads Phase-A/B output from the DB).
+const PipelineResults = lazy(() => import("./pages/preview/PipelineResults"));
 
 const RouteFallback = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -127,6 +129,8 @@ const App = () => (
                 <Route path="/preview/deliver" element={<ProtectedRoute><DeliverConcept /></ProtectedRoute>} />
                 {/* In-browser AI scoring demo — public so it's clickable in the Vercel preview without login. */}
                 <Route path="/preview/aesthetic" element={<AestheticScoreDemo />} />
+                {/* Pipeline results — reads gallery pipeline output (auth required for RLS). */}
+                <Route path="/preview/pipeline" element={<ProtectedRoute><PipelineResults /></ProtectedRoute>} />
                 <Route
                   path="/dashboard"
                   element={(
