@@ -81,7 +81,11 @@ serve(async (req: Request) => {
       if (!gallery) return json({ error: "Gallery not found or access denied" }, 404);
     }
 
-    await admin.from("galleries").update({ pipeline_status: "processing", pipeline_error: null }).eq("id", galleryId);
+    await admin.from("galleries").update({
+      pipeline_status: "processing",
+      pipeline_error: null,
+      ...(isInternal ? {} : { pipeline_timing: null }), // reset timing on a fresh user-initiated run
+    }).eq("id", galleryId);
 
     // Images in this gallery that don't yet have features (computed in JS — more
     // robust than a PostgREST anti-join embed).
@@ -137,6 +141,7 @@ serve(async (req: Request) => {
       processed++;
     };
 
+    const timing = { download_ms: 0, clip_ms: 0, faces_ms: 0, count: 0 };
     let cursor = 0;
     const worker = async () => {
       while (cursor < batches.length) {
@@ -152,6 +157,13 @@ serve(async (req: Request) => {
             }),
           });
           const data = await res.json();
+          const tm = data.timing;
+          if (tm) {
+            timing.download_ms += tm.download_ms || 0;
+            timing.clip_ms += tm.clip_ms || 0;
+            timing.faces_ms += tm.faces_ms || 0;
+            timing.count += tm.count || 0;
+          }
           for (const r of (data.results || []) as ModalResult[]) await storeResult(r);
         } catch (err) {
           console.error("Modal call failed:", err); // leave for next invocation
@@ -159,6 +171,20 @@ serve(async (req: Request) => {
       }
     };
     await Promise.all(Array.from({ length: Math.min(MODAL_CONCURRENCY, batches.length) }, worker));
+
+    // Accumulate per-stage timing on the gallery (summed across chained invocations).
+    const wallMs = Date.now() - start;
+    const { data: gPrev } = await admin.from("galleries").select("pipeline_timing").eq("id", galleryId).single();
+    const prev = (gPrev?.pipeline_timing as Record<string, number> | null) || {};
+    await admin.from("galleries").update({
+      pipeline_timing: {
+        download_ms: (prev.download_ms || 0) + timing.download_ms,
+        clip_ms: (prev.clip_ms || 0) + timing.clip_ms,
+        faces_ms: (prev.faces_ms || 0) + timing.faces_ms,
+        wall_ms: (prev.wall_ms || 0) + wallMs,
+        images: (prev.images || 0) + timing.count,
+      },
+    }).eq("id", galleryId);
 
     // Count remaining (total images minus those that now have features).
     const { data: doneRows2 } = await admin

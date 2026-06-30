@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Sparkles, Loader2, Users, LayoutGrid, Star, X, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +20,9 @@ interface GalleryRow { id: string; name: string }
 interface ImageRow { id: string; original_url: string; filename: string }
 interface Feature { image_id: string; aesthetic: number | null; visual_cluster: number | null }
 interface FaceDet { image_id: string; cluster_id: string | null }
-interface FaceCluster { id: string; face_count: number; representative_image_id: string | null }
+type Bbox = { x: number; y: number; width: number; height: number };
+interface FaceCluster { id: string; face_count: number; representative_image_id: string | null; representative_bbox: Bbox | null }
+interface Timing { download_ms?: number; clip_ms?: number; faces_ms?: number; wall_ms?: number; images?: number }
 
 export default function PipelineResults() {
   const [galleryId, setGalleryId] = useState<string>("");
@@ -44,14 +46,16 @@ export default function PipelineResults() {
     refetchInterval: (q) => ((q.state.data as { status?: string } | undefined)?.status === "processing" ? 4000 : false),
     queryFn: async () => {
       const [gRes, fRes, fdRes, fcRes, imgRes] = await Promise.all([
-        supabase.from("galleries").select("pipeline_status").eq("id", galleryId).single(),
+        supabase.from("galleries").select("pipeline_status, pipeline_timing").eq("id", galleryId).single(),
         db.from("image_features").select("image_id, aesthetic, visual_cluster").eq("gallery_id", galleryId),
         supabase.from("face_detections").select("image_id, cluster_id").eq("gallery_id", galleryId).not("cluster_id", "is", null),
-        supabase.from("face_clusters").select("id, face_count, representative_image_id").eq("gallery_id", galleryId).order("face_count", { ascending: false }),
+        supabase.from("face_clusters").select("id, face_count, representative_image_id, representative_bbox").eq("gallery_id", galleryId).order("face_count", { ascending: false }),
         supabase.from("gallery_images").select("id, original_url, filename").eq("gallery_id", galleryId),
       ]);
+      const g = gRes.data as { pipeline_status?: string; pipeline_timing?: Timing } | null;
       return {
-        status: (gRes.data as { pipeline_status?: string } | null)?.pipeline_status ?? "idle",
+        status: g?.pipeline_status ?? "idle",
+        timing: g?.pipeline_timing ?? null,
         features: (fRes.data as Feature[]) ?? [],
         faces: (fdRes.data as FaceDet[]) ?? [],
         faceClusters: (fcRes.data as FaceCluster[]) ?? [],
@@ -114,14 +118,26 @@ export default function PipelineResults() {
     return (results.data?.faceClusters ?? []).map((c) => ({
       id: c.id,
       rep: c.representative_image_id,
+      repBbox: c.representative_bbox,
       images: byCluster.get(c.id) ?? [],
     })).filter((p) => p.images.length > 0);
   }, [results.data]);
 
+  // Re-cluster images at a chosen similarity threshold (loose/medium/strict).
+  const recluster = useMutation({
+    mutationFn: async (threshold: number) => {
+      const { error } = await db.rpc("cluster_gallery_images", { p_gallery_id: galleryId, p_threshold: threshold });
+      if (error) throw error;
+    },
+    onSuccess: () => results.refetch(),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const status = results.data?.status;
   const thumb = (id: string) => { const im = imById.get(id); return im ? getThumbnailUrl(im.original_url) : ""; };
   const preview = (id: string) => { const im = imById.get(id); return im ? getPreviewUrl(im.original_url) : ""; };
-  const score = (a: number | null) => (a == null ? "—" : a.toFixed(1));
+  // LAION aesthetic is ~0–10; show it as 0–5 stars (each star = 2 LAION points).
+  const score = (a: number | null) => (a == null ? "—" : Math.min(5, Math.max(0, a / 2)).toFixed(1));
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
@@ -177,6 +193,37 @@ export default function PipelineResults() {
               )}
             </div>
 
+            {/* Per-stage timing */}
+            {results.data?.timing && (
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
+                <span>⏱ זמני עיבוד ({results.data.timing.images ?? 0} תמונות):</span>
+                <span>הורדה <b className="text-foreground">{((results.data.timing.download_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
+                <span>CLIP+ציון <b className="text-foreground">{((results.data.timing.clip_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
+                <span>פרצופים <b className="text-foreground">{((results.data.timing.faces_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
+                <span>סה״כ <b className="text-foreground">{((results.data.timing.wall_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
+              </div>
+            )}
+
+            {/* Clustering level (re-cluster on demand) */}
+            {view === "clusters" && (results.data?.features.length ?? 0) > 0 && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                דרגת קיבוץ:
+                <div className="flex overflow-hidden rounded-md border border-border">
+                  {([["רופף", 0.80], ["בינוני", 0.88], ["מהודק", 0.93]] as const).map(([label, t], i) => (
+                    <button
+                      key={label}
+                      onClick={() => recluster.mutate(t)}
+                      disabled={recluster.isPending}
+                      className={`bg-surface-2 px-2.5 py-1 font-medium text-muted-foreground hover:text-foreground ${i > 0 ? "border-r border-border" : ""}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {recluster.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              </div>
+            )}
+
             {results.isLoading && <div className="mt-6 text-sm text-muted-foreground">טוען…</div>}
 
             {!results.isLoading && (results.data?.features.length ?? 0) === 0 && (
@@ -201,7 +248,7 @@ export default function PipelineResults() {
                 {people.map((p, i) => (
                   <div key={p.id} className="rounded-lg border border-border bg-surface-2 p-3">
                     <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                      {p.rep && <img src={thumb(p.rep)} alt="" className="h-10 w-10 rounded-full object-cover" />}
+                      {p.rep && <FaceCrop url={imById.get(p.rep)?.original_url || ""} bbox={p.repBbox} size={44} />}
                       אדם {i + 1} <span className="text-muted-foreground">· {p.images.length} תמונות</span>
                     </div>
                     <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
@@ -230,6 +277,31 @@ export default function PipelineResults() {
       )}
     </div>
   );
+}
+
+// Crops the representative face out of the full image (bbox is in original-image
+// pixels) onto a small canvas — so the avatar shows the face, not the whole photo.
+function FaceCrop({ url, bbox, size = 44 }: { url: string; bbox: Bbox | null; size?: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas || !url || !bbox) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const img = new Image();
+    img.onload = () => {
+      const pad = 0.4;
+      const x = Math.max(0, bbox.x - bbox.width * pad);
+      const y = Math.max(0, bbox.y - bbox.height * pad);
+      const w = Math.min(img.naturalWidth - x, bbox.width * (1 + 2 * pad));
+      const h = Math.min(img.naturalHeight - y, bbox.height * (1 + 2 * pad));
+      ctx.clearRect(0, 0, size, size);
+      ctx.drawImage(img, x, y, w, h, 0, 0, size, size);
+    };
+    img.src = url;
+  }, [url, bbox, size]);
+  if (!bbox) return <div className="rounded-full bg-surface-2" style={{ width: size, height: size }} />;
+  return <canvas ref={ref} width={size} height={size} className="rounded-full object-cover" />;
 }
 
 function Thumb({ url, score, onOpen }: { url: string; score?: string; onOpen: () => void }) {

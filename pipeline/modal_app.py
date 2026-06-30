@@ -113,6 +113,8 @@ class Pipeline:
         Body: {"token": "...", "images": [{"id": "...", "url": "https://..."}]}
         Returns per image: clip (768), aesthetic (0–10), faces[].
         """
+        import time
+
         if data.get("token") != os.environ.get("PIPELINE_TOKEN"):
             return {"error": "unauthorized"}
 
@@ -128,24 +130,31 @@ class Pipeline:
             except Exception as exc:  # noqa: BLE001
                 return it["id"], exc
 
+        t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
             downloaded = list(ex.map(dl, items))
+        download_ms = (time.time() - t0) * 1000
 
         valid = [(i, img) for i, img in downloaded if not isinstance(img, Exception)]
         for iid, img in downloaded:
             if isinstance(img, Exception):
                 results.append({"id": iid, "error": str(img)})
 
+        clip_ms = 0.0
+        faces_ms = 0.0
         if valid:
             # 2) CLIP + aesthetic as a single batched forward (GPU-efficient).
+            t1 = time.time()
             with torch.no_grad():
                 batch = torch.stack([self.preprocess(img) for _, img in valid]).to(self.device)
                 feats = self.clip.encode_image(batch)
                 feats = feats / feats.norm(dim=-1, keepdim=True)
                 aesthetics = self.head(feats.float()).squeeze(-1).cpu().tolist()
                 embs = feats.cpu().numpy().tolist()
+            clip_ms = (time.time() - t1) * 1000
 
             # 3) Faces per image (detection is inherently per-image).
+            t2 = time.time()
             for idx, (iid, img) in enumerate(valid):
                 results.append({
                     "id": iid,
@@ -153,5 +162,9 @@ class Pipeline:
                     "aesthetic": float(aesthetics[idx]) if isinstance(aesthetics, list) else float(aesthetics),
                     "faces": self._faces_for(img),
                 })
+            faces_ms = (time.time() - t2) * 1000
 
-        return {"results": results}
+        return {
+            "results": results,
+            "timing": {"download_ms": download_ms, "clip_ms": clip_ms, "faces_ms": faces_ms, "count": len(valid)},
+        }
