@@ -8,16 +8,10 @@ zero (≈$0 when idle), producing everything the cheap layers need:
   • aesthetic score (LAION head on CLIP) → ranking within a group (Phase B)
   • ArcFace face embeddings (InsightFace)→ accurate face grouping (Phase A)
 
-One CLIP compute → both the embedding and the aesthetic score (the head is a
-tiny matrix multiply, essentially free). Faces come from InsightFace buffalo_l,
-which is detection + ArcFace recognition — the production-grade model.
-
-Deploy:
-    pip install modal
-    modal token new
-    modal secret create imagick-pipeline-secret PIPELINE_TOKEN=<a-long-random-string>
-    modal deploy pipeline/modal_app.py
-Modal prints a public URL; POST to it with the same PIPELINE_TOKEN.
+Speed: model weights are baked into the image (fast cold starts), each request
+downloads its images in parallel and runs CLIP as a single batched forward; the
+edge function fans out several requests at once so Modal scales to many
+containers. Deploy: `modal deploy pipeline/modal_app.py`.
 """
 
 import io
@@ -26,28 +20,35 @@ import modal
 
 app = modal.App("imagick-pipeline")
 
-image = (
-    modal.Image.debian_slim()
-    .apt_install("libgl1", "libglib2.0-0")  # for insightface / opencv
-    .pip_install(
-        "fastapi[standard]",
-        "torch",
-        "open_clip_torch",
-        "insightface",
-        "onnxruntime-gpu",
-        "pillow",
-        "numpy",
-        "requests",
-    )
-)
-
-# LAION aesthetic predictor head for CLIP ViT-L/14 (768-d) embeddings.
 AESTHETIC_URL = (
     "https://github.com/christophschuhmann/improved-aesthetic-predictor/"
     "raw/main/sac+logos+ava1-l14-linearMSE.pth"
 )
 
+
+def _download_models():
+    """Run at image-build time so weights are baked in → fast cold starts."""
+    import open_clip
+    import torch
+    from insightface.app import FaceAnalysis
+
+    open_clip.create_model_and_transforms("ViT-L-14", pretrained="openai")
+    torch.hub.load_state_dict_from_url(AESTHETIC_URL, map_location="cpu")
+    FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+
+
+image = (
+    modal.Image.debian_slim()
+    .apt_install("libgl1", "libglib2.0-0")
+    .pip_install(
+        "fastapi[standard]", "torch", "open_clip_torch", "insightface",
+        "onnxruntime-gpu", "pillow", "numpy", "requests",
+    )
+    .run_function(_download_models)  # bake CLIP + aesthetic + ArcFace weights in
+)
+
 with image.imports():
+    import concurrent.futures
     import numpy as np
     import requests
     import torch
@@ -61,13 +62,13 @@ with image.imports():
     gpu="L4",
     image=image,
     secrets=[modal.Secret.from_name("imagick-pipeline-secret")],
+    min_containers=0,
+    max_containers=10,   # let bursts fan out across containers
 )
 class Pipeline:
     @modal.enter()
     def load(self):
-        """Load every model once per warm container (keeps cold starts amortized)."""
         self.device = "cuda"
-
         self.clip, _, self.preprocess = open_clip.create_model_and_transforms(
             "ViT-L-14", pretrained="openai"
         )
@@ -87,53 +88,70 @@ class Pipeline:
                 return self.layers(x)
 
         self.head = Head().to(self.device)
-        self.head.load_state_dict(
-            torch.hub.load_state_dict_from_url(AESTHETIC_URL, map_location="cpu")
-        )
+        self.head.load_state_dict(torch.hub.load_state_dict_from_url(AESTHETIC_URL, map_location="cpu"))
         self.head.eval()
 
         self.faces = FaceAnalysis(
-            name="buffalo_l",
-            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+            name="buffalo_l", providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
         )
         self.faces.prepare(ctx_id=0, det_size=(640, 640))
 
-    def _one(self, img_id, url):
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-        pil = PILImage.open(io.BytesIO(resp.content)).convert("RGB")
-
-        with torch.no_grad():
-            t = self.preprocess(pil).unsqueeze(0).to(self.device)
-            feat = self.clip.encode_image(t)
-            feat = feat / feat.norm(dim=-1, keepdim=True)
-            aesthetic = float(self.head(feat.float()).squeeze().cpu())
-            clip_emb = feat.squeeze(0).cpu().numpy().tolist()
-
-        bgr = np.array(pil)[:, :, ::-1]  # RGB → BGR for insightface
-        faces = [
+    def _faces_for(self, pil):
+        bgr = np.array(pil)[:, :, ::-1]
+        return [
             {
                 "bbox": [float(v) for v in f.bbox.tolist()],
                 "det_score": float(f.det_score),
-                "embedding": [float(v) for v in f.normed_embedding.tolist()],  # 512-d, L2-normalized
+                "embedding": [float(v) for v in f.normed_embedding.tolist()],
             }
             for f in self.faces.get(bgr)
         ]
-        return {"id": img_id, "clip": clip_emb, "aesthetic": aesthetic, "faces": faces}
 
     @modal.fastapi_endpoint(method="POST")
     def process(self, data: dict):
         """
         Body: {"token": "...", "images": [{"id": "...", "url": "https://..."}]}
-        Returns per image: clip embedding (768), aesthetic (0–10), faces[].
+        Returns per image: clip (768), aesthetic (0–10), faces[].
         """
         if data.get("token") != os.environ.get("PIPELINE_TOKEN"):
             return {"error": "unauthorized"}
 
+        items = data.get("images", [])
         results = []
-        for item in data.get("images", []):
+
+        # 1) Download all images in the batch in parallel (network-bound).
+        def dl(it):
             try:
-                results.append(self._one(item["id"], item["url"]))
-            except Exception as exc:  # one bad image must not fail the batch
-                results.append({"id": item.get("id"), "error": str(exc)})
+                r = requests.get(it["url"], timeout=30)
+                r.raise_for_status()
+                return it["id"], PILImage.open(io.BytesIO(r.content)).convert("RGB")
+            except Exception as exc:  # noqa: BLE001
+                return it["id"], exc
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+            downloaded = list(ex.map(dl, items))
+
+        valid = [(i, img) for i, img in downloaded if not isinstance(img, Exception)]
+        for iid, img in downloaded:
+            if isinstance(img, Exception):
+                results.append({"id": iid, "error": str(img)})
+
+        if valid:
+            # 2) CLIP + aesthetic as a single batched forward (GPU-efficient).
+            with torch.no_grad():
+                batch = torch.stack([self.preprocess(img) for _, img in valid]).to(self.device)
+                feats = self.clip.encode_image(batch)
+                feats = feats / feats.norm(dim=-1, keepdim=True)
+                aesthetics = self.head(feats.float()).squeeze(-1).cpu().tolist()
+                embs = feats.cpu().numpy().tolist()
+
+            # 3) Faces per image (detection is inherently per-image).
+            for idx, (iid, img) in enumerate(valid):
+                results.append({
+                    "id": iid,
+                    "clip": embs[idx],
+                    "aesthetic": float(aesthetics[idx]) if isinstance(aesthetics, list) else float(aesthetics),
+                    "faces": self._faces_for(img),
+                })
+
         return {"results": results}

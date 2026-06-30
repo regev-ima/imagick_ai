@@ -12,7 +12,8 @@ import { corsHeaders } from "../_shared/cors.ts";
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
 const IMAGES_PER_INVOCATION = 100; // keep each invocation under the runtime limit
-const MODAL_BATCH = 10;            // images per Modal HTTP call
+const MODAL_BATCH = 12;            // images per Modal HTTP call
+const MODAL_CONCURRENCY = 4;       // Modal calls in flight at once (→ parallel containers)
 const TIME_BUDGET_MS = 110_000;
 
 // B2 originals have a smaller compressed JPEG sibling — cheaper + faster to process.
@@ -106,56 +107,58 @@ serve(async (req: Request) => {
     const start = Date.now();
     let processed = 0;
 
-    for (let i = 0; i < images.length; i += MODAL_BATCH) {
-      if (Date.now() - start > TIME_BUDGET_MS) break;
-      const batch = images.slice(i, i + MODAL_BATCH);
-      const payload = {
-        token: modalToken,
-        images: batch.map((img) => ({ id: img.id, url: toCompressedJpegUrl(img.original_url) })),
-      };
+    // Split into batches, then run several Modal calls concurrently (Modal scales
+    // to multiple containers under the parallel load).
+    const batches: { id: string; original_url: string }[][] = [];
+    for (let i = 0; i < images.length; i += MODAL_BATCH) batches.push(images.slice(i, i + MODAL_BATCH));
 
-      let results: ModalResult[] = [];
-      try {
-        const res = await fetch(modalUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        results = data.results || [];
-      } catch (err) {
-        console.error("Modal call failed:", err);
-        continue; // leave these images for the next invocation
+    const storeResult = async (r: ModalResult) => {
+      if (r.error || !r.clip) {
+        console.warn("Image failed in Modal:", r.id, r.error);
+        return;
       }
-
-      for (const r of results) {
-        if (r.error || !r.clip) {
-          console.warn("Image failed in Modal:", r.id, r.error);
-          continue;
-        }
-        // Store image features (CLIP + aesthetic).
-        await admin.from("image_features").upsert({
+      await admin.from("image_features").upsert({
+        image_id: r.id,
+        gallery_id: galleryId,
+        clip_vector: JSON.stringify(r.clip),
+        aesthetic: r.aesthetic ?? null,
+        updated_at: new Date().toISOString(),
+      });
+      await admin.from("face_detections").delete().eq("image_id", r.id).not("arcface_vector", "is", null);
+      if (r.faces && r.faces.length) {
+        await admin.from("face_detections").insert(r.faces.map((f) => ({
           image_id: r.id,
           gallery_id: galleryId,
-          clip_vector: JSON.stringify(r.clip),
-          aesthetic: r.aesthetic ?? null,
-          updated_at: new Date().toISOString(),
-        });
-        // Replace this image's ArcFace faces.
-        await admin.from("face_detections").delete().eq("image_id", r.id).not("arcface_vector", "is", null);
-        if (r.faces && r.faces.length) {
-          const rows = r.faces.map((f) => ({
-            image_id: r.id,
-            gallery_id: galleryId,
-            bounding_box: { x: f.bbox[0], y: f.bbox[1], width: f.bbox[2] - f.bbox[0], height: f.bbox[3] - f.bbox[1] },
-            det_score: f.det_score,
-            arcface_vector: JSON.stringify(f.embedding),
-          }));
-          await admin.from("face_detections").insert(rows);
-        }
-        processed++;
+          bounding_box: { x: f.bbox[0], y: f.bbox[1], width: f.bbox[2] - f.bbox[0], height: f.bbox[3] - f.bbox[1] },
+          det_score: f.det_score,
+          arcface_vector: JSON.stringify(f.embedding),
+        })));
       }
-    }
+      processed++;
+    };
+
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < batches.length) {
+        if (Date.now() - start > TIME_BUDGET_MS) return;
+        const batch = batches[cursor++];
+        try {
+          const res = await fetch(modalUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              token: modalToken,
+              images: batch.map((img) => ({ id: img.id, url: toCompressedJpegUrl(img.original_url) })),
+            }),
+          });
+          const data = await res.json();
+          for (const r of (data.results || []) as ModalResult[]) await storeResult(r);
+        } catch (err) {
+          console.error("Modal call failed:", err); // leave for next invocation
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(MODAL_CONCURRENCY, batches.length) }, worker));
 
     // Count remaining (total images minus those that now have features).
     const { data: doneRows2 } = await admin
