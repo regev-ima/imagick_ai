@@ -79,8 +79,13 @@ jobs:
           ID="5db666d2-9efa-47fa-8802-dffc13aa67a3"
           for V in "thumbnail/${ID}_reduced_thumbnail.webp" "compressed/${ID}_reduced.webp"; do
             echo "Probing: $V"
-            curl -sS -G --max-time 60 --data-urlencode "url=$BASE/$V" "$HURL" \
-              | python3 -c "import sys,json; print('  ->', json.load(sys.stdin).get('sample'))" || echo "  probe failed"
+            for attempt in $(seq 1 12); do
+              OUT=$(curl -sS -G --max-time 60 --data-urlencode "url=$BASE/$V" "$HURL" || echo '{}')
+              S=$(echo "$OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sample') if isinstance(d,dict) else '')" 2>/dev/null || echo "")
+              if echo "$S" | grep -q "dims"; then echo "  -> $S"; break; fi
+              # warm old container (no 'sample' field) may still answer; wait it out
+              sleep 7
+            done
           done
 
       - name: Install Supabase CLI
