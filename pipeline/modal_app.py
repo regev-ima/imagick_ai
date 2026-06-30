@@ -41,46 +41,53 @@ def _download_models():
     )
 
 
-def _link_cuda_libs():
-    """Expose the CUDA libraries torch bundles so onnxruntime-gpu can find them.
+def _register_cuda_libs():
+    """Put the pip-installed CUDA libraries on the system loader path.
 
-    torch ships its own copies of cuDNN/cuBLAS/etc. under site-packages/nvidia/*,
-    but onnxruntime's CUDA provider only looks in the standard loader path. Rather
-    than guess the site-packages location, find it for real and symlink every
-    nvidia .so into /usr/lib/x86_64-linux-gnu so the GPU provider loads (otherwise
-    it silently falls back to CPU and we pay GPU rates for CPU work).
+    onnxruntime-gpu needs cuDNN 9.* and CUDA 12.* but only searches the standard
+    loader path, while the libs (shipped by torch + nvidia-cudnn-cu12) live under
+    site-packages/nvidia/*/lib. Discover those dirs via `import nvidia` (the most
+    reliable way — no path guessing), register them with ldconfig, so the GPU
+    provider loads instead of silently falling back to CPU.
     """
     import glob
     import os
     import site
+    import subprocess
 
-    target = "/usr/lib/x86_64-linux-gnu"
-    roots = list(site.getsitepackages()) + [site.getusersitepackages()]
-    for root in roots:
-        for so in glob.glob(os.path.join(root, "nvidia", "*", "lib", "*.so*")):
-            dst = os.path.join(target, os.path.basename(so))
-            if not os.path.exists(dst):
-                try:
-                    os.symlink(so, dst)
-                except OSError:
-                    pass
+    dirs = set()
+    try:
+        import nvidia  # namespace package over all nvidia-*-cu12 wheels
+        for p in nvidia.__path__:
+            dirs.update(glob.glob(os.path.join(p, "*", "lib")))
+    except Exception:  # noqa: BLE001
+        pass
+    for root in list(site.getsitepackages()) + [site.getusersitepackages()]:
+        dirs.update(glob.glob(os.path.join(root, "nvidia", "*", "lib")))
+
+    print("[cuda] lib dirs:", sorted(dirs))
+    if dirs:
+        with open("/etc/ld.so.conf.d/zzz-nvidia-torch.conf", "w") as f:
+            f.write("\n".join(sorted(dirs)) + "\n")
+        subprocess.run(["ldconfig"], check=False)
 
 
 # Keep the image SMALL so cold starts on a scale-to-zero GPU are fast and cheap.
 # A full CUDA devel image works but is several GB — every cold start then has to
 # pull all of it, which is slow, costly, and can even trip "not enough compute
-# resources". Instead we lean on the CUDA libraries that `torch` already bundles
-# (symlinked into the loader path above) so onnxruntime-gpu runs face detection on
-# the GPU. onnxruntime-gpu is pinned to a build matching CUDA 12.x + cuDNN 9.
+# resources". Instead we install the CUDA libs onnxruntime needs (cuDNN 9 explicitly,
+# the rest via torch) and register them with ldconfig so the GPU provider loads.
+# onnxruntime-gpu / torch are pinned to a combination that ships CUDA 12.x + cuDNN 9.
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1", "libglib2.0-0")
     .pip_install(
-        "fastapi[standard]", "torch", "open_clip_torch", "insightface",
-        "onnxruntime-gpu==1.20.1", "pillow", "numpy", "requests",
+        "fastapi[standard]", "torch>=2.4", "open_clip_torch", "insightface",
+        "onnxruntime-gpu==1.20.1", "nvidia-cudnn-cu12>=9,<10",
+        "pillow", "numpy", "requests",
     )
-    .run_function(_link_cuda_libs)  # make torch's CUDA libs visible to onnxruntime
-    .run_function(_download_models)  # bake CLIP + aesthetic + ArcFace weights in
+    .run_function(_register_cuda_libs)  # put cuDNN 9 / CUDA 12 on the loader path
+    .run_function(_download_models)     # bake CLIP + aesthetic + ArcFace weights in
 )
 
 with image.imports():
