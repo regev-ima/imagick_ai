@@ -117,6 +117,14 @@ function euclidean(a: number[], b: number[]): number {
   return Math.sqrt(s);
 }
 
+/** L2-normalize so distance thresholds are consistent across descriptors. */
+function l2norm(v: number[]): number[] {
+  let s = 0;
+  for (const x of v) s += x * x;
+  s = Math.sqrt(s) || 1;
+  return v.map((x) => x / s);
+}
+
 export interface GroupFacesOptions {
   threshold?: number;
   onStatus?: (s: string) => void;
@@ -149,7 +157,7 @@ export async function groupFaces(
           imageUrl: items[i].url,
           imageName: items[i].name,
           crop,
-          descriptor: Array.from(det.descriptor as Float32Array),
+          descriptor: l2norm(Array.from(det.descriptor as Float32Array)),
           quality,
           person: -1,
         });
@@ -162,39 +170,32 @@ export async function groupFaces(
     opts.onProgress?.(i + 1, items.length, faces.length);
   }
 
-  // Seed clusters with the best faces first, and match against the running
-  // centroid (mean descriptor) — far more stable than matching the first face.
+  // Exemplar clustering: best faces first become fixed "anchors"; every other
+  // face joins the nearest anchor only if it's strictly close. Matching against
+  // a real sharp face (not a drifting mean) stops garbage/occluded descriptors
+  // from snowballing into the biggest cluster — the cause of the contamination.
   const ordered = [...faces].sort((a, b) => b.quality - a.quality);
-  const clusters: { sum: number[]; count: number; faces: DetectedFace[] }[] = [];
-  const centroid = (c: { sum: number[]; count: number }) => c.sum.map((v) => v / c.count);
+  const anchors: { desc: number[]; faces: DetectedFace[] }[] = [];
   for (const face of ordered) {
     let best = -1;
     let bestD = threshold;
-    for (let c = 0; c < clusters.length; c++) {
-      const d = euclidean(face.descriptor, centroid(clusters[c]));
+    for (let c = 0; c < anchors.length; c++) {
+      const d = euclidean(face.descriptor, anchors[c].desc);
       if (d < bestD) { bestD = d; best = c; }
     }
-    if (best === -1) {
-      clusters.push({ sum: [...face.descriptor], count: 1, faces: [face] });
-    } else {
-      const c = clusters[best];
-      for (let i = 0; i < c.sum.length; i++) c.sum[i] += face.descriptor[i];
-      c.count++;
-      c.faces.push(face);
-    }
+    if (best === -1) anchors.push({ desc: face.descriptor, faces: [face] });
+    else anchors[best].faces.push(face);
   }
 
-  // Merge pass: join clusters whose centroids are close (same person, drifted).
+  // Conservative merge: only join anchors that are clearly the same identity.
   let merged = true;
   while (merged) {
     merged = false;
-    for (let a = 0; a < clusters.length && !merged; a++) {
-      for (let b = a + 1; b < clusters.length; b++) {
-        if (euclidean(centroid(clusters[a]), centroid(clusters[b])) < threshold * 0.95) {
-          for (let i = 0; i < clusters[a].sum.length; i++) clusters[a].sum[i] += clusters[b].sum[i];
-          clusters[a].count += clusters[b].count;
-          clusters[a].faces.push(...clusters[b].faces);
-          clusters.splice(b, 1);
+    for (let a = 0; a < anchors.length && !merged; a++) {
+      for (let b = a + 1; b < anchors.length; b++) {
+        if (euclidean(anchors[a].desc, anchors[b].desc) < threshold * 0.85) {
+          anchors[a].faces.push(...anchors[b].faces);
+          anchors.splice(b, 1);
           merged = true;
           break;
         }
@@ -202,7 +203,7 @@ export async function groupFaces(
     }
   }
 
-  const people: Person[] = clusters
+  const people: Person[] = anchors
     .map((c) => {
       const sorted = c.faces.sort((x, y) => y.quality - x.quality);
       const images: string[] = [];
