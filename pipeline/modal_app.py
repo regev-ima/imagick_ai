@@ -34,11 +34,19 @@ def _download_models():
 
     open_clip.create_model_and_transforms("ViT-L-14", pretrained="openai")
     torch.hub.load_state_dict_from_url(AESTHETIC_URL, map_location="cpu")
-    FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+    FaceAnalysis(
+        name="buffalo_l",
+        allowed_modules=["detection", "recognition"],
+        providers=["CPUExecutionProvider"],
+    )
 
 
+# A CUDA+cuDNN base image is what lets onnxruntime-gpu actually use the GPU for
+# face detection/recognition — on debian_slim it silently falls back to slow CPU.
 image = (
-    modal.Image.debian_slim()
+    modal.Image.from_registry(
+        "nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04", add_python="3.11"
+    )
     .apt_install("libgl1", "libglib2.0-0")
     .pip_install(
         "fastapi[standard]", "torch", "open_clip_torch", "insightface",
@@ -91,10 +99,18 @@ class Pipeline:
         self.head.load_state_dict(torch.hub.load_state_dict_from_url(AESTHETIC_URL, map_location="cpu"))
         self.head.eval()
 
+        # Only load detection + recognition — we never use gender/age or the two
+        # landmark models, and skipping them removes most of the per-face cost.
         self.faces = FaceAnalysis(
-            name="buffalo_l", providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+            name="buffalo_l",
+            allowed_modules=["detection", "recognition"],
+            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
         )
         self.faces.prepare(ctx_id=0, det_size=(640, 640))
+        # Confirm the face models actually landed on the GPU (CPU fallback is the
+        # #1 cost trap here) — visible in the Modal logs.
+        for mod_name, model in self.faces.models.items():
+            print(f"[faces] {mod_name} -> {model.session.get_providers()[0]}")
 
     def _faces_for(self, pil):
         bgr = np.array(pil)[:, :, ::-1]
