@@ -58,6 +58,22 @@ jobs:
           URL=$(grep -Eo 'https://[a-zA-Z0-9._-]+\.modal\.run[^ ]*' modal_out.txt | grep -i process | head -1)
           echo "Captured Modal URL: $URL"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
+          HURL=$(grep -Eo 'https://[a-zA-Z0-9._-]+\.modal\.run[^ ]*' modal_out.txt | grep -i health | head -1)
+          echo "health=$HURL" >> "$GITHUB_OUTPUT"
+
+      - name: Verify GPU (health check)
+        run: |
+          HURL="${{ steps.modal.outputs.health }}"
+          echo "Health URL: $HURL"
+          echo "Calling health (cold start + GPU probe, allow ~2 min)..."
+          RESP=$(curl -sS --max-time 150 "$HURL" || echo '{"error":"curl failed"}')
+          echo "Health response:"
+          echo "$RESP"
+          if echo "$RESP" | grep -q '"gpu_ok":true'; then
+            echo "::notice::✅ Faces running on GPU"
+          else
+            echo "::warning::⚠️ Faces NOT on GPU yet"
+          fi
 
       - name: Install Supabase CLI
         run: |
