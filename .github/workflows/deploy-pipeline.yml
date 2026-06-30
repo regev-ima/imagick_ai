@@ -58,9 +58,16 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
+        run: |
+          # setup-cli@v1 hits GitHub's unauthenticated API and gets rate-limited;
+          # fetch the release with an authenticated curl and install the binary.
+          JSON=$(curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/supabase/cli/releases/latest)
+          URL=$(echo "$JSON" | grep -oE 'https://[^"]*_linux_amd64\.tar\.gz' | head -1)
+          echo "Supabase CLI asset: $URL"
+          curl -sSL "$URL" -o /tmp/supabase.tar.gz
+          tar -xzf /tmp/supabase.tar.gz -C /tmp supabase
+          sudo mv /tmp/supabase /usr/local/bin/supabase
+          supabase --version
 
       - name: Link Supabase project
         run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
