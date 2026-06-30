@@ -60,14 +60,16 @@ jobs:
       - name: Install Supabase CLI
         run: |
           # setup-cli@v1 hits GitHub's unauthenticated API and gets rate-limited;
-          # fetch the release with an authenticated curl and install the binary.
+          # fetch the release with an authenticated curl instead. The CLI ships as
+          # two co-located binaries (supabase shim + supabase-go), so extract the
+          # whole tarball into one dir and put it on PATH — don't move just the shim.
           JSON=$(curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/supabase/cli/releases/latest)
           URL=$(echo "$JSON" | grep -oE 'https://[^"]*_linux_amd64\.tar\.gz' | head -1)
           echo "Supabase CLI asset: $URL"
-          curl -sSL "$URL" -o /tmp/supabase.tar.gz
-          tar -xzf /tmp/supabase.tar.gz -C /tmp supabase
-          sudo mv /tmp/supabase /usr/local/bin/supabase
-          supabase --version
+          mkdir -p "$HOME/.local/share/supabase"
+          curl -sSL "$URL" | tar -xzf - -C "$HOME/.local/share/supabase"
+          echo "$HOME/.local/share/supabase" >> "$GITHUB_PATH"
+          "$HOME/.local/share/supabase/supabase" --version
 
       - name: Link Supabase project
         run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
