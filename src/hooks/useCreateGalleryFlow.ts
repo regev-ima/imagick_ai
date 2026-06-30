@@ -9,8 +9,9 @@ import { useImageUpload } from "@/hooks/useImageUpload";
 import { useSubscription } from "@/hooks/useSubscription";
 import { getCullingLabels, type LanguageCode } from "@/lib/cullingLabels";
 
-// Shared "create a collection" engine for the design-concept prototypes.
-// It mirrors the real CreateGalleryPage local-upload path exactly (gallery
+// Shared "create a collection" engine. Powers the production CreateGalleryPage
+// (the live-plan create flow) and the internal design-concept prototypes.
+// It runs the real local-upload path (gallery
 // insert → upload via Uppy → hero → status → upload-complete email → AI
 // processing → navigate to the gallery), and also the Google Drive
 // server-transfer path (gallery → transferring → gd-transfer). The import
@@ -45,7 +46,7 @@ export function useCreateGalleryFlow() {
 
   // The user's preferred culling-label language, so curated tags match what
   // they'd see in the real wizard. Defaults to English until loaded.
-  const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
+  const [cullingLanguage, setCullingLang] = useState<LanguageCode>("en");
   useEffect(() => {
     if (!user) return;
     supabase
@@ -54,9 +55,22 @@ export function useCreateGalleryFlow() {
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
-        if (data?.preferred_language) setCullingLanguage(data.preferred_language as LanguageCode);
+        if (data?.preferred_language) setCullingLang(data.preferred_language as LanguageCode);
       });
   }, [user]);
+
+  // Change the preferred language and persist it, so the choice sticks for the
+  // next collection (mirrors the production wizard's language selector).
+  const setCullingLanguage = (lang: LanguageCode) => {
+    setCullingLang(lang);
+    if (user) {
+      supabase
+        .from("user_subscriptions")
+        .update({ preferred_language: lang })
+        .eq("user_id", user.id)
+        .then(({ error }) => { if (error) console.error("Failed to save language preference:", error); });
+    }
+  };
 
   // Same source + cache key as the real wizard, so styles are shared.
   const { data: styles = [], isLoading: stylesLoading } = useQuery({
@@ -263,6 +277,7 @@ export function useCreateGalleryFlow() {
     styles,
     stylesLoading,
     cullingLanguage,
+    setCullingLanguage,
     uploadProgress,
     isUploading,
     isSubmitting,
