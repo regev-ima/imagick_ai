@@ -156,7 +156,19 @@ class Pipeline:
         elif "CUDAExecutionProvider" not in avail:
             self.faces_provider = "CPU (no-cuda-ep)"  # onnxruntime can't load CUDA libs
         else:
-            self.faces_provider = "CPU (fallback)"    # CUDA available but not used
+            # CUDA EP exists but the sessions fell back to CPU — force it onto one
+            # of insightface's own models to surface the exact init error (usually
+            # a precise "needs libX.so.N" / version-mismatch message).
+            import glob
+            reason = "init-ok-but-unused"
+            files = glob.glob(os.path.expanduser("~/.insightface/models/buffalo_l/*.onnx"))
+            if files:
+                try:
+                    ort.InferenceSession(files[0], providers=["CUDAExecutionProvider"])
+                except Exception as exc:  # noqa: BLE001
+                    reason = str(exc).replace("\n", " ")[:200]
+            print("[faces] CUDA fallback reason:", reason)
+            self.faces_provider = f"CPU: {reason}"
 
     def _faces_for(self, pil):
         bgr = np.array(pil)[:, :, ::-1]
