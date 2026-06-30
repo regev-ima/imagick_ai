@@ -101,10 +101,35 @@ class Pipeline:
     def load(self):
         self.device = "cuda"
 
-        # Bridge torch's bundled CUDA/cuDNN into the process so onnxruntime's CUDA
-        # provider can resolve them when it builds face sessions below. torch is
-        # imported first (via image.imports) and primes the loader; preload_dlls
-        # (onnxruntime >= 1.21) then loads CUDA + cuDNN from site-packages/nvidia/*.
+        # Force-load EVERY bundled CUDA lib into the GLOBAL symbol namespace so
+        # libonnxruntime_providers_cuda.so resolves them at dlopen. The exact error
+        # we hit was "libcublasLt.so.12: cannot open" — neither preload_dlls nor
+        # LD_LIBRARY_PATH made it globally visible. ctypes RTLD_GLOBAL does. Paths
+        # come from `import nvidia` (no guessing); two passes so libs that depend on
+        # each other resolve regardless of load order.
+        import ctypes
+        import glob
+        self.cuda_preload = "n/a"
+        try:
+            import nvidia
+            sos = []
+            for base in nvidia.__path__:
+                sos += glob.glob(os.path.join(base, "*", "lib", "*.so*"))
+            loaded = 0
+            for _ in range(2):
+                for so in sos:
+                    try:
+                        ctypes.CDLL(so, mode=ctypes.RTLD_GLOBAL)
+                        loaded += 1
+                    except OSError:
+                        pass
+            self.cuda_preload = f"ctypes RTLD_GLOBAL over {len(sos)} libs"
+            print(f"[cuda] ctypes-preloaded {len(sos)} nvidia libs (RTLD_GLOBAL)")
+        except Exception as e:  # noqa: BLE001
+            self.cuda_preload = f"ctypes preload failed: {e}"
+            print("[cuda] ctypes preload failed:", e)
+
+        # Belt-and-suspenders: onnxruntime's own bridge to torch's CUDA/cuDNN.
         import onnxruntime as ort
         self.preload_ok = "n/a"
         try:
@@ -112,7 +137,7 @@ class Pipeline:
             self.preload_ok = "ok"
         except Exception as e:  # noqa: BLE001
             self.preload_ok = f"failed: {e}"
-            print("[ort] preload_dlls failed (LD_LIBRARY_PATH should still cover it):", e)
+            print("[ort] preload_dlls failed:", e)
         self.faces_debug = ""  # full CUDA-load stderr, surfaced via /health when CPU
         print(f"[ort] version={ort.__version__} preload={self.preload_ok} "
               f"providers={ort.get_available_providers()}")
@@ -241,6 +266,7 @@ class Pipeline:
             "faces_provider": getattr(self, "faces_provider", "?"),
             "ort_version": ort.__version__,
             "has_preload_dlls": hasattr(ort, "preload_dlls"),
+            "cuda_preload": getattr(self, "cuda_preload", "n/a"),
             "preload_ok": getattr(self, "preload_ok", "n/a"),
             "cuda_load_error": err[:1500],
             "ort_providers": ort.get_available_providers(),
