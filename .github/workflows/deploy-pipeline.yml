@@ -53,7 +53,9 @@ jobs:
         id: modal
         run: |
           modal deploy pipeline/modal_app.py 2>&1 | tee modal_out.txt
-          URL=$(grep -Eo 'https://[a-zA-Z0-9._-]+\.modal\.run[^ ]*' modal_out.txt | head -1)
+          # Grab the PROCESS endpoint specifically — there are now multiple
+          # endpoints (process + health), so we must not pick the wrong one.
+          URL=$(grep -Eo 'https://[a-zA-Z0-9._-]+\.modal\.run[^ ]*' modal_out.txt | grep -i process | head -1)
           echo "Captured Modal URL: $URL"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
