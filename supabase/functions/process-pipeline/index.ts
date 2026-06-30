@@ -69,8 +69,15 @@ serve(async (req: Request) => {
     const token = authHeader.replace("Bearer ", "");
 
     const body = await req.json();
-    const { galleryId, stall = 0 } = body as { galleryId: string; userId?: string; stall?: number };
+    const { galleryId, stall = 0, options } = body as {
+      galleryId: string; userId?: string; stall?: number;
+      options?: { faces?: boolean; cluster?: boolean };
+    };
     if (!galleryId) return json({ error: "Missing galleryId" }, 400);
+    // Which optional steps to run. Faces (ArcFace) is the heavy, premium-gated one;
+    // CLIP-based rating/clustering/tagging always ride on the one cheap embedding.
+    const doFaces = options?.faces !== false;
+    const doCluster = options?.cluster !== false;
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -107,9 +114,9 @@ serve(async (req: Request) => {
       .filter((i: { id: string; original_url: string | null }) => i.original_url && !done.has(i.id))
       .slice(0, IMAGES_PER_INVOCATION) as { id: string; original_url: string }[];
     if (images.length === 0) {
-      // Nothing left → cluster and finish.
-      await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
-      await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
+      // Nothing left → cluster (only the enabled steps) and finish.
+      if (doCluster) await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
+      if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
       await admin.from("galleries").update({ pipeline_status: "ready" }).eq("id", galleryId);
       return json({ success: true, done: true });
     }
@@ -160,6 +167,7 @@ serve(async (req: Request) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               token: modalToken,
+              faces: doFaces, // skip ArcFace on Modal when faces are off
               images: batch.map((img) => ({
                 id: img.id,
                 url: toPreviewUrl(img.original_url),
@@ -222,15 +230,15 @@ serve(async (req: Request) => {
       const chain = fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-        body: JSON.stringify({ galleryId, stall: nextStall }),
+        body: JSON.stringify({ galleryId, stall: nextStall, options }),
       }).catch((e) => console.error("self-chain failed", e));
       EdgeRuntime.waitUntil(chain);
       return json({ success: true, processed, remaining, chained: true });
     }
 
-    // Done → cluster everything.
-    await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
-    await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
+    // Done → cluster the enabled steps.
+    if (doCluster) await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
+    if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
     await admin.from("galleries").update({ pipeline_status: "ready" }).eq("id", galleryId);
     return json({ success: true, processed, done: true });
   } catch (err: unknown) {

@@ -361,6 +361,7 @@ class Pipeline:
             return {"error": "unauthorized"}
 
         items = data.get("images", [])
+        do_faces = bool(data.get("faces", True))  # skip the expensive ArcFace step when off
         results = []
 
         # 1) Download all images in the batch in parallel (network-bound).
@@ -404,8 +405,9 @@ class Pipeline:
             clip_ms = (time.time() - t1) * 1000
 
             # 3) Faces: detect per image, recognize all faces in one batched forward.
+            # Skipped entirely when faces are off (the heaviest, premium-gated step).
             t2 = time.time()
-            per_img_faces = self._faces_batched([img for _, img in valid])
+            per_img_faces = self._faces_batched([img for _, img in valid]) if do_faces else [[] for _ in valid]
             for idx, (iid, _img) in enumerate(valid):
                 results.append({
                     "id": iid,

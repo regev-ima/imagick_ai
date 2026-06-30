@@ -28,6 +28,9 @@ export default function PipelineResults() {
   const [galleryId, setGalleryId] = useState<string>("");
   const [view, setView] = useState<"clusters" | "people" | "top">("clusters");
   const [lightbox, setLightbox] = useState<string | null>(null);
+  // Which steps to run. Faces (people) is the heavy, premium-gated step; the rest
+  // ride on the single cheap CLIP embedding.
+  const [opts, setOpts] = useState({ cluster: true, faces: true });
 
   const galleries = useQuery({
     queryKey: ["pipeline-galleries"],
@@ -66,7 +69,7 @@ export default function PipelineResults() {
 
   const process = useMutation({
     mutationFn: async () => {
-      const res = await supabase.functions.invoke("process-pipeline", { body: { galleryId } });
+      const res = await supabase.functions.invoke("process-pipeline", { body: { galleryId, options: opts } });
       if (res.error) {
         // Surface the function's real error body, not the generic wrapper text.
         let msg = res.error.message;
@@ -198,6 +201,29 @@ export default function PipelineResults() {
             </span>
           )}
         </div>
+
+        {galleryId && (
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+            <span>שלבים לעיבוד:</span>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked readOnly className="accent-primary" />
+              דירוג + תיוג <span className="opacity-60">(תמיד, זול)</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5">
+              <input type="checkbox" checked={opts.cluster}
+                onChange={(e) => setOpts((o) => ({ ...o, cluster: e.target.checked }))}
+                className="accent-primary" />
+              קיבוץ תמונות
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5">
+              <input type="checkbox" checked={opts.faces}
+                onChange={(e) => setOpts((o) => ({ ...o, faces: e.target.checked }))}
+                className="accent-primary" />
+              זיהוי אנשים <span className="rounded bg-amber-500/20 px-1 text-amber-600">פרימיום</span>
+              <span className="opacity-60">(השלב היקר — ~40שׁ)</span>
+            </label>
+          </div>
+        )}
 
         {galleryId && (
           <>
