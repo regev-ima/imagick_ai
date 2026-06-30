@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Images, Scissors, UploadCloud, Ban } from "lucide-react";
+import { Check, Images, Scissors, UploadCloud, Ban, X } from "lucide-react";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { IMAGE_ACCEPT } from "@/lib/imageFileTypes";
+import { Button } from "@/components/ui/button";
 import { UploadSourceSelector } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput } from "@/components/gallery/GoogleDriveInput";
 import { CullingTags } from "./CullingTags";
@@ -24,6 +26,10 @@ export function FileInput({ flow }: { flow: CanvasFlow }) {
 }
 
 export function SourceUpload({ flow }: { flow: CanvasFlow }) {
+  const [reviewOpen, setReviewOpen] = useState(false);
+  // Close the review modal automatically if every photo gets removed.
+  useEffect(() => { if (flow.photos === 0) setReviewOpen(false); }, [flow.photos]);
+  const shown = Math.min(6, flow.previews.length);
   return (
     <>
       <UploadSourceSelector value={flow.uploadSource} onChange={flow.setUploadSource} disabled={flow.busy} />
@@ -36,19 +42,29 @@ export function SourceUpload({ flow }: { flow: CanvasFlow }) {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Images className="h-3.5 w-3.5" /> {flow.photos.toLocaleString()} photos selected
             <button type="button" onClick={() => flow.inputRef.current?.click()} className="text-accent hover:underline">change</button>
+            <span className="text-muted-foreground/40">·</span>
+            <button type="button" onClick={() => setReviewOpen(true)} className="text-accent hover:underline">review &amp; remove</button>
           </div>
           {flow.previews.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {flow.previews.slice(0, 6).map((src, i) => (
-                <img key={i} src={src} alt="" className="h-12 w-12 rounded-md object-cover ring-1 ring-border" />
+                <button key={i} type="button" onClick={() => setReviewOpen(true)} className="overflow-hidden rounded-md ring-1 ring-border transition hover:ring-primary/60" aria-label="Review selected photos">
+                  <img src={src} alt="" className="h-12 w-12 object-cover" />
+                </button>
               ))}
-              {flow.photos > flow.previews.slice(0, 6).length && (
-                <div className="grid h-12 w-12 place-items-center rounded-md bg-surface-2 text-xs font-medium text-muted-foreground">
-                  +{(flow.photos - flow.previews.slice(0, 6).length).toLocaleString()}
-                </div>
+              {flow.photos > shown && (
+                <button
+                  type="button"
+                  onClick={() => setReviewOpen(true)}
+                  className="grid h-12 w-12 place-items-center rounded-md border border-border bg-surface-2 text-xs font-semibold text-foreground/80 transition hover:border-primary/50 hover:text-foreground"
+                  aria-label="See all selected photos"
+                >
+                  +{(flow.photos - shown).toLocaleString()}
+                </button>
               )}
             </div>
           )}
+          {reviewOpen && <SelectedPhotosModal flow={flow} onClose={() => setReviewOpen(false)} />}
         </div>
       ) : (
         <button
@@ -175,6 +191,58 @@ export function PlanStat({ icon, label, value }: { icon: React.ReactNode; label:
     <div className="rounded-[--radius] bg-surface-2 p-3">
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">{icon} {label}</div>
       <div className="mt-0.5 font-mono text-lg font-semibold tracking-tight">{value}</div>
+    </div>
+  );
+}
+
+// Full-screen review grid — see every selected photo and drop the ones picked
+// by mistake before creating the collection.
+function SelectedPhotosModal({ flow, onClose }: { flow: CanvasFlow; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="glass-card flex max-h-[85vh] w-full max-w-3xl flex-col rounded-[--radius] p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-1 flex items-start justify-between gap-3">
+          <div>
+            <span className="aura-microlabel text-accent">Review selection</span>
+            <h2 className="text-lg font-semibold tracking-tight">{flow.photos.toLocaleString()} photos</h2>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close"><X className="h-5 w-5" /></Button>
+        </div>
+        <p className="caption mb-3">Tap ✕ on any photo to drop it before creating. RAW files show as a tile.</p>
+
+        <div className="grid grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-5">
+          {flow.items.map((it, i) => (
+            <div
+              key={`${it.file.name}-${it.file.size}-${it.file.lastModified}`}
+              className="group relative aspect-square overflow-hidden rounded-md bg-surface-2"
+            >
+              {it.url ? (
+                <img src={it.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center px-1 text-center text-[9px] font-medium uppercase tracking-wide text-muted-foreground">RAW</div>
+              )}
+              <button
+                type="button"
+                onClick={() => flow.removeAt(i)}
+                aria-label="Remove photo"
+                className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-all hover:bg-destructive group-hover:opacity-100"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button variant="glow" onClick={onClose}>Done · {flow.photos.toLocaleString()} photos</Button>
+        </div>
+      </div>
     </div>
   );
 }

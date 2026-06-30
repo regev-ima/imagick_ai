@@ -9,6 +9,15 @@ import type { DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 
 export type StyleRow = ReturnType<typeof useCreateGalleryFlow>["styles"][number];
 
+// One selected photo: the File plus a preview object URL (null for RAW/HEIC
+// which the browser can't render, or beyond the preview cap).
+export interface SelImg { file: File; url: string | null }
+
+// How many object URLs to create up front. Generous enough to fully preview a
+// typical shoot in the review modal; large enough sets show the rest as
+// removable placeholders.
+const PREVIEW_CAP = 500;
+
 export const SHOOT_TYPES: { value: string; label: string }[] = [
   { value: "wedding", label: "Wedding" },
   { value: "portrait", label: "Portrait" },
@@ -41,12 +50,11 @@ export function useCanvasFlow() {
 
   const [name, setName] = useState("");
   const [type, setType] = useState("wedding");
-  const [files, setFiles] = useState<File[]>([]);
+  const [items, setItems] = useState<SelImg[]>([]);
   const [styleId, setStyleId] = useState<string | null>(null);
   const [styleTouched, setStyleTouched] = useState(false);
   const [cull, setCull] = useState(true);
   const [categories, setCategories] = useState<string[]>(() => defaultCullingTags("wedding"));
-  const [previews, setPreviews] = useState<string[]>([]);
   const [uploadSource, setUploadSource] = useState<UploadSource>("local");
   const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
   const [driveLinks, setDriveLinks] = useState<string[]>([]);
@@ -66,18 +74,24 @@ export function useCanvasFlow() {
     if (cull) setCategories(defaultCullingTags(value, cullingLanguage));
   };
 
-  const photos = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : files.length;
-
   const ingest = (list: FileList | null) => {
     if (!list) return;
     const imgs = Array.from(list).filter(isImageFile);
     if (imgs.length === 0) return;
-    setFiles(imgs);
-    setPreviews(imgs.filter(isPreviewable).slice(0, 120).map((f) => {
-      const url = URL.createObjectURL(f);
-      objectUrls.current.push(url);
-      return url;
-    }));
+    // Replacing the selection — revoke the previous batch's URLs.
+    objectUrls.current.forEach((u) => URL.revokeObjectURL(u));
+    objectUrls.current = [];
+    let made = 0;
+    const next: SelImg[] = imgs.map((f) => {
+      let url: string | null = null;
+      if (isPreviewable(f) && made < PREVIEW_CAP) {
+        url = URL.createObjectURL(f);
+        objectUrls.current.push(url);
+        made++;
+      }
+      return { file: f, url };
+    });
+    setItems(next);
     if (!name.trim()) {
       const mid = imgs.map((f) => f.lastModified).filter(Boolean).sort((a, b) => a - b)[Math.floor(imgs.length / 2)];
       const d = mid ? new Date(mid) : new Date();
@@ -85,10 +99,25 @@ export function useCanvasFlow() {
     }
   };
 
+  // Remove a single photo the user picked by mistake.
+  const removeAt = (index: number) => {
+    setItems((prev) => {
+      const target = prev[index];
+      if (target?.url) URL.revokeObjectURL(target.url);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   const setDrive = (info: DriveFolderInfo | null, links: string[]) => {
     setDriveFolderInfo(info);
     setDriveLinks(links);
   };
+
+  const photos = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : items.length;
+  const previews = useMemo(
+    () => items.map((it) => it.url).filter((u): u is string => !!u),
+    [items],
+  );
 
   const style = styles.find((s) => s.id === styleId) ?? null;
   const rankedStyles = rankStyles(styles, type);
@@ -119,7 +148,7 @@ export function useCanvasFlow() {
       cullingLanguage,
       source: uploadSource === "drive"
         ? { kind: "drive", links: driveLinks, totalImageCount: driveFolderInfo?.totalImageCount || 0, totalSizeMB: driveFolderInfo?.totalSizeMB || 0 }
-        : { kind: "local", files },
+        : { kind: "local", files: items.map((it) => it.file) },
     });
   };
 
@@ -127,7 +156,7 @@ export function useCanvasFlow() {
     navigate,
     styles, busy, isUploading, uploadProgress, availableEdits, isUnlimited, cullingLanguage,
     name, setName, type, changeType,
-    photos, previews, inputRef, ingest,
+    photos, previews, items, removeAt, inputRef, ingest,
     uploadSource, setUploadSource, driveFolderInfo, setDrive,
     style, rankedStyles, styleId, pickStyle,
     cull, toggleCull, categories, setCategories,
