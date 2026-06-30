@@ -106,11 +106,15 @@ class Pipeline:
         # imported first (via image.imports) and primes the loader; preload_dlls
         # (onnxruntime >= 1.21) then loads CUDA + cuDNN from site-packages/nvidia/*.
         import onnxruntime as ort
+        self.preload_ok = "n/a"
         try:
             ort.preload_dlls(cuda=True, cudnn=True)
+            self.preload_ok = "ok"
         except Exception as e:  # noqa: BLE001
+            self.preload_ok = f"failed: {e}"
             print("[ort] preload_dlls failed (LD_LIBRARY_PATH should still cover it):", e)
-        print(f"[ort] version={ort.__version__} preload={hasattr(ort, 'preload_dlls')} "
+        self.faces_debug = ""  # full CUDA-load stderr, surfaced via /health when CPU
+        print(f"[ort] version={ort.__version__} preload={self.preload_ok} "
               f"providers={ort.get_available_providers()}")
 
         self.clip, _, self.preprocess = open_clip.create_model_and_transforms(
@@ -194,8 +198,9 @@ class Pipeline:
                 captured = tf.read().decode(errors="ignore")
                 tf.close()
             print("[faces] CUDA EP stderr (full):\n", captured)
-            # The "cannot open shared object file" line names the real missing lib;
-            # prefer it over the generic "Require cuDNN 9.*" masking message.
+            # Keep the full text (surfaced via /health) so we see exactly which lib
+            # the CUDA provider failed on, plus a short summary in the badge.
+            self.faces_debug = captured.replace("\x1b[1;31m", "").replace("\x1b[0;93m", "").replace("\x1b[0m", "")
             culprit = next((ln.strip() for ln in captured.splitlines()
                             if "cannot open shared object" in ln), None)
             keys = ("Failed to load", "cannot open", "cuDNN", "libcud", "libcub", "libnv", ".so", "version")
@@ -227,6 +232,8 @@ class Pipeline:
             "faces_provider": getattr(self, "faces_provider", "?"),
             "ort_version": ort.__version__,
             "has_preload_dlls": hasattr(ort, "preload_dlls"),
+            "preload_ok": getattr(self, "preload_ok", "n/a"),
+            "cuda_load_error": getattr(self, "faces_debug", "")[-1200:],  # full, untruncated
             "ort_providers": ort.get_available_providers(),
             "gpu_ok": str(getattr(self, "faces_provider", "")).startswith("GPU"),
         }
