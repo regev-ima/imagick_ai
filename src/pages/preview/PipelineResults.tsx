@@ -93,28 +93,40 @@ export default function PipelineResults() {
     return m;
   }, [results.data]);
 
-  // CLIP cosine threshold for showing a tag. Raw ViT-L/14 sims: relevant tags
-  // land ~0.24+, noise below. Tunable.
-  const TAG_THRESHOLD = 0.24;
-  // Tags above the threshold — but never leave an image untagged: if none pass,
-  // fall back to the single best-matching tag so every photo has at least one.
-  const labelsFor = (f: Feature | undefined, max = 3) => {
-    const ts = f?.tags ?? [];
-    const above = ts.filter((t) => t.score >= TAG_THRESHOLD).slice(0, max).map((t) => t.tag);
-    if (above.length) return above;
-    return ts.length ? [ts[0].tag] : [];
-  };
-
-  // Tag chips for the filter bar: every tag seen above threshold, with a count.
-  const tagCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const f of results.data?.features ?? [])
-      for (const t of (f.tags ?? [])) if (t.score >= TAG_THRESHOLD) m.set(t.tag, (m.get(t.tag) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  // Tag assignment with per-tag mean-centering: CLIP gives each tag a baseline
+  // bias, so one "sticky" tag (e.g. ספונטני) can win on every photo. We subtract
+  // each tag's gallery-wide average, so each image surfaces what's DISTINCTIVE about
+  // it. Result: top-2 calibrated tags per image (≥1 so nothing is left untagged).
+  const labelsByImg = useMemo(() => {
+    const feats = results.data?.features ?? [];
+    const sum = new Map<string, number>(), cnt = new Map<string, number>();
+    for (const f of feats) for (const t of (f.tags ?? [])) {
+      sum.set(t.tag, (sum.get(t.tag) ?? 0) + t.score);
+      cnt.set(t.tag, (cnt.get(t.tag) ?? 0) + 1);
+    }
+    const mean = new Map<string, number>();
+    for (const [k, v] of sum) mean.set(k, v / (cnt.get(k) || 1));
+    const m = new Map<string, string[]>();
+    for (const f of feats) {
+      const cal = (f.tags ?? [])
+        .map((t) => ({ tag: t.tag, c: t.score - (mean.get(t.tag) ?? 0) }))
+        .sort((a, b) => b.c - a.c);
+      const pos = cal.filter((x) => x.c > 0.012).slice(0, 2).map((x) => x.tag);
+      m.set(f.image_id, pos.length ? pos : (cal.length ? [cal[0].tag] : []));
+    }
+    return m;
   }, [results.data]);
 
-  const matchesTag = (f: Feature) =>
-    !tagFilter || (f.tags ?? []).some((t) => t.tag === tagFilter && t.score >= TAG_THRESHOLD);
+  const labelsFor = (f: Feature | undefined) => (f ? labelsByImg.get(f.image_id) ?? [] : []);
+
+  // Tag filter bar: every assigned tag, with a count.
+  const tagCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const labels of labelsByImg.values()) for (const t of labels) m.set(t, (m.get(t) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [labelsByImg]);
+
+  const matchesTag = (f: Feature) => !tagFilter || (labelsByImg.get(f.image_id) ?? []).includes(tagFilter);
 
   // Visual clusters: group by visual_cluster, best-aesthetic first within each.
   const clusters = useMemo(() => {
@@ -419,9 +431,9 @@ function Thumb({ url, score, tags, onOpen }: { url: string; score?: string; tags
       {url && <img src={url} alt="" loading="lazy" onClick={onOpen} className="h-full w-full cursor-zoom-in object-cover" />}
       {score && <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-bold text-white">{score}</span>}
       {tags && tags.length > 0 && (
-        <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-0.5 bg-gradient-to-t from-black/70 to-transparent p-1">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-gradient-to-t from-black/80 to-transparent p-1.5 pt-4">
           {tags.map((t) => (
-            <span key={t} className="rounded bg-black/60 px-1 text-[9px] leading-tight text-white">{t}</span>
+            <span key={t} className="rounded bg-primary/80 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-white">{t}</span>
           ))}
         </div>
       )}

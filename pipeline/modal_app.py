@@ -468,16 +468,17 @@ class Pipeline:
                 feats = self.clip.encode_image(batch)
                 feats = feats / feats.norm(dim=-1, keepdim=True)
                 aesthetics = self.head(feats.float()).squeeze(-1).cpu().tolist()
-                # Zero-shot tags: cosine sim of each image to every tag prompt, top 6.
+                # Zero-shot tags: cosine sim of each image to every tag prompt.
+                # Return ALL tags (sorted) — the UI mean-centers per tag to cancel
+                # each tag's baseline bias (otherwise one "sticky" tag wins everywhere).
                 tag_lists = [[] for _ in valid]
                 if do_tags:
                     sims = feats.float() @ self.tag_feats.T          # (N, T)
-                    k = min(6, sims.shape[1])
-                    top = sims.topk(k, dim=-1)
+                    order = sims.argsort(dim=-1, descending=True)
                     for n in range(sims.shape[0]):
                         tag_lists[n] = [
-                            {"tag": self.tag_labels[j], "score": round(float(s), 4)}
-                            for s, j in zip(top.values[n].tolist(), top.indices[n].tolist())
+                            {"tag": self.tag_labels[j], "score": round(float(sims[n, j]), 4)}
+                            for j in order[n].tolist()
                         ]
                 embs = feats.cpu().numpy().tolist()
             clip_ms = (time.time() - t1) * 1000
