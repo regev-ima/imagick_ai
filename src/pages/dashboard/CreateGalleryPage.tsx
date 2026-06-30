@@ -15,6 +15,7 @@ import {
   MapPin,
   Mountain,
   PartyPopper,
+  Pencil,
   Plus,
   Scissors,
   Shirt,
@@ -364,13 +365,19 @@ export default function CreateGalleryPage() {
         {/* Plan hero — name, live summary, and the create action */}
         <div className="glass-card mt-6 rounded-[--radius] p-6">
           <span className="aura-microlabel flex items-center gap-1.5 text-accent"><SparklesIcon className="h-3 w-3" /> Live plan</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-2 w-full border-0 bg-transparent text-3xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
-            placeholder="Untitled shoot"
-            aria-label="Collection name"
-          />
+          {/* Editable title — a subtle field + pencil so it clearly reads as
+              renameable (not a static heading), on desktop and mobile alike. */}
+          <div className="group relative mt-2">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-md bg-surface-2/40 py-1.5 pl-3 pr-11 text-3xl font-bold tracking-tight outline-none ring-1 ring-inset ring-border/60 transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 hover:ring-border focus:bg-surface-2 focus:ring-primary/60"
+              placeholder="Untitled shoot"
+              aria-label="Collection name"
+            />
+            <Pencil className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50 transition-colors group-hover:text-foreground/70" />
+          </div>
+          <p className="caption mt-1.5 pl-1">Tap to rename</p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Pill><Images className="h-3 w-3" /> {photos ? `${photos.toLocaleString()} photos` : "no photos yet"}</Pill>
             <Pill>{typeLabel}</Pill>
