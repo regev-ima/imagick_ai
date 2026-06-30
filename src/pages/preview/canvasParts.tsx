@@ -206,7 +206,7 @@ function SelectedPhotosModal({ flow, onClose }: { flow: CanvasFlow; onClose: () 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="glass-card flex max-h-[85vh] w-full max-w-3xl flex-col rounded-[--radius] p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="glass-card flex max-h-[90vh] w-full max-w-5xl flex-col rounded-[--radius] p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-1 flex items-start justify-between gap-3">
           <div>
             <span className="aura-microlabel text-accent">Review selection</span>
@@ -214,32 +214,36 @@ function SelectedPhotosModal({ flow, onClose }: { flow: CanvasFlow; onClose: () 
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close"><X className="h-5 w-5" /></Button>
         </div>
-        <p className="caption mb-3">Tap ✕ on any photo to drop it before creating. RAW files show as a tile.</p>
+        <p className="caption mb-3">Hover a photo and tap ✕ to drop it before creating. RAW files show as a tile.</p>
 
-        <div className="grid grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-5">
+        {/* Dense contact-sheet grid — small thumbs, many columns, so most of the
+            selection fits without much scrolling. min-h-0 + auto-rows keep the
+            tiles square inside the flex scroll area. */}
+        <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5 overflow-y-auto pr-1">
           {flow.items.map((it, i) => (
             <div
               key={`${it.file.name}-${it.file.size}-${it.file.lastModified}`}
-              className="group relative aspect-square overflow-hidden rounded-md bg-surface-2"
+              className="group relative aspect-square overflow-hidden rounded-[5px] bg-surface-2"
             >
               {it.url ? (
                 <img src={it.url} alt="" loading="lazy" className="h-full w-full object-cover" />
               ) : (
-                <div className="grid h-full w-full place-items-center px-1 text-center text-[9px] font-medium uppercase tracking-wide text-muted-foreground">RAW</div>
+                <div className="grid h-full w-full place-items-center text-center text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</div>
               )}
               <button
                 type="button"
                 onClick={() => flow.removeAt(i)}
                 aria-label="Remove photo"
-                className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-all hover:bg-destructive group-hover:opacity-100"
+                className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-all hover:bg-destructive group-hover:opacity-100"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3 w-3" />
               </button>
             </div>
           ))}
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="caption">Click a tile's ✕ to remove · scroll for more</span>
           <Button variant="glow" onClick={onClose}>Done · {flow.photos.toLocaleString()} photos</Button>
         </div>
       </div>
