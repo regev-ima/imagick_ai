@@ -63,7 +63,15 @@ export default function PipelineResults() {
   const process = useMutation({
     mutationFn: async () => {
       const res = await supabase.functions.invoke("process-pipeline", { body: { galleryId } });
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) {
+        // Surface the function's real error body, not the generic wrapper text.
+        let msg = res.error.message;
+        const ctx = (res.error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === "function") {
+          try { const b = await ctx.json(); msg = b?.message || b?.error || msg; } catch { /* keep msg */ }
+        }
+        throw new Error(msg);
+      }
       return res.data;
     },
     onSuccess: () => { toast.success("עיבוד הגלריה התחיל"); results.refetch(); },

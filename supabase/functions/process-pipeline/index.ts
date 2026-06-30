@@ -82,17 +82,19 @@ serve(async (req: Request) => {
 
     await admin.from("galleries").update({ pipeline_status: "processing", pipeline_error: null }).eq("id", galleryId);
 
-    // Images in this gallery that don't yet have features.
-    const { data: pending, error: pendingErr } = await admin
-      .from("gallery_images")
-      .select("id, original_url, image_features!left(image_id)")
-      .eq("gallery_id", galleryId)
-      .is("image_features.image_id", null)
-      .limit(IMAGES_PER_INVOCATION);
+    // Images in this gallery that don't yet have features (computed in JS — more
+    // robust than a PostgREST anti-join embed).
+    const { data: doneRows } = await admin
+      .from("image_features").select("image_id").eq("gallery_id", galleryId);
+    const done = new Set((doneRows || []).map((r: { image_id: string }) => r.image_id));
 
-    if (pendingErr) return json({ error: pendingErr.message }, 500);
+    const { data: allImgs, error: imgErr } = await admin
+      .from("gallery_images").select("id, original_url").eq("gallery_id", galleryId);
+    if (imgErr) return json({ error: imgErr.message }, 500);
 
-    const images = (pending || []).filter((i) => i.original_url);
+    const images = (allImgs || [])
+      .filter((i: { id: string; original_url: string | null }) => i.original_url && !done.has(i.id))
+      .slice(0, IMAGES_PER_INVOCATION) as { id: string; original_url: string }[];
     if (images.length === 0) {
       // Nothing left → cluster and finish.
       await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
@@ -155,14 +157,14 @@ serve(async (req: Request) => {
       }
     }
 
-    // Count remaining to decide whether to chain or finish.
-    const { count: remaining } = await admin
-      .from("gallery_images")
-      .select("id, image_features!left(image_id)", { count: "exact", head: true })
-      .eq("gallery_id", galleryId)
-      .is("image_features.image_id", null);
+    // Count remaining (total images minus those that now have features).
+    const { data: doneRows2 } = await admin
+      .from("image_features").select("image_id").eq("gallery_id", galleryId);
+    const { count: totalCount } = await admin
+      .from("gallery_images").select("id", { count: "exact", head: true }).eq("gallery_id", galleryId);
+    const remaining = (totalCount ?? 0) - (doneRows2 || []).length;
 
-    if ((remaining ?? 0) > 0) {
+    if (remaining > 0) {
       const chain = fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
