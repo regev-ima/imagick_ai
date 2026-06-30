@@ -167,7 +167,35 @@ class Pipeline:
         elif "CUDAExecutionProvider" not in avail:
             self.faces_provider = "CPU (no-cuda-ep)"  # onnxruntime can't load CUDA libs
         else:
-            self.faces_provider = "CPU (fallback)"
+            # CUDA is listed as available but every session still falls back to CPU.
+            # onnxruntime logs WHY at the C++ level (a missing/mismatched .so) but
+            # only to stderr — capture that fd while forcing CUDA to read the reason.
+            import os as _os
+            import tempfile
+            mf = next((getattr(m, "model_file", None) for m in self.faces.models.values()
+                       if getattr(m, "model_file", None)), None)
+            captured = ""
+            if mf:
+                tf = tempfile.TemporaryFile()
+                old = _os.dup(2)
+                _os.dup2(tf.fileno(), 2)
+                try:
+                    ort.set_default_logger_severity(1)  # surface warnings
+                    try:
+                        ort.InferenceSession(mf, providers=["CUDAExecutionProvider"])
+                    except Exception:  # noqa: BLE001
+                        pass
+                finally:
+                    _os.dup2(old, 2)
+                    _os.close(old)
+                tf.seek(0)
+                captured = tf.read().decode(errors="ignore")
+                tf.close()
+            print("[faces] CUDA EP stderr:\n", captured)
+            keys = ("Failed to load", "cannot open", "cuDNN", "libcud", "libcub", "libnv", ".so", "version")
+            lines = [ln.strip() for ln in captured.splitlines() if any(k in ln for k in keys)]
+            msg = (lines[-1] if lines else "no-stderr")[:220]
+            self.faces_provider = f"CPU: {msg}"
 
     def _faces_for(self, pil):
         bgr = np.array(pil)[:, :, ::-1]
