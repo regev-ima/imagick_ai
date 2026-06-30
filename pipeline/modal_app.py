@@ -41,53 +41,39 @@ def _download_models():
     )
 
 
-def _register_cuda_libs():
-    """Put the pip-installed CUDA libraries on the system loader path.
+# onnxruntime-gpu's CUDA provider is a separately dlopen'd plugin whose dependency
+# chain (split cuDNN 9 sub-libs + libnvrtc + libnvJitLink + libcublasLt + libcudart)
+# must be resolvable by the dynamic loader AT session-creation time. A build-time
+# ldconfig edit or an in-process os.environ set is too late, so two robust levers are
+# used together: (1) onnxruntime-gpu >= 1.22 exposes ort.preload_dlls(), the official
+# bridge that loads torch's bundled CUDA/cuDNN into the process; (2) LD_LIBRARY_PATH is
+# baked at the IMAGE level so the libs are on the loader path before the process starts.
+# torch>=2.4 already ships cuDNN 9.x — we deliberately do NOT also pin nvidia-cudnn-cu12,
+# since two cuDNN trees cause partial-load failures.
+_SITE = "/usr/local/lib/python3.11/site-packages"
+_LD_LIBRARY_PATH = ":".join([
+    f"{_SITE}/nvidia/cudnn/lib",      # cuDNN first
+    f"{_SITE}/nvidia/cublas/lib",
+    f"{_SITE}/nvidia/cuda_runtime/lib",
+    f"{_SITE}/nvidia/cuda_nvrtc/lib",
+    f"{_SITE}/nvidia/nvjitlink/lib",
+    f"{_SITE}/nvidia/cufft/lib",
+    f"{_SITE}/nvidia/curand/lib",
+    f"{_SITE}/torch/lib",
+])
 
-    onnxruntime-gpu needs cuDNN 9.* and CUDA 12.* but only searches the standard
-    loader path, while the libs (shipped by torch + nvidia-cudnn-cu12) live under
-    site-packages/nvidia/*/lib. Discover those dirs via `import nvidia` (the most
-    reliable way — no path guessing), register them with ldconfig, so the GPU
-    provider loads instead of silently falling back to CPU.
-    """
-    import glob
-    import os
-    import site
-    import subprocess
-
-    dirs = set()
-    try:
-        import nvidia  # namespace package over all nvidia-*-cu12 wheels
-        for p in nvidia.__path__:
-            dirs.update(glob.glob(os.path.join(p, "*", "lib")))
-    except Exception:  # noqa: BLE001
-        pass
-    for root in list(site.getsitepackages()) + [site.getusersitepackages()]:
-        dirs.update(glob.glob(os.path.join(root, "nvidia", "*", "lib")))
-
-    print("[cuda] lib dirs:", sorted(dirs))
-    if dirs:
-        with open("/etc/ld.so.conf.d/zzz-nvidia-torch.conf", "w") as f:
-            f.write("\n".join(sorted(dirs)) + "\n")
-        subprocess.run(["ldconfig"], check=False)
-
-
-# Keep the image SMALL so cold starts on a scale-to-zero GPU are fast and cheap.
-# A full CUDA devel image works but is several GB — every cold start then has to
-# pull all of it, which is slow, costly, and can even trip "not enough compute
-# resources". Instead we install the CUDA libs onnxruntime needs (cuDNN 9 explicitly,
-# the rest via torch) and register them with ldconfig so the GPU provider loads.
-# onnxruntime-gpu / torch are pinned to a combination that ships CUDA 12.x + cuDNN 9.
+# Keep the image SMALL (debian_slim) so cold starts on a scale-to-zero GPU stay fast
+# and cheap — no multi-GB CUDA devel image is needed once the loader paths are right.
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1", "libglib2.0-0")
     .pip_install(
         "fastapi[standard]", "torch>=2.4", "open_clip_torch", "insightface",
-        "onnxruntime-gpu==1.20.1", "nvidia-cudnn-cu12>=9,<10",
+        "onnxruntime-gpu>=1.22,<1.23",   # >=1.21 required for preload_dlls(); 1.22 = CUDA12 + cuDNN9
         "pillow", "numpy", "requests",
     )
-    .run_function(_register_cuda_libs)  # put cuDNN 9 / CUDA 12 on the loader path
-    .run_function(_download_models)     # bake CLIP + aesthetic + ArcFace weights in
+    .env({"LD_LIBRARY_PATH": _LD_LIBRARY_PATH})  # present at exec time, before any dlopen
+    .run_function(_download_models)               # bake CLIP + aesthetic + ArcFace weights in
 )
 
 with image.imports():
@@ -114,6 +100,19 @@ class Pipeline:
     @modal.enter()
     def load(self):
         self.device = "cuda"
+
+        # Bridge torch's bundled CUDA/cuDNN into the process so onnxruntime's CUDA
+        # provider can resolve them when it builds face sessions below. torch is
+        # imported first (via image.imports) and primes the loader; preload_dlls
+        # (onnxruntime >= 1.21) then loads CUDA + cuDNN from site-packages/nvidia/*.
+        import onnxruntime as ort
+        try:
+            ort.preload_dlls(cuda=True, cudnn=True)
+        except Exception as e:  # noqa: BLE001
+            print("[ort] preload_dlls failed (LD_LIBRARY_PATH should still cover it):", e)
+        print(f"[ort] version={ort.__version__} preload={hasattr(ort, 'preload_dlls')} "
+              f"providers={ort.get_available_providers()}")
+
         self.clip, _, self.preprocess = open_clip.create_model_and_transforms(
             "ViT-L-14", pretrained="openai"
         )
@@ -136,11 +135,7 @@ class Pipeline:
         self.head.load_state_dict(torch.hub.load_state_dict_from_url(AESTHETIC_URL, map_location="cpu"))
         self.head.eval()
 
-        # Does this onnxruntime build even have a loadable CUDA provider? If the
-        # CUDA libs aren't found, CUDAExecutionProvider won't appear here at all.
-        import onnxruntime as ort
-        avail = ort.get_available_providers()
-        print("[ort] available providers:", avail)
+        avail = ort.get_available_providers()  # ort imported + preloaded at the top
 
         # Only load detection + recognition — we never use gender/age or the two
         # landmark models, and skipping them removes most of the per-face cost.
@@ -187,7 +182,7 @@ class Pipeline:
                 old = _os.dup(2)
                 _os.dup2(tf.fileno(), 2)
                 try:
-                    ort.set_default_logger_severity(1)  # surface warnings
+                    ort.set_default_logger_severity(0)  # VERBOSE — surface the real dlopen error
                     try:
                         ort.InferenceSession(mf, providers=["CUDAExecutionProvider"])
                     except Exception:  # noqa: BLE001
@@ -198,10 +193,14 @@ class Pipeline:
                 tf.seek(0)
                 captured = tf.read().decode(errors="ignore")
                 tf.close()
-            print("[faces] CUDA EP stderr:\n", captured)
+            print("[faces] CUDA EP stderr (full):\n", captured)
+            # The "cannot open shared object file" line names the real missing lib;
+            # prefer it over the generic "Require cuDNN 9.*" masking message.
+            culprit = next((ln.strip() for ln in captured.splitlines()
+                            if "cannot open shared object" in ln), None)
             keys = ("Failed to load", "cannot open", "cuDNN", "libcud", "libcub", "libnv", ".so", "version")
             lines = [ln.strip() for ln in captured.splitlines() if any(k in ln for k in keys)]
-            msg = (lines[-1] if lines else "no-stderr")[:220]
+            msg = (culprit or (lines[-1] if lines else "no-stderr"))[:220]
             self.faces_provider = f"CPU: {msg}"
 
     def _faces_for(self, pil):
@@ -226,6 +225,8 @@ class Pipeline:
         import onnxruntime as ort
         return {
             "faces_provider": getattr(self, "faces_provider", "?"),
+            "ort_version": ort.__version__,
+            "has_preload_dlls": hasattr(ort, "preload_dlls"),
             "ort_providers": ort.get_available_providers(),
             "gpu_ok": str(getattr(self, "faces_provider", "")).startswith("GPU"),
         }
