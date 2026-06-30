@@ -262,13 +262,45 @@ class Pipeline:
                 "Failed to load", "TryGetProviderInfo", "cannot open",
                 "ONNXRuntimeError", "error:", "FAIL", "provider_bridge"))
         )
+
+        # Live probe: does libcublasLt.so.12 exist, and why won't it load?
+        import ctypes
+        import glob
+        probe = {}
+        try:
+            search = []
+            try:
+                import nvidia
+                probe["nvidia_path"] = list(nvidia.__path__)
+                for base in nvidia.__path__:
+                    probe.setdefault("nvidia_subdirs", [])
+                    probe["nvidia_subdirs"] += [os.path.basename(d) for d in glob.glob(os.path.join(base, "*"))]
+                    search.append(os.path.join(base, "**", "libcublasLt.so*"))
+            except Exception as e:  # noqa: BLE001
+                probe["nvidia_import"] = str(e)
+            import torch as _t
+            search.append(os.path.join(os.path.dirname(_t.__file__), "lib", "libcublasLt.so*"))
+            hits = []
+            for pat in search:
+                hits += glob.glob(pat, recursive=True)
+            probe["cublasLt_files"] = sorted(set(hits))
+            if hits:
+                try:
+                    ctypes.CDLL(sorted(hits)[-1], mode=ctypes.RTLD_GLOBAL)
+                    probe["cublasLt_load"] = "ok"
+                except OSError as e:
+                    probe["cublasLt_load"] = str(e)
+        except Exception as e:  # noqa: BLE001
+            probe["err"] = str(e)
+
         return {
             "faces_provider": getattr(self, "faces_provider", "?"),
             "ort_version": ort.__version__,
             "has_preload_dlls": hasattr(ort, "preload_dlls"),
             "cuda_preload": getattr(self, "cuda_preload", "n/a"),
             "preload_ok": getattr(self, "preload_ok", "n/a"),
-            "cuda_load_error": err[:1500],
+            "cuda_load_error": err[:1200],
+            "probe": probe,
             "ort_providers": ort.get_available_providers(),
             "gpu_ok": str(getattr(self, "faces_provider", "")).startswith("GPU"),
         }
