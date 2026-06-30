@@ -68,6 +68,9 @@ interface GalleryRightSidebarProps {
   onRunCulling?: () => void;
   isCullingRunning?: boolean;
   isCullingStuck?: boolean;
+  /** Culling was opted-in at creation and will auto-start when upload finishes —
+   *  it's queued, not idle, so don't offer an actionable "Run AI Culling". */
+  isCullingQueued?: boolean;
   /** ISO timestamp of when the in-flight culling run started.
    *  Used to render the live X:XX countdown on the running button. */
   cullingStartedAt?: string | null;
@@ -136,6 +139,7 @@ export function GalleryRightSidebar({
   onRunCulling,
   isCullingRunning,
   isCullingStuck,
+  isCullingQueued,
   cullingStartedAt,
   cullingImageCount = 0,
   hasActiveFilters,
@@ -233,9 +237,9 @@ export function GalleryRightSidebar({
                 </Button>
               )}
               {onRunCulling && (
-                <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onRunCulling} disabled={isCullingRunning}>
-                  {isCullingRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkle size={13} className="text-primary" />}
-                  AI Culling
+                <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onRunCulling} disabled={isCullingRunning || isCullingQueued}>
+                  {isCullingRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isCullingQueued ? <Clock className="w-3.5 h-3.5 text-primary" /> : <Sparkle size={13} className="text-primary" />}
+                  {isCullingQueued ? "Culling queued" : "AI Culling"}
                 </Button>
               )}
               {onOpenFaceSearch && (
@@ -277,6 +281,7 @@ export function GalleryRightSidebar({
                 onRunCulling={onRunCulling}
                 isCullingRunning={isCullingRunning}
                 isCullingStuck={isCullingStuck}
+                isCullingQueued={isCullingQueued}
                 cullingCountdown={cullingCountdown}
                 onToggleLikedFilter={onToggleLikedFilter}
               />
@@ -356,6 +361,7 @@ export function GalleryRightSidebar({
                 onRunCulling={onRunCulling}
                 isCullingRunning={isCullingRunning}
                 isCullingStuck={isCullingStuck}
+                isCullingQueued={isCullingQueued}
                 cullingCountdown={cullingCountdown}
                 onToggleLikedFilter={onToggleLikedFilter}
               />
@@ -602,6 +608,7 @@ function UnifiedFilterPanel({
   onRunCulling,
   isCullingRunning,
   isCullingStuck,
+  isCullingQueued,
   cullingCountdown,
   onToggleLikedFilter,
 }: {
@@ -620,6 +627,7 @@ function UnifiedFilterPanel({
   onRunCulling?: () => void;
   isCullingRunning?: boolean;
   isCullingStuck?: boolean;
+  isCullingQueued?: boolean;
   cullingCountdown?: string;
   onToggleLikedFilter?: () => void;
 }) {
@@ -757,7 +765,9 @@ function UnifiedFilterPanel({
               </div>
               <div>
                 <p className="text-xs font-medium text-foreground">AI Culling</p>
-                <p className="text-[10px] text-muted-foreground leading-tight">Auto-rate, categorize & find duplicates</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  {isCullingQueued ? "Queued — starts automatically after upload" : "Auto-rate, categorize & find duplicates"}
+                </p>
               </div>
             </div>
             {onRunCulling && (
@@ -766,17 +776,22 @@ function UnifiedFilterPanel({
                 size="sm"
                 className={cn(
                   "w-full gap-1.5 text-xs h-8 transition-colors",
-                  isCullingRunning && "cursor-not-allowed",
+                  (isCullingRunning || isCullingQueued) && "cursor-not-allowed",
                   isCullingStuck && "bg-rating/10 border-rating/30 text-rating hover:bg-rating/20",
                 )}
                 onClick={onRunCulling}
-                disabled={isCullingRunning}
-                aria-busy={isCullingRunning || undefined}
+                disabled={isCullingRunning || isCullingQueued}
+                aria-busy={isCullingRunning || isCullingQueued || undefined}
               >
                 {isCullingRunning ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     Running… <span className="tabular-nums font-mono">{cullingCountdown ?? ""}</span>
+                  </>
+                ) : isCullingQueued ? (
+                  <>
+                    <Clock className="w-3.5 h-3.5 text-current" />
+                    Culling queued
                   </>
                 ) : isCullingStuck ? (
                   <>
@@ -790,6 +805,11 @@ function UnifiedFilterPanel({
                   </>
                 )}
               </Button>
+            )}
+            {isCullingQueued && (
+              <p className="text-[10px] text-muted-foreground leading-tight text-center">
+                You chose AI Culling when creating this collection — Aura will start the moment your photos finish uploading.
+              </p>
             )}
             <div className="grid grid-cols-3 gap-1.5 pt-1">
               <div className="text-center">
