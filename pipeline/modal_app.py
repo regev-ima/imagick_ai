@@ -41,16 +41,19 @@ def _download_models():
     )
 
 
-# A CUDA+cuDNN base image is what lets onnxruntime-gpu actually use the GPU for
-# face detection/recognition — on debian_slim it silently falls back to slow CPU.
+# The full CUDA toolkit (devel) is what lets onnxruntime-gpu actually use the GPU
+# for face detection/recognition. The slim `runtime` image omits cuFFT/cuRAND/etc.
+# that onnxruntime's CUDA provider needs, so it silently falls back to slow CPU —
+# while we keep paying L4 rates for a GPU doing CPU work. devel ships them all.
+# onnxruntime-gpu is pinned to a build that matches CUDA 12.x + cuDNN 9.
 image = (
     modal.Image.from_registry(
-        "nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04", add_python="3.11"
+        "nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04", add_python="3.11"
     )
     .apt_install("libgl1", "libglib2.0-0")
     .pip_install(
         "fastapi[standard]", "torch", "open_clip_torch", "insightface",
-        "onnxruntime-gpu", "pillow", "numpy", "requests",
+        "onnxruntime-gpu==1.20.1", "pillow", "numpy", "requests",
     )
     .run_function(_download_models)  # bake CLIP + aesthetic + ArcFace weights in
 )
@@ -108,9 +111,14 @@ class Pipeline:
         )
         self.faces.prepare(ctx_id=0, det_size=(640, 640))
         # Confirm the face models actually landed on the GPU (CPU fallback is the
-        # #1 cost trap here) — visible in the Modal logs.
+        # #1 cost trap here). Surface it in the response so we can verify without
+        # digging through Modal logs.
+        provs = set()
         for mod_name, model in self.faces.models.items():
-            print(f"[faces] {mod_name} -> {model.session.get_providers()[0]}")
+            p = model.session.get_providers()[0]
+            provs.add(p)
+            print(f"[faces] {mod_name} -> {p}")
+        self.faces_provider = "GPU" if any("CUDA" in p for p in provs) else "CPU"
 
     def _faces_for(self, pil):
         bgr = np.array(pil)[:, :, ::-1]
@@ -190,5 +198,8 @@ class Pipeline:
 
         return {
             "results": results,
-            "timing": {"download_ms": download_ms, "clip_ms": clip_ms, "faces_ms": faces_ms, "count": len(valid)},
+            "timing": {
+                "download_ms": download_ms, "clip_ms": clip_ms, "faces_ms": faces_ms,
+                "count": len(valid), "faces_provider": getattr(self, "faces_provider", "?"),
+            },
         }

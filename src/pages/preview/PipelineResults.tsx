@@ -22,7 +22,7 @@ interface Feature { image_id: string; aesthetic: number | null; visual_cluster: 
 interface FaceDet { image_id: string; cluster_id: string | null }
 type Bbox = { x: number; y: number; width: number; height: number };
 interface FaceCluster { id: string; face_count: number; representative_image_id: string | null; representative_bbox: Bbox | null }
-interface Timing { download_ms?: number; clip_ms?: number; faces_ms?: number; wall_ms?: number; images?: number }
+interface Timing { download_ms?: number; clip_ms?: number; faces_ms?: number; wall_ms?: number; images?: number; faces_provider?: string | null }
 
 export default function PipelineResults() {
   const [galleryId, setGalleryId] = useState<string>("");
@@ -218,7 +218,11 @@ export default function PipelineResults() {
                 <span>⏱ זמני עיבוד ({results.data.timing.images ?? 0} תמונות):</span>
                 <span>הורדה <b className="text-foreground">{((results.data.timing.download_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
                 <span>CLIP+ציון <b className="text-foreground">{((results.data.timing.clip_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
-                <span>פרצופים <b className="text-foreground">{((results.data.timing.faces_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
+                <span>פרצופים <b className="text-foreground">{((results.data.timing.faces_ms ?? 0) / 1000).toFixed(1)}ש׳</b>
+                  {results.data.timing.faces_provider && (
+                    <b className={results.data.timing.faces_provider === "GPU" ? "text-green-500" : "text-red-500"}> ({results.data.timing.faces_provider})</b>
+                  )}
+                </span>
                 <span>סה״כ <b className="text-foreground">{((results.data.timing.wall_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
               </div>
             )}

@@ -148,6 +148,7 @@ serve(async (req: Request) => {
     };
 
     const timing = { download_ms: 0, clip_ms: 0, faces_ms: 0, count: 0 };
+    let facesProvider: string | null = null; // "GPU" / "CPU" — surfaced in the UI
     let cursor = 0;
     const worker = async () => {
       while (cursor < batches.length) {
@@ -173,6 +174,7 @@ serve(async (req: Request) => {
             timing.clip_ms += tm.clip_ms || 0;
             timing.faces_ms += tm.faces_ms || 0;
             timing.count += tm.count || 0;
+            if (tm.faces_provider) facesProvider = tm.faces_provider;
           }
           for (const r of (data.results || []) as ModalResult[]) await storeResult(r);
         } catch (err) {
@@ -193,6 +195,7 @@ serve(async (req: Request) => {
         faces_ms: (prev.faces_ms || 0) + timing.faces_ms,
         wall_ms: (prev.wall_ms || 0) + wallMs,
         images: (prev.images || 0) + timing.count,
+        faces_provider: facesProvider ?? (prev as Record<string, unknown>).faces_provider ?? null,
       },
     }).eq("id", galleryId);
 
