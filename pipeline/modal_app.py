@@ -277,14 +277,25 @@ class Pipeline:
         return per_img
 
     @modal.fastapi_endpoint(method="GET")
-    def health(self):
+    def health(self, url: str = ""):
         """Cheap status check — open in a browser to see if faces run on the GPU.
 
         Spins up one container (a fraction of a cent) and reports the provider
         WITHOUT processing any gallery, so you can confirm "GPU" before paying to
-        run a full run.
+        run a full run. Pass ?url=<image-url> to also report that image's pixel
+        dimensions (to check the resolution faces are actually detected on).
         """
         import onnxruntime as ort
+
+        sample = {}
+        if url:
+            try:
+                r = requests.get(url, timeout=30)
+                r.raise_for_status()
+                im = PILImage.open(io.BytesIO(r.content))
+                sample = {"url": url, "dims": list(im.size), "bytes": len(r.content)}
+            except Exception as e:  # noqa: BLE001
+                sample = {"url": url, "error": str(e)}
         dbg = getattr(self, "faces_debug", "")
         # Keep only the error-relevant lines (drop the BFCArena INFO spam) so the
         # actual "Failed to load ... with error: <lib>" line is visible.
@@ -333,6 +344,7 @@ class Pipeline:
             "preload_ok": getattr(self, "preload_ok", "n/a"),
             "cuda_load_error": err[:1200],
             "probe": probe,
+            "sample": sample,
             "ort_providers": ort.get_available_providers(),
             "gpu_ok": str(getattr(self, "faces_provider", "")).startswith("GPU"),
         }
