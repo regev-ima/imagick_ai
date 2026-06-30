@@ -63,6 +63,7 @@ export default function AestheticScoreDemo() {
   const [faceProgress, setFaceProgress] = useState<{ done: number; total: number; faces: number } | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [faceError, setFaceError] = useState("");
+  const [faceThreshold, setFaceThreshold] = useState(0.55);
 
   useEffect(() => {
     fetchVisionModels()
@@ -156,6 +157,7 @@ export default function AestheticScoreDemo() {
       const { people: ppl } = await groupFaces(
         images.map((img) => ({ url: img.url, name: img.name })),
         {
+          threshold: faceThreshold,
           onStatus: setFaceStatus,
           onProgress: (done, total, faces) => setFaceProgress({ done, total, faces }),
         },
@@ -168,7 +170,7 @@ export default function AestheticScoreDemo() {
     } finally {
       setFaceBusy(false);
     }
-  }, [images]);
+  }, [images, faceThreshold]);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) =>
     run(Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/")));
@@ -370,6 +372,15 @@ export default function AestheticScoreDemo() {
                 {faceBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 זהה וקבץ פרצופים
               </button>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground" title="נמוך = מפריד יותר (מדויק), גבוה = מאחד יותר">
+                סף זהות
+                <input
+                  type="range" min={0.4} max={0.7} step={0.01} value={faceThreshold}
+                  disabled={faceBusy}
+                  onChange={(e) => setFaceThreshold(parseFloat(e.target.value))}
+                />
+                <span className="tabular-nums text-foreground">{faceThreshold.toFixed(2)}</span>
+              </label>
               {faceBusy && (
                 <span className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

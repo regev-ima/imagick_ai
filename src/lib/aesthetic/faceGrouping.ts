@@ -1,34 +1,42 @@
 /**
  * In-browser face detection + grouping — proof of concept.
  *
- * Detects every face, computes a 128-d face descriptor, and clusters faces by
- * identity (same person → same group). Runs fully client-side via face-api.js
- * loaded from a CDN (kept out of our bundle). Works on locally-uploaded images,
- * so there's no CORS and no Azure dependency — the two things that broke the
- * old pipeline.
+ * Detects faces, computes a 128-d identity descriptor (face-api.js from a CDN,
+ * kept out of our bundle), and clusters faces by identity. Runs on locally
+ * uploaded images — no CORS, no Azure (the two things that broke the old
+ * pipeline).
  *
- * Same embedding→cluster idea as the image/aesthetic pipeline, but the vector
- * describes a face's identity instead of the whole image. Production swaps the
- * browser model for a stronger one (InsightFace/ArcFace on Replicate).
+ * Accuracy work, since a browser model is weaker than ArcFace:
+ *  - drop junk faces (too small / low confidence) so they don't pollute clusters
+ *  - score each face's quality (confidence × size × sharpness) and seed clusters
+ *    with the best faces first
+ *  - cluster against a running CENTROID (not the first face) → fewer splits
+ *  - a merge pass joins clusters of the same person that drifted apart
+ *  - the representative thumbnail is the SHARPEST/best face, never a soft one
+ *
+ * Production swaps the browser model for InsightFace/ArcFace on Replicate.
  */
 
 const FACEAPI_CDN = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.esm.js";
 const MODELS_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model";
-// Euclidean distance below which two face descriptors are the same person.
-const MATCH_THRESHOLD = 0.55;
+
+const MIN_FACE_PX = 44;      // ignore faces smaller than this (unreliable descriptors)
+const MIN_CONFIDENCE = 0.45; // ignore low-confidence detections
+const DEFAULT_THRESHOLD = 0.55;
 
 export interface DetectedFace {
   imageUrl: string;
   imageName: string;
-  crop: string;          // data URL of the cropped face thumbnail
-  descriptor: number[];  // 128-d identity vector
-  person: number;        // cluster id (assigned after grouping)
+  crop: string;
+  descriptor: number[];
+  quality: number; // higher = sharper / bigger / more confident
+  person: number;
 }
 
 export interface Person {
   id: number;
-  faces: DetectedFace[];
-  images: string[];      // unique image URLs this person appears in
+  faces: DetectedFace[]; // sorted best-quality first
+  images: string[];      // unique image URLs, best first
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,33 +67,58 @@ function loadImageEl(url: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Variance of the Laplacian over a grayscale crop — a standard sharpness/blur metric. */
+function sharpness(gray: Float32Array, size: number): number {
+  let mean = 0;
+  let count = 0;
+  const lap: number[] = [];
+  for (let y = 1; y < size - 1; y++) {
+    for (let x = 1; x < size - 1; x++) {
+      const i = y * size + x;
+      const v = -4 * gray[i] + gray[i - 1] + gray[i + 1] + gray[i - size] + gray[i + size];
+      lap.push(v); mean += v; count++;
+    }
+  }
+  mean /= count || 1;
+  let varr = 0;
+  for (const v of lap) varr += (v - mean) * (v - mean);
+  return varr / (count || 1);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function cropFace(img: HTMLImageElement, box: any): string {
+function cropAndQuality(img: HTMLImageElement, box: any, score: number): { crop: string; quality: number } {
   const pad = 0.3;
   const x = Math.max(0, box.x - box.width * pad);
   const y = Math.max(0, box.y - box.height * pad);
   const w = Math.min(img.naturalWidth - x, box.width * (1 + 2 * pad));
   const h = Math.min(img.naturalHeight - y, box.height * (1 + 2 * pad));
-  const size = 96;
+  const size = 112;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
+  if (!ctx) return { crop: "", quality: 0 };
   ctx.drawImage(img, x, y, w, h, 0, 0, size, size);
-  return canvas.toDataURL("image/jpeg", 0.8);
+
+  const { data } = ctx.getImageData(0, 0, size, size);
+  const gray = new Float32Array(size * size);
+  for (let i = 0; i < size * size; i++) {
+    gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+  }
+  const sharp = sharpness(gray, size);
+  // Combine: bigger + sharper + more confident = better representative.
+  const quality = score * Math.sqrt(box.width * box.height) * Math.pow(sharp + 1, 0.25);
+  return { crop: canvas.toDataURL("image/jpeg", 0.85), quality };
 }
 
 function euclidean(a: number[], b: number[]): number {
   let s = 0;
-  for (let i = 0; i < a.length; i++) {
-    const d = a[i] - b[i];
-    s += d * d;
-  }
+  for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; s += d * d; }
   return Math.sqrt(s);
 }
 
 export interface GroupFacesOptions {
+  threshold?: number;
   onStatus?: (s: string) => void;
   onProgress?: (doneImages: number, totalImages: number, faces: number) => void;
 }
@@ -94,8 +127,9 @@ export async function groupFaces(
   items: { url: string; name: string }[],
   opts: GroupFacesOptions = {},
 ): Promise<{ people: Person[]; faces: DetectedFace[]; imagesWithFaces: number }> {
+  const threshold = opts.threshold ?? DEFAULT_THRESHOLD;
   const faceapi = await loadFaceApi(opts.onStatus);
-  const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+  const detOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: MIN_CONFIDENCE });
 
   const faces: DetectedFace[] = [];
   let imagesWithFaces = 0;
@@ -103,51 +137,81 @@ export async function groupFaces(
   for (let i = 0; i < items.length; i++) {
     try {
       const img = await loadImageEl(items[i].url);
-      const dets = await faceapi
-        .detectAllFaces(img, options)
-        .withFaceLandmarks()
-        .withFaceDescriptors();
-      if (dets.length) imagesWithFaces++;
+      const dets = await faceapi.detectAllFaces(img, detOptions).withFaceLandmarks().withFaceDescriptors();
+      let kept = 0;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const det of dets as any[]) {
+        const box = det.detection.box;
+        const score = det.detection.score ?? 1;
+        if (box.width < MIN_FACE_PX || box.height < MIN_FACE_PX) continue; // skip tiny faces
+        const { crop, quality } = cropAndQuality(img, box, score);
         faces.push({
           imageUrl: items[i].url,
           imageName: items[i].name,
-          crop: cropFace(img, det.detection.box),
+          crop,
           descriptor: Array.from(det.descriptor as Float32Array),
+          quality,
           person: -1,
         });
+        kept++;
       }
+      if (kept) imagesWithFaces++;
     } catch (e) {
       console.warn("face detect failed for", items[i].name, e);
     }
     opts.onProgress?.(i + 1, items.length, faces.length);
   }
 
-  // Greedy clustering by identity (nearest representative under the threshold).
-  const reps: DetectedFace[] = [];
-  for (const face of faces) {
+  // Seed clusters with the best faces first, and match against the running
+  // centroid (mean descriptor) — far more stable than matching the first face.
+  const ordered = [...faces].sort((a, b) => b.quality - a.quality);
+  const clusters: { sum: number[]; count: number; faces: DetectedFace[] }[] = [];
+  const centroid = (c: { sum: number[]; count: number }) => c.sum.map((v) => v / c.count);
+  for (const face of ordered) {
     let best = -1;
-    let bestD = MATCH_THRESHOLD;
-    for (let c = 0; c < reps.length; c++) {
-      const d = euclidean(face.descriptor, reps[c].descriptor);
+    let bestD = threshold;
+    for (let c = 0; c < clusters.length; c++) {
+      const d = euclidean(face.descriptor, centroid(clusters[c]));
       if (d < bestD) { bestD = d; best = c; }
     }
-    if (best === -1) { reps.push(face); face.person = reps.length - 1; }
-    else face.person = best;
+    if (best === -1) {
+      clusters.push({ sum: [...face.descriptor], count: 1, faces: [face] });
+    } else {
+      const c = clusters[best];
+      for (let i = 0; i < c.sum.length; i++) c.sum[i] += face.descriptor[i];
+      c.count++;
+      c.faces.push(face);
+    }
   }
 
-  // Build people, each with the unique images they appear in.
-  const byPerson = new Map<number, DetectedFace[]>();
-  for (const f of faces) {
-    const arr = byPerson.get(f.person) ?? [];
-    arr.push(f);
-    byPerson.set(f.person, arr);
+  // Merge pass: join clusters whose centroids are close (same person, drifted).
+  let merged = true;
+  while (merged) {
+    merged = false;
+    for (let a = 0; a < clusters.length && !merged; a++) {
+      for (let b = a + 1; b < clusters.length; b++) {
+        if (euclidean(centroid(clusters[a]), centroid(clusters[b])) < threshold * 0.95) {
+          for (let i = 0; i < clusters[a].sum.length; i++) clusters[a].sum[i] += clusters[b].sum[i];
+          clusters[a].count += clusters[b].count;
+          clusters[a].faces.push(...clusters[b].faces);
+          clusters.splice(b, 1);
+          merged = true;
+          break;
+        }
+      }
+    }
   }
-  const people: Person[] = [...byPerson.entries()]
-    .map(([id, fs]) => ({ id, faces: fs, images: [...new Set(fs.map((f) => f.imageUrl))] }))
+
+  const people: Person[] = clusters
+    .map((c) => {
+      const sorted = c.faces.sort((x, y) => y.quality - x.quality);
+      const images: string[] = [];
+      for (const f of sorted) if (!images.includes(f.imageUrl)) images.push(f.imageUrl);
+      return { id: 0, faces: sorted, images };
+    })
     .sort((a, b) => b.images.length - a.images.length)
-    .map((p, i) => ({ ...p, id: i })); // renumber by size (person 0 = most photos)
+    .map((p, i) => ({ ...p, id: i }));
 
+  for (const p of people) for (const f of p.faces) f.person = p.id;
   return { people, faces, imagesWithFaces };
 }
