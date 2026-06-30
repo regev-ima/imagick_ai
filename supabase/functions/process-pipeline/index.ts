@@ -13,7 +13,7 @@ declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
 const IMAGES_PER_INVOCATION = 100; // keep each invocation under the runtime limit
 const MODAL_BATCH = 12;            // images per Modal HTTP call
-const MODAL_CONCURRENCY = 4;       // Modal calls in flight at once (→ parallel containers)
+const MODAL_CONCURRENCY = 3;       // Modal calls in flight at once (matches max_containers)
 const TIME_BUDGET_MS = 110_000;
 
 // B2 originals have a small compressed `.webp` sibling (matches src/lib/imageUrls.ts) —
@@ -69,7 +69,7 @@ serve(async (req: Request) => {
     const token = authHeader.replace("Bearer ", "");
 
     const body = await req.json();
-    const { galleryId } = body as { galleryId: string; userId?: string };
+    const { galleryId, stall = 0 } = body as { galleryId: string; userId?: string; stall?: number };
     if (!galleryId) return json({ error: "Missing galleryId" }, 400);
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
@@ -207,10 +207,22 @@ serve(async (req: Request) => {
     const remaining = (totalCount ?? 0) - (doneRows2 || []).length;
 
     if (remaining > 0) {
+      // Runaway guard: if an invocation makes zero progress (e.g. Modal has no
+      // compute, every image errors), count it as a stall. After 3 consecutive
+      // stalls, stop chaining and mark an error instead of looping forever and
+      // burning invocations/credits.
+      const nextStall = processed > 0 ? 0 : stall + 1;
+      if (nextStall >= 3) {
+        await admin.from("galleries").update({
+          pipeline_status: "error",
+          pipeline_error: "עיבוד נעצר: לא הייתה התקדמות אחרי 3 ניסיונות (ייתכן ש-Modal ללא משאבי GPU פנויים).",
+        }).eq("id", galleryId);
+        return json({ error: "stalled", remaining }, 200);
+      }
       const chain = fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-        body: JSON.stringify({ galleryId }),
+        body: JSON.stringify({ galleryId, stall: nextStall }),
       }).catch((e) => console.error("self-chain failed", e));
       EdgeRuntime.waitUntil(chain);
       return json({ success: true, processed, remaining, chained: true });

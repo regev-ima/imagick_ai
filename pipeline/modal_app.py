@@ -41,20 +41,25 @@ def _download_models():
     )
 
 
-# The full CUDA toolkit (devel) is what lets onnxruntime-gpu actually use the GPU
-# for face detection/recognition. The slim `runtime` image omits cuFFT/cuRAND/etc.
-# that onnxruntime's CUDA provider needs, so it silently falls back to slow CPU —
-# while we keep paying L4 rates for a GPU doing CPU work. devel ships them all.
-# onnxruntime-gpu is pinned to a build that matches CUDA 12.x + cuDNN 9.
+# Keep the image SMALL so cold starts on a scale-to-zero GPU are fast and cheap.
+# A full CUDA devel image works but is several GB — every cold start then has to
+# pull all of it, which is slow, costly, and can even trip "not enough compute
+# resources". Instead we lean on the CUDA libraries that `torch` already bundles
+# and point LD_LIBRARY_PATH at them, so onnxruntime-gpu runs face detection on the
+# GPU instead of silently falling back to CPU. onnxruntime-gpu is pinned to a
+# build matching CUDA 12.x + cuDNN 9 (which current torch ships).
+NVIDIA_LIB_PATH = ":".join(
+    f"/usr/local/lib/python3.11/site-packages/nvidia/{pkg}/lib"
+    for pkg in ("cudnn", "cublas", "cuda_runtime", "cufft", "curand", "cuda_nvrtc", "nvjitlink")
+)
 image = (
-    modal.Image.from_registry(
-        "nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04", add_python="3.11"
-    )
+    modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1", "libglib2.0-0")
     .pip_install(
         "fastapi[standard]", "torch", "open_clip_torch", "insightface",
         "onnxruntime-gpu==1.20.1", "pillow", "numpy", "requests",
     )
+    .env({"LD_LIBRARY_PATH": NVIDIA_LIB_PATH})
     .run_function(_download_models)  # bake CLIP + aesthetic + ArcFace weights in
 )
 
@@ -73,8 +78,10 @@ with image.imports():
     gpu="L4",
     image=image,
     secrets=[modal.Secret.from_name("imagick-pipeline-secret")],
-    min_containers=0,
-    max_containers=10,   # let bursts fan out across containers
+    min_containers=0,        # scale to zero → $0 when idle
+    max_containers=3,        # cap parallel GPU burn (cost + capacity safety)
+    timeout=300,             # hard ceiling per request — nothing runs unbounded
+    scaledown_window=60,     # release the GPU ~1 min after the last call
 )
 class Pipeline:
     @modal.enter()
