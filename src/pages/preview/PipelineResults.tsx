@@ -136,8 +136,27 @@ export default function PipelineResults() {
   const status = results.data?.status;
   const thumb = (id: string) => { const im = imById.get(id); return im ? getThumbnailUrl(im.original_url) : ""; };
   const preview = (id: string) => { const im = imById.get(id); return im ? getPreviewUrl(im.original_url) : ""; };
-  // LAION aesthetic is ~0–10; show it as 0–5 stars (each star = 2 LAION points).
-  const score = (a: number | null) => (a == null ? "—" : Math.min(5, Math.max(0, a / 2)).toFixed(1));
+  // The LAION aesthetic score is only meaningful as a *relative* ranking — its
+  // absolute values cluster around 5–6/10 even for great professional photos, so
+  // showing them raw (÷2) looks insultingly low to a photographer. Calibrate to
+  // stars *within this gallery*: the best shots reach ~5★ and even the weakest
+  // stay respectable. Anchored on the 5th–95th percentiles so one outlier (a
+  // blurry test frame, a screenshot) can't drag the whole scale.
+  const score = useMemo(() => {
+    const FLOOR = 3.6, TOP = 5.0;
+    const vals = (results.data?.features ?? [])
+      .map((f) => f.aesthetic)
+      .filter((a): a is number => a != null)
+      .sort((a, b) => a - b);
+    if (vals.length < 5) return (a: number | null) => (a == null ? "—" : "4.5");
+    const pct = (p: number) => vals[Math.max(0, Math.min(vals.length - 1, Math.round((p / 100) * (vals.length - 1))))];
+    const lo = pct(5), hi = pct(95), span = hi - lo || 1;
+    return (a: number | null) => {
+      if (a == null) return "—";
+      const t = Math.min(1, Math.max(0, (a - lo) / span));
+      return (FLOOR + t * (TOP - FLOOR)).toFixed(1);
+    };
+  }, [results.data]);
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
