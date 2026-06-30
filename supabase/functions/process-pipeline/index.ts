@@ -16,16 +16,22 @@ const MODAL_BATCH = 12;            // images per Modal HTTP call
 const MODAL_CONCURRENCY = 4;       // Modal calls in flight at once (→ parallel containers)
 const TIME_BUDGET_MS = 110_000;
 
-// B2 originals have a smaller compressed JPEG sibling — cheaper + faster to process.
-function toCompressedJpegUrl(originalUrl: string): string {
+// B2 originals have a small compressed `.webp` sibling (matches src/lib/imageUrls.ts) —
+// cheaper bandwidth + faster downloads, still big enough for accurate face embeddings.
+// (The thumbnail variant is even smaller but too low-res for reliable ArcFace.)
+function toPreviewUrl(originalUrl: string): string {
   try {
+    if (originalUrl.includes("/compressed/") && originalUrl.includes("_reduced")) return originalUrl;
     const lastSlash = originalUrl.lastIndexOf("/");
     if (lastSlash === -1) return originalUrl;
-    const base = originalUrl.substring(0, lastSlash);
+    let base = originalUrl.substring(0, lastSlash);
     const full = originalUrl.substring(lastSlash + 1);
     const dot = full.lastIndexOf(".");
-    const name = dot > 0 ? full.substring(0, dot) : full;
-    return `${base}/compressed/${name}_reduced.jpeg`;
+    let name = dot > 0 ? full.substring(0, dot) : full;
+    // Strip any already-derived markers so we point at the canonical preview.
+    base = base.replace(/\/(thumbnail|compressed)$/, "");
+    name = name.replace(/_reduced_thumbnail$/, "").replace(/_reduced$/, "");
+    return `${base}/compressed/${name}_reduced.webp`;
   } catch {
     return originalUrl;
   }
@@ -153,7 +159,11 @@ serve(async (req: Request) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               token: modalToken,
-              images: batch.map((img) => ({ id: img.id, url: toCompressedJpegUrl(img.original_url) })),
+              images: batch.map((img) => ({
+                id: img.id,
+                url: toPreviewUrl(img.original_url),
+                fallback: img.original_url, // if the preview is missing, use the original
+              })),
             }),
           });
           const data = await res.json();

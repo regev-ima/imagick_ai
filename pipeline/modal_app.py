@@ -122,13 +122,21 @@ class Pipeline:
         results = []
 
         # 1) Download all images in the batch in parallel (network-bound).
+        # Try the small preview first, then fall back to the original if it's missing.
         def dl(it):
-            try:
-                r = requests.get(it["url"], timeout=30)
-                r.raise_for_status()
-                return it["id"], PILImage.open(io.BytesIO(r.content)).convert("RGB")
-            except Exception as exc:  # noqa: BLE001
-                return it["id"], exc
+            urls = [it["url"]]
+            fb = it.get("fallback")
+            if fb and fb != it["url"]:
+                urls.append(fb)
+            last_exc = None
+            for url in urls:
+                try:
+                    r = requests.get(url, timeout=30)
+                    r.raise_for_status()
+                    return it["id"], PILImage.open(io.BytesIO(r.content)).convert("RGB")
+                except Exception as exc:  # noqa: BLE001
+                    last_exc = exc
+            return it["id"], last_exc
 
         t0 = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
