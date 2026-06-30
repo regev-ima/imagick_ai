@@ -34,26 +34,21 @@ AESTHETIC_URL = (
 #   USER_TAGS    — the domain/test list; this is what the *user's* tag list replaces.
 #   GENERAL_TAGS — our own general-purpose suggestions, kept separate so they can be
 #                  reused elsewhere. Both are combined for scoring (ALL_TAGS).
-# (Currently USER_TAGS holds a wedding test set until the real list is provided.)
+# The product's photo-style labels (from the in-app "What should I look for?" picker).
+# General photography descriptors — framing, lighting, and style — not domain-specific.
 USER_TAGS = [
-    ("חופה", "a wedding chuppah ceremony under a canopy"),
-    ("טבעות", "exchanging wedding rings, close up of hands"),
-    ("ריקודים", "people dancing and celebrating at a party"),
-    ("זוג", "a bride and groom couple together"),
-    ("כלה", "a bride wearing a white wedding dress"),
-    ("חתן", "a groom wearing a suit at a wedding"),
-    ("קבוצה", "a large group of people posing together"),
-    ("משפחה", "a family portrait of several people"),
-    ("ילדים", "children at a celebration"),
-    ("פורטרט", "a close up portrait of one person's face"),
-    ("צילום חוץ", "an outdoor photo in a garden with greenery"),
-    ("צילום פנים", "an indoor photo in a hall"),
-    ("שולחן ערוך", "a decorated dining table setting with flowers"),
-    ("זר פרחים", "a bouquet of flowers"),
-    ("נאום", "a person giving a speech holding a microphone"),
-    ("קבלת פנים", "a wedding reception with seated guests"),
-    ("בכי / רגש", "an emotional moment, a person crying with joy"),
-    ("חיבוק", "two people hugging warmly"),
+    ("תקריב פנים", "a close-up portrait of a person's face filling the frame"),
+    ("גוף מלא", "a full length photo of a person from head to toe"),
+    ("קלוז-אפ", "an extreme close-up shot of a small detail or object"),
+    ("פרופיל", "a side profile of a person's face looking sideways"),
+    ("סביבתי", "an environmental portrait showing the person within their surroundings"),
+    ("סטודיו", "a studio portrait against a plain seamless backdrop"),
+    ("אור טבעי", "a portrait lit by soft natural daylight"),
+    ("שחור-לבן", "a black and white monochrome photograph"),
+    ("הבעה", "a person showing a strong emotional facial expression"),
+    ("מונחה", "a posed portrait with the subject looking at the camera"),
+    ("ספונטני", "a candid unposed moment captured spontaneously"),
+    ("יצירתי", "a creative artistic photograph with dramatic unusual composition"),
 ]
 
 # Our own general-purpose tags (separate from the user's list — reusable anywhere).
@@ -72,7 +67,9 @@ GENERAL_TAGS = [
     ("ספורט", "people playing sports"),
 ]
 
-# Combined vocabulary used for scoring (labels are de-duplicated, user list wins).
+# Vocabulary used for scoring. Only the USER list is active; GENERAL_TAGS stays
+# defined but separate (reserved for elsewhere), per the product decision. To also
+# score the general ones, change this to _dedup_tags(USER_TAGS, GENERAL_TAGS).
 def _dedup_tags(*lists):
     seen, out = set(), []
     for lst in lists:
@@ -83,7 +80,7 @@ def _dedup_tags(*lists):
     return out
 
 
-ALL_TAGS = _dedup_tags(USER_TAGS, GENERAL_TAGS)
+ALL_TAGS = _dedup_tags(USER_TAGS)
 
 
 def _download_models():
