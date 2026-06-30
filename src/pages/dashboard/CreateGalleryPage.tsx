@@ -14,6 +14,7 @@ import {
   Loader2,
   MapPin,
   Mountain,
+  Palette,
   PartyPopper,
   Pencil,
   Plus,
@@ -619,53 +620,58 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
   }
   const atMax = selectedIds.length >= max;
   const hosting = chosen && selectedIds.length === 0;
+  const rowCls = (on: boolean, locked = false) =>
+    cn(
+      "flex w-full items-center gap-3 rounded-[--radius] border p-2.5 text-left transition-colors",
+      on ? "border-primary bg-primary/10 ring-1 ring-inset ring-primary" : "border-border hover:border-primary/40 hover:bg-surface-2/40",
+      locked && "cursor-not-allowed opacity-45 hover:border-border hover:bg-transparent",
+    );
   return (
-    <div className="grid max-h-[330px] gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
-      <button
-        type="button"
-        onClick={onHosting}
-        className={cn(
-          "relative rounded-[--radius] border p-3 text-left transition-colors",
-          hosting ? "border-primary bg-primary/10 ring-2 ring-inset ring-primary" : "border-border hover:border-primary/40",
-        )}
-      >
-        {hosting && <span className="absolute right-2 top-2 grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" strokeWidth={3} /></span>}
-        <div className="mb-2 grid h-10 w-full place-items-center rounded-md bg-surface-2 text-muted-foreground"><Ban className="h-4 w-4" /></div>
-        <div className="text-sm font-semibold">No editing</div>
-        <div className="caption mt-0.5">Host as-is · 0 edits</div>
+    <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
+      {/* No editing — host & share as-is */}
+      <button type="button" onClick={onHosting} className={rowCls(hosting)}>
+        <span className="plate-keyline grid h-12 w-12 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground"><Ban className="h-5 w-5" strokeWidth={1.5} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">No editing</span>
+          <span className="caption block">Host &amp; share as-is · 0 edits</span>
+        </span>
+        <SelectMark on={hosting} />
       </button>
       {styles.map((s, i) => {
         const cover = s.thumbnail_url || s.after_image_urls?.[0];
         const on = selectedIds.includes(s.id);
         const locked = atMax && !on;
         const yours = ownerId != null && s.user_id === ownerId && s.user_id != null;
+        const meta = yours ? "Your look" : s.is_preset ? "Preset" : (s.category || "Public look");
         return (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => onToggle(s.id)}
-            disabled={locked}
-            className={cn(
-              "relative rounded-[--radius] border p-3 text-left transition-colors",
-              on ? "border-primary bg-primary/10 ring-2 ring-inset ring-primary" : "border-border hover:border-primary/40",
-              locked && "cursor-not-allowed opacity-45 hover:border-border",
-            )}
-          >
-            {on && <span className="absolute right-2 top-2 z-10 grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" strokeWidth={3} /></span>}
+          <button key={s.id} type="button" onClick={() => onToggle(s.id)} disabled={locked} className={rowCls(on, locked)}>
             {cover ? (
-              <img src={getThumbnailUrl(cover)} alt="" className="plate-keyline mb-2 h-10 w-full rounded-md object-cover" />
+              <img src={getThumbnailUrl(cover)} alt="" className="plate-keyline h-12 w-12 shrink-0 rounded-md object-cover" />
             ) : (
-              <div className="plate-keyline mb-2 h-10 w-full rounded-md bg-[image:var(--gradient-primary)]" />
+              <span className="plate-keyline grid h-12 w-12 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground/70"><Palette className="h-5 w-5" strokeWidth={1.5} /></span>
             )}
-            <div className="flex items-center gap-1.5 text-sm font-semibold">
-              <span className="truncate">{s.name}</span>
-              {i === 0 && !on && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[9px] font-semibold uppercase text-primary">Pick</span>}
-            </div>
-            <div className="caption mt-0.5 truncate">{yours ? "Your look" : (s.is_preset ? "Preset" : s.category || "Public")}</div>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-semibold">{s.name}</span>
+                {i === 0 && !on && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">Pick</span>}
+              </span>
+              <span className="caption mt-0.5 block truncate">{meta}</span>
+            </span>
+            <SelectMark on={on} />
           </button>
         );
       })}
     </div>
+  );
+}
+
+// Selection indicator for a look row — filled check when chosen, empty ring
+// otherwise (signals each row is independently selectable).
+function SelectMark({ on }: { on: boolean }) {
+  return on ? (
+    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" strokeWidth={3} /></span>
+  ) : (
+    <span className="h-5 w-5 shrink-0 rounded-full border border-muted-foreground/40" aria-hidden />
   );
 }
 
