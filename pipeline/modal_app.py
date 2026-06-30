@@ -228,12 +228,21 @@ class Pipeline:
         run a full run.
         """
         import onnxruntime as ort
+        dbg = getattr(self, "faces_debug", "")
+        # Keep only the error-relevant lines (drop the BFCArena INFO spam) so the
+        # actual "Failed to load ... with error: <lib>" line is visible.
+        err = "\n".join(
+            ln for ln in dbg.splitlines()
+            if any(k in ln for k in (
+                "Failed to load", "TryGetProviderInfo", "cannot open",
+                "ONNXRuntimeError", "error:", "FAIL", "provider_bridge"))
+        )
         return {
             "faces_provider": getattr(self, "faces_provider", "?"),
             "ort_version": ort.__version__,
             "has_preload_dlls": hasattr(ort, "preload_dlls"),
             "preload_ok": getattr(self, "preload_ok", "n/a"),
-            "cuda_load_error": getattr(self, "faces_debug", "")[-1200:],  # full, untruncated
+            "cuda_load_error": err[:1500],
             "ort_providers": ort.get_available_providers(),
             "gpu_ok": str(getattr(self, "faces_provider", "")).startswith("GPU"),
         }
