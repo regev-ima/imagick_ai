@@ -237,16 +237,44 @@ class Pipeline:
             msg = (culprit or (lines[-1] if lines else "no-stderr"))[:220]
             self.faces_provider = f"CPU: {msg}"
 
-    def _faces_for(self, pil):
-        bgr = np.array(pil)[:, :, ::-1]
-        return [
-            {
-                "bbox": [float(v) for v in f.bbox.tolist()],
-                "det_score": float(f.det_score),
-                "embedding": [float(v) for v in f.normed_embedding.tolist()],
-            }
-            for f in self.faces.get(bgr)
-        ]
+    def _faces_batched(self, pils):
+        """Detect per image, then run ALL face recognitions across the whole batch
+        in ONE GPU forward (instead of insightface's per-face calls). Uses
+        insightface's own detector + alignment + recognition get_feat, so the
+        embeddings are identical to the per-image path — just far fewer GPU launches,
+        which is the big win on group photos with many faces.
+        """
+        from insightface.utils import face_align
+
+        det = self.faces.models["detection"]
+        rec = self.faces.models["recognition"]
+        rec_size = rec.input_size[0] if getattr(rec, "input_size", None) else 112
+
+        per_img = [[] for _ in pils]
+        crops, owners, metas = [], [], []
+        for i, pil in enumerate(pils):
+            bgr = np.array(pil)[:, :, ::-1]
+            bboxes, kpss = det.detect(bgr, max_num=0, metric="default")
+            if bboxes is None or len(bboxes) == 0:
+                continue
+            for j in range(bboxes.shape[0]):
+                crops.append(face_align.norm_crop(bgr, kpss[j], image_size=rec_size))
+                owners.append(i)
+                metas.append((bboxes[j][:4], float(bboxes[j][4])))
+
+        if crops:
+            feats = rec.get_feat(crops)               # (M, 512) in one batched forward
+            norms = np.linalg.norm(feats, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            feats = feats / norms                     # == insightface normed_embedding
+            for k in range(len(crops)):
+                bbox, score = metas[k]
+                per_img[owners[k]].append({
+                    "bbox": [float(v) for v in bbox.tolist()],
+                    "det_score": score,
+                    "embedding": [float(v) for v in feats[k].tolist()],
+                })
+        return per_img
 
     @modal.fastapi_endpoint(method="GET")
     def health(self):
@@ -341,7 +369,7 @@ class Pipeline:
             return it["id"], last_exc
 
         t0 = time.time()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
             downloaded = list(ex.map(dl, items))
         download_ms = (time.time() - t0) * 1000
 
@@ -363,14 +391,15 @@ class Pipeline:
                 embs = feats.cpu().numpy().tolist()
             clip_ms = (time.time() - t1) * 1000
 
-            # 3) Faces per image (detection is inherently per-image).
+            # 3) Faces: detect per image, recognize all faces in one batched forward.
             t2 = time.time()
-            for idx, (iid, img) in enumerate(valid):
+            per_img_faces = self._faces_batched([img for _, img in valid])
+            for idx, (iid, _img) in enumerate(valid):
                 results.append({
                     "id": iid,
                     "clip": embs[idx],
                     "aesthetic": float(aesthetics[idx]) if isinstance(aesthetics, list) else float(aesthetics),
-                    "faces": self._faces_for(img),
+                    "faces": per_img_faces[idx],
                 })
             faces_ms = (time.time() - t2) * 1000
 

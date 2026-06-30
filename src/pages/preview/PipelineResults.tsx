@@ -189,7 +189,12 @@ export default function PipelineResults() {
           {status && (
             <span className="text-xs text-muted-foreground">
               סטטוס: <b className="text-foreground">{status}</b>
-              {status === "processing" && " (מתעדכן…)"}
+              {status === "processing" && (() => {
+                const done = results.data?.features.length ?? 0;
+                const total = results.data?.images.length ?? 0;
+                const pct = total ? Math.round((done / total) * 100) : 0;
+                return <b className="text-primary"> — מעבד {done}/{total} ({pct}%)…</b>;
+              })()}
             </span>
           )}
         </div>
