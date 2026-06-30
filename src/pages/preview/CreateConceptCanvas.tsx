@@ -171,9 +171,23 @@ export default function CreateConceptCanvas() {
                   <GoogleDriveInput folderInfo={driveFolderInfo} onUpdate={(info, links) => { setDriveFolderInfo(info); setDriveLinks(links); }} disabled={busy} />
                 </div>
               ) : photos > 0 ? (
-                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <Images className="h-3.5 w-3.5" /> {photos.toLocaleString()} photos selected
-                  <button type="button" onClick={() => inputRef.current?.click()} className="text-accent hover:underline">change</button>
+                <div className="mt-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Images className="h-3.5 w-3.5" /> {photos.toLocaleString()} photos selected
+                    <button type="button" onClick={() => inputRef.current?.click()} className="text-accent hover:underline">change</button>
+                  </div>
+                  {previews.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {previews.slice(0, 6).map((src, i) => (
+                        <img key={i} src={src} alt="" className="h-12 w-12 rounded-md object-cover ring-1 ring-border" />
+                      ))}
+                      {photos > previews.slice(0, 6).length && (
+                        <div className="grid h-12 w-12 place-items-center rounded-md bg-surface-2 text-xs font-medium text-muted-foreground">
+                          +{(photos - previews.slice(0, 6).length).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button

@@ -32,9 +32,23 @@ export function SourceUpload({ flow }: { flow: CanvasFlow }) {
           <GoogleDriveInput folderInfo={flow.driveFolderInfo} onUpdate={flow.setDrive} disabled={flow.busy} />
         </div>
       ) : flow.photos > 0 ? (
-        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <Images className="h-3.5 w-3.5" /> {flow.photos.toLocaleString()} photos selected
-          <button type="button" onClick={() => flow.inputRef.current?.click()} className="text-accent hover:underline">change</button>
+        <div className="mt-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Images className="h-3.5 w-3.5" /> {flow.photos.toLocaleString()} photos selected
+            <button type="button" onClick={() => flow.inputRef.current?.click()} className="text-accent hover:underline">change</button>
+          </div>
+          {flow.previews.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {flow.previews.slice(0, 6).map((src, i) => (
+                <img key={i} src={src} alt="" className="h-12 w-12 rounded-md object-cover ring-1 ring-border" />
+              ))}
+              {flow.photos > flow.previews.slice(0, 6).length && (
+                <div className="grid h-12 w-12 place-items-center rounded-md bg-surface-2 text-xs font-medium text-muted-foreground">
+                  +{(flow.photos - flow.previews.slice(0, 6).length).toLocaleString()}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <button
