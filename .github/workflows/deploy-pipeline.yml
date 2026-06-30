@@ -74,19 +74,8 @@ jobs:
           else
             echo "::warning::⚠️ Faces NOT on GPU yet"
           fi
-          echo "--- Sample image resolutions (what faces are detected on) ---"
-          BASE="https://s3.us-east-005.backblazeb2.com/imagick/galleries/f92382a7-958f-4626-9201-1a67c0c0ff2a/1a861e37-0b85-4109-bcc3-e0e12658c0bf"
-          ID="5db666d2-9efa-47fa-8802-dffc13aa67a3"
-          for V in "thumbnail/${ID}_reduced_thumbnail.webp" "compressed/${ID}_reduced.webp"; do
-            echo "Probing: $V"
-            for attempt in $(seq 1 12); do
-              OUT=$(curl -sS -G --max-time 60 --data-urlencode "url=$BASE/$V" "$HURL" || echo '{}')
-              S=$(echo "$OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sample') if isinstance(d,dict) else '')" 2>/dev/null || echo "")
-              if echo "$S" | grep -q "dims"; then echo "  -> $S"; break; fi
-              # warm old container (no 'sample' field) may still answer; wait it out
-              sleep 7
-            done
-          done
+          # To check a specific image's processed resolution on demand, open:
+          #   <health-url>?url=<image-url>   (returns sample.dims / sample.bytes)
 
       - name: Install Supabase CLI
         run: |
