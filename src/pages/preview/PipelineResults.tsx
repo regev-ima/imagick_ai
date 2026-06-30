@@ -96,8 +96,14 @@ export default function PipelineResults() {
   // CLIP cosine threshold for showing a tag. Raw ViT-L/14 sims: relevant tags
   // land ~0.24+, noise below. Tunable.
   const TAG_THRESHOLD = 0.24;
-  const labelsFor = (f: Feature | undefined, max = 3) =>
-    (f?.tags ?? []).filter((t) => t.score >= TAG_THRESHOLD).slice(0, max).map((t) => t.tag);
+  // Tags above the threshold — but never leave an image untagged: if none pass,
+  // fall back to the single best-matching tag so every photo has at least one.
+  const labelsFor = (f: Feature | undefined, max = 3) => {
+    const ts = f?.tags ?? [];
+    const above = ts.filter((t) => t.score >= TAG_THRESHOLD).slice(0, max).map((t) => t.tag);
+    if (above.length) return above;
+    return ts.length ? [ts[0].tag] : [];
+  };
 
   // Tag chips for the filter bar: every tag seen above threshold, with a count.
   const tagCounts = useMemo(() => {

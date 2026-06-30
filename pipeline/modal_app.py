@@ -25,11 +25,17 @@ AESTHETIC_URL = (
     "raw/main/sac+logos+ava1-l14-linearMSE.pth"
 )
 
-# Zero-shot tag vocabulary: (Hebrew label shown to the user, English CLIP prompt).
+# Zero-shot tag vocabulary: (label shown to the user, English CLIP prompt).
 # CLIP (openai ViT-L/14) is English-trained, so the prompt must be English; the
 # label is just for display. Tags are scored by cosine similarity against the image
 # embedding we already compute — essentially free (one matmul on the GPU).
-WEDDING_TAGS = [
+#
+# TWO SEPARATE lists, on purpose:
+#   USER_TAGS    — the domain/test list; this is what the *user's* tag list replaces.
+#   GENERAL_TAGS — our own general-purpose suggestions, kept separate so they can be
+#                  reused elsewhere. Both are combined for scoring (ALL_TAGS).
+# (Currently USER_TAGS holds a wedding test set until the real list is provided.)
+USER_TAGS = [
     ("חופה", "a wedding chuppah ceremony under a canopy"),
     ("טבעות", "exchanging wedding rings, close up of hands"),
     ("ריקודים", "people dancing and celebrating at a party"),
@@ -49,6 +55,35 @@ WEDDING_TAGS = [
     ("בכי / רגש", "an emotional moment, a person crying with joy"),
     ("חיבוק", "two people hugging warmly"),
 ]
+
+# Our own general-purpose tags (separate from the user's list — reusable anywhere).
+GENERAL_TAGS = [
+    ("טבע", "nature, trees and green plants"),
+    ("נוף", "a wide landscape view"),
+    ("ים / מים", "the sea, a lake or water"),
+    ("שמיים", "the sky with clouds"),
+    ("אוכל", "food on a plate"),
+    ("מבנה / אדריכלות", "a building or architecture"),
+    ("רחוב / עיר", "a city street"),
+    ("רכב", "a car or vehicle"),
+    ("לילה", "a night scene with lights"),
+    ("מסמך / טקסט", "a document or page with text"),
+    ("חיה", "an animal"),
+    ("ספורט", "people playing sports"),
+]
+
+# Combined vocabulary used for scoring (labels are de-duplicated, user list wins).
+def _dedup_tags(*lists):
+    seen, out = set(), []
+    for lst in lists:
+        for label, prompt in lst:
+            if label not in seen:
+                seen.add(label)
+                out.append((label, prompt))
+    return out
+
+
+ALL_TAGS = _dedup_tags(USER_TAGS, GENERAL_TAGS)
 
 
 def _download_models():
@@ -178,10 +213,10 @@ class Pipeline:
 
         # Pre-encode the tag prompts once (fixed vocabulary) → zero-shot tagging is
         # then a single image·text matmul per batch.
-        self.tag_labels = [t[0] for t in WEDDING_TAGS]
+        self.tag_labels = [t[0] for t in ALL_TAGS]
         tokenizer = open_clip.get_tokenizer("ViT-L-14")
         with torch.no_grad():
-            tok = tokenizer([f"a photo of {t[1]}" for t in WEDDING_TAGS]).to(self.device)
+            tok = tokenizer([f"a photo of {t[1]}" for t in ALL_TAGS]).to(self.device)
             tfeats = self.clip.encode_text(tok)
             self.tag_feats = (tfeats / tfeats.norm(dim=-1, keepdim=True)).float()
 
