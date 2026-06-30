@@ -25,6 +25,31 @@ AESTHETIC_URL = (
     "raw/main/sac+logos+ava1-l14-linearMSE.pth"
 )
 
+# Zero-shot tag vocabulary: (Hebrew label shown to the user, English CLIP prompt).
+# CLIP (openai ViT-L/14) is English-trained, so the prompt must be English; the
+# label is just for display. Tags are scored by cosine similarity against the image
+# embedding we already compute — essentially free (one matmul on the GPU).
+WEDDING_TAGS = [
+    ("חופה", "a wedding chuppah ceremony under a canopy"),
+    ("טבעות", "exchanging wedding rings, close up of hands"),
+    ("ריקודים", "people dancing and celebrating at a party"),
+    ("זוג", "a bride and groom couple together"),
+    ("כלה", "a bride wearing a white wedding dress"),
+    ("חתן", "a groom wearing a suit at a wedding"),
+    ("קבוצה", "a large group of people posing together"),
+    ("משפחה", "a family portrait of several people"),
+    ("ילדים", "children at a celebration"),
+    ("פורטרט", "a close up portrait of one person's face"),
+    ("צילום חוץ", "an outdoor photo in a garden with greenery"),
+    ("צילום פנים", "an indoor photo in a hall"),
+    ("שולחן ערוך", "a decorated dining table setting with flowers"),
+    ("זר פרחים", "a bouquet of flowers"),
+    ("נאום", "a person giving a speech holding a microphone"),
+    ("קבלת פנים", "a wedding reception with seated guests"),
+    ("בכי / רגש", "an emotional moment, a person crying with joy"),
+    ("חיבוק", "two people hugging warmly"),
+]
+
 
 def _download_models():
     """Run at image-build time so weights are baked in → fast cold starts."""
@@ -150,6 +175,15 @@ class Pipeline:
             "ViT-L-14", pretrained="openai"
         )
         self.clip = self.clip.to(self.device).eval()
+
+        # Pre-encode the tag prompts once (fixed vocabulary) → zero-shot tagging is
+        # then a single image·text matmul per batch.
+        self.tag_labels = [t[0] for t in WEDDING_TAGS]
+        tokenizer = open_clip.get_tokenizer("ViT-L-14")
+        with torch.no_grad():
+            tok = tokenizer([f"a photo of {t[1]}" for t in WEDDING_TAGS]).to(self.device)
+            tfeats = self.clip.encode_text(tok)
+            self.tag_feats = (tfeats / tfeats.norm(dim=-1, keepdim=True)).float()
 
         class Head(nn.Module):
             def __init__(self, d=768):
@@ -362,6 +396,7 @@ class Pipeline:
 
         items = data.get("images", [])
         do_faces = bool(data.get("faces", True))  # skip the expensive ArcFace step when off
+        do_tags = bool(data.get("tags", True))    # zero-shot tags (essentially free)
         results = []
 
         # 1) Download all images in the batch in parallel (network-bound).
@@ -401,6 +436,17 @@ class Pipeline:
                 feats = self.clip.encode_image(batch)
                 feats = feats / feats.norm(dim=-1, keepdim=True)
                 aesthetics = self.head(feats.float()).squeeze(-1).cpu().tolist()
+                # Zero-shot tags: cosine sim of each image to every tag prompt, top 6.
+                tag_lists = [[] for _ in valid]
+                if do_tags:
+                    sims = feats.float() @ self.tag_feats.T          # (N, T)
+                    k = min(6, sims.shape[1])
+                    top = sims.topk(k, dim=-1)
+                    for n in range(sims.shape[0]):
+                        tag_lists[n] = [
+                            {"tag": self.tag_labels[j], "score": round(float(s), 4)}
+                            for s, j in zip(top.values[n].tolist(), top.indices[n].tolist())
+                        ]
                 embs = feats.cpu().numpy().tolist()
             clip_ms = (time.time() - t1) * 1000
 
@@ -414,6 +460,7 @@ class Pipeline:
                     "clip": embs[idx],
                     "aesthetic": float(aesthetics[idx]) if isinstance(aesthetics, list) else float(aesthetics),
                     "faces": per_img_faces[idx],
+                    "tags": tag_lists[idx],
                 })
             faces_ms = (time.time() - t2) * 1000
 

@@ -42,11 +42,13 @@ interface ModalFace {
   det_score: number;
   embedding: number[];
 }
+interface ModalTag { tag: string; score: number }
 interface ModalResult {
   id: string;
   clip?: number[];
   aesthetic?: number;
   faces?: ModalFace[];
+  tags?: ModalTag[];
   error?: string;
 }
 
@@ -71,13 +73,14 @@ serve(async (req: Request) => {
     const body = await req.json();
     const { galleryId, stall = 0, options } = body as {
       galleryId: string; userId?: string; stall?: number;
-      options?: { faces?: boolean; cluster?: boolean };
+      options?: { faces?: boolean; cluster?: boolean; tags?: boolean };
     };
     if (!galleryId) return json({ error: "Missing galleryId" }, 400);
     // Which optional steps to run. Faces (ArcFace) is the heavy, premium-gated one;
     // CLIP-based rating/clustering/tagging always ride on the one cheap embedding.
     const doFaces = options?.faces !== false;
     const doCluster = options?.cluster !== false;
+    const doTags = options?.tags !== false;
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -139,6 +142,7 @@ serve(async (req: Request) => {
         gallery_id: galleryId,
         clip_vector: JSON.stringify(r.clip),
         aesthetic: r.aesthetic ?? null,
+        tags: r.tags ?? null,
         updated_at: new Date().toISOString(),
       });
       await admin.from("face_detections").delete().eq("image_id", r.id).not("arcface_vector", "is", null);
@@ -168,6 +172,7 @@ serve(async (req: Request) => {
             body: JSON.stringify({
               token: modalToken,
               faces: doFaces, // skip ArcFace on Modal when faces are off
+              tags: doTags,
               images: batch.map((img) => ({
                 id: img.id,
                 url: toPreviewUrl(img.original_url),

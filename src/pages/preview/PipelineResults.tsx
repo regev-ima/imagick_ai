@@ -18,7 +18,8 @@ const db = supabase as any;
 
 interface GalleryRow { id: string; name: string }
 interface ImageRow { id: string; original_url: string; filename: string }
-interface Feature { image_id: string; aesthetic: number | null; visual_cluster: number | null }
+interface Tag { tag: string; score: number }
+interface Feature { image_id: string; aesthetic: number | null; visual_cluster: number | null; tags: Tag[] | null }
 interface FaceDet { image_id: string; cluster_id: string | null }
 type Bbox = { x: number; y: number; width: number; height: number };
 interface FaceCluster { id: string; face_count: number; representative_image_id: string | null; representative_bbox: Bbox | null }
@@ -30,7 +31,8 @@ export default function PipelineResults() {
   const [lightbox, setLightbox] = useState<string | null>(null);
   // Which steps to run. Faces (people) is the heavy, premium-gated step; the rest
   // ride on the single cheap CLIP embedding.
-  const [opts, setOpts] = useState({ cluster: true, faces: true });
+  const [opts, setOpts] = useState({ cluster: true, faces: true, tags: true });
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   const galleries = useQuery({
     queryKey: ["pipeline-galleries"],
@@ -50,7 +52,7 @@ export default function PipelineResults() {
     queryFn: async () => {
       const [gRes, fRes, fdRes, fcRes, imgRes] = await Promise.all([
         supabase.from("galleries").select("pipeline_status, pipeline_timing").eq("id", galleryId).single(),
-        db.from("image_features").select("image_id, aesthetic, visual_cluster").eq("gallery_id", galleryId),
+        db.from("image_features").select("image_id, aesthetic, visual_cluster, tags").eq("gallery_id", galleryId),
         supabase.from("face_detections").select("image_id, cluster_id").eq("gallery_id", galleryId).not("cluster_id", "is", null),
         supabase.from("face_clusters").select("id, face_count, representative_image_id, representative_bbox").eq("gallery_id", galleryId).order("face_count", { ascending: false }),
         supabase.from("gallery_images").select("id, original_url, filename").eq("gallery_id", galleryId),
@@ -91,6 +93,23 @@ export default function PipelineResults() {
     return m;
   }, [results.data]);
 
+  // CLIP cosine threshold for showing a tag. Raw ViT-L/14 sims: relevant tags
+  // land ~0.24+, noise below. Tunable.
+  const TAG_THRESHOLD = 0.24;
+  const labelsFor = (f: Feature | undefined, max = 3) =>
+    (f?.tags ?? []).filter((t) => t.score >= TAG_THRESHOLD).slice(0, max).map((t) => t.tag);
+
+  // Tag chips for the filter bar: every tag seen above threshold, with a count.
+  const tagCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of results.data?.features ?? [])
+      for (const t of (f.tags ?? [])) if (t.score >= TAG_THRESHOLD) m.set(t.tag, (m.get(t.tag) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [results.data]);
+
+  const matchesTag = (f: Feature) =>
+    !tagFilter || (f.tags ?? []).some((t) => t.tag === tagFilter && t.score >= TAG_THRESHOLD);
+
   // Visual clusters: group by visual_cluster, best-aesthetic first within each.
   const clusters = useMemo(() => {
     const map = new Map<number, Feature[]>();
@@ -106,8 +125,10 @@ export default function PipelineResults() {
   }, [results.data]);
 
   const top = useMemo(
-    () => [...(results.data?.features ?? [])].sort((a, b) => (b.aesthetic ?? 0) - (a.aesthetic ?? 0)).slice(0, 40),
-    [results.data],
+    () => [...(results.data?.features ?? [])]
+      .filter(matchesTag)
+      .sort((a, b) => (b.aesthetic ?? 0) - (a.aesthetic ?? 0)).slice(0, 40),
+    [results.data, tagFilter],
   );
 
   const people = useMemo(() => {
@@ -207,7 +228,13 @@ export default function PipelineResults() {
             <span>שלבים לעיבוד:</span>
             <label className="flex items-center gap-1.5">
               <input type="checkbox" checked readOnly className="accent-primary" />
-              דירוג + תיוג <span className="opacity-60">(תמיד, זול)</span>
+              דירוג <span className="opacity-60">(תמיד, זול)</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5">
+              <input type="checkbox" checked={opts.tags}
+                onChange={(e) => setOpts((o) => ({ ...o, tags: e.target.checked }))}
+                className="accent-primary" />
+              תיוג <span className="opacity-60">(זול)</span>
             </label>
             <label className="flex cursor-pointer items-center gap-1.5">
               <input type="checkbox" checked={opts.cluster}
@@ -258,6 +285,28 @@ export default function PipelineResults() {
               </div>
             )}
 
+            {/* Tag filter — click a tag to show only matching photos (top view) */}
+            {tagCounts.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">תגיות:</span>
+                {tagFilter && (
+                  <button onClick={() => setTagFilter(null)}
+                    className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground">
+                    ✕ נקה
+                  </button>
+                )}
+                {tagCounts.map(([tag, count]) => (
+                  <button key={tag}
+                    onClick={() => { setTagFilter(tag === tagFilter ? null : tag); setView("top"); }}
+                    className={`rounded-full px-2 py-0.5 text-xs ${
+                      tag === tagFilter ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground"
+                    }`}>
+                    {tag} <span className="opacity-60">{count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Clustering level (re-cluster on demand) */}
             {view === "clusters" && (results.data?.features.length ?? 0) > 0 && (
               <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
@@ -291,7 +340,7 @@ export default function PipelineResults() {
               <div key={c.id} className="mt-5">
                 <div className="mb-1.5 text-xs font-medium text-muted-foreground">קבוצה {c.id} · {c.items.length} תמונות</div>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9">
-                  {c.items.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} onOpen={() => setLightbox(preview(f.image_id))} />)}
+                  {c.items.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} tags={labelsFor(f)} onOpen={() => setLightbox(preview(f.image_id))} />)}
                 </div>
               </div>
             ))}
@@ -316,7 +365,7 @@ export default function PipelineResults() {
             {/* Best of gallery */}
             {view === "top" && (
               <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9">
-                {top.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} onOpen={() => setLightbox(preview(f.image_id))} />)}
+                {top.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} tags={labelsFor(f)} onOpen={() => setLightbox(preview(f.image_id))} />)}
               </div>
             )}
           </>
@@ -358,11 +407,18 @@ function FaceCrop({ url, bbox, size = 44 }: { url: string; bbox: Bbox | null; si
   return <canvas ref={ref} width={size} height={size} className="rounded-full object-cover" />;
 }
 
-function Thumb({ url, score, onOpen }: { url: string; score?: string; onOpen: () => void }) {
+function Thumb({ url, score, tags, onOpen }: { url: string; score?: string; tags?: string[]; onOpen: () => void }) {
   return (
     <div className="relative aspect-square overflow-hidden rounded bg-surface-2">
       {url && <img src={url} alt="" loading="lazy" onClick={onOpen} className="h-full w-full cursor-zoom-in object-cover" />}
       {score && <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-bold text-white">{score}</span>}
+      {tags && tags.length > 0 && (
+        <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-0.5 bg-gradient-to-t from-black/70 to-transparent p-1">
+          {tags.map((t) => (
+            <span key={t} className="rounded bg-black/60 px-1 text-[9px] leading-tight text-white">{t}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
