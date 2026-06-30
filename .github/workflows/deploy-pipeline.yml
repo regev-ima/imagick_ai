@@ -11,11 +11,18 @@ name: Deploy AI pipeline
 #   SUPABASE_PROJECT_ID                   - your project ref (e.g. abcdefgh...)
 #   SUPABASE_DB_PASSWORD                  - the database password
 
-# Manual only — run it from Actions → "Deploy AI pipeline" → Run workflow,
-# AFTER you've added the six secrets below. (Kept manual so it never fails on a
-# push before the secrets exist.)
+# Runs automatically on changes to the pipeline (the secrets are set now), and
+# can also be run manually. NOTE: the "Run workflow" button only appears once
+# this file is on the default branch — until then, push triggers it.
 on:
   workflow_dispatch:
+  push:
+    branches: [claude/image-scoring-tagging-0cszyi]
+    paths:
+      - "pipeline/**"
+      - "supabase/functions/process-pipeline/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/deploy-pipeline.yml"
 
 jobs:
   deploy:
