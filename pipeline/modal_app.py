@@ -143,32 +143,31 @@ class Pipeline:
             providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
         )
         self.faces.prepare(ctx_id=0, det_size=(640, 640))
-        # Confirm the face models actually landed on the GPU (CPU fallback is the
-        # #1 cost trap here). Surface a precise reason in the response so we can
-        # diagnose without digging through Modal logs.
-        provs = set()
+
+        # InsightFace often builds its onnx sessions on CPU even when handed CUDA
+        # providers (diagnosed as "init-ok-but-unused": the raw CUDA provider works,
+        # insightface just doesn't use it). Since CUDA is healthy here, rebuild each
+        # model's session on the GPU ourselves — this is what actually moves face
+        # detection/recognition off the CPU.
+        if "CUDAExecutionProvider" in avail:
+            for mod_name, model in self.faces.models.items():
+                mf = getattr(model, "model_file", None)
+                if mf and "CUDA" not in model.session.get_providers()[0]:
+                    model.session = ort.InferenceSession(
+                        mf, providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+                    )
+                    print(f"[faces] rebuilt {mod_name} session on {model.session.get_providers()[0]}")
+
+        # Confirm where the face models actually landed, surfaced in the response.
+        provs = {model.session.get_providers()[0] for model in self.faces.models.values()}
         for mod_name, model in self.faces.models.items():
-            p = model.session.get_providers()[0]
-            provs.add(p)
-            print(f"[faces] {mod_name} -> {p}")
+            print(f"[faces] {mod_name} -> {model.session.get_providers()[0]}")
         if any("CUDA" in p for p in provs):
             self.faces_provider = "GPU"
         elif "CUDAExecutionProvider" not in avail:
             self.faces_provider = "CPU (no-cuda-ep)"  # onnxruntime can't load CUDA libs
         else:
-            # CUDA EP exists but the sessions fell back to CPU — force it onto one
-            # of insightface's own models to surface the exact init error (usually
-            # a precise "needs libX.so.N" / version-mismatch message).
-            import glob
-            reason = "init-ok-but-unused"
-            files = glob.glob(os.path.expanduser("~/.insightface/models/buffalo_l/*.onnx"))
-            if files:
-                try:
-                    ort.InferenceSession(files[0], providers=["CUDAExecutionProvider"])
-                except Exception as exc:  # noqa: BLE001
-                    reason = str(exc).replace("\n", " ")[:200]
-            print("[faces] CUDA fallback reason:", reason)
-            self.faces_provider = f"CPU: {reason}"
+            self.faces_provider = "CPU (fallback)"
 
     def _faces_for(self, pil):
         bgr = np.array(pil)[:, :, ::-1]
