@@ -14,7 +14,6 @@ import {
   Loader2,
   MapPin,
   Mountain,
-  Palette,
   PartyPopper,
   Pencil,
   Plus,
@@ -501,11 +500,17 @@ export default function CreateGalleryPage() {
             </div>
           </div>
 
-          {/* Look */}
-          <div className="glass-card rounded-[--radius] p-5">
-            <div className="mb-2.5 flex items-center justify-between">
-              <div className="caption">Look — tap to choose{looksCount > 0 ? ` (${looksCount}/${MAX_LOOKS})` : ""}</div>
-              <span className="caption">{looksLabel}</span>
+          {/* AI editing model — the most important choice; given an AI-forward
+              treatment (rotating royal-blue keyline) to feel like the engine. */}
+          <div className="aura-ai-border glass-card rounded-[--radius] p-5">
+            <div className="mb-3.5 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                  <Sparkle size={13} className="text-primary" /> Choose your AI look
+                </div>
+                <p className="caption mt-1">A trained AI model edits every photo in this look — pick up to {MAX_LOOKS}.</p>
+              </div>
+              {looksCount > 0 && <span className="aura-microlabel shrink-0 text-primary">{looksCount}/{MAX_LOOKS}</span>}
             </div>
             <LookGrid
               styles={rankedStyles}
@@ -517,7 +522,7 @@ export default function CreateGalleryPage() {
               max={MAX_LOOKS}
             />
             {looksCount >= 1 && (
-              <p className="caption mt-2.5">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
+              <p className="caption mt-3">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
             )}
           </div>
           </motion.div>
@@ -691,53 +696,108 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
   onHosting: () => void;
   max: number;
 }) {
-  if (styles.length === 0) {
-    return <p className="caption">No trained looks yet — photos will be hosted as-is. You can train a look later.</p>;
-  }
   const atMax = selectedIds.length >= max;
   const hosting = chosen && selectedIds.length === 0;
-  const rowCls = (on: boolean, locked = false) =>
-    cn(
-      "flex w-full items-center gap-3 rounded-[--radius] border p-2.5 text-left transition-colors",
-      on ? "border-primary bg-primary/10 ring-1 ring-inset ring-primary" : "border-border hover:border-primary/40 hover:bg-surface-2/40",
-      locked && "cursor-not-allowed opacity-45 hover:border-border hover:bg-transparent",
-    );
+  const bestId = styles[0]?.id;
+  // The photographer's own trained AI models, kept distinct from the public
+  // Aura models so it's clear which engine edits their photos.
+  const isMine = (s: StyleRow) => ownerId != null && s.user_id === ownerId && s.status === "ready";
+  const mine = styles.filter(isMine);
+  const aura = styles.filter((s) => !(ownerId != null && s.user_id === ownerId));
+
   return (
-    <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
-      {/* No editing — host & share as-is */}
-      <button type="button" onClick={onHosting} className={rowCls(hosting)}>
-        <span className="plate-keyline grid h-12 w-12 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground"><Ban className="h-5 w-5" strokeWidth={1.5} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">No editing</span>
-          <span className="caption block">Host &amp; share as-is · 0 edits</span>
-        </span>
-        <SelectMark on={hosting} />
-      </button>
-      {styles.map((s, i) => {
-        const cover = s.thumbnail_url || s.after_image_urls?.[0];
-        const on = selectedIds.includes(s.id);
-        const locked = atMax && !on;
-        const yours = ownerId != null && s.user_id === ownerId && s.user_id != null;
-        const meta = yours ? "Your look" : s.is_preset ? "Preset" : (s.category || "Public look");
-        return (
-          <button key={s.id} type="button" onClick={() => onToggle(s.id)} disabled={locked} className={rowCls(on, locked)}>
-            {cover ? (
-              <img src={getThumbnailUrl(cover)} alt="" className="plate-keyline h-12 w-12 shrink-0 rounded-md object-cover" />
-            ) : (
-              <span className="plate-keyline grid h-12 w-12 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground/70"><Palette className="h-5 w-5" strokeWidth={1.5} /></span>
-            )}
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-semibold">{s.name}</span>
-                {i === 0 && !on && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">Pick</span>}
-              </span>
-              <span className="caption mt-0.5 block truncate">{meta}</span>
-            </span>
-            <SelectMark on={on} />
-          </button>
-        );
-      })}
+    <div className="max-h-[360px] space-y-4 overflow-y-auto pr-1">
+      {mine.length > 0 && (
+        <div className="space-y-2">
+          <div className="aura-microlabel flex items-center gap-1.5 text-primary"><Sparkle size={10} /> Your AI models</div>
+          {mine.map((s) => (
+            <LookRow key={s.id} style={s} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+          ))}
+        </div>
+      )}
+
+      {aura.length > 0 && (
+        <div className="space-y-2">
+          {mine.length > 0 && <div className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={10} /> Aura looks</div>}
+          {aura.map((s) => (
+            <LookRow key={s.id} style={s} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+          ))}
+        </div>
+      )}
+
+      {styles.length === 0 && (
+        <p className="caption">No AI models available yet — host &amp; share as-is below, or train your own look later.</p>
+      )}
+
+      {/* Opt-out — dashed + separated so it never competes with the AI models. */}
+      <div className="pt-1">
+        <div className="aura-hairline mb-2.5" />
+        <button
+          type="button"
+          onClick={onHosting}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-[--radius] border border-dashed p-2.5 text-left transition-colors",
+            hosting ? "border-primary bg-primary/10 ring-1 ring-inset ring-primary" : "border-border/70 hover:border-primary/40 hover:bg-surface-2/40",
+          )}
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground"><Ban className="h-5 w-5" strokeWidth={1.5} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">No editing</span>
+            <span className="caption block">Host &amp; share as-is · 0 edits</span>
+          </span>
+          <SelectMark on={hosting} />
+        </button>
+      </div>
     </div>
+  );
+}
+
+// One AI-model row — premium, AI-forward (never says "preset"). No-cover models
+// get a subtle royal-blue aura tile with the sparkle so they read as AI engines.
+function LookRow({ style: s, on, locked, mine = false, recommended = false, onClick }: {
+  style: StyleRow;
+  on: boolean;
+  locked: boolean;
+  mine?: boolean;
+  recommended?: boolean;
+  onClick: () => void;
+}) {
+  const cover = s.thumbnail_url || s.after_image_urls?.[0];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={locked}
+      className={cn(
+        "group flex w-full items-center gap-3 rounded-[--radius] border p-2.5 text-left transition-all",
+        on
+          ? "border-primary bg-primary/10 ring-1 ring-inset ring-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.10)]"
+          : "border-border hover:border-primary/40 hover:bg-surface-2/40",
+        locked && "cursor-not-allowed opacity-45 hover:border-border hover:bg-transparent",
+      )}
+    >
+      <span className="plate-keyline relative h-12 w-12 shrink-0 overflow-hidden rounded-md">
+        {cover ? (
+          <img src={getThumbnailUrl(cover)} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="relative grid h-full w-full place-items-center bg-surface-2">
+            <span className="absolute inset-0 bg-gradient-to-br from-primary/30 to-transparent" />
+            <Sparkle size={15} className="relative text-primary" />
+          </span>
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-semibold">{s.name}</span>
+          {recommended && !on && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">Aura pick</span>}
+        </span>
+        <span className="caption mt-0.5 flex items-center gap-1 truncate">
+          <Sparkle size={9} className={mine ? "text-primary" : "text-accent"} />
+          {mine ? "Your AI model" : s.category ? `Aura · ${s.category}` : "Aura AI model"}
+        </span>
+      </span>
+      <SelectMark on={on} />
+    </button>
   );
 }
 
