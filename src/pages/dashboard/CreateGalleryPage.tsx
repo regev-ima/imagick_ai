@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -170,7 +169,6 @@ export default function CreateGalleryPage() {
   const { answers: onboardingAnswers, allQuestions: onboardingQuestions } = useOnboardingQuestionnaire();
 
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [type, setType] = useState("wedding");
   const [typeTouched, setTypeTouched] = useState(false);
   const [items, setItems] = useState<SelImg[]>([]);
@@ -241,16 +239,9 @@ export default function CreateGalleryPage() {
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
   const maxImages = isUnlimited || looksCount === 0 ? Infinity : Math.floor(availableEdits / looksCount);
   const typeLabel = galleryTypes.find((t) => t.value === type)?.label ?? type;
-  const complete = name.trim().length > 0 && photos > 0 && !!type && !hasInsufficientEdits;
-
-  // Pre-pick Aura's best-matching look once photos are in (unless the user has
-  // already chosen looks or arrived via a ?styleId deep link).
-  useEffect(() => {
-    if (photos > 0 && !styleTouched && rankedStyles.length > 0) {
-      setStyleIds([rankedStyles[0].id]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos, styles, type]);
+  // The look isn't pre-picked — the photographer must explicitly choose a look
+  // or "No editing", so styleTouched is part of completeness.
+  const complete = name.trim().length > 0 && photos > 0 && !!type && styleTouched && !hasInsufficientEdits;
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const ingest = (list: FileList | File[] | null) => {
@@ -318,7 +309,6 @@ export default function CreateGalleryPage() {
     submit({
       name: name.trim(),
       galleryType: type,
-      description: description.trim() || undefined,
       styleIds,
       aiCulling: cull,
       categories: cull ? categories : [],
@@ -347,7 +337,13 @@ export default function CreateGalleryPage() {
   const pct = uploadProgress && uploadProgress.totalBytes > 0
     ? Math.round((uploadProgress.bytesUploaded / uploadProgress.totalBytes) * 100)
     : 0;
-  const looksLabel = looksCount === 0 ? "Hosting only" : looksCount === 1 ? (selectedStyles[0]?.name ?? "1 look") : `${looksCount} looks`;
+  const looksLabel = !styleTouched
+    ? "choose a look"
+    : looksCount === 0
+      ? "Hosting only"
+      : looksCount === 1
+        ? (selectedStyles[0]?.name ?? "1 look")
+        : `${looksCount} looks`;
 
   return (
     <div className="min-h-full bg-background px-4 py-8 lg:px-8">
@@ -399,31 +395,6 @@ export default function CreateGalleryPage() {
               You're on the free plan with no edits left — pick "No editing" to host &amp; share, or{" "}
               <button className="text-primary hover:underline" onClick={() => navigate("/dashboard/billing")}>upgrade</button> to let Aura edit.
             </p>
-          )}
-
-          {busy ? (
-            <div className="mt-5 space-y-3 rounded-[--radius] border border-border bg-card p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 text-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  {isUploading ? "Uploading your photos…" : "Creating collection…"}
-                </span>
-                <span className="font-mono text-primary">{isUploading && uploadProgress ? `${uploadProgress.uploaded}/${uploadProgress.total}` : ""}</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <motion.div className="h-full rounded-full bg-primary" initial={{ width: 0 }} animate={{ width: `${isUploading ? pct : 100}%` }} transition={{ ease: "easeOut", duration: 0.4 }} />
-              </div>
-              {isUploading && uploadProgress?.currentFile && (
-                <p className="truncate text-xs text-muted-foreground">Receiving {uploadProgress.currentFile} · {pct}%</p>
-              )}
-            </div>
-          ) : (
-            <>
-              <Button variant="glow" size="lg" disabled={!complete} className="mt-5 w-full gap-2" onClick={handleCreate}>
-                <Zap className="h-4 w-4" /> Create &amp; start editing
-              </Button>
-              <p className="mt-2 text-center text-[11px] text-muted-foreground/70">Creates a real collection &amp; hands it to Aura</p>
-            </>
           )}
         </div>
 
@@ -510,6 +481,7 @@ export default function CreateGalleryPage() {
             <LookGrid
               styles={rankedStyles}
               selectedIds={styleIds}
+              chosen={styleTouched}
               ownerId={user?.id}
               onToggle={toggleStyle}
               onHosting={pickHosting}
@@ -555,23 +527,37 @@ export default function CreateGalleryPage() {
             )}
           </div>
 
-          {/* Notes (optional) */}
-          <div className="glass-card rounded-[--radius] p-5">
-            <label htmlFor="cg-notes" className="caption mb-2.5 block">Notes for Aura · optional</label>
-            <Textarea
-              id="cg-notes"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Anything I should know about this shoot?"
-              className="min-h-[72px]"
-            />
-          </div>
         </div>
 
-        <p className="mt-8 flex items-start gap-2 text-xs text-muted-foreground/70">
-          <Images className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          One page, no steps — the plan up top recalculates live from your real photo count as you edit the controls below.
-        </p>
+        {/* Create — the final step, greyed out until everything above is chosen */}
+        {busy ? (
+          <div className="mt-6 space-y-3 rounded-[--radius] border border-border bg-card p-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2 text-foreground">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                {isUploading ? "Uploading your photos…" : "Creating collection…"}
+              </span>
+              <span className="font-mono text-primary">{isUploading && uploadProgress ? `${uploadProgress.uploaded}/${uploadProgress.total}` : ""}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <motion.div className="h-full rounded-full bg-primary" initial={{ width: 0 }} animate={{ width: `${isUploading ? pct : 100}%` }} transition={{ ease: "easeOut", duration: 0.4 }} />
+            </div>
+            {isUploading && uploadProgress?.currentFile && (
+              <p className="truncate text-xs text-muted-foreground">Receiving {uploadProgress.currentFile} · {pct}%</p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-6">
+            <Button variant="glow" size="lg" disabled={!complete} className="w-full gap-2" onClick={handleCreate}>
+              <Zap className="h-4 w-4" /> Create &amp; start editing
+            </Button>
+            <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
+              {complete
+                ? "Creates a real collection & hands it to Aura"
+                : "Name it, add photos, pick a shoot type and a look to continue"}
+            </p>
+          </div>
+        )}
       </div>
 
       {reviewOpen && <SelectedPhotosModal items={items} count={photos} onRemove={removeAt} onClose={() => setReviewOpen(false)} />}
@@ -612,9 +598,10 @@ function Pill({ children, accent = false }: { children: React.ReactNode; accent?
   );
 }
 
-function LookGrid({ styles, selectedIds, ownerId, onToggle, onHosting, max }: {
+function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, max }: {
   styles: StyleRow[];
   selectedIds: string[];
+  chosen: boolean;
   ownerId?: string | null;
   onToggle: (id: string) => void;
   onHosting: () => void;
@@ -624,7 +611,7 @@ function LookGrid({ styles, selectedIds, ownerId, onToggle, onHosting, max }: {
     return <p className="caption">No trained looks yet — photos will be hosted as-is. You can train a look later.</p>;
   }
   const atMax = selectedIds.length >= max;
-  const hosting = selectedIds.length === 0;
+  const hosting = chosen && selectedIds.length === 0;
   return (
     <div className="grid max-h-[330px] gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
       <button
