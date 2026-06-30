@@ -1,0 +1,79 @@
+name: Deploy AI pipeline
+
+# Automates the whole deploy: Modal GPU app + Supabase migration + edge function.
+# You only add the secrets below once (Settings → Secrets and variables → Actions);
+# then every change to the pipeline deploys itself. Run manually via "Run workflow".
+#
+# Required repository secrets:
+#   MODAL_TOKEN_ID, MODAL_TOKEN_SECRET   - from modal.com (Settings → API Tokens)
+#   PIPELINE_TOKEN                        - any long random string (shared Modal↔Supabase)
+#   SUPABASE_ACCESS_TOKEN                 - supabase.com (Account → Access Tokens)
+#   SUPABASE_PROJECT_ID                   - your project ref (e.g. abcdefgh...)
+#   SUPABASE_DB_PASSWORD                  - the database password
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/image-scoring-tagging-0cszyi]
+    paths:
+      - "pipeline/**"
+      - "supabase/functions/process-pipeline/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/deploy-pipeline.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Modal
+        run: pip install modal
+
+      - name: Create/refresh Modal pipeline secret
+        run: |
+          modal secret create imagick-pipeline-secret \
+            PIPELINE_TOKEN="${{ secrets.PIPELINE_TOKEN }}" --force
+
+      - name: Deploy Modal app
+        id: modal
+        run: |
+          modal deploy pipeline/modal_app.py 2>&1 | tee modal_out.txt
+          URL=$(grep -Eo 'https://[a-zA-Z0-9._-]+\.modal\.run[^ ]*' modal_out.txt | head -1)
+          echo "Captured Modal URL: $URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+
+      - name: Push database migration
+        run: supabase db push
+
+      - name: Set edge-function secrets
+        run: |
+          supabase secrets set \
+            MODAL_URL="${{ steps.modal.outputs.url }}" \
+            MODAL_TOKEN="${{ secrets.PIPELINE_TOKEN }}" \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+
+      - name: Deploy edge function
+        run: supabase functions deploy process-pipeline --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+
+      - name: Summary
+        run: |
+          echo "### ✅ Pipeline deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "Modal URL: ${{ steps.modal.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
