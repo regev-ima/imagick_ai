@@ -18,7 +18,8 @@ const db = supabase as any;
 
 interface GalleryRow { id: string; name: string }
 interface ImageRow { id: string; original_url: string; filename: string }
-interface Tag { tag: string; score: number }
+interface Tag { tag: string; score: number; src?: "user" | "general" }
+interface Label { tag: string; src: "user" | "general" }
 interface Feature { image_id: string; aesthetic: number | null; visual_cluster: number | null; tags: Tag[] | null }
 interface FaceDet { image_id: string; cluster_id: string | null }
 type Bbox = { x: number; y: number; width: number; height: number };
@@ -94,9 +95,10 @@ export default function PipelineResults() {
   }, [results.data]);
 
   // Tag assignment with per-tag mean-centering: CLIP gives each tag a baseline
-  // bias, so one "sticky" tag (e.g. ספונטני) can win on every photo. We subtract
-  // each tag's gallery-wide average, so each image surfaces what's DISTINCTIVE about
-  // it. Result: top-2 calibrated tags per image (≥1 so nothing is left untagged).
+  // bias, so one "sticky" tag can win on every photo. We subtract each tag's
+  // gallery-wide average so each image surfaces what's DISTINCTIVE about it.
+  // Guarantee ≥1 tag from the USER list per image, plus a few more distinctive
+  // ones (user or general). Each label carries its source for coloring.
   const labelsByImg = useMemo(() => {
     const feats = results.data?.features ?? [];
     const sum = new Map<string, number>(), cnt = new Map<string, number>();
@@ -106,27 +108,36 @@ export default function PipelineResults() {
     }
     const mean = new Map<string, number>();
     for (const [k, v] of sum) mean.set(k, v / (cnt.get(k) || 1));
-    const m = new Map<string, string[]>();
+    const m = new Map<string, Label[]>();
     for (const f of feats) {
       const cal = (f.tags ?? [])
-        .map((t) => ({ tag: t.tag, c: t.score - (mean.get(t.tag) ?? 0) }))
+        .map((t) => ({ tag: t.tag, src: (t.src ?? "user") as "user" | "general", c: t.score - (mean.get(t.tag) ?? 0) }))
         .sort((a, b) => b.c - a.c);
-      const pos = cal.filter((x) => x.c > 0.012).slice(0, 2).map((x) => x.tag);
-      m.set(f.image_id, pos.length ? pos : (cal.length ? [cal[0].tag] : []));
+      const userCal = cal.filter((x) => x.src === "user");
+      const genCal = cal.filter((x) => x.src === "general");
+      const chosen: Label[] = [];
+      if (userCal.length) chosen.push({ tag: userCal[0].tag, src: "user" });         // guaranteed user tag
+      for (const x of userCal.slice(1)) if (x.c > 0.012 && chosen.length < 3) chosen.push({ tag: x.tag, src: "user" });
+      for (const x of genCal) if (x.c > 0.02 && chosen.length < 4) chosen.push({ tag: x.tag, src: "general" });
+      m.set(f.image_id, chosen);
     }
     return m;
   }, [results.data]);
 
   const labelsFor = (f: Feature | undefined) => (f ? labelsByImg.get(f.image_id) ?? [] : []);
 
-  // Tag filter bar: every assigned tag, with a count.
+  // Tag filter bar: every assigned tag with a count + its source (for coloring).
   const tagCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const labels of labelsByImg.values()) for (const t of labels) m.set(t, (m.get(t) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    const m = new Map<string, { count: number; src: "user" | "general" }>();
+    for (const labels of labelsByImg.values())
+      for (const t of labels) {
+        const e = m.get(t.tag) ?? { count: 0, src: t.src };
+        e.count++; e.src = t.src; m.set(t.tag, e);
+      }
+    return [...m.entries()].map(([tag, v]) => ({ tag, ...v })).sort((a, b) => b.count - a.count);
   }, [labelsByImg]);
 
-  const matchesTag = (f: Feature) => !tagFilter || (labelsByImg.get(f.image_id) ?? []).includes(tagFilter);
+  const matchesTag = (f: Feature) => !tagFilter || (labelsByImg.get(f.image_id) ?? []).some((l) => l.tag === tagFilter);
 
   // Visual clusters: group by visual_cluster, best-aesthetic first within each.
   const clusters = useMemo(() => {
@@ -303,25 +314,31 @@ export default function PipelineResults() {
               </div>
             )}
 
-            {/* Tag filter — click a tag to show only matching photos (top view) */}
+            {/* Tag panel — all tags in the gallery, color-coded by source, clickable to filter */}
             {tagCounts.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">תגיות:</span>
-                {tagFilter && (
-                  <button onClick={() => setTagFilter(null)}
-                    className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground">
-                    ✕ נקה
-                  </button>
-                )}
-                {tagCounts.map(([tag, count]) => (
-                  <button key={tag}
-                    onClick={() => { setTagFilter(tag === tagFilter ? null : tag); setView("top"); }}
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      tag === tagFilter ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground"
-                    }`}>
-                    {tag} <span className="opacity-60">{count}</span>
-                  </button>
-                ))}
+              <div className="mt-3 rounded-lg border border-border bg-surface-2 p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-3 text-xs">
+                  <span className="font-medium text-foreground">תגיות בגלריה</span>
+                  <span className="flex items-center gap-1 text-muted-foreground"><span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600" /> הרשימה שלך</span>
+                  <span className="flex items-center gap-1 text-muted-foreground"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" /> הצעות המערכת</span>
+                  {tagFilter && (
+                    <button onClick={() => setTagFilter(null)}
+                      className="rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground">✕ נקה סינון</button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {tagCounts.map(({ tag, count, src }) => {
+                    const active = tag === tagFilter;
+                    const base = src === "user" ? "bg-blue-600" : "bg-amber-500";
+                    return (
+                      <button key={tag}
+                        onClick={() => { setTagFilter(active ? null : tag); setView("top"); }}
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium text-white transition ${base} ${active ? "ring-2 ring-white/70" : "opacity-85 hover:opacity-100"}`}>
+                        {tag} <span className="opacity-75">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -425,15 +442,18 @@ function FaceCrop({ url, bbox, size = 44 }: { url: string; bbox: Bbox | null; si
   return <canvas ref={ref} width={size} height={size} className="rounded-full object-cover" />;
 }
 
-function Thumb({ url, score, tags, onOpen }: { url: string; score?: string; tags?: string[]; onOpen: () => void }) {
+function Thumb({ url, score, tags, onOpen }: { url: string; score?: string; tags?: Label[]; onOpen: () => void }) {
   return (
     <div className="relative aspect-square overflow-hidden rounded bg-surface-2">
       {url && <img src={url} alt="" loading="lazy" onClick={onOpen} className="h-full w-full cursor-zoom-in object-cover" />}
       {score && <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-bold text-white">{score}</span>}
       {tags && tags.length > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-gradient-to-t from-black/80 to-transparent p-1.5 pt-4">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-gradient-to-t from-black/85 to-transparent p-1.5 pt-5">
           {tags.map((t) => (
-            <span key={t} className="rounded bg-primary/80 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-white">{t}</span>
+            <span key={t.tag}
+              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white ${
+                t.src === "user" ? "bg-blue-600/90" : "bg-amber-500/90"
+              }`}>{t.tag}</span>
           ))}
         </div>
       )}

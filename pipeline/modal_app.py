@@ -67,9 +67,8 @@ GENERAL_TAGS = [
     ("ספורט", "people playing sports"),
 ]
 
-# Vocabulary used for scoring. Only the USER list is active; GENERAL_TAGS stays
-# defined but separate (reserved for elsewhere), per the product decision. To also
-# score the general ones, change this to _dedup_tags(USER_TAGS, GENERAL_TAGS).
+# Score BOTH lists, but keep track of which is which so the UI can color them
+# differently (user's own labels vs our general suggestions).
 def _dedup_tags(*lists):
     seen, out = set(), []
     for lst in lists:
@@ -80,7 +79,8 @@ def _dedup_tags(*lists):
     return out
 
 
-ALL_TAGS = _dedup_tags(USER_TAGS)
+ALL_TAGS = _dedup_tags(USER_TAGS, GENERAL_TAGS)
+USER_TAG_LABELS = {t[0] for t in USER_TAGS}
 
 
 def _download_models():
@@ -477,7 +477,11 @@ class Pipeline:
                     order = sims.argsort(dim=-1, descending=True)
                     for n in range(sims.shape[0]):
                         tag_lists[n] = [
-                            {"tag": self.tag_labels[j], "score": round(float(sims[n, j]), 4)}
+                            {
+                                "tag": self.tag_labels[j],
+                                "score": round(float(sims[n, j]), 4),
+                                "src": "user" if self.tag_labels[j] in USER_TAG_LABELS else "general",
+                            }
                             for j in order[n].tolist()
                         ]
                 embs = feats.cpu().numpy().tolist()
