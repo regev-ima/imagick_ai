@@ -93,6 +93,28 @@ export default function PipelineResults() {
     },
   });
 
+  // The FULL OpenRouter vision-model list (sorted cheap→expensive), fetched live.
+  const orModels = useQuery({
+    queryKey: ["or-vision-models"],
+    staleTime: 3_600_000,
+    queryFn: async (): Promise<{ id: string; name: string; prompt: number; image: number }[]> => {
+      const r = await fetch(`${window.location.origin}/api/or-models`);
+      if (!r.ok) throw new Error(String(r.status));
+      const d = await r.json();
+      return d?.models ?? [];
+    },
+  });
+  // Options for the dropdown — live list if available, else the static fallback.
+  const modelOptions = useMemo(() => {
+    const live = orModels.data ?? [];
+    if (!live.length) return VLM_MODELS.map((m) => ({ id: m.id, label: m.label }));
+    return live.map((m) => ({
+      id: m.id,
+      // name + input-token price per 1M (the sort key), so cost is visible.
+      label: `${m.name} — $${(m.prompt * 1e6).toFixed(2)}/1M`,
+    }));
+  }, [orModels.data]);
+
   const results = useQuery({
     enabled: !!galleryId,
     queryKey: ["pipeline-results", galleryId],
@@ -288,12 +310,12 @@ export default function PipelineResults() {
 
         {galleryId && (
           <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <label className="flex items-center gap-1.5 font-medium text-foreground" title="מודל הראייה (OpenRouter) לדירוג ולתיוג">
-              מודל AI:
+            <label className="flex items-center gap-1.5 font-medium text-foreground" title="כל מודלי הראייה של OpenRouter — ממוין מהזול ליקר ($/1M טוקני קלט)">
+              מודל AI{orModels.isLoading ? " (טוען…)" : ""}:
               <select value={opts.model}
                 onChange={(e) => setOpts((o) => ({ ...o, model: e.target.value }))}
-                className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs">
-                {VLM_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                className="max-w-[22rem] rounded-md border border-border bg-surface-2 px-2 py-1 text-xs">
+                {modelOptions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
               </select>
             </label>
             <span>שלבים:</span>
