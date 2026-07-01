@@ -506,32 +506,62 @@ function Thumb({ url, score, culling, tags, onOpen }: { url: string; score?: str
   // fall back to the CLIP aesthetic. One number only — no competing scores.
   const rating = culling?.culling_score != null ? (culling.culling_score * 5).toFixed(1) : score;
   const cat = hasCull ? cullingLabelHe(culling!.culling_label) : null;
+  const overall = culling?.culling_score != null ? Math.round(culling.culling_score * 100) : null;
   return (
-    <div className="group relative aspect-square overflow-hidden rounded bg-surface-2">
-      {url && <img src={url} alt="" loading="lazy" onClick={onOpen} className="h-full w-full cursor-zoom-in object-cover" />}
+    <div className="overflow-hidden rounded border border-border bg-surface-2">
+      {/* Square image — nothing overlaid on it */}
+      <div className="relative aspect-square overflow-hidden">
+        {url && <img src={url} alt="" loading="lazy" onClick={onOpen} className="h-full w-full cursor-zoom-in object-cover" />}
+      </div>
 
-      {/* Single primary rating badge (top-right) */}
-      {rating && rating !== "—" && (
-        <span className="absolute right-1 top-1 flex items-center gap-0.5 rounded bg-black/65 px-1.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
-          <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />{rating}
-        </span>
-      )}
-
-      {/* Full culling breakdown — revealed on hover, so it never covers the photo by default */}
-      {hasCull && <CullingDetails metrics={culling!} />}
-
-      {/* Bottom chips: category (distinct color) + tags */}
-      {(cat || (tags && tags.length > 0)) && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-end gap-1 bg-gradient-to-t from-black/85 to-transparent p-1.5 pt-6">
+      {/* All info BELOW the image */}
+      <div className="space-y-1.5 p-2">
+        {/* rating + category */}
+        <div className="flex items-center justify-between gap-1">
+          {rating && rating !== "—" && (
+            <span className="flex items-center gap-0.5 text-xs font-bold text-foreground">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />{rating}
+            </span>
+          )}
           {cat && <span className="rounded bg-fuchsia-600/90 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white">{cat}</span>}
-          {tags?.map((t) => (
-            <span key={t.tag}
-              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white ${
-                t.src === "user" ? "bg-blue-600/90" : "bg-amber-500/90"
-              }`}>{t.tag}</span>
-          ))}
         </div>
-      )}
+
+        {/* culling sub-scores — Hebrew labels + bars */}
+        {hasCull && (
+          <div className="space-y-1">
+            {overall != null && (
+              <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground">
+                <span>דירוג AI</span><span className="font-mono text-foreground">{overall}%</span>
+              </div>
+            )}
+            {SUBSCORES.map(({ key, he }) => {
+              const v = culling![key] as number | null;
+              const pct = v != null ? Math.round(v * 100) : 0;
+              return (
+                <div key={key} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <span className="w-[4.5rem] shrink-0">{he}</span>
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                    <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                  </span>
+                  <span className="w-6 shrink-0 text-left font-mono">{v != null ? pct : "—"}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* tags */}
+        {tags && tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {tags.map((t) => (
+              <span key={t.tag}
+                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white ${
+                  t.src === "user" ? "bg-blue-600/90" : "bg-amber-500/90"
+                }`}>{t.tag}</span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -571,27 +601,3 @@ const SUBSCORES: { key: keyof CullingMetrics; he: string }[] = [
   { key: "intended_facial_expression", he: "הבעה" },
 ];
 
-function CullingDetails({ metrics }: { metrics: CullingMetrics }) {
-  const overall = metrics.culling_score != null ? Math.round(metrics.culling_score * 100) : null;
-  return (
-    <div className="pointer-events-none absolute inset-0 flex flex-col justify-center gap-1.5 bg-black/80 p-3 text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-      <div className="mb-0.5 flex items-center justify-between text-[11px] font-semibold">
-        <span>דירוג AI</span>
-        <span>{overall != null ? `${overall}%` : "—"}</span>
-      </div>
-      {SUBSCORES.map(({ key, he }) => {
-        const v = metrics[key] as number | null;
-        const pct = v != null ? Math.round(v * 100) : 0;
-        return (
-          <div key={key} className="flex items-center gap-1.5 text-[10px]">
-            <span className="w-[4.5rem] shrink-0 text-white/85">{he}</span>
-            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
-              <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
-            </span>
-            <span className="w-6 shrink-0 text-left font-mono text-white/90">{v != null ? pct : "—"}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
