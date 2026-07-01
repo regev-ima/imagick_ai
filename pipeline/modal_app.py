@@ -508,3 +508,78 @@ class Pipeline:
                 "count": len(valid), "faces_provider": getattr(self, "faces_provider", "?"),
             },
         }
+
+
+# ── Grouping ────────────────────────────────────────────────────────────────
+# Faithful port of the OLD RunPod grouping (community detection over image
+# embeddings, with a HARD EXIF time gate). This is a whole-gallery "reduce" over
+# all embeddings + capture times, so it runs once (not per batch). Pure numpy →
+# CPU function (no GPU cost). Reuses the CLIP embeddings we already compute (the
+# old code's `g.encode()` was likewise the image-embedding source).
+def _community_detection(emb, threshold, times=None, time_threshold=None, min_community_size=1, batch_size=1024):
+    """Return non-overlapping communities (lists of indices), largest-first then
+    de-overlapped greedily. A pair further apart in time than `time_threshold`
+    (seconds, by EXIF capture time) is forced below threshold so it can't group."""
+    import numpy as np
+
+    n = emb.shape[0]
+    neighbors = []
+    for start in range(0, n, batch_size):
+        end = min(start + batch_size, n)
+        sims = emb[start:end] @ emb.T                     # cosine (emb is L2-normalized)
+        if times is not None and time_threshold is not None:
+            dt = np.abs(times[start:end, None] - times[None, :])
+            sims = np.where(dt > float(time_threshold), -1.0, sims)   # hard time gate
+        for bi in range(end - start):
+            neighbors.append(np.nonzero(sims[bi] >= threshold)[0])
+
+    order = sorted(range(n), key=lambda i: len(neighbors[i]), reverse=True)  # largest first
+    seen, communities = set(), []
+    for i in order:
+        fresh = [int(m) for m in neighbors[i] if m not in seen]              # greedy de-overlap
+        if len(fresh) >= min_community_size:
+            communities.append(fresh)
+            seen.update(fresh)
+    return communities
+
+
+@app.function(image=image, secrets=[modal.Secret.from_name("imagick-pipeline-secret")])
+@modal.fastapi_endpoint(method="POST")
+def group(data: dict):
+    """Whole-gallery grouping. Body:
+        {token, embeddings:[[...]], times:[epoch_seconds|null], thresholds:[...],
+         time_threshold: seconds|null}
+    Returns {groups: [[g1,g2,g3], ...]} aligned to the input order — per-image
+    group ids at each threshold, ids ordered by each cluster's earliest capture."""
+    import os
+    import numpy as np
+
+    if data.get("token") != os.environ.get("PIPELINE_TOKEN"):
+        return {"error": "unauthorized"}
+
+    emb = np.asarray(data.get("embeddings") or [], dtype=np.float32)
+    if emb.ndim != 2 or emb.shape[0] == 0:
+        return {"groups": []}
+    emb = emb / (np.linalg.norm(emb, axis=1, keepdims=True) + 1e-12)
+    n = emb.shape[0]
+
+    thresholds = data.get("thresholds") or [0.5, 0.7, 0.9]
+    time_threshold = data.get("time_threshold", None)
+    times_in = data.get("times")
+    # Missing EXIF → epoch 0 (matches the old 1970 fallback).
+    times = (np.array([float(t) if t is not None else 0.0 for t in times_in], dtype=np.float64)
+             if times_in is not None else None)
+
+    def ids_for(threshold):
+        comms = _community_detection(emb, threshold, times, time_threshold)
+        if times is not None:                              # order group ids by earliest capture
+            comms.sort(key=lambda members: min(times[m] for m in members))
+        ids = [0] * n
+        for gid, members in enumerate(comms):
+            for m in members:
+                ids[m] = gid
+        return ids
+
+    per_threshold = [ids_for(t) for t in thresholds]
+    groups = [[per_threshold[k][i] for k in range(len(thresholds))] for i in range(n)]
+    return {"groups": groups}
