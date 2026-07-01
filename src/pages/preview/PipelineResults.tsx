@@ -32,7 +32,9 @@ export default function PipelineResults() {
   const [lightbox, setLightbox] = useState<string | null>(null);
   // Which steps to run. Faces (people) is the heavy, premium-gated step; the rest
   // ride on the single cheap CLIP embedding.
-  const [opts, setOpts] = useState({ cluster: true, faces: true, tags: true });
+  const [opts, setOpts] = useState<{ cluster: boolean; faces: boolean; tags: boolean; source: "preview" | "thumbnail" }>(
+    { cluster: true, faces: true, tags: true, source: "preview" },
+  );
   const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   const galleries = useQuery({
@@ -277,6 +279,12 @@ export default function PipelineResults() {
                 className="accent-primary" />
               זיהוי אנשים <span className="rounded bg-amber-500/20 px-1 text-amber-600">פרימיום</span>
               <span className="opacity-60">(השלב היקר — ~40שׁ)</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5">
+              <input type="checkbox" checked={opts.source === "thumbnail"}
+                onChange={(e) => setOpts((o) => ({ ...o, source: e.target.checked ? "thumbnail" : "preview" }))}
+                className="accent-primary" />
+              תמונות מוקטנות <span className="opacity-60">(thumbnail — הכי זול/מהיר, בלי פנים)</span>
             </label>
           </div>
         )}

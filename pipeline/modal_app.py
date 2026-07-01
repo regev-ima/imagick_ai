@@ -435,9 +435,9 @@ class Pipeline:
         # Try the small preview first, then fall back to the original if it's missing.
         def dl(it):
             urls = [it["url"]]
-            fb = it.get("fallback")
-            if fb and fb != it["url"]:
-                urls.append(fb)
+            for fb in (it.get("fallbacks") or ([it["fallback"]] if it.get("fallback") else [])):
+                if fb and fb not in urls:
+                    urls.append(fb)
             last_exc = None
             for url in urls:
                 try:

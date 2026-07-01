@@ -37,6 +37,25 @@ function toPreviewUrl(originalUrl: string): string {
   }
 }
 
+// The tiny thumbnail (~256px). Fine for CLIP (rating/clustering/tags all use 224px),
+// too small for faces — so only used when faces are off. Much cheaper/faster.
+function toThumbnailUrl(originalUrl: string): string {
+  try {
+    if (originalUrl.includes("/thumbnail/") && originalUrl.includes("_reduced_thumbnail")) return originalUrl;
+    const lastSlash = originalUrl.lastIndexOf("/");
+    if (lastSlash === -1) return originalUrl;
+    let base = originalUrl.substring(0, lastSlash);
+    const full = originalUrl.substring(lastSlash + 1);
+    const dot = full.lastIndexOf(".");
+    let name = dot > 0 ? full.substring(0, dot) : full;
+    base = base.replace(/\/(thumbnail|compressed)$/, "");
+    name = name.replace(/_reduced_thumbnail$/, "").replace(/_reduced$/, "");
+    return `${base}/thumbnail/${name}_reduced_thumbnail.webp`;
+  } catch {
+    return originalUrl;
+  }
+}
+
 interface ModalFace {
   bbox: [number, number, number, number];
   det_score: number;
@@ -73,7 +92,7 @@ serve(async (req: Request) => {
     const body = await req.json();
     const { galleryId, stall = 0, options } = body as {
       galleryId: string; userId?: string; stall?: number;
-      options?: { faces?: boolean; cluster?: boolean; tags?: boolean };
+      options?: { faces?: boolean; cluster?: boolean; tags?: boolean; source?: "preview" | "thumbnail" };
     };
     if (!galleryId) return json({ error: "Missing galleryId" }, 400);
     // Which optional steps to run. Faces (ArcFace) is the heavy, premium-gated one;
@@ -81,6 +100,8 @@ serve(async (req: Request) => {
     const doFaces = options?.faces !== false;
     const doCluster = options?.cluster !== false;
     const doTags = options?.tags !== false;
+    // Image source: preview (default) or the tiny thumbnail (cheaper; CLIP-only, no faces).
+    const source = options?.source === "thumbnail" ? "thumbnail" : "preview";
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -173,11 +194,16 @@ serve(async (req: Request) => {
               token: modalToken,
               faces: doFaces, // skip ArcFace on Modal when faces are off
               tags: doTags,
-              images: batch.map((img) => ({
-                id: img.id,
-                url: toPreviewUrl(img.original_url),
-                fallback: img.original_url, // if the preview is missing, use the original
-              })),
+              images: batch.map((img) => {
+                const preview = toPreviewUrl(img.original_url);
+                const thumb = toThumbnailUrl(img.original_url);
+                // Primary source + progressively larger fallbacks if it's missing.
+                const url = source === "thumbnail" ? thumb : preview;
+                const fallbacks = source === "thumbnail"
+                  ? [preview, img.original_url]
+                  : [img.original_url];
+                return { id: img.id, url, fallbacks };
+              }),
             }),
           });
           const data = await res.json();
