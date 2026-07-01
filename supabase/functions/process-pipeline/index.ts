@@ -115,9 +115,14 @@ serve(async (req: Request) => {
     const doCluster = options?.cluster !== false;
     const doTags = options?.tags !== false;
     // Culling = the OLD VLM rating/label pass (score-vision `mode:"culling"`), which
-    // writes the old gallery_images columns. On by default; needs scoreVisionUrl.
-    const scoreVisionUrl = typeof options?.scoreVisionUrl === "string" ? options.scoreVisionUrl : null;
-    const doCulling = options?.culling !== false && !!scoreVisionUrl;
+    // writes the old gallery_images columns. On by default; needs a score-vision URL.
+    // Source of truth = the Edge Function secret SCORE_VISION_URL (a stable PUBLIC
+    // endpoint). The frontend-provided value is only a FALLBACK — a browser preview
+    // URL is often auth-protected and returns HTML/401 to server-to-server calls.
+    const scoreVisionUrl = Deno.env.get("SCORE_VISION_URL") ||
+      (typeof options?.scoreVisionUrl === "string" ? options.scoreVisionUrl : null);
+    const cullingRequested = options?.culling !== false;
+    const doCulling = cullingRequested && !!scoreVisionUrl;
     // Image source: preview (default) or the tiny thumbnail (cheaper; CLIP-only, no faces).
     const source = options?.source === "thumbnail" ? "thumbnail" : "preview";
     // OLD grouping params. `thresholds` → similarity_group_1/2/3; `timeThreshold`
@@ -140,8 +145,8 @@ serve(async (req: Request) => {
         .from("image_features").select("image_id, clip_vector").eq("gallery_id", galleryId);
       const { data: imgRows } = await admin
         .from("gallery_images").select("id, taken_at").eq("gallery_id", galleryId);
-      const takenAt = new Map(
-        (imgRows || []).map((r: { id: string; taken_at: string | null }) => [r.id, r.taken_at]),
+      const takenAt = new Map<string, string | null>(
+        (imgRows || []).map((r: { id: string; taken_at: string | null }) => [r.id, r.taken_at] as [string, string | null]),
       );
       const ids: string[] = [];
       const embeddings: number[][] = [];
@@ -211,6 +216,17 @@ serve(async (req: Request) => {
       pipeline_error: null,
       ...(isInternal ? {} : { pipeline_timing: null }), // reset timing on a fresh user-initiated run
     }).eq("id", galleryId);
+
+    // Culling was requested but there's no endpoint to call it — fail loudly with
+    // an actionable message instead of silently skipping the rating pass.
+    if (cullingRequested && !scoreVisionUrl) {
+      await admin.from("galleries").update({
+        pipeline_status: "error",
+        pipeline_error: "חסר scoreVisionUrl: הגדר secret בשם SCORE_VISION_URL ב-Edge Function " +
+          "(endpoint ציבורי של /api/score-vision), או שלח options.scoreVisionUrl תקין.",
+      }).eq("id", galleryId);
+      return json({ error: "missing scoreVisionUrl / SCORE_VISION_URL" }, 400);
+    }
 
     // Images in this gallery that don't yet have CLIP features (computed in JS —
     // more robust than a PostgREST anti-join embed).
@@ -327,25 +343,58 @@ serve(async (req: Request) => {
     // Runs on the thumbnail (~small, cheap) with the gallery's labels. Bounded by the
     // same time budget; whatever's left over is picked up by the next chained call.
     let cullStart = 0;
-    const cullOne = async (img: { id: string; original_url: string }) => {
+    let cullFirstError: string | null = null; // first failure this invocation (for pipeline_error)
+
+    // Safe score-vision caller: never throws. Reads the body as TEXT first, checks
+    // status + content-type, and only JSON.parses when it's actually JSON. Returns a
+    // COMPACT diagnostic (status/content-type/body prefix ≤300 chars) — so a bad
+    // endpoint (protected preview → HTML/401, wrong URL → 404) is visible instead of
+    // silently stalling with a misleading "Modal/GPU" message.
+    const callScoreVision = async (image: string): Promise<{ data?: Record<string, unknown>; error?: string }> => {
+      let res: Response;
       try {
-        const res = await fetch(scoreVisionUrl!, {
+        res = await fetch(scoreVisionUrl!, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "culling", image: toThumbnailUrl(img.original_url), labels }),
+          body: JSON.stringify({ mode: "culling", image, labels }),
         });
-        const d = await res.json();
+      } catch (e) {
+        return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+      }
+      const ct = res.headers.get("content-type") || "";
+      const text = await res.text();
+      if (!res.ok) return { error: `status=${res.status} ct=${ct || "?"} body=${text.slice(0, 300)}` };
+      if (!ct.includes("application/json")) {
+        return { error: `non-json response ct=${ct || "?"} status=${res.status} body=${text.slice(0, 300)}` };
+      }
+      try {
+        return { data: JSON.parse(text) as Record<string, unknown> };
+      } catch {
+        return { error: `json parse failed ct=${ct} body=${text.slice(0, 300)}` };
+      }
+    };
+
+    const cullOne = async (img: { id: string; original_url: string }) => {
+      const { data: d, error } = await callScoreVision(toThumbnailUrl(img.original_url));
+      if (error || !d) {
+        if (!cullFirstError) cullFirstError = error ?? "unknown culling error";
+        console.error("Culling call failed:", img.id, error);
+        return; // leave for next invocation
+      }
+      const num = (v: unknown) => (typeof v === "number" ? v : 0);
+      try {
         await admin.from("gallery_images").update({
-          culling_score: typeof d?.overall_score === "number" ? d.overall_score : 0,
-          culling_label: typeof d?.label === "string" ? d.label : null,
-          subject_sharpness: typeof d?.subject_sharpness === "number" ? d.subject_sharpness : 0,
-          background_sharpness: typeof d?.background_sharpness === "number" ? d.background_sharpness : 0,
-          thirds_rule: typeof d?.thirds_rule === "number" ? d.thirds_rule : 0,
-          intended_facial_expression: typeof d?.intended_facial_expression === "number" ? d.intended_facial_expression : 0,
+          culling_score: num(d.overall_score),
+          culling_label: typeof d.label === "string" ? d.label : null,
+          subject_sharpness: num(d.subject_sharpness),
+          background_sharpness: num(d.background_sharpness),
+          thirds_rule: num(d.thirds_rule),
+          intended_facial_expression: num(d.intended_facial_expression),
         }).eq("id", img.id);
         cullProcessed++;
-      } catch (err) {
-        console.error("Culling call failed:", img.id, err); // leave for next invocation
+      } catch (e) {
+        if (!cullFirstError) cullFirstError = `db update failed: ${e instanceof Error ? e.message : String(e)}`;
+        console.error("Culling DB write failed:", img.id, e);
       }
     };
     if (doCulling && cullTodo.length) {
@@ -403,11 +452,22 @@ serve(async (req: Request) => {
       // burning invocations/credits.
       const nextStall = madeProgress ? 0 : stall + 1;
       if (nextStall >= 3) {
+        // Point the finger at the step that actually failed to progress.
+        let msg: string;
+        if (doCulling && cullRemaining > 0 && cullProcessed === 0) {
+          msg = "עיבוד נעצר: culling לא התקדם (0 הצלחות) אחרי 3 ניסיונות. " +
+            "בדוק שה-SCORE_VISION_URL הוא endpoint ציבורי שמחזיר JSON. " +
+            `שגיאה ראשונה: ${cullFirstError ?? "לא ידועה"}`;
+        } else if (clipRemaining > 0 && processed === 0) {
+          msg = "עיבוד נעצר: CLIP/Modal לא התקדם אחרי 3 ניסיונות (ייתכן ש-Modal ללא משאבי GPU פנויים).";
+        } else {
+          msg = "עיבוד נעצר: לא הייתה התקדמות אחרי 3 ניסיונות.";
+        }
         await admin.from("galleries").update({
           pipeline_status: "error",
-          pipeline_error: "עיבוד נעצר: לא הייתה התקדמות אחרי 3 ניסיונות (ייתכן ש-Modal ללא משאבי GPU פנויים).",
+          pipeline_error: msg,
         }).eq("id", galleryId);
-        return json({ error: "stalled", remaining }, 200);
+        return json({ error: "stalled", remaining, clipRemaining, cullRemaining, cullFirstError }, 200);
       }
       const chain = fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {
         method: "POST",

@@ -17,6 +17,14 @@
  *   SCORE_VISION_URL="https://<your-app-domain>/api/score-vision" \
  *   node scripts/smoke-pipeline.mjs <galleryId>
  *
+ * IMPORTANT — culling endpoint: the Edge Function PREFERS its own `SCORE_VISION_URL`
+ * secret over the value sent by this script (or the frontend). The value here is only
+ * a FALLBACK. Make sure the Edge Function secret points to a PUBLIC endpoint — a
+ * protected Vercel *preview* URL returns HTML/401 to the server-to-server culling call
+ * and every culling call fails. Set it once with:
+ *   supabase secrets set SCORE_VISION_URL="https://<public-domain>/api/score-vision" \
+ *     --project-ref <ref>
+ *
  * Optional env:
  *   SUPABASE_USER_JWT   a real user JWT to invoke as the gallery owner (closest
  *                       to the app path). If unset, the SERVICE_ROLE key is used
@@ -109,6 +117,14 @@ async function restCount(path) {
 async function main() {
   console.log(`\n▶ Smoke test — gallery ${galleryId}`);
   console.log(`  options: ${JSON.stringify({ ...options, scoreVisionUrl: options.scoreVisionUrl ? "<set>" : undefined })}\n`);
+
+  if (options.culling) {
+    console.log("  ⚠ culling is ON. The Edge Function uses its OWN `SCORE_VISION_URL` secret");
+    console.log("    if set (preferred), else the fallback URL passed here" +
+      `${SCORE_VISION_URL ? "" : " — but you passed NONE, so it relies entirely on the secret"}.`);
+    console.log("    Ensure that endpoint is PUBLIC (a protected Vercel preview URL returns HTML/401");
+    console.log("    to the server-to-server call and every culling call fails).\n");
+  }
 
   // 1) Trigger the pipeline exactly like the app (edge function invoke).
   const bearer = USER_JWT || SERVICE_KEY;

@@ -10,6 +10,10 @@ name: Deploy AI pipeline
 #   SUPABASE_ACCESS_TOKEN                 - supabase.com (Account → Access Tokens)
 #   SUPABASE_PROJECT_ID                   - your project ref (e.g. abcdefgh...)
 #   SUPABASE_DB_PASSWORD                  - the database password
+#   SCORE_VISION_URL   (optional)         - PUBLIC /api/score-vision endpoint for
+#                                           culling (e.g. https://imagick.ai/api/score-vision).
+#                                           If unset, culling falls back to the URL the
+#                                           frontend sends (a protected preview URL will fail).
 
 # Runs automatically on changes to the pipeline (the secrets are set now), and
 # can also be run manually. NOTE: the "Run workflow" button only appears once
@@ -102,12 +106,24 @@ jobs:
         run: supabase db push
 
       - name: Set edge-function secrets
+        env:
+          # A stable PUBLIC score-vision endpoint (e.g. https://imagick.ai/api/score-vision).
+          # Preferred over the frontend-provided scoreVisionUrl, which on a protected
+          # preview URL returns HTML/401 to the server-to-server culling call.
+          SCORE_VISION_URL: ${{ secrets.SCORE_VISION_URL }}
         run: |
-          supabase secrets set \
-            MODAL_URL="${{ steps.modal.outputs.url }}" \
-            MODAL_GROUP_URL="${{ steps.modal.outputs.group }}" \
-            MODAL_TOKEN="${{ secrets.PIPELINE_TOKEN }}" \
-            --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+          ARGS=(
+            MODAL_URL="${{ steps.modal.outputs.url }}"
+            MODAL_GROUP_URL="${{ steps.modal.outputs.group }}"
+            MODAL_TOKEN="${{ secrets.PIPELINE_TOKEN }}"
+          )
+          if [ -n "$SCORE_VISION_URL" ]; then
+            ARGS+=( SCORE_VISION_URL="$SCORE_VISION_URL" )
+            echo "SCORE_VISION_URL will be set on the Edge Function."
+          else
+            echo "::warning::SCORE_VISION_URL repo secret is NOT set. Culling will fall back to the frontend-provided scoreVisionUrl; a protected preview URL will fail. Set a repo secret SCORE_VISION_URL to a PUBLIC /api/score-vision endpoint."
+          fi
+          supabase secrets set "${ARGS[@]}" --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
 
       - name: Deploy edge function
         # --use-api bundles via the Management API instead of pulling a Docker
