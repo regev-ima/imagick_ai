@@ -23,7 +23,15 @@ const DEFAULT_LABELS = [
 ];
 
 interface GalleryRow { id: string; name: string }
-interface ImageRow { id: string; original_url: string; filename: string }
+interface CullingMetrics {
+  culling_score: number | null;
+  culling_label: string | null;
+  subject_sharpness: number | null;
+  background_sharpness: number | null;
+  thirds_rule: number | null;
+  intended_facial_expression: number | null;
+}
+interface ImageRow extends CullingMetrics { id: string; original_url: string; filename: string }
 interface Tag { tag: string; score: number; src?: "user" | "general" }
 interface Label { tag: string; src: "user" | "general" }
 interface Feature { image_id: string; aesthetic: number | null; visual_cluster: number | null; tags: Tag[] | null }
@@ -68,7 +76,17 @@ export default function PipelineResults() {
         db.from("image_features").select("image_id, aesthetic, visual_cluster, tags").eq("gallery_id", galleryId),
         supabase.from("face_detections").select("image_id, cluster_id").eq("gallery_id", galleryId).not("cluster_id", "is", null),
         supabase.from("face_clusters").select("id, face_count, representative_image_id, representative_bbox").eq("gallery_id", galleryId).order("face_count", { ascending: false }),
-        supabase.from("gallery_images").select("id, original_url, filename").eq("gallery_id", galleryId),
+        supabase.from("gallery_images").select([
+          "id",
+          "original_url",
+          "filename",
+          "culling_score",
+          "culling_label",
+          "subject_sharpness",
+          "background_sharpness",
+          "thirds_rule",
+          "intended_facial_expression",
+        ].join(", ")).eq("gallery_id", galleryId),
       ]);
       const g = gRes.data as { pipeline_status?: string; pipeline_timing?: Timing } | null;
       return {
@@ -415,7 +433,7 @@ export default function PipelineResults() {
               <div key={c.id} className="mt-5">
                 <div className="mb-1.5 text-xs font-medium text-muted-foreground">קבוצה {c.id} · {c.items.length} תמונות</div>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9">
-                  {c.items.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} tags={labelsFor(f)} onOpen={() => setLightbox(preview(f.image_id))} />)}
+                  {c.items.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} culling={imById.get(f.image_id)} tags={labelsFor(f)} onOpen={() => setLightbox(preview(f.image_id))} />)}
                 </div>
               </div>
             ))}
@@ -430,7 +448,7 @@ export default function PipelineResults() {
                       אדם {i + 1} <span className="text-muted-foreground">· {p.images.length} תמונות</span>
                     </div>
                     <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-                      {p.images.map((id) => <Thumb key={id} url={thumb(id)} onOpen={() => setLightbox(preview(id))} />)}
+                      {p.images.map((id) => <Thumb key={id} url={thumb(id)} culling={imById.get(id)} onOpen={() => setLightbox(preview(id))} />)}
                     </div>
                   </div>
                 ))}
@@ -440,7 +458,7 @@ export default function PipelineResults() {
             {/* Best of gallery */}
             {view === "top" && (
               <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9">
-                {top.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} tags={labelsFor(f)} onOpen={() => setLightbox(preview(f.image_id))} />)}
+                {top.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} culling={imById.get(f.image_id)} tags={labelsFor(f)} onOpen={() => setLightbox(preview(f.image_id))} />)}
               </div>
             )}
           </>
@@ -482,11 +500,12 @@ function FaceCrop({ url, bbox, size = 44 }: { url: string; bbox: Bbox | null; si
   return <canvas ref={ref} width={size} height={size} className="rounded-full object-cover" />;
 }
 
-function Thumb({ url, score, tags, onOpen }: { url: string; score?: string; tags?: Label[]; onOpen: () => void }) {
+function Thumb({ url, score, culling, tags, onOpen }: { url: string; score?: string; culling?: CullingMetrics; tags?: Label[]; onOpen: () => void }) {
   return (
     <div className="relative aspect-square overflow-hidden rounded bg-surface-2">
       {url && <img src={url} alt="" loading="lazy" onClick={onOpen} className="h-full w-full cursor-zoom-in object-cover" />}
       {score && <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-bold text-white">{score}</span>}
+      {culling && hasCullingMetrics(culling) && <CullingOverlay metrics={culling} />}
       {tags && tags.length > 0 && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-gradient-to-t from-black/85 to-transparent p-1.5 pt-5">
           {tags.map((t) => (
@@ -497,6 +516,44 @@ function Thumb({ url, score, tags, onOpen }: { url: string; score?: string; tags
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function hasCullingMetrics(metrics: CullingMetrics) {
+  return [
+    metrics.culling_score,
+    metrics.subject_sharpness,
+    metrics.background_sharpness,
+    metrics.thirds_rule,
+    metrics.intended_facial_expression,
+  ].some((v) => v !== null && v !== undefined) || !!metrics.culling_label;
+}
+
+function metricPct(value: number | null | undefined) {
+  return value === null || value === undefined ? "—" : `${Math.round(value * 100)}`;
+}
+
+function compactLabel(label: string | null | undefined) {
+  if (!label || label === "N/A" || label === "none") return null;
+  return label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function CullingOverlay({ metrics }: { metrics: CullingMetrics }) {
+  const label = compactLabel(metrics.culling_label);
+  return (
+    <div className="pointer-events-none absolute left-1 top-1 max-w-[calc(100%-2.5rem)] rounded bg-black/70 px-1.5 py-1 text-[9px] font-semibold leading-tight text-white shadow-sm backdrop-blur">
+      <div className="flex items-center gap-1 text-[10px]">
+        <span className="text-primary-foreground/80">AI</span>
+        <span>{metricPct(metrics.culling_score)}</span>
+        {label && <span className="truncate text-white/75">· {label}</span>}
+      </div>
+      <div className="mt-0.5 grid grid-cols-2 gap-x-1 gap-y-0.5 font-mono text-[8px] text-white/85">
+        <span>S {metricPct(metrics.subject_sharpness)}</span>
+        <span>B {metricPct(metrics.background_sharpness)}</span>
+        <span>T {metricPct(metrics.thirds_rule)}</span>
+        <span>E {metricPct(metrics.intended_facial_expression)}</span>
+      </div>
     </div>
   );
 }
