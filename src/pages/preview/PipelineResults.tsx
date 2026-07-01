@@ -501,14 +501,30 @@ function FaceCrop({ url, bbox, size = 44 }: { url: string; bbox: Bbox | null; si
 }
 
 function Thumb({ url, score, culling, tags, onOpen }: { url: string; score?: string; culling?: CullingMetrics; tags?: Label[]; onOpen: () => void }) {
+  const hasCull = !!(culling && hasCullingMetrics(culling));
+  // Prefer the VLM culling rating (the trusted photographer score) for the badge,
+  // fall back to the CLIP aesthetic. One number only — no competing scores.
+  const rating = culling?.culling_score != null ? (culling.culling_score * 5).toFixed(1) : score;
+  const cat = hasCull ? cullingLabelHe(culling!.culling_label) : null;
   return (
-    <div className="relative aspect-square overflow-hidden rounded bg-surface-2">
+    <div className="group relative aspect-square overflow-hidden rounded bg-surface-2">
       {url && <img src={url} alt="" loading="lazy" onClick={onOpen} className="h-full w-full cursor-zoom-in object-cover" />}
-      {score && <span className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] font-bold text-white">{score}</span>}
-      {culling && hasCullingMetrics(culling) && <CullingOverlay metrics={culling} />}
-      {tags && tags.length > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-gradient-to-t from-black/85 to-transparent p-1.5 pt-5">
-          {tags.map((t) => (
+
+      {/* Single primary rating badge (top-right) */}
+      {rating && rating !== "—" && (
+        <span className="absolute right-1 top-1 flex items-center gap-0.5 rounded bg-black/65 px-1.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
+          <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />{rating}
+        </span>
+      )}
+
+      {/* Full culling breakdown — revealed on hover, so it never covers the photo by default */}
+      {hasCull && <CullingDetails metrics={culling!} />}
+
+      {/* Bottom chips: category (distinct color) + tags */}
+      {(cat || (tags && tags.length > 0)) && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-end gap-1 bg-gradient-to-t from-black/85 to-transparent p-1.5 pt-6">
+          {cat && <span className="rounded bg-fuchsia-600/90 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white">{cat}</span>}
+          {tags?.map((t) => (
             <span key={t.tag}
               className={`rounded px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white ${
                 t.src === "user" ? "bg-blue-600/90" : "bg-amber-500/90"
@@ -530,30 +546,52 @@ function hasCullingMetrics(metrics: CullingMetrics) {
   ].some((v) => v !== null && v !== undefined) || !!metrics.culling_label;
 }
 
-function metricPct(value: number | null | undefined) {
-  return value === null || value === undefined ? "—" : `${Math.round(value * 100)}`;
-}
-
-function compactLabel(label: string | null | undefined) {
+// English culling labels → short Hebrew. Falls back to a tidied version of the raw
+// label so an unmapped/custom label still reads cleanly (never a truncated stub).
+const CULLING_LABEL_HE: Record<string, string> = {
+  "Preparations": "הכנות",
+  "Outdoor photography": "צילום חוץ",
+  "Couple moments": "רגעי זוג",
+  "Family & Reception": "משפחה וקבלת פנים",
+  "Ceremony": "טקס",
+  "Dance/Party": "ריקודים",
+  "Other": "אחר",
+};
+function cullingLabelHe(label: string | null | undefined) {
   if (!label || label === "N/A" || label === "none") return null;
-  return label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return CULLING_LABEL_HE[label] ??
+    label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function CullingOverlay({ metrics }: { metrics: CullingMetrics }) {
-  const label = compactLabel(metrics.culling_label);
+// The four sub-scores with clear Hebrew names (instead of cryptic S/B/T/E).
+const SUBSCORES: { key: keyof CullingMetrics; he: string }[] = [
+  { key: "subject_sharpness", he: "חדות נושא" },
+  { key: "background_sharpness", he: "חדות רקע" },
+  { key: "thirds_rule", he: "כלל השליש" },
+  { key: "intended_facial_expression", he: "הבעה" },
+];
+
+function CullingDetails({ metrics }: { metrics: CullingMetrics }) {
+  const overall = metrics.culling_score != null ? Math.round(metrics.culling_score * 100) : null;
   return (
-    <div className="pointer-events-none absolute left-1 top-1 max-w-[calc(100%-2.5rem)] rounded bg-black/70 px-1.5 py-1 text-[9px] font-semibold leading-tight text-white shadow-sm backdrop-blur">
-      <div className="flex items-center gap-1 text-[10px]">
-        <span className="text-primary-foreground/80">AI</span>
-        <span>{metricPct(metrics.culling_score)}</span>
-        {label && <span className="truncate text-white/75">· {label}</span>}
+    <div className="pointer-events-none absolute inset-0 flex flex-col justify-center gap-1.5 bg-black/80 p-3 text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+      <div className="mb-0.5 flex items-center justify-between text-[11px] font-semibold">
+        <span>דירוג AI</span>
+        <span>{overall != null ? `${overall}%` : "—"}</span>
       </div>
-      <div className="mt-0.5 grid grid-cols-2 gap-x-1 gap-y-0.5 font-mono text-[8px] text-white/85">
-        <span>S {metricPct(metrics.subject_sharpness)}</span>
-        <span>B {metricPct(metrics.background_sharpness)}</span>
-        <span>T {metricPct(metrics.thirds_rule)}</span>
-        <span>E {metricPct(metrics.intended_facial_expression)}</span>
-      </div>
+      {SUBSCORES.map(({ key, he }) => {
+        const v = metrics[key] as number | null;
+        const pct = v != null ? Math.round(v * 100) : 0;
+        return (
+          <div key={key} className="flex items-center gap-1.5 text-[10px]">
+            <span className="w-[4.5rem] shrink-0 text-white/85">{he}</span>
+            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
+              <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
+            </span>
+            <span className="w-6 shrink-0 text-left font-mono text-white/90">{v != null ? pct : "—"}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
