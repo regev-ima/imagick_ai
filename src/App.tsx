@@ -70,6 +70,8 @@ const DeliverConcept = lazy(() => import("./pages/preview/DeliverConcept"));
 const AestheticScoreDemo = lazy(() => import("./pages/preview/AestheticScoreDemo"));
 // Pipeline results (reads Phase-A/B output from the DB).
 const PipelineResults = lazy(() => import("./pages/preview/PipelineResults"));
+// Design mock for integrating AI into the client gallery / creation / settings.
+const AiMock = lazy(() => import("./pages/preview/AiMock"));
 
 const RouteFallback = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -131,6 +133,7 @@ const App = () => (
                 <Route path="/preview/aesthetic" element={<AestheticScoreDemo />} />
                 {/* Pipeline results — reads gallery pipeline output (auth required for RLS). */}
                 <Route path="/preview/pipeline" element={<ProtectedRoute><PipelineResults /></ProtectedRoute>} />
+                <Route path="/preview/mock" element={<ProtectedRoute><AiMock /></ProtectedRoute>} />
                 <Route
                   path="/dashboard"
                   element={(
