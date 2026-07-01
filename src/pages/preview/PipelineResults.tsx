@@ -74,10 +74,12 @@ export default function PipelineResults() {
   // ride on the single cheap CLIP embedding.
   const [opts, setOpts] = useState<{
     cluster: boolean; faces: boolean; tags: boolean; culling: boolean;
-    source: "preview" | "thumbnail"; timeThreshold: number | null; model: string;
+    timeThreshold: number | null; model: string;
   }>(
     // timeThreshold = the hard EXIF grouping gate in SECONDS (null = no time gate).
-    { cluster: true, faces: true, tags: true, culling: true, source: "preview", timeThreshold: 600, model: VLM_MODELS[0].id },
+    // The Modal image source is derived automatically (faces → preview; else the
+    // cheaper thumbnail), so there's no manual source toggle.
+    { cluster: true, faces: true, tags: true, culling: true, timeThreshold: 600, model: VLM_MODELS[0].id },
   );
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [groupLevel, setGroupLevel] = useState<1 | 2 | 3>(1); // which similarity_group_N to view
@@ -152,6 +154,9 @@ export default function PipelineResults() {
       // the label set, and the grouping thresholds + EXIF time gate.
       const options = {
         ...opts,
+        // Faces need the full-res preview; otherwise CLIP grouping rides on the
+        // cheapest thumbnail. Derived automatically — no manual toggle.
+        source: opts.faces ? "preview" : "thumbnail",
         scoreVisionUrl: `${window.location.origin}/api/score-vision`,
         labels: DEFAULT_LABELS,
         tagsList: DEFAULT_TAGS,          // VLM tagging candidates (not CLIP)
@@ -357,12 +362,6 @@ export default function PipelineResults() {
                 className="accent-primary" />
               זיהוי אנשים <span className="rounded bg-amber-500/20 px-1 text-amber-600">פרימיום</span>
               <span className="opacity-60">(השלב היקר — ~40שׁ)</span>
-            </label>
-            <label className="flex cursor-pointer items-center gap-1.5">
-              <input type="checkbox" checked={opts.source === "thumbnail"}
-                onChange={(e) => setOpts((o) => ({ ...o, source: e.target.checked ? "thumbnail" : "preview" }))}
-                className="accent-primary" />
-              תמונות מוקטנות <span className="opacity-60">(thumbnail — הכי זול/מהיר, בלי פנים)</span>
             </label>
           </div>
         )}
