@@ -320,13 +320,14 @@ class Pipeline:
         crops, owners, metas = [], [], []
         for i, pil in enumerate(pils):
             bgr = np.array(pil)[:, :, ::-1]
+            fh, fw = bgr.shape[:2]                     # detection-frame dimensions
             bboxes, kpss = det.detect(bgr, max_num=0, metric="default")
             if bboxes is None or len(bboxes) == 0:
                 continue
             for j in range(bboxes.shape[0]):
                 crops.append(face_align.norm_crop(bgr, kpss[j], image_size=rec_size))
                 owners.append(i)
-                metas.append((bboxes[j][:4], float(bboxes[j][4])))
+                metas.append((bboxes[j][:4], float(bboxes[j][4]), fw, fh))
 
         if crops:
             feats = rec.get_feat(crops)               # (M, 512) in one batched forward
@@ -334,9 +335,18 @@ class Pipeline:
             norms[norms == 0] = 1.0
             feats = feats / norms                     # == insightface normed_embedding
             for k in range(len(crops)):
-                bbox, score = metas[k]
+                bbox, score, fw, fh = metas[k]
+                x1, y1, x2, y2 = (float(v) for v in bbox.tolist())
+                fw = float(fw) or 1.0
+                fh = float(fh) or 1.0
                 per_img[owners[k]].append({
-                    "bbox": [float(v) for v in bbox.tolist()],
+                    # Raw pixels are in the DETECTION FRAME (whatever image we
+                    # downloaded — preview or thumbnail). Also emit resolution-
+                    # independent NORMALIZED coords (0..1) + the frame dims, so the
+                    # caller can rescale to the ORIGINAL image without guessing.
+                    "bbox": [x1, y1, x2, y2],
+                    "bbox_norm": [x1 / fw, y1 / fh, x2 / fw, y2 / fh],
+                    "frame": [fw, fh],
                     "det_score": score,
                     "embedding": [float(v) for v in feats[k].tolist()],
                 })

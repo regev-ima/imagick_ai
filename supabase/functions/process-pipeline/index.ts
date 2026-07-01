@@ -64,7 +64,9 @@ function toThumbnailUrl(originalUrl: string): string {
 }
 
 interface ModalFace {
-  bbox: [number, number, number, number];
+  bbox: [number, number, number, number]; // raw px in the detection frame
+  bbox_norm?: [number, number, number, number]; // 0..1 in the detection frame
+  frame?: [number, number]; // detection-frame [w, h]
   det_score: number;
   embedding: number[];
 }
@@ -76,6 +78,24 @@ interface ModalResult {
   faces?: ModalFace[];
   tags?: ModalTag[];
   error?: string;
+}
+
+// Face bboxes are detected on whatever frame Modal downloaded (preview OR the tiny
+// thumbnail). Consumers (FaceThumbnail / FaceCrop) render the face against the
+// PREVIEW/ORIGINAL image, so the box must be in ORIGINAL-image pixels. Convert the
+// normalized (0..1) coords by the original width/height. We store BOTH {x,y} and
+// {left,top} aliases so every consumer key works, plus source_* for traceability.
+// Fallback (no original dims yet): keep detection-frame px + record its frame size.
+function faceBox(f: ModalFace, origW: number | null, origH: number | null) {
+  const n = f.bbox_norm;
+  if (n && origW && origH && origW > 0 && origH > 0) {
+    const x = n[0] * origW, y = n[1] * origH;
+    const width = (n[2] - n[0]) * origW, height = (n[3] - n[1]) * origH;
+    return { x, y, left: x, top: y, width, height, source_width: origW, source_height: origH };
+  }
+  const [x1, y1, x2, y2] = f.bbox;
+  const sw = f.frame?.[0] ?? null, sh = f.frame?.[1] ?? null;
+  return { x: x1, y: y1, left: x1, top: y1, width: x2 - x1, height: y2 - y1, source_width: sw, source_height: sh };
 }
 
 serve(async (req: Request) => {
@@ -233,10 +253,15 @@ serve(async (req: Request) => {
     }
 
     // Images in this gallery that don't yet have CLIP features (computed in JS —
-    // more robust than a PostgREST anti-join embed).
+    // more robust than a PostgREST anti-join embed). `faces_done` tracks whether an
+    // image's faces were computed in the CURRENT (original-coord) scheme — images
+    // with stale/old-scheme faces have faces_done=false and get recomputed.
     const { data: doneRows } = await admin
-      .from("image_features").select("image_id").eq("gallery_id", galleryId);
+      .from("image_features").select("image_id, faces_done").eq("gallery_id", galleryId);
     const clipDone = new Set((doneRows || []).map((r: { image_id: string }) => r.image_id));
+    const facesDone = new Set(
+      (doneRows || []).filter((r: { faces_done?: boolean }) => r.faces_done).map((r: { image_id: string }) => r.image_id),
+    );
 
     // Images that already have an OLD culling score (so we don't re-pay the VLM).
     let cullDone = new Set<string>();
@@ -247,17 +272,26 @@ serve(async (req: Request) => {
     }
 
     const { data: allImgs, error: imgErr } = await admin
-      .from("gallery_images").select("id, original_url").eq("gallery_id", galleryId);
+      .from("gallery_images").select("id, original_url, width, height").eq("gallery_id", galleryId);
     if (imgErr) return json({ error: imgErr.message }, 500);
 
     const withUrl = (allImgs || [])
       .filter((i: { id: string; original_url: string | null }) => i.original_url) as
-      { id: string; original_url: string }[];
+      { id: string; original_url: string; width: number | null; height: number | null }[];
 
-    const images = withUrl.filter((i) => !clipDone.has(i.id)).slice(0, IMAGES_PER_INVOCATION);
+    // Original-image dimensions, for converting normalized face boxes → original px.
+    const dims = new Map<string, { w: number | null; h: number | null }>(
+      withUrl.map((i) => [i.id, { w: i.width, h: i.height }]),
+    );
+
+    // A image needs (re)processing on Modal if it lacks CLIP features OR (faces are
+    // on and its faces aren't computed in the current scheme yet).
+    const images = withUrl
+      .filter((i) => !clipDone.has(i.id) || (doFaces && !facesDone.has(i.id)))
+      .slice(0, IMAGES_PER_INVOCATION);
     const cullTodo = doCulling ? withUrl.filter((i) => !cullDone.has(i.id)) : [];
 
-    // Everything (CLIP + culling) already computed → finalize and finish.
+    // Everything (CLIP + faces + culling) already computed → finalize and finish.
     if (images.length === 0 && cullTodo.length === 0) {
       await finalize();
       return json({ success: true, done: true });
@@ -284,16 +318,24 @@ serve(async (req: Request) => {
         aesthetic: r.aesthetic ?? null,
         tags: r.tags ?? null,
         updated_at: new Date().toISOString(),
+        // Mark faces computed in the current (original-coord) scheme, so we don't
+        // reprocess. Only set when faces actually ran this call — otherwise leave the
+        // existing value untouched (omitted keys aren't overwritten on upsert-update).
+        ...(doFaces ? { faces_done: true } : {}),
       });
-      await admin.from("face_detections").delete().eq("image_id", r.id).not("arcface_vector", "is", null);
-      if (r.faces && r.faces.length) {
-        await admin.from("face_detections").insert(r.faces.map((f) => ({
-          image_id: r.id,
-          gallery_id: galleryId,
-          bounding_box: { x: f.bbox[0], y: f.bbox[1], width: f.bbox[2] - f.bbox[0], height: f.bbox[3] - f.bbox[1] },
-          det_score: f.det_score,
-          arcface_vector: JSON.stringify(f.embedding),
-        })));
+      if (doFaces) {
+        // Replace this image's faces (clears any stale old-scheme boxes first).
+        await admin.from("face_detections").delete().eq("image_id", r.id).not("arcface_vector", "is", null);
+        if (r.faces && r.faces.length) {
+          const d = dims.get(r.id);
+          await admin.from("face_detections").insert(r.faces.map((f) => ({
+            image_id: r.id,
+            gallery_id: galleryId,
+            bounding_box: faceBox(f, d?.w ?? null, d?.h ?? null), // ORIGINAL-image pixels
+            det_score: f.det_score,
+            arcface_vector: JSON.stringify(f.embedding),
+          })));
+        }
       }
       processed++;
     };
@@ -438,8 +480,9 @@ serve(async (req: Request) => {
       },
     }).eq("id", galleryId);
 
-    // Count remaining: an image is "done" only once it has CLIP features AND (if
-    // culling is enabled) an OLD culling score. Total work left is the sum of both.
+    // Count remaining: an image is "done" only once it has CLIP features, AND (if
+    // faces on) faces computed in the current scheme, AND (if culling on) a culling
+    // score. Total work left is the sum of all enabled steps.
     const { data: doneRows2 } = await admin
       .from("image_features").select("image_id").eq("gallery_id", galleryId);
     const { count: totalCount } = await admin
@@ -452,7 +495,14 @@ serve(async (req: Request) => {
         .eq("gallery_id", galleryId).not("culling_score", "is", null);
       cullRemaining = (totalCount ?? 0) - (cullDoneCount ?? 0);
     }
-    const remaining = clipRemaining + cullRemaining;
+    let facesRemaining = 0;
+    if (doFaces) {
+      const { count: facesDoneCount } = await admin
+        .from("image_features").select("image_id", { count: "exact", head: true })
+        .eq("gallery_id", galleryId).eq("faces_done", true);
+      facesRemaining = (totalCount ?? 0) - (facesDoneCount ?? 0);
+    }
+    const remaining = clipRemaining + cullRemaining + facesRemaining;
     const madeProgress = processed > 0 || cullProcessed > 0;
 
     if (remaining > 0) {
