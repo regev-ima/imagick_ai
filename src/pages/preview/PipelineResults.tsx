@@ -12,6 +12,10 @@ import { toast } from "sonner";
  * edge function (Modal engine). Populates once the engine has run.
  */
 
+// image_features (CLIP) isn't in the generated Supabase types — cast for that read.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
+
 // OLD photo-shoot label set the VLM culling picks from (same list as the backend).
 const DEFAULT_LABELS = [
   "Preparations", "Outdoor photography", "Couple moments",
@@ -50,6 +54,9 @@ interface ImageRow extends CullingMetrics {
   similarity_group_2: number | null;
   similarity_group_3: number | null;
 }
+// CLIP tags from a PRIOR run (no longer produced — tagging is via the VLM now).
+// Kept for display so existing data isn't hidden.
+interface Feature { image_id: string; tags: { tag: string; score: number; src?: "user" | "general" }[] | null }
 interface FaceDet { image_id: string; cluster_id: string | null }
 type Bbox = { x: number; y: number; width: number; height: number };
 interface FaceCluster { id: string; face_count: number; representative_image_id: string | null; representative_bbox: Bbox | null }
@@ -91,8 +98,9 @@ export default function PipelineResults() {
     queryKey: ["pipeline-results", galleryId],
     refetchInterval: (q) => ((q.state.data as { status?: string } | undefined)?.status === "processing" ? 4000 : false),
     queryFn: async () => {
-      const [gRes, fdRes, fcRes, imgRes] = await Promise.all([
+      const [gRes, fRes, fdRes, fcRes, imgRes] = await Promise.all([
         supabase.from("galleries").select("pipeline_status, pipeline_timing").eq("id", galleryId).single(),
+        db.from("image_features").select("image_id, tags").eq("gallery_id", galleryId), // CLIP tags (display only)
         supabase.from("face_detections").select("image_id, cluster_id").eq("gallery_id", galleryId).not("cluster_id", "is", null),
         supabase.from("face_clusters").select("id, face_count, representative_image_id, representative_bbox").eq("gallery_id", galleryId).order("face_count", { ascending: false }),
         supabase.from("gallery_images").select([
@@ -106,6 +114,7 @@ export default function PipelineResults() {
       return {
         status: g?.pipeline_status ?? "idle",
         timing: g?.pipeline_timing ?? null,
+        features: (fRes.data as Feature[]) ?? [],
         faces: (fdRes.data as FaceDet[]) ?? [],
         faceClusters: (fcRes.data as FaceCluster[]) ?? [],
         images: (imgRes.data as ImageRow[]) ?? [],
@@ -160,6 +169,35 @@ export default function PipelineResults() {
       for (const t of (im.ai_tags ?? [])) m.set(t, (m.get(t) ?? 0) + 1);
     return [...m.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count);
   }, [results.data]);
+
+  // Existing CLIP tags (display only — not produced anymore). Mean-center per tag so
+  // each image surfaces its most DISTINCTIVE CLIP tags, then keep the top few.
+  const clipTagsByImg = useMemo(() => {
+    const feats = results.data?.features ?? [];
+    const sum = new Map<string, number>(), cnt = new Map<string, number>();
+    for (const f of feats) for (const t of (f.tags ?? [])) {
+      sum.set(t.tag, (sum.get(t.tag) ?? 0) + t.score);
+      cnt.set(t.tag, (cnt.get(t.tag) ?? 0) + 1);
+    }
+    const mean = new Map<string, number>();
+    for (const [k, v] of sum) mean.set(k, v / (cnt.get(k) || 1));
+    const m = new Map<string, string[]>();
+    for (const f of feats) {
+      const cal = (f.tags ?? [])
+        .map((t) => ({ tag: t.tag, c: t.score - (mean.get(t.tag) ?? 0) }))
+        .sort((a, b) => b.c - a.c);
+      m.set(f.image_id, cal.slice(0, 3).filter((x) => x.c > 0.008).map((x) => x.tag));
+    }
+    return m;
+  }, [results.data]);
+
+  const clipTagCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const tags of clipTagsByImg.values()) for (const t of tags) m.set(t, (m.get(t) ?? 0) + 1);
+    return [...m.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count);
+  }, [clipTagsByImg]);
+
+  const hasClipTags = clipTagCounts.length > 0;
 
   // Groups from Modal community-detection (similarity_group_N), ranked within each
   // group by the VLM culling score, groups ordered by size.
@@ -362,28 +400,61 @@ export default function PipelineResults() {
               );
             })()}
 
-            {/* Tag panel — VLM (OpenRouter) tags in the gallery, clickable to filter */}
-            {tagCounts.length > 0 && (
-              <div className="mt-3 rounded-lg border border-border bg-surface-2 p-3">
-                <div className="mb-2 flex flex-wrap items-center gap-3 text-xs">
-                  <span className="font-medium text-foreground">תגיות (VLM)</span>
-                  {tagFilter && (
-                    <button onClick={() => setTagFilter(null)}
-                      className="rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground">✕ נקה סינון</button>
-                  )}
+            {/* Provenance — who produces what, stated explicitly */}
+            <div className="mt-3 rounded-lg border border-border bg-surface-2 p-3 text-xs">
+              <div className="mb-2 font-medium text-foreground">מי יוצר מה</div>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• <b className="text-foreground">ציון + תת-ציונים</b> (חדות נושא/רקע, שליש, הבעה): OpenRouter (VLM){results.data?.timing?.model ? ` · ${results.data.timing.model}` : ""}</li>
+                <li>• <b className="text-foreground">דירוג / קטגוריה</b> (התווית הסגולה): OpenRouter (VLM)</li>
+                <li>• <b className="text-foreground">תגיות</b>: <span className="text-blue-500">🔵 OpenRouter (VLM)</span> — מהרשימה הקבועה שנשלחה · <span className="text-amber-500">🟠 CLIP</span> — קיים מריצות קודמות, <b>לא מיוצר יותר</b></li>
+                <li>• <b className="text-foreground">קיבוץ תמונות</b>: CLIP (community-detection + זמן EXIF) · <b className="text-foreground">זיהוי פנים</b>: ArcFace</li>
+              </ul>
+              <div className="mt-2 border-t border-border pt-2">
+                <span className="text-muted-foreground">תגיות שנשלחו ל-VLM (רשימה קבועה):</span>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {DEFAULT_TAGS.map((t) => (
+                    <span key={t} className="rounded-full border border-blue-500/50 px-2 py-0.5 text-[11px] text-blue-400">{t}</span>
+                  ))}
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {tagCounts.map(({ tag, count }) => {
-                    const active = tag === tagFilter;
-                    return (
-                      <button key={tag}
-                        onClick={() => { setTagFilter(active ? null : tag); setView("top"); }}
-                        className={`rounded-full bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition ${active ? "ring-2 ring-white/70" : "opacity-85 hover:opacity-100"}`}>
-                        {tag} <span className="opacity-75">{count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              </div>
+            </div>
+
+            {/* Tag panel — which tags EXIST in the gallery, split by engine, clickable to filter */}
+            {(tagCounts.length > 0 || hasClipTags) && (
+              <div className="mt-3 space-y-3 rounded-lg border border-border bg-surface-2 p-3">
+                {tagFilter && (
+                  <button onClick={() => setTagFilter(null)}
+                    className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground">✕ נקה סינון</button>
+                )}
+                {tagCounts.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 flex items-center gap-1.5 text-xs"><span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600" /><span className="font-medium text-foreground">תגיות VLM (OpenRouter)</span></div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tagCounts.map(({ tag, count }) => {
+                        const active = tag === tagFilter;
+                        return (
+                          <button key={tag}
+                            onClick={() => { setTagFilter(active ? null : tag); setView("top"); }}
+                            className={`rounded-full bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition ${active ? "ring-2 ring-white/70" : "opacity-85 hover:opacity-100"}`}>
+                            {tag} <span className="opacity-75">{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {hasClipTags && (
+                  <div>
+                    <div className="mb-1.5 flex items-center gap-1.5 text-xs"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" /><span className="font-medium text-foreground">תגיות CLIP (ישן — לא מיוצר יותר)</span></div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {clipTagCounts.map(({ tag, count }) => (
+                        <span key={tag} className="rounded-full bg-amber-500 px-2.5 py-1 text-xs font-medium text-white opacity-85">
+                          {tag} <span className="opacity-75">{count}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -418,7 +489,7 @@ export default function PipelineResults() {
               <div key={c.id} className="mt-6">
                 <div className="mb-2 text-sm font-medium text-muted-foreground">קבוצה {c.id} · {c.items.length} תמונות</div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {c.items.map((im) => <Thumb key={im.id} url={thumb(im.id)} culling={im} tags={im.ai_tags ?? []} onOpen={() => setLightbox(preview(im.id))} />)}
+                  {c.items.map((im) => <Thumb key={im.id} url={thumb(im.id)} culling={im} tags={im.ai_tags ?? []} clipTags={clipTagsByImg.get(im.id) ?? []} onOpen={() => setLightbox(preview(im.id))} />)}
                 </div>
               </div>
             ))}
@@ -433,7 +504,7 @@ export default function PipelineResults() {
                       אדם {i + 1} <span className="text-muted-foreground">· {p.images.length} תמונות</span>
                     </div>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                      {p.images.map((id) => <Thumb key={id} url={thumb(id)} culling={imById.get(id)} tags={imById.get(id)?.ai_tags ?? []} onOpen={() => setLightbox(preview(id))} />)}
+                      {p.images.map((id) => <Thumb key={id} url={thumb(id)} culling={imById.get(id)} tags={imById.get(id)?.ai_tags ?? []} clipTags={clipTagsByImg.get(id) ?? []} onOpen={() => setLightbox(preview(id))} />)}
                     </div>
                   </div>
                 ))}
@@ -443,7 +514,7 @@ export default function PipelineResults() {
             {/* Best of gallery (by VLM culling score) */}
             {view === "top" && (
               <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {top.map((im) => <Thumb key={im.id} url={thumb(im.id)} culling={im} tags={im.ai_tags ?? []} onOpen={() => setLightbox(preview(im.id))} />)}
+                {top.map((im) => <Thumb key={im.id} url={thumb(im.id)} culling={im} tags={im.ai_tags ?? []} clipTags={clipTagsByImg.get(im.id) ?? []} onOpen={() => setLightbox(preview(im.id))} />)}
               </div>
             )}
           </>
@@ -485,7 +556,7 @@ function FaceCrop({ url, bbox, size = 44 }: { url: string; bbox: Bbox | null; si
   return <canvas ref={ref} width={size} height={size} className="rounded-full object-cover" />;
 }
 
-function Thumb({ url, culling, tags, onOpen }: { url: string; culling?: CullingMetrics; tags?: string[]; onOpen: () => void }) {
+function Thumb({ url, culling, tags, clipTags, onOpen }: { url: string; culling?: CullingMetrics; tags?: string[]; clipTags?: string[]; onOpen: () => void }) {
   const hasCull = !!(culling && hasCullingMetrics(culling));
   // Rating = the VLM culling score only (0..1 → 0..5 stars). No CLIP.
   const rating = culling?.culling_score != null ? (culling.culling_score * 5).toFixed(1) : null;
@@ -534,11 +605,21 @@ function Thumb({ url, culling, tags, onOpen }: { url: string; culling?: CullingM
           </div>
         )}
 
-        {/* VLM tags */}
+        {/* VLM tags (blue) */}
         {tags && tags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[9px] font-semibold text-blue-500">VLM</span>
             {tags.map((t) => (
               <span key={t} className="rounded bg-blue-600/90 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white">{t}</span>
+            ))}
+          </div>
+        )}
+        {/* CLIP tags (amber) — existing data, not produced anymore */}
+        {clipTags && clipTags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[9px] font-semibold text-amber-500">CLIP</span>
+            {clipTags.map((t) => (
+              <span key={t} className="rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white">{t}</span>
             ))}
           </div>
         )}
