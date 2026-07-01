@@ -16,6 +16,12 @@ import { toast } from "sonner";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
+// OLD photo-shoot label set the VLM culling picks from (same list as the backend).
+const DEFAULT_LABELS = [
+  "Preparations", "Outdoor photography", "Couple moments",
+  "Family & Reception", "Ceremony", "Dance/Party", "Other",
+];
+
 interface GalleryRow { id: string; name: string }
 interface ImageRow { id: string; original_url: string; filename: string }
 interface Tag { tag: string; score: number; src?: "user" | "general" }
@@ -32,8 +38,12 @@ export default function PipelineResults() {
   const [lightbox, setLightbox] = useState<string | null>(null);
   // Which steps to run. Faces (people) is the heavy, premium-gated step; the rest
   // ride on the single cheap CLIP embedding.
-  const [opts, setOpts] = useState<{ cluster: boolean; faces: boolean; tags: boolean; source: "preview" | "thumbnail" }>(
-    { cluster: true, faces: true, tags: true, source: "preview" },
+  const [opts, setOpts] = useState<{
+    cluster: boolean; faces: boolean; tags: boolean; culling: boolean;
+    source: "preview" | "thumbnail"; timeThreshold: number | null;
+  }>(
+    // timeThreshold = the hard EXIF grouping gate in SECONDS (null = no time gate).
+    { cluster: true, faces: true, tags: true, culling: true, source: "preview", timeThreshold: 600 },
   );
   const [tagFilter, setTagFilter] = useState<string | null>(null);
 
@@ -74,7 +84,15 @@ export default function PipelineResults() {
 
   const process = useMutation({
     mutationFn: async () => {
-      const res = await supabase.functions.invoke("process-pipeline", { body: { galleryId, options: opts } });
+      // The OLD culling/grouping needs the score-vision (OpenRouter) endpoint URL,
+      // the label set, and the grouping thresholds + EXIF time gate.
+      const options = {
+        ...opts,
+        scoreVisionUrl: `${window.location.origin}/api/score-vision`,
+        labels: DEFAULT_LABELS,
+        thresholds: [0.5, 0.7, 0.9],
+      };
+      const res = await supabase.functions.invoke("process-pipeline", { body: { galleryId, options } });
       if (res.error) {
         // Surface the function's real error body, not the generic wrapper text.
         let msg = res.error.message;
@@ -257,9 +275,11 @@ export default function PipelineResults() {
         {galleryId && (
           <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             <span>שלבים לעיבוד:</span>
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked readOnly className="accent-primary" />
-              דירוג <span className="opacity-60">(תמיד, זול)</span>
+            <label className="flex cursor-pointer items-center gap-1.5">
+              <input type="checkbox" checked={opts.culling}
+                onChange={(e) => setOpts((o) => ({ ...o, culling: e.target.checked }))}
+                className="accent-primary" />
+              דירוג (culling) <span className="opacity-60">(VLM)</span>
             </label>
             <label className="flex cursor-pointer items-center gap-1.5">
               <input type="checkbox" checked={opts.tags}
@@ -273,6 +293,18 @@ export default function PipelineResults() {
                 className="accent-primary" />
               קיבוץ תמונות
             </label>
+            {opts.cluster && (
+              <label className="flex items-center gap-1.5" title="פער זמן EXIF מקסימלי בין תמונות באותה קבוצה (שניות)">
+                מרווח זמן (שנ'):
+                <input type="number" min={0} step={30}
+                  value={opts.timeThreshold ?? ""}
+                  placeholder="ללא"
+                  onChange={(e) => setOpts((o) => ({
+                    ...o, timeThreshold: e.target.value === "" ? null : Math.max(0, Number(e.target.value)),
+                  }))}
+                  className="w-20 rounded border border-border bg-background px-1 py-0.5 text-foreground" />
+              </label>
+            )}
             <label className="flex cursor-pointer items-center gap-1.5">
               <input type="checkbox" checked={opts.faces}
                 onChange={(e) => setOpts((o) => ({ ...o, faces: e.target.checked }))}

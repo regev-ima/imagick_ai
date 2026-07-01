@@ -14,7 +14,14 @@ declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 const IMAGES_PER_INVOCATION = 100; // keep each invocation under the runtime limit
 const MODAL_BATCH = 12;            // images per Modal HTTP call
 const MODAL_CONCURRENCY = 3;       // Modal calls in flight at once (matches max_containers)
+const CULLING_CONCURRENCY = 8;     // parallel VLM culling calls (score-vision)
 const TIME_BUDGET_MS = 110_000;
+
+// Old default photo-shoot labels, used if the caller doesn't pass its own.
+const DEFAULT_LABELS = [
+  "Preparations", "Outdoor photography", "Couple moments",
+  "Family & Reception", "Ceremony", "Dance/Party", "Other",
+];
 
 // B2 originals have a small compressed `.webp` sibling (matches src/lib/imageUrls.ts) —
 // cheaper bandwidth + faster downloads, still big enough for accurate face embeddings.
@@ -80,6 +87,7 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const modalUrl = Deno.env.get("MODAL_URL");
     const modalToken = Deno.env.get("MODAL_TOKEN");
+    const modalGroupUrl = Deno.env.get("MODAL_GROUP_URL"); // whole-gallery grouping endpoint
 
     if (!modalUrl || !modalToken) {
       return json({ error: "MODAL_URL / MODAL_TOKEN not configured" }, 500);
@@ -92,18 +100,98 @@ serve(async (req: Request) => {
     const body = await req.json();
     const { galleryId, stall = 0, options } = body as {
       galleryId: string; userId?: string; stall?: number;
-      options?: { faces?: boolean; cluster?: boolean; tags?: boolean; source?: "preview" | "thumbnail" };
+      options?: {
+        faces?: boolean; cluster?: boolean; tags?: boolean; culling?: boolean;
+        source?: "preview" | "thumbnail";
+        // OLD-pipeline grouping/culling params (ported into Modal + score-vision).
+        labels?: string[]; thresholds?: number[]; timeThreshold?: number | null;
+        scoreVisionUrl?: string;
+      };
     };
     if (!galleryId) return json({ error: "Missing galleryId" }, 400);
     // Which optional steps to run. Faces (ArcFace) is the heavy, premium-gated one;
-    // CLIP-based rating/clustering/tagging always ride on the one cheap embedding.
+    // CLIP-based clustering/tagging always ride on the one cheap embedding.
     const doFaces = options?.faces !== false;
     const doCluster = options?.cluster !== false;
     const doTags = options?.tags !== false;
+    // Culling = the OLD VLM rating/label pass (score-vision `mode:"culling"`), which
+    // writes the old gallery_images columns. On by default; needs scoreVisionUrl.
+    const scoreVisionUrl = typeof options?.scoreVisionUrl === "string" ? options.scoreVisionUrl : null;
+    const doCulling = options?.culling !== false && !!scoreVisionUrl;
     // Image source: preview (default) or the tiny thumbnail (cheaper; CLIP-only, no faces).
     const source = options?.source === "thumbnail" ? "thumbnail" : "preview";
+    // OLD grouping params. `thresholds` → similarity_group_1/2/3; `timeThreshold`
+    // (SECONDS) is the hard EXIF gate: images more than this far apart never group.
+    const labels = Array.isArray(options?.labels) && options.labels.length
+      ? options.labels.filter((t): t is string => typeof t === "string")
+      : DEFAULT_LABELS;
+    const thresholds = Array.isArray(options?.thresholds) && options.thresholds.length === 3
+      ? options.thresholds.map((t) => Number(t))
+      : [0.5, 0.7, 0.9];
+    const timeThreshold = typeof options?.timeThreshold === "number" ? options.timeThreshold : null;
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Whole-gallery grouping: OLD community-detection over CLIP embeddings + hard
+    // EXIF time gate, ported into Modal. Writes similarity_group_1/2/3. Falls back
+    // to the SQL clusterer if the Modal group endpoint isn't configured.
+    async function groupViaModal() {
+      const { data: feats } = await admin
+        .from("image_features").select("image_id, clip_vector").eq("gallery_id", galleryId);
+      const { data: imgRows } = await admin
+        .from("gallery_images").select("id, taken_at").eq("gallery_id", galleryId);
+      const takenAt = new Map(
+        (imgRows || []).map((r: { id: string; taken_at: string | null }) => [r.id, r.taken_at]),
+      );
+      const ids: string[] = [];
+      const embeddings: number[][] = [];
+      const times: (number | null)[] = [];
+      for (const f of (feats || []) as { image_id: string; clip_vector: unknown }[]) {
+        if (!f.clip_vector) continue;
+        let vec: number[];
+        try { vec = typeof f.clip_vector === "string" ? JSON.parse(f.clip_vector) : (f.clip_vector as number[]); }
+        catch { continue; }
+        if (!Array.isArray(vec) || !vec.length) continue;
+        ids.push(f.image_id);
+        embeddings.push(vec);
+        const t = takenAt.get(f.image_id);
+        times.push(t ? Math.floor(new Date(t).getTime() / 1000) : null); // epoch seconds; null→1970 in Modal
+      }
+      if (!ids.length) return;
+      const res = await fetch(modalGroupUrl!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: modalToken, embeddings, times, thresholds, time_threshold: timeThreshold }),
+      });
+      const data = await res.json();
+      const groups = data?.groups as number[][] | undefined;
+      if (!groups || groups.length !== ids.length) {
+        console.error("group endpoint returned unexpected shape", data?.error);
+        return;
+      }
+      // similarity_group_1/2/3 aligned to thresholds[0..2].
+      const CHUNK = 25; // keep the update fan-out modest
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        await Promise.all(ids.slice(i, i + CHUNK).map((id, j) => {
+          const g = groups[i + j] || [];
+          return admin.from("gallery_images").update({
+            similarity_group_1: g[0] ?? null,
+            similarity_group_2: g[1] ?? null,
+            similarity_group_3: g[2] ?? null,
+          }).eq("id", id);
+        }));
+      }
+    }
+
+    // Finalize a fully-processed gallery: group images, cluster faces, mark ready.
+    async function finalize() {
+      if (doCluster) {
+        if (modalGroupUrl) await groupViaModal();
+        else await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
+      }
+      if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
+      await admin.from("galleries").update({ pipeline_status: "ready" }).eq("id", galleryId);
+    }
 
     // Auth: either the gallery owner (user JWT) or an internal self-chain (service key).
     const isInternal = token === supabaseServiceKey;
@@ -124,29 +212,40 @@ serve(async (req: Request) => {
       ...(isInternal ? {} : { pipeline_timing: null }), // reset timing on a fresh user-initiated run
     }).eq("id", galleryId);
 
-    // Images in this gallery that don't yet have features (computed in JS — more
-    // robust than a PostgREST anti-join embed).
+    // Images in this gallery that don't yet have CLIP features (computed in JS —
+    // more robust than a PostgREST anti-join embed).
     const { data: doneRows } = await admin
       .from("image_features").select("image_id").eq("gallery_id", galleryId);
-    const done = new Set((doneRows || []).map((r: { image_id: string }) => r.image_id));
+    const clipDone = new Set((doneRows || []).map((r: { image_id: string }) => r.image_id));
+
+    // Images that already have an OLD culling score (so we don't re-pay the VLM).
+    let cullDone = new Set<string>();
+    if (doCulling) {
+      const { data: cullRows } = await admin
+        .from("gallery_images").select("id").eq("gallery_id", galleryId).not("culling_score", "is", null);
+      cullDone = new Set((cullRows || []).map((r: { id: string }) => r.id));
+    }
 
     const { data: allImgs, error: imgErr } = await admin
       .from("gallery_images").select("id, original_url").eq("gallery_id", galleryId);
     if (imgErr) return json({ error: imgErr.message }, 500);
 
-    const images = (allImgs || [])
-      .filter((i: { id: string; original_url: string | null }) => i.original_url && !done.has(i.id))
-      .slice(0, IMAGES_PER_INVOCATION) as { id: string; original_url: string }[];
-    if (images.length === 0) {
-      // Nothing left → cluster (only the enabled steps) and finish.
-      if (doCluster) await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
-      if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
-      await admin.from("galleries").update({ pipeline_status: "ready" }).eq("id", galleryId);
+    const withUrl = (allImgs || [])
+      .filter((i: { id: string; original_url: string | null }) => i.original_url) as
+      { id: string; original_url: string }[];
+
+    const images = withUrl.filter((i) => !clipDone.has(i.id)).slice(0, IMAGES_PER_INVOCATION);
+    const cullTodo = doCulling ? withUrl.filter((i) => !cullDone.has(i.id)) : [];
+
+    // Everything (CLIP + culling) already computed → finalize and finish.
+    if (images.length === 0 && cullTodo.length === 0) {
+      await finalize();
       return json({ success: true, done: true });
     }
 
     const start = Date.now();
     let processed = 0;
+    let cullProcessed = 0;
 
     // Split into batches, then run several Modal calls concurrently (Modal scales
     // to multiple containers under the parallel load).
@@ -223,8 +322,49 @@ serve(async (req: Request) => {
     };
     await Promise.all(Array.from({ length: Math.min(MODAL_CONCURRENCY, batches.length) }, worker));
 
+    // OLD culling pass: one VLM call per image via score-vision `mode:"culling"`,
+    // writing the old gallery_images columns (culling_score/label + the 4 sub-scores).
+    // Runs on the thumbnail (~small, cheap) with the gallery's labels. Bounded by the
+    // same time budget; whatever's left over is picked up by the next chained call.
+    let cullStart = 0;
+    const cullOne = async (img: { id: string; original_url: string }) => {
+      try {
+        const res = await fetch(scoreVisionUrl!, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "culling", image: toThumbnailUrl(img.original_url), labels }),
+        });
+        const d = await res.json();
+        await admin.from("gallery_images").update({
+          culling_score: typeof d?.overall_score === "number" ? d.overall_score : 0,
+          culling_label: typeof d?.label === "string" ? d.label : null,
+          subject_sharpness: typeof d?.subject_sharpness === "number" ? d.subject_sharpness : 0,
+          background_sharpness: typeof d?.background_sharpness === "number" ? d.background_sharpness : 0,
+          thirds_rule: typeof d?.thirds_rule === "number" ? d.thirds_rule : 0,
+          intended_facial_expression: typeof d?.intended_facial_expression === "number" ? d.intended_facial_expression : 0,
+        }).eq("id", img.id);
+        cullProcessed++;
+      } catch (err) {
+        console.error("Culling call failed:", img.id, err); // leave for next invocation
+      }
+    };
+    if (doCulling && cullTodo.length) {
+      cullStart = Date.now();
+      let ci = 0;
+      const cullWorker = async () => {
+        while (ci < cullTodo.length) {
+          if (Date.now() - start > TIME_BUDGET_MS) return;
+          await cullOne(cullTodo[ci++]);
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(CULLING_CONCURRENCY, cullTodo.length) }, cullWorker),
+      );
+    }
+
     // Accumulate per-stage timing on the gallery (summed across chained invocations).
     const wallMs = Date.now() - start;
+    const cullMs = cullStart ? Date.now() - cullStart : 0;
     const { data: gPrev } = await admin.from("galleries").select("pipeline_timing").eq("id", galleryId).single();
     const prev = (gPrev?.pipeline_timing as Record<string, number> | null) || {};
     await admin.from("galleries").update({
@@ -232,25 +372,36 @@ serve(async (req: Request) => {
         download_ms: (prev.download_ms || 0) + timing.download_ms,
         clip_ms: (prev.clip_ms || 0) + timing.clip_ms,
         faces_ms: (prev.faces_ms || 0) + timing.faces_ms,
+        cull_ms: (prev.cull_ms || 0) + cullMs,
         wall_ms: (prev.wall_ms || 0) + wallMs,
         images: (prev.images || 0) + timing.count,
         faces_provider: facesProvider ?? (prev as Record<string, unknown>).faces_provider ?? null,
       },
     }).eq("id", galleryId);
 
-    // Count remaining (total images minus those that now have features).
+    // Count remaining: an image is "done" only once it has CLIP features AND (if
+    // culling is enabled) an OLD culling score. Total work left is the sum of both.
     const { data: doneRows2 } = await admin
       .from("image_features").select("image_id").eq("gallery_id", galleryId);
     const { count: totalCount } = await admin
       .from("gallery_images").select("id", { count: "exact", head: true }).eq("gallery_id", galleryId);
-    const remaining = (totalCount ?? 0) - (doneRows2 || []).length;
+    const clipRemaining = (totalCount ?? 0) - (doneRows2 || []).length;
+    let cullRemaining = 0;
+    if (doCulling) {
+      const { count: cullDoneCount } = await admin
+        .from("gallery_images").select("id", { count: "exact", head: true })
+        .eq("gallery_id", galleryId).not("culling_score", "is", null);
+      cullRemaining = (totalCount ?? 0) - (cullDoneCount ?? 0);
+    }
+    const remaining = clipRemaining + cullRemaining;
+    const madeProgress = processed > 0 || cullProcessed > 0;
 
     if (remaining > 0) {
       // Runaway guard: if an invocation makes zero progress (e.g. Modal has no
       // compute, every image errors), count it as a stall. After 3 consecutive
       // stalls, stop chaining and mark an error instead of looping forever and
       // burning invocations/credits.
-      const nextStall = processed > 0 ? 0 : stall + 1;
+      const nextStall = madeProgress ? 0 : stall + 1;
       if (nextStall >= 3) {
         await admin.from("galleries").update({
           pipeline_status: "error",
@@ -264,14 +415,12 @@ serve(async (req: Request) => {
         body: JSON.stringify({ galleryId, stall: nextStall, options }),
       }).catch((e) => console.error("self-chain failed", e));
       EdgeRuntime.waitUntil(chain);
-      return json({ success: true, processed, remaining, chained: true });
+      return json({ success: true, processed, cullProcessed, remaining, chained: true });
     }
 
-    // Done → cluster the enabled steps.
-    if (doCluster) await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
-    if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
-    await admin.from("galleries").update({ pipeline_status: "ready" }).eq("id", galleryId);
-    return json({ success: true, processed, done: true });
+    // Everything computed → group + cluster faces + mark ready.
+    await finalize();
+    return json({ success: true, processed, cullProcessed, done: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
     return json({ error: message }, 500);

@@ -17,6 +17,106 @@ export const config = { maxDuration: 60 };
 
 const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
+// OpenRouter retired some ids; remap so old/cached clients keep working.
+const DEPRECATED_MODELS: Record<string, string> = {
+  "google/gemini-flash-1.5": DEFAULT_MODEL,
+  "google/gemini-flash-1.5-8b": DEFAULT_MODEL,
+};
+
+// ── OLD RunPod-compatible culling (ported prompt + schema) ──────────────────
+// The VLM returns a JSON LIST in this exact order; label is chosen from the
+// caller's labels. Parse failure → one retry → then zeroed defaults / last label.
+const CULLING_KEYS = [
+  "subject_sharpness", "background_sharpness", "thirds_rule",
+  "intended_facial_expression", "overall_score", "label",
+] as const;
+const CULLING_DEFAULT_LABELS = [
+  "Preparations", "Outdoor photography", "Couple moments",
+  "Family & Reception", "Ceremony", "Dance/Party", "Other",
+];
+
+function cullingPrompt(labels: string[]): string {
+  const ls = labels.length ? labels : CULLING_DEFAULT_LABELS;
+  const example = CULLING_KEYS.map((k) => `${k}_val`).join(", ");
+  return [
+    "Rate the image from 0 to 1 as a professional photographer.",
+    "Be as accurate and as critic as you can.",
+    "RETURN A JSON PARSABLE LIST ONLY! NO MARKDOWN! NO FREE TEXT! just like this:",
+    `[${example}]`,
+    `In label please choose one of: ${ls.join(", ")}`,
+  ].join("\n");
+}
+
+function parseCulling(content: string, labels: string[]) {
+  const cleaned = content.replace(/```json|```/g, "").trim();
+  const v: unknown = JSON.parse(cleaned);
+  let arr: unknown[];
+  if (Array.isArray(v)) arr = v;
+  else if (v && typeof v === "object") arr = CULLING_KEYS.map((k) => (v as Record<string, unknown>)[k]);
+  else throw new Error("culling: not a list/dict");
+  if (arr.length !== CULLING_KEYS.length) throw new Error("culling: wrong length");
+  const num = (x: unknown) => { const n = typeof x === "number" ? x : parseFloat(String(x)); return Number.isFinite(n) ? n : 0; };
+  return {
+    subject_sharpness: num(arr[0]),
+    background_sharpness: num(arr[1]),
+    thirds_rule: num(arr[2]),
+    intended_facial_expression: num(arr[3]),
+    overall_score: num(arr[4]),
+    label: (typeof arr[5] === "string" && arr[5]) ? arr[5] : (labels[labels.length - 1] ?? "Other"),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleCulling(res: any, key: string, image: string, body: any) {
+  const labels: string[] = Array.isArray(body?.labels)
+    ? body.labels.filter((t: unknown) => typeof t === "string")
+    : CULLING_DEFAULT_LABELS;
+  const requested = typeof body?.model === "string" && body.model ? body.model : DEFAULT_MODEL;
+  const chosenModel = DEPRECATED_MODELS[requested] || requested;
+  const prompt = cullingPrompt(labels);
+
+  const callOnce = async () => {
+    const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Title": "Imagick culling" },
+      body: JSON.stringify({
+        model: chosenModel,
+        messages: [{ role: "user", content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: image } },
+        ] }],
+        max_tokens: 120,
+        temperature: 0.2,
+        usage: { include: true },
+      }),
+    });
+    if (!orRes.ok) throw new Error(`openrouter ${orRes.status}: ${(await orRes.text()).slice(0, 150)}`);
+    const data = await orRes.json();
+    return { content: data?.choices?.[0]?.message?.content ?? "", usage: data?.usage ?? {} };
+  };
+
+  for (let attempt = 0; attempt < 2; attempt++) { // one call + one retry
+    try {
+      const { content, usage } = await callOnce();
+      const parsed = parseCulling(content, labels);
+      const cost = typeof usage?.cost === "number" ? usage.cost : null;
+      res.status(200).json({ ...parsed, model: chosenModel, usage: { cost } });
+      return;
+    } catch {
+      if (attempt === 1) {
+        // Faithful fallback: zeros + last label.
+        res.status(200).json({
+          subject_sharpness: 0, background_sharpness: 0, thirds_rule: 0,
+          intended_facial_expression: 0, overall_score: 0,
+          label: labels[labels.length - 1] ?? "Other",
+          model: chosenModel, fallback: true,
+        });
+        return;
+      }
+    }
+  }
+}
+
 // The professional rubric. Encodes what photographers actually judge, and —
 // crucially — tells the model to read intent/context before penalizing.
 const SYSTEM_RUBRIC = `You are a professional photography judge scoring a single photo for a photographer's gallery culling.
@@ -67,6 +167,12 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    // OLD RunPod-compatible culling path (list schema + labels + fallback).
+    if (body?.mode === "culling") {
+      await handleCulling(res, key, image, body);
+      return;
+    }
+
     // Optional tagging: caller supplies an exact tag list (e.g. Hebrew wedding
     // tags) and the model returns which of them genuinely apply — same call,
     // no extra cost.
@@ -79,11 +185,6 @@ export default async function handler(req: any, res: any) {
     if (tagList.length) {
       system += `\n\nTAGGING: From EXACTLY this list (verbatim, do not invent new tags), add a "tags" array with every tag that genuinely applies to the photo (0 or more):\n${JSON.stringify(tagList)}`;
     }
-    // Remap ids OpenRouter has retired, so old/cached clients keep working.
-    const DEPRECATED_MODELS: Record<string, string> = {
-      "google/gemini-flash-1.5": DEFAULT_MODEL,
-      "google/gemini-flash-1.5-8b": DEFAULT_MODEL,
-    };
     const requested = typeof model === "string" && model ? model : DEFAULT_MODEL;
     const chosenModel = DEPRECATED_MODELS[requested] || requested;
 

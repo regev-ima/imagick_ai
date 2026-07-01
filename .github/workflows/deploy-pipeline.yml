@@ -60,6 +60,10 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           HURL=$(grep -Eo 'https://[a-zA-Z0-9._-]+\.modal\.run[^ ]*' modal_out.txt | grep -i health | head -1)
           echo "health=$HURL" >> "$GITHUB_OUTPUT"
+          # The whole-gallery grouping endpoint (community-detection + EXIF time gate).
+          GURL=$(grep -Eo 'https://[a-zA-Z0-9._-]+\.modal\.run[^ ]*' modal_out.txt | grep -i group | head -1)
+          echo "Captured Modal GROUP URL: $GURL"
+          echo "group=$GURL" >> "$GITHUB_OUTPUT"
 
       - name: Verify GPU (health check)
         run: |
@@ -101,6 +105,7 @@ jobs:
         run: |
           supabase secrets set \
             MODAL_URL="${{ steps.modal.outputs.url }}" \
+            MODAL_GROUP_URL="${{ steps.modal.outputs.group }}" \
             MODAL_TOKEN="${{ secrets.PIPELINE_TOKEN }}" \
             --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
 
