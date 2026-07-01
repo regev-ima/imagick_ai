@@ -31,10 +31,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+export interface CullingRunOptions {
+  tags: string[];      // category labels the model picks from
+  cluster: boolean;    // group similar images
+  faces: boolean;      // people / face recognition (heavier)
+}
+
 interface AICullingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (tags: string[]) => void;
+  onConfirm: (opts: CullingRunOptions) => void;
   isProcessing: boolean;
   imageCount: number;
   showCullingRequiredNote?: boolean;
@@ -76,6 +82,10 @@ export function AICullingModal({
   const { user } = useAuth();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
+  // Photographer-chosen steps. Rating + tags always run (the core); grouping is on
+  // by default; faces (people) is the heavier, opt-in step.
+  const [doCluster, setDoCluster] = useState(true);
+  const [doFaces, setDoFaces] = useState(false);
   const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
   const [languageLoaded, setLanguageLoaded] = useState(false);
   /** Required check before triggering a re-run that would overwrite
@@ -208,7 +218,7 @@ export function AICullingModal({
   };
 
   const handleConfirm = () => {
-    onConfirm(selectedTags);
+    onConfirm({ tags: selectedTags, cluster: doCluster, faces: doFaces });
   };
 
   const handleClose = () => {
@@ -293,15 +303,32 @@ export function AICullingModal({
           )}
 
           {/* Description */}
-          <div className="p-4 rounded-[--radius] surface-2 border border-border/60 mb-6">
+          <div className="p-4 rounded-[--radius] surface-2 border border-border/60 mb-4">
             <p className="text-sm text-muted-foreground">
               AI Culling will analyze your images and provide:
             </p>
             <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-              <li>• Quality ratings (1-5 stars)</li>
-              <li>• Smart tags and categorization</li>
-              <li>• Duplicate/similar image detection</li>
+              <li>• Quality ratings (1-5 stars) & smart tags</li>
+              <li>• Category for each photo</li>
             </ul>
+          </div>
+
+          {/* Steps the photographer can toggle. Rating + tags always run; grouping
+              and people (faces) are optional. Model/timing are admin settings. */}
+          <div className="mb-6 space-y-2">
+            <label className="flex items-center justify-between p-3 rounded-[--radius] surface-2 border border-border/60 cursor-pointer">
+              <span className="text-sm text-foreground">Group similar images</span>
+              <input type="checkbox" checked={doCluster} onChange={(e) => setDoCluster(e.target.checked)}
+                className="w-4 h-4 rounded accent-primary" disabled={isCurrentlyRunning} />
+            </label>
+            <label className="flex items-center justify-between p-3 rounded-[--radius] surface-2 border border-border/60 cursor-pointer">
+              <span className="text-sm text-foreground">
+                Recognize people (faces)
+                <span className="ms-2 text-xs text-muted-foreground">heavier step</span>
+              </span>
+              <input type="checkbox" checked={doFaces} onChange={(e) => setDoFaces(e.target.checked)}
+                className="w-4 h-4 rounded accent-primary" disabled={isCurrentlyRunning} />
+            </label>
           </div>
 
           {/* Tag Selection */}

@@ -237,7 +237,12 @@ serve(async (req: Request) => {
         else await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
       }
       if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
-      await admin.from("galleries").update({ pipeline_status: "ready" }).eq("id", galleryId);
+      // Mirror to the legacy culling_* fields the gallery UI watches.
+      await admin.from("galleries").update({
+        pipeline_status: "ready",
+        culling_status: "ready",
+        culling_completed_at: new Date().toISOString(),
+      }).eq("id", galleryId);
     }
 
     // Auth: either the gallery owner (user JWT) or an internal self-chain (service key).
@@ -256,7 +261,10 @@ serve(async (req: Request) => {
     await admin.from("galleries").update({
       pipeline_status: "processing",
       pipeline_error: null,
-      ...(isInternal ? {} : { pipeline_timing: null }), // reset timing on a fresh user-initiated run
+      // Mirror the legacy culling_* fields the gallery UI watches. Stamp the start
+      // time only on a fresh user-initiated run (not internal self-chains).
+      culling_status: "processing",
+      ...(isInternal ? {} : { pipeline_timing: null, culling_started_at: new Date().toISOString() }),
     }).eq("id", galleryId);
 
     // Culling was requested but there's no endpoint to call it — fail loudly with
@@ -264,6 +272,7 @@ serve(async (req: Request) => {
     if (cullingRequested && !scoreVisionUrl) {
       await admin.from("galleries").update({
         pipeline_status: "error",
+        culling_status: "error",
         pipeline_error: "חסר scoreVisionUrl: הגדר secret בשם SCORE_VISION_URL ב-Edge Function " +
           "(endpoint ציבורי של /api/score-vision), או שלח options.scoreVisionUrl תקין.",
       }).eq("id", galleryId);
@@ -564,6 +573,7 @@ serve(async (req: Request) => {
         }
         await admin.from("galleries").update({
           pipeline_status: "error",
+          culling_status: "error",
           pipeline_error: msg,
         }).eq("id", galleryId);
         return json({ error: "stalled", remaining, clipRemaining, cullRemaining, cullFirstError }, 200);

@@ -1213,7 +1213,8 @@ export default function GalleryEditorPage() {
 
   // AI Culling mutation - calls the start-grouping function
   const runAICulling = useMutation({
-    mutationFn: async (tags: string[]) => {
+    mutationFn: async (opts: { tags: string[]; cluster: boolean; faces: boolean }) => {
+      const { tags, cluster, faces } = opts;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
@@ -1246,6 +1247,7 @@ export default function GalleryEditorPage() {
             subject_sharpness: null,
             thirds_rule: null,
             intended_facial_expression: null,
+            ai_tags: null,
           })
           .eq("gallery_id", id!);
         // Reset filter selections that referenced the now-cleared data.
@@ -1256,14 +1258,33 @@ export default function GalleryEditorPage() {
           selectedLabels: [],
         }));
       }
+      // Culling runs need image_features (CLIP) recomputed only when clip is missing;
+      // the pipeline self-manages that. Force a fresh faces recompute on re-run.
+      if (hasCullingData) {
+        await (supabase as any)
+          .from("image_features")
+          .update({ faces_done: false })
+          .eq("gallery_id", id!);
+      }
 
-      const { data, error } = await supabase.functions.invoke('start-grouping', {
-        body: { 
+      // NEW engine: process-pipeline (Modal CLIP grouping + ArcFace + OpenRouter
+      // culling/tagging). Model + EXIF time gate are admin settings (defaults here
+      // until the admin screen lands). scoreVisionUrl lets the edge fn reach the VLM
+      // layer; the edge's own SCORE_VISION_URL secret takes precedence when set.
+      const { data, error } = await supabase.functions.invoke('process-pipeline', {
+        body: {
           galleryId: id,
-          labels: tags,
-          thresholds: [0.5, 0.7, 0.9],
-          timeThreshold: 60
-        }
+          options: {
+            culling: true,
+            tags: true,
+            cluster,
+            faces,
+            labels: tags,
+            thresholds: [0.5, 0.7, 0.9],
+            timeThreshold: 600,
+            scoreVisionUrl: `${window.location.origin}/api/score-vision`,
+          },
+        },
       });
       if (error) throw error;
       return data;
@@ -3022,14 +3043,14 @@ export default function GalleryEditorPage() {
           <AICullingModal
             isOpen={showAICullingModal}
             onClose={() => { setShowAICullingModal(false); setCullingRequiredNote(false); }}
-            onConfirm={(tags) => {
+            onConfirm={(opts) => {
               setShowAICullingModal(false);
               setCullingRequiredNote(false);
               // Surface the live "AI is working" overlay for this run even
               // if a previous run had been minimized away.
               setCullingProgressMinimized(false);
               toast.success("Starting AI Culling... We'll update you when it's done in a few minutes.");
-              runAICulling.mutate(tags);
+              runAICulling.mutate(opts);
             }}
             isProcessing={false}
             imageCount={images.length}
