@@ -23,6 +23,17 @@ const DEFAULT_LABELS = [
   "Family & Reception", "Ceremony", "Dance/Party", "Other",
 ];
 
+// Photo-style tag candidates the VLM chooses from (tagging is via OpenRouter now,
+// not CLIP). Overridable by the caller via options.tagsList.
+const DEFAULT_TAGS = [
+  "תקריב פנים", "גוף מלא", "קלוז-אפ", "פרופיל", "סביבתי", "סטודיו",
+  "אור טבעי", "שחור-לבן", "הבעה", "מונחה", "ספונטני", "יצירתי",
+];
+
+// Rough Modal L4 GPU price (~$0.80/hr) for an ESTIMATED cost — Modal bills GPU
+// container-seconds, not per-call. Only an approximation for the test dashboard.
+const MODAL_L4_USD_PER_SEC = 0.80 / 3600;
+
 // B2 originals have a small compressed `.webp` sibling (matches src/lib/imageUrls.ts) —
 // cheaper bandwidth + faster downloads, still big enough for accurate face embeddings.
 // (The thumbnail variant is even smaller but too low-res for reliable ArcFace.)
@@ -126,6 +137,8 @@ serve(async (req: Request) => {
         // OLD-pipeline grouping/culling params (ported into Modal + score-vision).
         labels?: string[]; thresholds?: number[]; timeThreshold?: number | null;
         scoreVisionUrl?: string;
+        // VLM tagging + model selection (tagging is via OpenRouter, not CLIP).
+        tagsList?: string[]; model?: string;
       };
     };
     if (!galleryId) return json({ error: "Missing galleryId" }, 400);
@@ -158,6 +171,11 @@ serve(async (req: Request) => {
       ? options.thresholds.map((t) => Number(t))
       : [0.5, 0.7, 0.9];
     const timeThreshold = typeof options?.timeThreshold === "number" ? options.timeThreshold : null;
+    // VLM tagging candidates + the chosen vision model (per-test comparison).
+    const tagsList = Array.isArray(options?.tagsList) && options.tagsList.length
+      ? options.tagsList.filter((t): t is string => typeof t === "string")
+      : DEFAULT_TAGS;
+    const vlmModel = typeof options?.model === "string" && options.model ? options.model : null;
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -354,7 +372,7 @@ serve(async (req: Request) => {
             body: JSON.stringify({
               token: modalToken,
               faces: doFaces, // skip ArcFace on Modal when faces are off
-              tags: doTags,
+              tags: false,    // tagging is via the VLM (OpenRouter) now, not CLIP
               images: batch.map((img) => {
                 const preview = toPreviewUrl(img.original_url);
                 const thumb = toThumbnailUrl(img.original_url);
@@ -390,6 +408,8 @@ serve(async (req: Request) => {
     // same time budget; whatever's left over is picked up by the next chained call.
     let cullStart = 0;
     let cullFirstError: string | null = null; // first failure this invocation (for pipeline_error)
+    let cullCostUsd = 0;                       // summed OpenRouter cost this invocation
+    let cullModel: string | null = null;       // the model the VLM actually used
 
     // Safe score-vision caller: never throws. Reads the body as TEXT first, checks
     // status + content-type, and only JSON.parses when it's actually JSON. Returns a
@@ -408,7 +428,11 @@ serve(async (req: Request) => {
         res = await fetch(scoreVisionUrl!, {
           method: "POST",
           headers: scoreVisionHeaders,
-          body: JSON.stringify({ mode: "culling", image, labels }),
+          body: JSON.stringify({
+            mode: "culling", image, labels,
+            tags: doTags ? tagsList : [], // VLM tagging (blue chips) — from the fixed list
+            ...(vlmModel ? { model: vlmModel } : {}), // per-test model choice
+          }),
         });
       } catch (e) {
         return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)} (${bypassInfo})` };
@@ -434,6 +458,8 @@ serve(async (req: Request) => {
         return; // leave for next invocation
       }
       const num = (v: unknown) => (typeof v === "number" ? v : 0);
+      // VLM-chosen tags → the old gallery_images.ai_tags column (text[]).
+      const aiTags = Array.isArray(d.tags) ? (d.tags as unknown[]).filter((t): t is string => typeof t === "string") : [];
       try {
         await admin.from("gallery_images").update({
           culling_score: num(d.overall_score),
@@ -442,8 +468,13 @@ serve(async (req: Request) => {
           background_sharpness: num(d.background_sharpness),
           thirds_rule: num(d.thirds_rule),
           intended_facial_expression: num(d.intended_facial_expression),
+          ai_tags: aiTags,
         }).eq("id", img.id);
         cullProcessed++;
+        // Cost/model telemetry for the test dashboard.
+        const usage = d.usage as { cost?: number } | undefined;
+        if (usage && typeof usage.cost === "number") cullCostUsd += usage.cost;
+        if (typeof d.model === "string") cullModel = d.model;
       } catch (e) {
         if (!cullFirstError) cullFirstError = `db update failed: ${e instanceof Error ? e.message : String(e)}`;
         console.error("Culling DB write failed:", img.id, e);
@@ -466,17 +497,25 @@ serve(async (req: Request) => {
     // Accumulate per-stage timing on the gallery (summed across chained invocations).
     const wallMs = Date.now() - start;
     const cullMs = cullStart ? Date.now() - cullStart : 0;
+    // Estimated Modal GPU cost this invocation (container-seconds ≈ sum of the
+    // GPU-container stages: download + CLIP + faces) × the L4 rate.
+    const modalCostThis = ((timing.download_ms + timing.clip_ms + timing.faces_ms) / 1000) * MODAL_L4_USD_PER_SEC;
     const { data: gPrev } = await admin.from("galleries").select("pipeline_timing").eq("id", galleryId).single();
-    const prev = (gPrev?.pipeline_timing as Record<string, number> | null) || {};
+    const prev = (gPrev?.pipeline_timing as Record<string, number | string | null> | null) || {};
+    const pnum = (k: string) => (typeof prev[k] === "number" ? prev[k] as number : 0);
     await admin.from("galleries").update({
       pipeline_timing: {
-        download_ms: (prev.download_ms || 0) + timing.download_ms,
-        clip_ms: (prev.clip_ms || 0) + timing.clip_ms,
-        faces_ms: (prev.faces_ms || 0) + timing.faces_ms,
-        cull_ms: (prev.cull_ms || 0) + cullMs,
-        wall_ms: (prev.wall_ms || 0) + wallMs,
-        images: (prev.images || 0) + timing.count,
-        faces_provider: facesProvider ?? (prev as Record<string, unknown>).faces_provider ?? null,
+        download_ms: pnum("download_ms") + timing.download_ms,
+        clip_ms: pnum("clip_ms") + timing.clip_ms,
+        faces_ms: pnum("faces_ms") + timing.faces_ms,
+        cull_ms: pnum("cull_ms") + cullMs,
+        wall_ms: pnum("wall_ms") + wallMs,
+        images: pnum("images") + timing.count,
+        faces_provider: facesProvider ?? prev.faces_provider ?? null,
+        // Test-dashboard telemetry: money spent, both engines.
+        cull_cost_usd: pnum("cull_cost_usd") + cullCostUsd,
+        modal_cost_usd: pnum("modal_cost_usd") + modalCostThis,
+        model: cullModel ?? (typeof prev.model === "string" ? prev.model : null),
       },
     }).eq("id", galleryId);
 

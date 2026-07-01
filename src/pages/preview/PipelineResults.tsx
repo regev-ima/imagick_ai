@@ -12,14 +12,26 @@ import { toast } from "sonner";
  * edge function (Modal engine). Populates once the engine has run.
  */
 
-// New pipeline tables aren't in the generated Supabase types yet.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any;
-
 // OLD photo-shoot label set the VLM culling picks from (same list as the backend).
 const DEFAULT_LABELS = [
   "Preparations", "Outdoor photography", "Couple moments",
   "Family & Reception", "Ceremony", "Dance/Party", "Other",
+];
+
+// Photo-style tags the VLM (OpenRouter) chooses from — tagging is NOT via CLIP.
+const DEFAULT_TAGS = [
+  "תקריב פנים", "גוף מלא", "קלוז-אפ", "פרופיל", "סביבתי", "סטודיו",
+  "אור טבעי", "שחור-לבן", "הבעה", "מונחה", "ספונטני", "יצירתי",
+];
+
+// Vision models to A/B for cost↔quality — chosen per test from the top dropdown.
+const VLM_MODELS = [
+  { id: "openai/gpt-4o-mini", label: "GPT-4o mini · זול" },
+  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash · זול" },
+  { id: "anthropic/claude-3.5-haiku", label: "Claude 3.5 Haiku · זול" },
+  { id: "openai/gpt-4o", label: "GPT-4o · איכות" },
+  { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet · איכות" },
+  { id: "google/gemini-1.5-pro", label: "Gemini 1.5 Pro · איכות" },
 ];
 
 interface GalleryRow { id: string; name: string }
@@ -31,14 +43,21 @@ interface CullingMetrics {
   thirds_rule: number | null;
   intended_facial_expression: number | null;
 }
-interface ImageRow extends CullingMetrics { id: string; original_url: string; filename: string }
-interface Tag { tag: string; score: number; src?: "user" | "general" }
-interface Label { tag: string; src: "user" | "general" }
-interface Feature { image_id: string; aesthetic: number | null; visual_cluster: number | null; tags: Tag[] | null }
+interface ImageRow extends CullingMetrics {
+  id: string; original_url: string; filename: string;
+  ai_tags: string[] | null;
+  similarity_group_1: number | null;
+  similarity_group_2: number | null;
+  similarity_group_3: number | null;
+}
 interface FaceDet { image_id: string; cluster_id: string | null }
 type Bbox = { x: number; y: number; width: number; height: number };
 interface FaceCluster { id: string; face_count: number; representative_image_id: string | null; representative_bbox: Bbox | null }
-interface Timing { download_ms?: number; clip_ms?: number; faces_ms?: number; wall_ms?: number; images?: number; faces_provider?: string | null }
+interface Timing {
+  download_ms?: number; clip_ms?: number; faces_ms?: number; cull_ms?: number;
+  wall_ms?: number; images?: number; faces_provider?: string | null;
+  cull_cost_usd?: number; modal_cost_usd?: number; model?: string | null;
+}
 
 export default function PipelineResults() {
   const [galleryId, setGalleryId] = useState<string>("");
@@ -48,12 +67,13 @@ export default function PipelineResults() {
   // ride on the single cheap CLIP embedding.
   const [opts, setOpts] = useState<{
     cluster: boolean; faces: boolean; tags: boolean; culling: boolean;
-    source: "preview" | "thumbnail"; timeThreshold: number | null;
+    source: "preview" | "thumbnail"; timeThreshold: number | null; model: string;
   }>(
     // timeThreshold = the hard EXIF grouping gate in SECONDS (null = no time gate).
-    { cluster: true, faces: true, tags: true, culling: true, source: "preview", timeThreshold: 600 },
+    { cluster: true, faces: true, tags: true, culling: true, source: "preview", timeThreshold: 600, model: VLM_MODELS[0].id },
   );
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [groupLevel, setGroupLevel] = useState<1 | 2 | 3>(1); // which similarity_group_N to view
 
   const galleries = useQuery({
     queryKey: ["pipeline-galleries"],
@@ -71,28 +91,21 @@ export default function PipelineResults() {
     queryKey: ["pipeline-results", galleryId],
     refetchInterval: (q) => ((q.state.data as { status?: string } | undefined)?.status === "processing" ? 4000 : false),
     queryFn: async () => {
-      const [gRes, fRes, fdRes, fcRes, imgRes] = await Promise.all([
+      const [gRes, fdRes, fcRes, imgRes] = await Promise.all([
         supabase.from("galleries").select("pipeline_status, pipeline_timing").eq("id", galleryId).single(),
-        db.from("image_features").select("image_id, aesthetic, visual_cluster, tags").eq("gallery_id", galleryId),
         supabase.from("face_detections").select("image_id, cluster_id").eq("gallery_id", galleryId).not("cluster_id", "is", null),
         supabase.from("face_clusters").select("id, face_count, representative_image_id, representative_bbox").eq("gallery_id", galleryId).order("face_count", { ascending: false }),
         supabase.from("gallery_images").select([
-          "id",
-          "original_url",
-          "filename",
-          "culling_score",
-          "culling_label",
-          "subject_sharpness",
-          "background_sharpness",
-          "thirds_rule",
-          "intended_facial_expression",
+          "id", "original_url", "filename",
+          "culling_score", "culling_label",
+          "subject_sharpness", "background_sharpness", "thirds_rule", "intended_facial_expression",
+          "ai_tags", "similarity_group_1", "similarity_group_2", "similarity_group_3",
         ].join(", ")).eq("gallery_id", galleryId),
       ]);
       const g = gRes.data as { pipeline_status?: string; pipeline_timing?: Timing } | null;
       return {
         status: g?.pipeline_status ?? "idle",
         timing: g?.pipeline_timing ?? null,
-        features: (fRes.data as Feature[]) ?? [],
         faces: (fdRes.data as FaceDet[]) ?? [],
         faceClusters: (fcRes.data as FaceCluster[]) ?? [],
         images: (imgRes.data as ImageRow[]) ?? [],
@@ -108,6 +121,7 @@ export default function PipelineResults() {
         ...opts,
         scoreVisionUrl: `${window.location.origin}/api/score-vision`,
         labels: DEFAULT_LABELS,
+        tagsList: DEFAULT_TAGS,          // VLM tagging candidates (not CLIP)
         thresholds: [0.5, 0.7, 0.9],
       };
       const res = await supabase.functions.invoke("process-pipeline", { body: { galleryId, options } });
@@ -132,70 +146,45 @@ export default function PipelineResults() {
     return m;
   }, [results.data]);
 
-  // Tag assignment with per-tag mean-centering: CLIP gives each tag a baseline
-  // bias, so one "sticky" tag can win on every photo. We subtract each tag's
-  // gallery-wide average so each image surfaces what's DISTINCTIVE about it.
-  // Guarantee ≥1 tag from the USER list per image, plus a few more distinctive
-  // ones (user or general). Each label carries its source for coloring.
-  const labelsByImg = useMemo(() => {
-    const feats = results.data?.features ?? [];
-    const sum = new Map<string, number>(), cnt = new Map<string, number>();
-    for (const f of feats) for (const t of (f.tags ?? [])) {
-      sum.set(t.tag, (sum.get(t.tag) ?? 0) + t.score);
-      cnt.set(t.tag, (cnt.get(t.tag) ?? 0) + 1);
-    }
-    const mean = new Map<string, number>();
-    for (const [k, v] of sum) mean.set(k, v / (cnt.get(k) || 1));
-    const m = new Map<string, Label[]>();
-    for (const f of feats) {
-      const cal = (f.tags ?? [])
-        .map((t) => ({ tag: t.tag, src: (t.src ?? "user") as "user" | "general", c: t.score - (mean.get(t.tag) ?? 0) }))
-        .sort((a, b) => b.c - a.c);
-      const userCal = cal.filter((x) => x.src === "user");
-      const genCal = cal.filter((x) => x.src === "general");
-      const chosen: Label[] = [];
-      if (userCal.length) chosen.push({ tag: userCal[0].tag, src: "user" });         // guaranteed user tag
-      for (const x of userCal.slice(1)) if (x.c > 0.012 && chosen.length < 3) chosen.push({ tag: x.tag, src: "user" });
-      for (const x of genCal) if (x.c > 0.02 && chosen.length < 4) chosen.push({ tag: x.tag, src: "general" });
-      m.set(f.image_id, chosen);
-    }
-    return m;
+  const groupOf = (im: ImageRow, level: 1 | 2 | 3) =>
+    level === 1 ? im.similarity_group_1 : level === 2 ? im.similarity_group_2 : im.similarity_group_3;
+
+  // Rank helper: culling score (VLM) descending — NOT CLIP.
+  const byCulling = (a: ImageRow, b: ImageRow) => (b.culling_score ?? 0) - (a.culling_score ?? 0);
+  const matchesTag = (im: ImageRow) => !tagFilter || (im.ai_tags ?? []).includes(tagFilter);
+
+  // Tag panel: every VLM tag in the gallery with a count (for the filter bar).
+  const tagCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const im of results.data?.images ?? [])
+      for (const t of (im.ai_tags ?? [])) m.set(t, (m.get(t) ?? 0) + 1);
+    return [...m.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count);
   }, [results.data]);
 
-  const labelsFor = (f: Feature | undefined) => (f ? labelsByImg.get(f.image_id) ?? [] : []);
-
-  // Tag filter bar: every assigned tag with a count + its source (for coloring).
-  const tagCounts = useMemo(() => {
-    const m = new Map<string, { count: number; src: "user" | "general" }>();
-    for (const labels of labelsByImg.values())
-      for (const t of labels) {
-        const e = m.get(t.tag) ?? { count: 0, src: t.src };
-        e.count++; e.src = t.src; m.set(t.tag, e);
-      }
-    return [...m.entries()].map(([tag, v]) => ({ tag, ...v })).sort((a, b) => b.count - a.count);
-  }, [labelsByImg]);
-
-  const matchesTag = (f: Feature) => !tagFilter || (labelsByImg.get(f.image_id) ?? []).some((l) => l.tag === tagFilter);
-
-  // Visual clusters: group by visual_cluster, best-aesthetic first within each.
+  // Groups from Modal community-detection (similarity_group_N), ranked within each
+  // group by the VLM culling score, groups ordered by size.
   const clusters = useMemo(() => {
-    const map = new Map<number, Feature[]>();
-    for (const f of results.data?.features ?? []) {
-      if (f.visual_cluster == null) continue;
-      const arr = map.get(f.visual_cluster) ?? [];
-      arr.push(f);
-      map.set(f.visual_cluster, arr);
+    const map = new Map<number, ImageRow[]>();
+    for (const im of results.data?.images ?? []) {
+      const g = groupOf(im, groupLevel);
+      if (g == null) continue;
+      const arr = map.get(g) ?? [];
+      arr.push(im);
+      map.set(g, arr);
     }
     return [...map.entries()]
-      .map(([id, fs]) => ({ id, items: fs.sort((a, b) => (b.aesthetic ?? 0) - (a.aesthetic ?? 0)) }))
+      .map(([id, items]) => ({ id, items: [...items].sort(byCulling) }))
       .sort((a, b) => b.items.length - a.items.length);
-  }, [results.data]);
+  }, [results.data, groupLevel]);
 
   const top = useMemo(
-    () => [...(results.data?.features ?? [])]
-      .filter(matchesTag)
-      .sort((a, b) => (b.aesthetic ?? 0) - (a.aesthetic ?? 0)).slice(0, 40),
+    () => (results.data?.images ?? []).filter(matchesTag).slice().sort(byCulling).slice(0, 60),
     [results.data, tagFilter],
+  );
+
+  const scoredCount = useMemo(
+    () => (results.data?.images ?? []).filter((im) => im.culling_score != null).length,
+    [results.data],
   );
 
   const people = useMemo(() => {
@@ -214,40 +203,9 @@ export default function PipelineResults() {
     })).filter((p) => p.images.length > 0);
   }, [results.data]);
 
-  // Re-cluster images at a chosen similarity threshold (loose/medium/strict).
-  const recluster = useMutation({
-    mutationFn: async (threshold: number) => {
-      const { error } = await db.rpc("cluster_gallery_images", { p_gallery_id: galleryId, p_threshold: threshold });
-      if (error) throw error;
-    },
-    onSuccess: () => results.refetch(),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const status = results.data?.status;
   const thumb = (id: string) => { const im = imById.get(id); return im ? getThumbnailUrl(im.original_url) : ""; };
   const preview = (id: string) => { const im = imById.get(id); return im ? getPreviewUrl(im.original_url) : ""; };
-  // The LAION aesthetic score is only meaningful as a *relative* ranking — its
-  // absolute values cluster around 5–6/10 even for great professional photos, so
-  // showing them raw (÷2) looks insultingly low to a photographer. Calibrate to
-  // stars *within this gallery*: the best shots reach ~5★ and even the weakest
-  // stay respectable. Anchored on the 5th–95th percentiles so one outlier (a
-  // blurry test frame, a screenshot) can't drag the whole scale.
-  const score = useMemo(() => {
-    const FLOOR = 3.6, TOP = 5.0;
-    const vals = (results.data?.features ?? [])
-      .map((f) => f.aesthetic)
-      .filter((a): a is number => a != null)
-      .sort((a, b) => a - b);
-    if (vals.length < 5) return (a: number | null) => (a == null ? "—" : "4.5");
-    const pct = (p: number) => vals[Math.max(0, Math.min(vals.length - 1, Math.round((p / 100) * (vals.length - 1))))];
-    const lo = pct(5), hi = pct(95), span = hi - lo || 1;
-    return (a: number | null) => {
-      if (a == null) return "—";
-      const t = Math.min(1, Math.max(0, (a - lo) / span));
-      return (FLOOR + t * (TOP - FLOOR)).toFixed(1);
-    };
-  }, [results.data]);
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
@@ -281,10 +239,10 @@ export default function PipelineResults() {
             <span className="text-xs text-muted-foreground">
               סטטוס: <b className="text-foreground">{status}</b>
               {status === "processing" && (() => {
-                const done = results.data?.features.length ?? 0;
+                const done = scoredCount;
                 const total = results.data?.images.length ?? 0;
                 const pct = total ? Math.round((done / total) * 100) : 0;
-                return <b className="text-primary"> — מעבד {done}/{total} ({pct}%)…</b>;
+                return <b className="text-primary"> — מדרג {done}/{total} ({pct}%)…</b>;
               })()}
             </span>
           )}
@@ -292,18 +250,26 @@ export default function PipelineResults() {
 
         {galleryId && (
           <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <span>שלבים לעיבוד:</span>
+            <label className="flex items-center gap-1.5 font-medium text-foreground" title="מודל הראייה (OpenRouter) לדירוג ולתיוג">
+              מודל AI:
+              <select value={opts.model}
+                onChange={(e) => setOpts((o) => ({ ...o, model: e.target.value }))}
+                className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs">
+                {VLM_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </label>
+            <span>שלבים:</span>
             <label className="flex cursor-pointer items-center gap-1.5">
               <input type="checkbox" checked={opts.culling}
                 onChange={(e) => setOpts((o) => ({ ...o, culling: e.target.checked }))}
                 className="accent-primary" />
-              דירוג (culling) <span className="opacity-60">(VLM)</span>
+              דירוג <span className="opacity-60">(VLM)</span>
             </label>
             <label className="flex cursor-pointer items-center gap-1.5">
               <input type="checkbox" checked={opts.tags}
                 onChange={(e) => setOpts((o) => ({ ...o, tags: e.target.checked }))}
                 className="accent-primary" />
-              תיוג <span className="opacity-60">(זול)</span>
+              תיוג <span className="opacity-60">(VLM)</span>
             </label>
             <label className="flex cursor-pointer items-center gap-1.5">
               <input type="checkbox" checked={opts.cluster}
@@ -357,41 +323,62 @@ export default function PipelineResults() {
               )}
             </div>
 
-            {/* Per-stage timing */}
-            {results.data?.timing && (
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
-                <span>⏱ זמני עיבוד ({results.data.timing.images ?? 0} תמונות):</span>
-                <span>הורדה <b className="text-foreground">{((results.data.timing.download_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
-                <span>CLIP+ציון <b className="text-foreground">{((results.data.timing.clip_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
-                <span>פרצופים <b className="text-foreground">{((results.data.timing.faces_ms ?? 0) / 1000).toFixed(1)}ש׳</b>
-                  {results.data.timing.faces_provider && (
-                    <b className={results.data.timing.faces_provider === "GPU" ? "text-green-500" : "text-red-500"}> ({results.data.timing.faces_provider})</b>
-                  )}
-                </span>
-                <span>סה״כ <b className="text-foreground">{((results.data.timing.wall_ms ?? 0) / 1000).toFixed(1)}ש׳</b></span>
-              </div>
-            )}
+            {/* Time + cost dashboard (both engines) */}
+            {results.data?.timing && (() => {
+              const t = results.data.timing;
+              const s = (ms?: number) => ((ms ?? 0) / 1000).toFixed(1);
+              const modalCost = t.modal_cost_usd ?? 0;
+              const orCost = t.cull_cost_usd ?? 0;
+              const n = t.images ?? 0;
+              const per1000 = (usd: number) => (n ? (usd / n) * 1000 : 0);
+              return (
+                <div className="mt-3 space-y-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <span>⏱ זמן ({n} תמונות):</span>
+                    <span>הורדה <b className="text-foreground">{s(t.download_ms)}ש׳</b></span>
+                    <span>CLIP (קיבוץ) <b className="text-foreground">{s(t.clip_ms)}ש׳</b></span>
+                    <span>פרצופים <b className="text-foreground">{s(t.faces_ms)}ש׳</b>
+                      {t.faces_provider && (
+                        <b className={t.faces_provider === "GPU" ? "text-green-500" : "text-red-500"}> ({t.faces_provider})</b>
+                      )}
+                    </span>
+                    <span>דירוג/תיוג VLM <b className="text-foreground">{s(t.cull_ms)}ש׳</b></span>
+                    <span>סה״כ <b className="text-foreground">{s(t.wall_ms)}ש׳</b></span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-1.5">
+                    <span>💰 עלות:</span>
+                    <span>Modal (GPU, אומדן) <b className="text-foreground">${modalCost.toFixed(4)}</b>
+                      <span className="opacity-60"> (~${per1000(modalCost).toFixed(2)}/1000)</span>
+                    </span>
+                    <span>OpenRouter <b className="text-foreground">${orCost.toFixed(4)}</b>
+                      <span className="opacity-60"> (~${per1000(orCost).toFixed(2)}/1000)</span>
+                    </span>
+                    <span>סה״כ <b className="text-foreground">${(modalCost + orCost).toFixed(4)}</b>
+                      <span className="opacity-60"> (~${per1000(modalCost + orCost).toFixed(2)}/1000)</span>
+                    </span>
+                    {t.model && <span>מודל: <b className="text-foreground">{t.model}</b></span>}
+                  </div>
+                </div>
+              );
+            })()}
 
-            {/* Tag panel — all tags in the gallery, color-coded by source, clickable to filter */}
+            {/* Tag panel — VLM (OpenRouter) tags in the gallery, clickable to filter */}
             {tagCounts.length > 0 && (
               <div className="mt-3 rounded-lg border border-border bg-surface-2 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-3 text-xs">
-                  <span className="font-medium text-foreground">תגיות בגלריה</span>
-                  <span className="flex items-center gap-1 text-muted-foreground"><span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600" /> הרשימה שלך</span>
-                  <span className="flex items-center gap-1 text-muted-foreground"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" /> הצעות המערכת</span>
+                  <span className="font-medium text-foreground">תגיות (VLM)</span>
                   {tagFilter && (
                     <button onClick={() => setTagFilter(null)}
                       className="rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground">✕ נקה סינון</button>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {tagCounts.map(({ tag, count, src }) => {
+                  {tagCounts.map(({ tag, count }) => {
                     const active = tag === tagFilter;
-                    const base = src === "user" ? "bg-blue-600" : "bg-amber-500";
                     return (
                       <button key={tag}
                         onClick={() => { setTagFilter(active ? null : tag); setView("top"); }}
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium text-white transition ${base} ${active ? "ring-2 ring-white/70" : "opacity-85 hover:opacity-100"}`}>
+                        className={`rounded-full bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition ${active ? "ring-2 ring-white/70" : "opacity-85 hover:opacity-100"}`}>
                         {tag} <span className="opacity-75">{count}</span>
                       </button>
                     );
@@ -400,65 +387,63 @@ export default function PipelineResults() {
               </div>
             )}
 
-            {/* Clustering level (re-cluster on demand) */}
-            {view === "clusters" && (results.data?.features.length ?? 0) > 0 && (
+            {/* Grouping level — which similarity_group_N (Modal community-detection) to view */}
+            {view === "clusters" && clusters.length > 0 && (
               <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                 דרגת קיבוץ:
                 <div className="flex overflow-hidden rounded-md border border-border">
-                  {([["רופף", 0.80], ["בינוני", 0.88], ["מהודק", 0.93]] as const).map(([label, t], i) => (
-                    <button
-                      key={label}
-                      onClick={() => recluster.mutate(t)}
-                      disabled={recluster.isPending}
-                      className={`bg-surface-2 px-2.5 py-1 font-medium text-muted-foreground hover:text-foreground ${i > 0 ? "border-r border-border" : ""}`}
-                    >
+                  {([[1, "רופף"], [2, "בינוני"], [3, "מהודק"]] as const).map(([lvl, label], i) => (
+                    <button key={lvl}
+                      onClick={() => setGroupLevel(lvl)}
+                      className={`px-2.5 py-1 font-medium ${i > 0 ? "border-r border-border" : ""} ${
+                        groupLevel === lvl ? "bg-primary/15 text-primary" : "bg-surface-2 text-muted-foreground hover:text-foreground"
+                      }`}>
                       {label}
                     </button>
                   ))}
                 </div>
-                {recluster.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               </div>
             )}
 
             {results.isLoading && <div className="mt-6 text-sm text-muted-foreground">טוען…</div>}
 
-            {!results.isLoading && (results.data?.features.length ?? 0) === 0 && (
+            {!results.isLoading && (results.data?.images.length ?? 0) === 0 && (
               <div className="mt-6 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                אין עדיין תוצאות. לחץ "עבד גלריה" כדי להריץ את המנוע (דורש שה-Modal יהיה פרוס).
+                אין עדיין תוצאות. לחץ "עבד גלריה" כדי להריץ את המנוע.
               </div>
             )}
 
-            {/* Visual clusters */}
+            {/* Visual groups */}
             {view === "clusters" && clusters.map((c) => (
-              <div key={c.id} className="mt-5">
-                <div className="mb-1.5 text-xs font-medium text-muted-foreground">קבוצה {c.id} · {c.items.length} תמונות</div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9">
-                  {c.items.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} culling={imById.get(f.image_id)} tags={labelsFor(f)} onOpen={() => setLightbox(preview(f.image_id))} />)}
+              <div key={c.id} className="mt-6">
+                <div className="mb-2 text-sm font-medium text-muted-foreground">קבוצה {c.id} · {c.items.length} תמונות</div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {c.items.map((im) => <Thumb key={im.id} url={thumb(im.id)} culling={im} tags={im.ai_tags ?? []} onOpen={() => setLightbox(preview(im.id))} />)}
                 </div>
               </div>
             ))}
 
             {/* People */}
             {view === "people" && (
-              <div className="mt-5 space-y-4">
+              <div className="mt-6 space-y-4">
                 {people.map((p, i) => (
                   <div key={p.id} className="rounded-lg border border-border bg-surface-2 p-3">
                     <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                       {p.rep && <FaceCrop url={imById.get(p.rep)?.original_url || ""} bbox={p.repBbox} size={44} />}
                       אדם {i + 1} <span className="text-muted-foreground">· {p.images.length} תמונות</span>
                     </div>
-                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-                      {p.images.map((id) => <Thumb key={id} url={thumb(id)} culling={imById.get(id)} onOpen={() => setLightbox(preview(id))} />)}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                      {p.images.map((id) => <Thumb key={id} url={thumb(id)} culling={imById.get(id)} tags={imById.get(id)?.ai_tags ?? []} onOpen={() => setLightbox(preview(id))} />)}
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Best of gallery */}
+            {/* Best of gallery (by VLM culling score) */}
             {view === "top" && (
-              <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9">
-                {top.map((f) => <Thumb key={f.image_id} url={thumb(f.image_id)} score={score(f.aesthetic)} culling={imById.get(f.image_id)} tags={labelsFor(f)} onOpen={() => setLightbox(preview(f.image_id))} />)}
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {top.map((im) => <Thumb key={im.id} url={thumb(im.id)} culling={im} tags={im.ai_tags ?? []} onOpen={() => setLightbox(preview(im.id))} />)}
               </div>
             )}
           </>
@@ -500,11 +485,10 @@ function FaceCrop({ url, bbox, size = 44 }: { url: string; bbox: Bbox | null; si
   return <canvas ref={ref} width={size} height={size} className="rounded-full object-cover" />;
 }
 
-function Thumb({ url, score, culling, tags, onOpen }: { url: string; score?: string; culling?: CullingMetrics; tags?: Label[]; onOpen: () => void }) {
+function Thumb({ url, culling, tags, onOpen }: { url: string; culling?: CullingMetrics; tags?: string[]; onOpen: () => void }) {
   const hasCull = !!(culling && hasCullingMetrics(culling));
-  // Prefer the VLM culling rating (the trusted photographer score) for the badge,
-  // fall back to the CLIP aesthetic. One number only — no competing scores.
-  const rating = culling?.culling_score != null ? (culling.culling_score * 5).toFixed(1) : score;
+  // Rating = the VLM culling score only (0..1 → 0..5 stars). No CLIP.
+  const rating = culling?.culling_score != null ? (culling.culling_score * 5).toFixed(1) : null;
   const cat = hasCull ? cullingLabelHe(culling!.culling_label) : null;
   const overall = culling?.culling_score != null ? Math.round(culling.culling_score * 100) : null;
   return (
@@ -518,7 +502,7 @@ function Thumb({ url, score, culling, tags, onOpen }: { url: string; score?: str
       <div className="space-y-1.5 p-2">
         {/* rating + category */}
         <div className="flex items-center justify-between gap-1">
-          {rating && rating !== "—" && (
+          {rating && (
             <span className="flex items-center gap-0.5 text-xs font-bold text-foreground">
               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />{rating}
             </span>
@@ -550,14 +534,11 @@ function Thumb({ url, score, culling, tags, onOpen }: { url: string; score?: str
           </div>
         )}
 
-        {/* tags */}
+        {/* VLM tags */}
         {tags && tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {tags.map((t) => (
-              <span key={t.tag}
-                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white ${
-                  t.src === "user" ? "bg-blue-600/90" : "bg-amber-500/90"
-                }`}>{t.tag}</span>
+              <span key={t} className="rounded bg-blue-600/90 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-white">{t}</span>
             ))}
           </div>
         )}

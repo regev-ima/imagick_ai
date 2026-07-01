@@ -35,27 +35,46 @@ const CULLING_DEFAULT_LABELS = [
   "Family & Reception", "Ceremony", "Dance/Party", "Other",
 ];
 
-function cullingPrompt(labels: string[]): string {
+function cullingPrompt(labels: string[], tags: string[]): string {
   const ls = labels.length ? labels : CULLING_DEFAULT_LABELS;
   const example = CULLING_KEYS.map((k) => `${k}_val`).join(", ");
-  return [
+  const lines = [
     "Rate the image from 0 to 1 as a professional photographer.",
     "Be as accurate and as critic as you can.",
     "RETURN A JSON PARSABLE LIST ONLY! NO MARKDOWN! NO FREE TEXT! just like this:",
-    `[${example}]`,
+    tags.length ? `[${example}, [tags_array]]` : `[${example}]`,
     `In label please choose one of: ${ls.join(", ")}`,
-  ].join("\n");
+  ];
+  if (tags.length) {
+    // Tagging (blue chips) now comes from the VLM instead of CLIP — the model picks
+    // whichever of THESE tags genuinely apply (0 or more, verbatim, no invention).
+    lines.push(
+      `As the LAST list element, return an array with every tag from this list that truly applies (0 or more, use the tag text verbatim, do NOT invent tags): ${tags.join(", ")}`,
+    );
+  }
+  return lines.join("\n");
 }
 
-function parseCulling(content: string, labels: string[]) {
+function parseCulling(content: string, labels: string[], tags: string[]) {
   const cleaned = content.replace(/```json|```/g, "").trim();
   const v: unknown = JSON.parse(cleaned);
   let arr: unknown[];
   if (Array.isArray(v)) arr = v;
-  else if (v && typeof v === "object") arr = CULLING_KEYS.map((k) => (v as Record<string, unknown>)[k]);
-  else throw new Error("culling: not a list/dict");
-  if (arr.length !== CULLING_KEYS.length) throw new Error("culling: wrong length");
+  else if (v && typeof v === "object") {
+    arr = CULLING_KEYS.map((k) => (v as Record<string, unknown>)[k]);
+    if (tags.length) arr.push((v as Record<string, unknown>).tags);
+  } else throw new Error("culling: not a list/dict");
+  if (arr.length < CULLING_KEYS.length) throw new Error("culling: wrong length");
   const num = (x: unknown) => { const n = typeof x === "number" ? x : parseFloat(String(x)); return Number.isFinite(n) ? n : 0; };
+  // Applicable tags = the 7th element, filtered to the allowed set (verbatim match).
+  let outTags: string[] = [];
+  if (tags.length && Array.isArray(arr[6])) {
+    const allow = new Set(tags.map((t) => t.trim()));
+    outTags = (arr[6] as unknown[])
+      .filter((x): x is string => typeof x === "string")
+      .map((s) => s.trim())
+      .filter((s) => allow.has(s));
+  }
   return {
     subject_sharpness: num(arr[0]),
     background_sharpness: num(arr[1]),
@@ -63,6 +82,7 @@ function parseCulling(content: string, labels: string[]) {
     intended_facial_expression: num(arr[3]),
     overall_score: num(arr[4]),
     label: (typeof arr[5] === "string" && arr[5]) ? arr[5] : (labels[labels.length - 1] ?? "Other"),
+    tags: outTags,
   };
 }
 
@@ -71,9 +91,12 @@ async function handleCulling(res: any, key: string, image: string, body: any) {
   const labels: string[] = Array.isArray(body?.labels)
     ? body.labels.filter((t: unknown) => typeof t === "string")
     : CULLING_DEFAULT_LABELS;
+  const tags: string[] = Array.isArray(body?.tags)
+    ? body.tags.filter((t: unknown) => typeof t === "string").slice(0, 40)
+    : [];
   const requested = typeof body?.model === "string" && body.model ? body.model : DEFAULT_MODEL;
   const chosenModel = DEPRECATED_MODELS[requested] || requested;
-  const prompt = cullingPrompt(labels);
+  const prompt = cullingPrompt(labels, tags);
 
   const callOnce = async () => {
     const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -85,7 +108,7 @@ async function handleCulling(res: any, key: string, image: string, body: any) {
           { type: "text", text: prompt },
           { type: "image_url", image_url: { url: image } },
         ] }],
-        max_tokens: 120,
+        max_tokens: 220, // a bit more headroom now that the list can include a tags array
         temperature: 0.2,
         usage: { include: true },
       }),
@@ -98,17 +121,17 @@ async function handleCulling(res: any, key: string, image: string, body: any) {
   for (let attempt = 0; attempt < 2; attempt++) { // one call + one retry
     try {
       const { content, usage } = await callOnce();
-      const parsed = parseCulling(content, labels);
+      const parsed = parseCulling(content, labels, tags);
       const cost = typeof usage?.cost === "number" ? usage.cost : null;
       res.status(200).json({ ...parsed, model: chosenModel, usage: { cost } });
       return;
     } catch {
       if (attempt === 1) {
-        // Faithful fallback: zeros + last label.
+        // Faithful fallback: zeros + last label + no tags.
         res.status(200).json({
           subject_sharpness: 0, background_sharpness: 0, thirds_rule: 0,
           intended_facial_expression: 0, overall_score: 0,
-          label: labels[labels.length - 1] ?? "Other",
+          label: labels[labels.length - 1] ?? "Other", tags: [],
           model: chosenModel, fallback: true,
         });
         return;
