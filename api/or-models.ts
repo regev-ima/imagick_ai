@@ -39,9 +39,13 @@ export default async function handler(req: any, res: any) {
         completion: num(m.pricing?.completion), // USD per output token
         image: num(m.pricing?.image),           // USD per image (if metered that way)
       }))
-      // cheapest first: input-token price, then per-image, then completion, then name
-      .sort((a, b) =>
-        (a.prompt - b.prompt) || (a.image - b.image) || (a.completion - b.completion) || a.id.localeCompare(b.id));
+      // cheapest first. OpenRouter uses -1 for variable/unknown pricing (Auto
+      // Router, some previews) — push those to the END instead of the top.
+      .sort((a, b) => {
+        const c = (x: number) => (x < 0 ? Number.POSITIVE_INFINITY : x);
+        return (c(a.prompt) - c(b.prompt)) || (c(a.image) - c(b.image)) ||
+          (c(a.completion) - c(b.completion)) || a.id.localeCompare(b.id);
+      });
 
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
     res.status(200).json({ models });

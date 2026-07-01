@@ -97,7 +97,7 @@ export default function PipelineResults() {
   const orModels = useQuery({
     queryKey: ["or-vision-models"],
     staleTime: 3_600_000,
-    queryFn: async (): Promise<{ id: string; name: string; prompt: number; image: number }[]> => {
+    queryFn: async (): Promise<{ id: string; name: string; prompt: number; completion: number; image: number }[]> => {
       const r = await fetch(`${window.location.origin}/api/or-models`);
       if (!r.ok) throw new Error(String(r.status));
       const d = await r.json();
@@ -105,13 +105,15 @@ export default function PipelineResults() {
     },
   });
   // Options for the dropdown — live list if available, else the static fallback.
+  // Show BOTH input (קלט) and output (פלט) price per 1M tokens. OpenRouter's -1
+  // means variable/unknown → shown as "?".
   const modelOptions = useMemo(() => {
     const live = orModels.data ?? [];
     if (!live.length) return VLM_MODELS.map((m) => ({ id: m.id, label: m.label }));
+    const money = (perToken: number) => (perToken < 0 ? "?" : `$${(perToken * 1e6).toFixed(2)}`);
     return live.map((m) => ({
       id: m.id,
-      // name + input-token price per 1M (the sort key), so cost is visible.
-      label: `${m.name} — $${(m.prompt * 1e6).toFixed(2)}/1M`,
+      label: `${m.name} · קלט ${money(m.prompt)} · פלט ${money(m.completion)} (ל-1M טוקנים)`,
     }));
   }, [orModels.data]);
 
@@ -314,7 +316,7 @@ export default function PipelineResults() {
               מודל AI{orModels.isLoading ? " (טוען…)" : ""}:
               <select value={opts.model}
                 onChange={(e) => setOpts((o) => ({ ...o, model: e.target.value }))}
-                className="max-w-[22rem] rounded-md border border-border bg-surface-2 px-2 py-1 text-xs">
+                className="max-w-[30rem] rounded-md border border-border bg-surface-2 px-2 py-1 text-xs">
                 {modelOptions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
               </select>
             </label>
