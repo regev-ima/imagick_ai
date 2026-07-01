@@ -121,6 +121,10 @@ serve(async (req: Request) => {
     // URL is often auth-protected and returns HTML/401 to server-to-server calls.
     const scoreVisionUrl = Deno.env.get("SCORE_VISION_URL") ||
       (typeof options?.scoreVisionUrl === "string" ? options.scoreVisionUrl : null);
+    // Optional Vercel "Protection Bypass for Automation" token, so we can reach a
+    // PROTECTED preview /api/score-vision server-to-server without opening it to the
+    // public. Sent as a request header only — NEVER logged or stored.
+    const scoreVisionBypass = Deno.env.get("SCORE_VISION_BYPASS_TOKEN") || null;
     const cullingRequested = options?.culling !== false;
     const doCulling = cullingRequested && !!scoreVisionUrl;
     // Image source: preview (default) or the tiny thumbnail (cheaper; CLIP-only, no faces).
@@ -350,27 +354,33 @@ serve(async (req: Request) => {
     // COMPACT diagnostic (status/content-type/body prefix ≤300 chars) — so a bad
     // endpoint (protected preview → HTML/401, wrong URL → 404) is visible instead of
     // silently stalling with a misleading "Modal/GPU" message.
+    // Header set for the culling call. The bypass token (if any) rides here only —
+    // it must never appear in errors/logs; we surface just a boolean.
+    const scoreVisionHeaders: Record<string, string> = { "Content-Type": "application/json" };
+    if (scoreVisionBypass) scoreVisionHeaders["x-vercel-protection-bypass"] = scoreVisionBypass;
+    const bypassInfo = `protection_bypass_configured=${!!scoreVisionBypass}`;
+
     const callScoreVision = async (image: string): Promise<{ data?: Record<string, unknown>; error?: string }> => {
       let res: Response;
       try {
         res = await fetch(scoreVisionUrl!, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: scoreVisionHeaders,
           body: JSON.stringify({ mode: "culling", image, labels }),
         });
       } catch (e) {
-        return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)}` };
+        return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)} (${bypassInfo})` };
       }
       const ct = res.headers.get("content-type") || "";
       const text = await res.text();
-      if (!res.ok) return { error: `status=${res.status} ct=${ct || "?"} body=${text.slice(0, 300)}` };
+      if (!res.ok) return { error: `status=${res.status} ct=${ct || "?"} ${bypassInfo} body=${text.slice(0, 300)}` };
       if (!ct.includes("application/json")) {
-        return { error: `non-json response ct=${ct || "?"} status=${res.status} body=${text.slice(0, 300)}` };
+        return { error: `non-json response ct=${ct || "?"} status=${res.status} ${bypassInfo} body=${text.slice(0, 300)}` };
       }
       try {
         return { data: JSON.parse(text) as Record<string, unknown> };
       } catch {
-        return { error: `json parse failed ct=${ct} body=${text.slice(0, 300)}` };
+        return { error: `json parse failed ct=${ct} ${bypassInfo} body=${text.slice(0, 300)}` };
       }
     };
 

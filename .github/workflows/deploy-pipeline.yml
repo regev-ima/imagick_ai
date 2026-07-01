@@ -14,6 +14,10 @@ name: Deploy AI pipeline
 #                                           culling (e.g. https://imagick.ai/api/score-vision).
 #                                           If unset, culling falls back to the URL the
 #                                           frontend sends (a protected preview URL will fail).
+#   SCORE_VISION_BYPASS_TOKEN (optional)  - Vercel "Protection Bypass for Automation"
+#                                           token; lets the Edge Function reach a
+#                                           PROTECTED preview score-vision without
+#                                           opening it publicly.
 
 # Runs automatically on changes to the pipeline (the secrets are set now), and
 # can also be run manually. NOTE: the "Run workflow" button only appears once
@@ -111,6 +115,9 @@ jobs:
           # Preferred over the frontend-provided scoreVisionUrl, which on a protected
           # preview URL returns HTML/401 to the server-to-server culling call.
           SCORE_VISION_URL: ${{ secrets.SCORE_VISION_URL }}
+          # Optional Vercel "Protection Bypass for Automation" token — lets the Edge
+          # Function reach a PROTECTED preview /api/score-vision without opening it publicly.
+          SCORE_VISION_BYPASS_TOKEN: ${{ secrets.SCORE_VISION_BYPASS_TOKEN }}
         run: |
           ARGS=(
             MODAL_URL="${{ steps.modal.outputs.url }}"
@@ -122,6 +129,10 @@ jobs:
             echo "SCORE_VISION_URL will be set on the Edge Function."
           else
             echo "::warning::SCORE_VISION_URL repo secret is NOT set. Culling will fall back to the frontend-provided scoreVisionUrl; a protected preview URL will fail. Set a repo secret SCORE_VISION_URL to a PUBLIC /api/score-vision endpoint."
+          fi
+          if [ -n "$SCORE_VISION_BYPASS_TOKEN" ]; then
+            ARGS+=( SCORE_VISION_BYPASS_TOKEN="$SCORE_VISION_BYPASS_TOKEN" )
+            echo "SCORE_VISION_BYPASS_TOKEN will be set (value hidden) — protected preview reachable."
           fi
           supabase secrets set "${ARGS[@]}" --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
 

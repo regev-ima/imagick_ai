@@ -25,6 +25,11 @@
  *   supabase secrets set SCORE_VISION_URL="https://<public-domain>/api/score-vision" \
  *     --project-ref <ref>
  *
+ * If the endpoint is a PROTECTED Vercel preview, either open it publicly OR give the
+ * Edge Function a Vercel "Protection Bypass for Automation" token (no public opening):
+ *   supabase secrets set SCORE_VISION_BYPASS_TOKEN="<token>" --project-ref <ref>
+ * (These are EDGE FUNCTION secrets — not env vars for this script.)
+ *
  * Optional env:
  *   SUPABASE_USER_JWT   a real user JWT to invoke as the gallery owner (closest
  *                       to the app path). If unset, the SERVICE_ROLE key is used
@@ -123,7 +128,9 @@ async function main() {
     console.log("    if set (preferred), else the fallback URL passed here" +
       `${SCORE_VISION_URL ? "" : " — but you passed NONE, so it relies entirely on the secret"}.`);
     console.log("    Ensure that endpoint is PUBLIC (a protected Vercel preview URL returns HTML/401");
-    console.log("    to the server-to-server call and every culling call fails).\n");
+    console.log("    to the server-to-server call and every culling call fails). For a protected");
+    console.log("    preview, set an Edge Function secret SCORE_VISION_BYPASS_TOKEN (Vercel automation");
+    console.log("    bypass) instead of opening it publicly.\n");
   }
 
   // 1) Trigger the pipeline exactly like the app (edge function invoke).
