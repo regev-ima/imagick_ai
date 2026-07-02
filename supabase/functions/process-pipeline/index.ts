@@ -8,6 +8,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { fetchCaptureTime } from "../_shared/exif-date.ts";
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
@@ -189,10 +190,38 @@ serve(async (req: Request) => {
       const { data: feats } = await admin
         .from("image_features").select("image_id, clip_vector").eq("gallery_id", galleryId);
       const { data: imgRows } = await admin
-        .from("gallery_images").select("id, taken_at").eq("gallery_id", galleryId);
+        .from("gallery_images").select("id, taken_at, original_url").eq("gallery_id", galleryId);
       const takenAt = new Map<string, string | null>(
         (imgRows || []).map((r: { id: string; taken_at: string | null }) => [r.id, r.taken_at] as [string, string | null]),
       );
+
+      // The time gate is the REAL separator between tight bursts and merely
+      // similar-looking frames. It only works if taken_at is populated — but the
+      // culling-only flow never runs extract-exif, so times were all null and
+      // grouping degraded to pure-CLIP (everything merged). Backfill capture
+      // times here, right before grouping, with a cheap 128KB range-fetch of the
+      // original. Parallelized in modest chunks; persisted so the UI + future
+      // runs benefit. JPEG originals only (same limitation as extract-exif).
+      const needTime = (imgRows || []).filter(
+        (r: { id: string; taken_at: string | null; original_url: string | null }) => !r.taken_at && r.original_url,
+      ) as { id: string; original_url: string }[];
+      if (needTime.length > 0) {
+        const CHUNK = 16;
+        let backfilled = 0;
+        for (let i = 0; i < needTime.length; i += CHUNK) {
+          const slice = needTime.slice(i, i + CHUNK);
+          const found = await Promise.all(
+            slice.map(async (r) => [r.id, await fetchCaptureTime(r.original_url)] as [string, string | null]),
+          );
+          const updates = found.filter(([, t]) => t) as [string, string][];
+          for (const [id, t] of updates) {
+            takenAt.set(id, t);
+            await admin.from("gallery_images").update({ taken_at: t }).eq("id", id);
+            backfilled++;
+          }
+        }
+        console.log(`grouping: backfilled taken_at for ${backfilled}/${needTime.length} images`);
+      }
       const ids: string[] = [];
       const embeddings: number[][] = [];
       const times: (number | null)[] = [];
