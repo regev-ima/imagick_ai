@@ -142,9 +142,12 @@ serve(async (req: Request) => {
       };
     };
     if (!galleryId) return json({ error: "Missing galleryId" }, 400);
-    // Which optional steps to run. Faces (ArcFace) is the heavy, premium-gated one;
-    // CLIP-based clustering/tagging always ride on the one cheap embedding.
-    const doFaces = options?.faces !== false;
+    // Which optional steps to run. Faces (ArcFace) is the heavy, opt-in step —
+    // it defaults OFF to match the UI (the create-gallery + modal toggles both
+    // default faces off) so a caller that omits the flag never silently pays for
+    // the expensive ArcFace pass. CLIP-based clustering/tagging always ride on
+    // the one cheap embedding.
+    const doFaces = options?.faces === true;
     const doCluster = options?.cluster !== false;
     const doTags = options?.tags !== false;
     // Culling = the OLD VLM rating/label pass (score-vision `mode:"culling"`), which

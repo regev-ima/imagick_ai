@@ -219,7 +219,12 @@ export function AICullingModal({
   };
 
   const handleConfirm = () => {
-    onConfirm({ tags: selectedTags, cluster: doCluster, faces: doFaces });
+    // When the photographer picked no categories, fall back to the curated
+    // shoot-type label set (same behaviour as the create-gallery wizard) so the
+    // model always culls against sensible topics instead of the pipeline's
+    // stale built-in defaults.
+    const tags = selectedTags.length > 0 ? selectedTags : labels;
+    onConfirm({ tags, cluster: doCluster, faces: doFaces });
   };
 
   const handleClose = () => {
