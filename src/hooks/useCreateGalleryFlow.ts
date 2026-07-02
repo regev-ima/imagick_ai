@@ -32,6 +32,9 @@ export interface CreateGalleryParams {
   styleIds: string[];
   categories?: string[];
   aiCulling: boolean;
+  /** Culling sub-steps (default on): collapse burst duplicates / detect people. */
+  grouping?: boolean;
+  faces?: boolean;
   cullingLanguage?: LanguageCode;
   source: ImportSpec;
 }
@@ -124,12 +127,11 @@ export function useCreateGalleryFlow() {
             categories: params.categories ?? [],
             culling_labels: effectiveCullingLabels,
             ai_culling_enabled: params.aiCulling,
-            // The create flow has ONE culling switch — when it's on, the run
-            // includes grouping AND people (faces), so the gallery arrives with
-            // the full experience. The backend transfer webhook reads these to
-            // auto-start culling when the Drive import lands.
-            ai_grouping_enabled: true,
-            ai_faces_enabled: params.aiCulling,
+            // Culling sub-steps from the create card's toggles (both default
+            // on). The backend transfer webhook reads these to auto-start
+            // culling when the Drive import lands.
+            ai_grouping_enabled: params.grouping ?? true,
+            ai_faces_enabled: params.aiCulling && (params.faces ?? true),
             total_images: source.totalImageCount,
             status: "transferring",
           })
@@ -174,9 +176,9 @@ export function useCreateGalleryFlow() {
           categories: params.categories ?? [],
           culling_labels: effectiveCullingLabels,
           ai_culling_enabled: params.aiCulling,
-          // One culling switch = the full experience (grouping + people).
-          ai_grouping_enabled: true,
-          ai_faces_enabled: params.aiCulling,
+          // Culling sub-steps from the create card's toggles (both default on).
+          ai_grouping_enabled: params.grouping ?? true,
+          ai_faces_enabled: params.aiCulling && (params.faces ?? true),
           total_images: files.length,
           status: "uploading",
         })
@@ -307,8 +309,8 @@ export function useCreateGalleryFlow() {
               options: {
                 culling: true,
                 tags: true,
-                cluster: true,
-                faces: true,
+                cluster: params.grouping ?? true,
+                faces: params.faces ?? true,
                 labels: effectiveCullingLabels,
                 thresholds: [0.5, 0.7, 0.9],
                 timeThreshold: adminTime,

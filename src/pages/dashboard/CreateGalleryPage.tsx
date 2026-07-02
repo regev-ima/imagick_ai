@@ -11,12 +11,14 @@ import {
   Heart,
   Home,
   Images,
+  Layers,
   Loader2,
   MapPin,
   Mountain,
   PartyPopper,
   Pencil,
   Plus,
+  ScanFace,
   Scissors,
   Shirt,
   Sparkles as SparklesIcon,
@@ -176,6 +178,11 @@ export default function CreateGalleryPage() {
   const [styleIds, setStyleIds] = useState<string[]>([]);
   const [styleTouched, setStyleTouched] = useState(false);
   const [cull, setCull] = useState(true);
+  // Culling sub-steps (mirror the AI Culling modal's toggles): grouping collapses
+  // burst duplicates; faces powers the People view. Both on by default so a
+  // culled collection arrives with the full experience.
+  const [cullGrouping, setCullGrouping] = useState(true);
+  const [cullFaces, setCullFaces] = useState(true);
   const [categories, setCategories] = useState<string[]>([]);
   const [uploadSource, setUploadSource] = useState<UploadSource>("local");
   const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
@@ -321,6 +328,8 @@ export default function CreateGalleryPage() {
       galleryType: type,
       styleIds,
       aiCulling: cull,
+      grouping: cullGrouping,
+      faces: cullFaces,
       categories: cull ? categories : [],
       cullingLanguage,
       source: uploadSource === "drive"
@@ -552,7 +561,35 @@ export default function CreateGalleryPage() {
             </button>
             {cull && (
               <div className="space-y-3 border-t border-border/60 p-5 pt-4">
-                <div className="flex items-center justify-between gap-3">
+                {/* Culling sub-steps — same options as the in-gallery AI Culling
+                    modal, in this card's design language. */}
+                <button
+                  type="button"
+                  onClick={() => setCullGrouping((v) => !v)}
+                  className="flex w-full items-center gap-2.5 text-left"
+                >
+                  <Layers className={cn("h-3.5 w-3.5", cullGrouping ? "text-primary" : "text-muted-foreground")} />
+                  <span className="caption flex-1 text-foreground">Group similar images</span>
+                  <span className={cn("h-5 w-9 rounded-full p-0.5 transition-colors", cullGrouping ? "bg-primary" : "bg-muted")}>
+                    <motion.span layout className="block h-4 w-4 rounded-full bg-white shadow" style={{ marginLeft: cullGrouping ? "auto" : 0 }} />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCullFaces((v) => !v)}
+                  className="flex w-full items-center gap-2.5 text-left"
+                >
+                  <ScanFace className={cn("h-3.5 w-3.5", cullFaces ? "text-primary" : "text-muted-foreground")} />
+                  <span className="caption flex-1 text-foreground">
+                    Recognize people (faces)
+                    <span className="ms-1.5 text-muted-foreground/60">heavier step</span>
+                  </span>
+                  <span className={cn("h-5 w-9 rounded-full p-0.5 transition-colors", cullFaces ? "bg-primary" : "bg-muted")}>
+                    <motion.span layout className="block h-4 w-4 rounded-full bg-white shadow" style={{ marginLeft: cullFaces ? "auto" : 0 }} />
+                  </span>
+                </button>
+
+                <div className="flex items-center justify-between gap-3 border-t border-border/40 pt-3">
                   <div className="caption flex items-center gap-1.5">
                     <Tag className="h-3 w-3" /> What should I look for?
                     <span className="text-primary">{categories.length}<span className="text-muted-foreground/50">/20</span></span>
