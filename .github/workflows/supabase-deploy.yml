@@ -56,9 +56,14 @@ jobs:
         if: ${{ inputs.skip_migrations != true }}
         run: supabase db push
 
+      # --use-api uploads the function source through the Management API on
+      # every run. The docker-bundling path's "No change found" skip once left
+      # EVERY function pointing at a missing code blob (gateway 404
+      # NOT_FOUND_FUNCTION_BLOB — a full production outage: uploads, emails and
+      # Drive imports all dead), so we never use it again.
       - name: Deploy edge functions
         if: ${{ inputs.skip_functions != true }}
-        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID"
+        run: supabase functions deploy --use-api --project-ref "$SUPABASE_PROJECT_ID"
 
       # Drive functions do their own Bearer-token / webhook-secret auth, so the
       # platform JWT gate must be OFF — otherwise it blocks the unauthenticated
@@ -67,5 +72,23 @@ jobs:
       - name: Force-disable JWT gate on Drive functions
         if: ${{ inputs.skip_functions != true }}
         run: |
-          supabase functions deploy gd-import --no-verify-jwt --project-ref "$SUPABASE_PROJECT_ID"
-          supabase functions deploy gd-transfer-webhook --no-verify-jwt --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy gd-import --use-api --no-verify-jwt --project-ref "$SUPABASE_PROJECT_ID"
+          supabase functions deploy gd-transfer-webhook --use-api --no-verify-jwt --project-ref "$SUPABASE_PROJECT_ID"
+
+      # Post-deploy smoke check: every browser-facing function must answer its
+      # CORS preflight. Catches the missing-blob failure mode (404) before
+      # users do.
+      - name: Verify functions respond
+        if: ${{ inputs.skip_functions != true }}
+        run: |
+          B="https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1"
+          fail=0
+          for fn in image-upload gd-import gd-transfer-webhook send-email image-webhook process-images process-pipeline extract-exif verify-gallery-password; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "$B/$fn" \
+              -H "Origin: https://app.imagick.ai" \
+              -H "Access-Control-Request-Method: POST" \
+              -H "Access-Control-Request-Headers: authorization,apikey,content-type" --max-time 20)
+            echo "$fn OPTIONS=$code"
+            if [ "$code" != "200" ] && [ "$code" != "204" ]; then fail=1; fi
+          done
+          exit $fail
