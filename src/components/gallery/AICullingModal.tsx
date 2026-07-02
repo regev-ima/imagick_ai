@@ -69,6 +69,10 @@ interface AICullingModalProps {
   /** Per-gallery step defaults chosen at creation (seed the toggles). */
   defaultCluster?: boolean;
   defaultFaces?: boolean;
+  /** Photos in the gallery WITHOUT a real AI score (null or the legacy zero
+   *  fallback). When > 0 the run stays available even on a "completed"
+   *  gallery, so stragglers the VLM failed on can be picked up. */
+  unculledCount?: number;
 }
 
 export function AICullingModal({
@@ -87,6 +91,7 @@ export function AICullingModal({
   uploadCompletedAt = null,
   defaultCluster = true,
   defaultFaces = false,
+  unculledCount = 0,
 }: AICullingModalProps) {
   const { user } = useAuth();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -130,7 +135,11 @@ export function AICullingModal({
   // run is blocked. Adding new photos is the only thing that re-enables it (and
   // then it processes only those new photos). This is a deliberate policy choice
   // to avoid any accidental/wasteful re-runs on a finished gallery.
-  const allAlreadyCulled = hasCompletedCulling && noNewImagesSinceCulling && !isCurrentlyRunning;
+  // Also require that every photo actually HAS a score — a completed run can
+  // leave stragglers the VLM failed on (unscored), and those must remain
+  // runnable ("Cull remaining N photos") even with no new uploads.
+  const allAlreadyCulled =
+    hasCompletedCulling && noNewImagesSinceCulling && unculledCount === 0 && !isCurrentlyRunning;
 
   // Estimated wall-clock for this run, shown next to the button so
   // users know what to expect ("up to ~3 min for 2,000 photos").
@@ -496,7 +505,7 @@ export function AICullingModal({
               ) : hasCompletedCulling ? (
                 <>
                   <Sparkle size={15} className="text-current" />
-                  Cull new photos
+                  {unculledCount > 0 ? `Cull remaining ${unculledCount} photos` : "Cull new photos"}
                 </>
               ) : (
                 <>

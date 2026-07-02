@@ -1,0 +1,38 @@
+# TEMPORARY diagnostic — pulls per-gallery pipeline aggregates via the Supabase
+# Management API (the dev sandbox can't reach supabase.co). Used to diagnose
+# "faces ran but zero people" + unscored-photo counts. Prints counts and status
+# fields only. Runs when this file changes; delete after diagnosis.
+name: DB diagnostics
+on:
+  push:
+    branches: [claude/image-scoring-tagging-0cszyi]
+    paths: ['.github/workflows/db-diagnose.yml']
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query pipeline state for newest galleries
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          run_q() {
+            local sql="$1"
+            curl -s -X POST "https://api.supabase.com/v1/projects/$REF/database/query" \
+              -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              -d "$(jq -n --arg q "$sql" '{query:$q}')" | jq .
+            echo "----"
+          }
+          run_q "select left(name,24) name, culling_status, pipeline_status, left(coalesce(pipeline_error,''),160) err,
+                 (select count(*) from gallery_images i where i.gallery_id=g.id) total,
+                 (select count(*) from gallery_images i where i.gallery_id=g.id and i.culling_score>0) scored,
+                 (select count(*) from gallery_images i where i.gallery_id=g.id and i.culling_score=0) zeroed,
+                 (select count(*) from gallery_images i where i.gallery_id=g.id and i.culling_score is null) unscored,
+                 (select count(*) from image_features f where f.gallery_id=g.id) clip,
+                 (select count(*) from image_features f where f.gallery_id=g.id and f.faces_done) faces_done,
+                 (select count(*) from face_detections d where d.gallery_id=g.id) detections,
+                 (select count(*) from face_detections d where d.gallery_id=g.id and d.arcface_vector is not null) det_vec,
+                 (select count(*) from face_clusters c where c.gallery_id=g.id) clusters,
+                 ai_faces_enabled, ai_grouping_enabled
+                 from galleries g order by created_at desc limit 4"
+          run_q "select left(name,24) name, left(coalesce(pipeline_timing::text,''),400) timing from galleries order by created_at desc limit 2"
