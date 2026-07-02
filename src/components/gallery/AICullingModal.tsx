@@ -125,21 +125,12 @@ export function AICullingModal({
     !!cullingCompletedAt &&
     (!uploadCompletedAt || new Date(uploadCompletedAt).getTime() <= new Date(cullingCompletedAt).getTime());
 
-  // Gate re-running: culling is incremental (only ever processes photos
-  // without a rating), so once a gallery is fully culled with no new photos
-  // there is nothing to do — block the button rather than re-spend on the
-  // same shots. Adding photos re-enables it (and it culls only the new ones).
+  // Fully lock re-running: once a gallery is completely culled with no new
+  // photos, NOTHING re-runs — not scoring, not grouping, not faces. The whole
+  // run is blocked. Adding new photos is the only thing that re-enables it (and
+  // then it processes only those new photos). This is a deliberate policy choice
+  // to avoid any accidental/wasteful re-runs on a finished gallery.
   const allAlreadyCulled = hasCompletedCulling && noNewImagesSinceCulling && !isCurrentlyRunning;
-
-  // Even when scoring is done, grouping + face detection are re-runnable. In the
-  // all-culled state the run does ONLY the toggled steps (scoring is skipped),
-  // so the button stays live as long as at least one step is selected.
-  const canReRunSteps = doCluster || doFaces;
-  const reRunLabel = doCluster && doFaces
-    ? "Re-run grouping & faces"
-    : doFaces ? "Re-detect people"
-    : doCluster ? "Re-group photos"
-    : "Select a step to re-run";
 
   // Estimated wall-clock for this run, shown next to the button so
   // users know what to expect ("up to ~3 min for 2,000 photos").
@@ -327,7 +318,9 @@ export function AICullingModal({
           )}
 
           {/* Steps the photographer can toggle. Rating + tags always run; grouping
-              and people (faces) are optional. Model/timing are admin settings. */}
+              and people (faces) are optional. Model/timing are admin settings.
+              Hidden once the gallery is fully culled — nothing re-runs then. */}
+          {!allAlreadyCulled && (
           <div className="mb-6 space-y-2">
             <label className="flex items-center justify-between p-3 rounded-[--radius] surface-2 border border-border/60 cursor-pointer">
               <span className="text-sm text-foreground">Group similar images</span>
@@ -343,6 +336,7 @@ export function AICullingModal({
                 className="w-4 h-4 rounded accent-primary" disabled={isCurrentlyRunning} />
             </label>
           </div>
+          )}
 
           {/* Tag Selection — only when scoring will run (topics guide the VLM). */}
           {!allAlreadyCulled && (
@@ -448,22 +442,19 @@ export function AICullingModal({
             </div>
           )}
 
-          {/* Already-culled note. Ratings are INCREMENTAL — already-rated photos
-              are never re-scored, so there's no wasteful re-run and nothing to
-              overwrite. But grouping and face detection ARE re-runnable (e.g. to
-              rebuild people after an engine update), so we keep those toggles
-              live and let the photographer re-run just those steps. */}
+          {/* Fully-culled note. Once every photo is culled and nothing new was
+              added, the whole run is locked — no scoring, grouping or faces
+              re-run. Adding photos is what re-enables it. */}
           {allAlreadyCulled && (
             <div className="flex items-start gap-3 p-4 mb-4 rounded-sm border border-border/60 surface-2">
               <Check className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">
-                  Ratings are up to date
+                  This gallery is fully culled
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Every photo already has an AI rating, so scoring won't re-run (no
-                  new photos, no wasted cost). You can still re-run grouping or
-                  face detection below.
+                  Every photo already has an AI rating and no new photos were
+                  added, so there's nothing to run. Add photos to cull new ones.
                 </p>
               </div>
             </div>
@@ -483,7 +474,7 @@ export function AICullingModal({
             <Button
               variant="glow"
               onClick={handleConfirm}
-              disabled={isProcessing || isCurrentlyRunning || (allAlreadyCulled && !canReRunSteps)}
+              disabled={isProcessing || isCurrentlyRunning || allAlreadyCulled}
               aria-busy={isCurrentlyRunning || undefined}
               className="gap-2 min-w-[180px]"
             >
@@ -500,7 +491,7 @@ export function AICullingModal({
               ) : allAlreadyCulled ? (
                 <>
                   <Sparkle size={15} className="text-current" />
-                  {reRunLabel}
+                  Nothing to run
                 </>
               ) : hasCompletedCulling ? (
                 <>
