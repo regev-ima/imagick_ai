@@ -35,27 +35,41 @@ const CULLING_DEFAULT_LABELS = [
   "Family & Reception", "Ceremony", "Dance/Party", "Other",
 ];
 
-function cullingPrompt(labels: string[], tags: string[]): string {
+// Extra per-photo signals (opt-in) the VLM returns as a final OBJECT element.
+// Near-zero extra cost — the image (input tokens) is what's expensive, not a few
+// more output fields.
+const EXTRAS_SPEC = '{"eyes":"open|closed|mixed|none","expression":"one short word","looking":true|false,"keeper":true|false,"hero":true|false,"blur":true|false,"exposure":true|false,"people":number}';
+
+function cullingPrompt(labels: string[], tags: string[], extras: boolean): string {
   const ls = labels.length ? labels : CULLING_DEFAULT_LABELS;
   const example = CULLING_KEYS.map((k) => `${k}_val`).join(", ");
+  const parts = [example];
+  if (tags.length) parts.push("[tags_array]");
+  if (extras) parts.push("{signals}");
   const lines = [
     "Rate the image from 0 to 1 as a professional photographer.",
     "Be as accurate and as critic as you can.",
     "RETURN A JSON PARSABLE LIST ONLY! NO MARKDOWN! NO FREE TEXT! just like this:",
-    tags.length ? `[${example}, [tags_array]]` : `[${example}]`,
+    `[${parts.join(", ")}]`,
     `In label please choose one of: ${ls.join(", ")}`,
   ];
   if (tags.length) {
-    // Tagging (blue chips) now comes from the VLM instead of CLIP — the model picks
-    // whichever of THESE tags genuinely apply (0 or more, verbatim, no invention).
     lines.push(
-      `As the LAST list element, return an array with every tag from this list that truly applies (0 or more, use the tag text verbatim, do NOT invent tags): ${tags.join(", ")}`,
+      `As the tags element, return an array with every tag from this list that truly applies (0 or more, verbatim, do NOT invent): ${tags.join(", ")}`,
+    );
+  }
+  if (extras) {
+    lines.push(
+      `As the FINAL list element, return this signals OBJECT for the photo: ${EXTRAS_SPEC}. ` +
+      `"eyes": overall eye state of the people; "expression": a one-word mood (smile/laugh/serious/emotional/none); ` +
+      `"looking": is anyone looking at the camera; "keeper": would a pro keep this in the final selection; ` +
+      `"hero": is it cover/hero-worthy; "blur": UNINTENDED blur/soft focus; "exposure": over/under-exposed; "people": how many people.`,
     );
   }
   return lines.join("\n");
 }
 
-function parseCulling(content: string, labels: string[], tags: string[]) {
+function parseCulling(content: string, labels: string[], tags: string[], extras: boolean) {
   const cleaned = content.replace(/```json|```/g, "").trim();
   const v: unknown = JSON.parse(cleaned);
   let arr: unknown[];
@@ -66,15 +80,33 @@ function parseCulling(content: string, labels: string[], tags: string[]) {
   } else throw new Error("culling: not a list/dict");
   if (arr.length < CULLING_KEYS.length) throw new Error("culling: wrong length");
   const num = (x: unknown) => { const n = typeof x === "number" ? x : parseFloat(String(x)); return Number.isFinite(n) ? n : 0; };
-  // Applicable tags = the 7th element, filtered to the allowed set (verbatim match).
+  const isObj = (e: unknown): e is Record<string, unknown> => !!e && typeof e === "object" && !Array.isArray(e);
+  // Applicable tags = the first array element after the 6 scores.
   let outTags: string[] = [];
-  if (tags.length && Array.isArray(arr[6])) {
+  const tagsEl = arr.slice(CULLING_KEYS.length).find((e) => Array.isArray(e));
+  if (tags.length && Array.isArray(tagsEl)) {
     const allow = new Set(tags.map((t) => t.trim()));
-    outTags = (arr[6] as unknown[])
+    outTags = (tagsEl as unknown[])
       .filter((x): x is string => typeof x === "string")
       .map((s) => s.trim())
       .filter((s) => allow.has(s));
   }
+  // Extra signals = the trailing OBJECT element (or the whole object if the model
+  // returned one big object instead of a list).
+  let sig: Record<string, unknown> = {};
+  if (extras) sig = (isObj(v) ? v : arr.slice(CULLING_KEYS.length).find(isObj)) as Record<string, unknown> ?? {};
+  const bool = (x: unknown) => x === true || x === "true" || x === 1;
+  const str = (x: unknown) => (typeof x === "string" ? x.trim() : "");
+  const extraOut = extras ? {
+    eyes_status: (["open", "closed", "mixed", "none"].includes(str(sig.eyes)) ? str(sig.eyes) : "none"),
+    expression: str(sig.expression) || null,
+    looking_at_camera: bool(sig.looking),
+    is_keeper: bool(sig.keeper),
+    is_hero: bool(sig.hero),
+    has_blur_issue: bool(sig.blur),
+    has_exposure_issue: bool(sig.exposure),
+    people_count: Math.max(0, Math.round(num(sig.people))),
+  } : {};
   return {
     subject_sharpness: num(arr[0]),
     background_sharpness: num(arr[1]),
@@ -83,6 +115,7 @@ function parseCulling(content: string, labels: string[], tags: string[]) {
     overall_score: num(arr[4]),
     label: (typeof arr[5] === "string" && arr[5]) ? arr[5] : (labels[labels.length - 1] ?? "Other"),
     tags: outTags,
+    ...extraOut,
   };
 }
 
@@ -94,9 +127,10 @@ async function handleCulling(res: any, key: string, image: string, body: any) {
   const tags: string[] = Array.isArray(body?.tags)
     ? body.tags.filter((t: unknown) => typeof t === "string").slice(0, 40)
     : [];
+  const extras: boolean = body?.extras === true;
   const requested = typeof body?.model === "string" && body.model ? body.model : DEFAULT_MODEL;
   const chosenModel = DEPRECATED_MODELS[requested] || requested;
-  const prompt = cullingPrompt(labels, tags);
+  const prompt = cullingPrompt(labels, tags, extras);
 
   const callOnce = async () => {
     const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -108,7 +142,7 @@ async function handleCulling(res: any, key: string, image: string, body: any) {
           { type: "text", text: prompt },
           { type: "image_url", image_url: { url: image } },
         ] }],
-        max_tokens: 220, // a bit more headroom now that the list can include a tags array
+        max_tokens: extras ? 320 : 220, // headroom for the tags array + signals object
         temperature: 0.2,
         usage: { include: true },
       }),
@@ -121,7 +155,7 @@ async function handleCulling(res: any, key: string, image: string, body: any) {
   for (let attempt = 0; attempt < 2; attempt++) { // one call + one retry
     try {
       const { content, usage } = await callOnce();
-      const parsed = parseCulling(content, labels, tags);
+      const parsed = parseCulling(content, labels, tags, extras);
       const cost = typeof usage?.cost === "number" ? usage.cost : null;
       res.status(200).json({ ...parsed, model: chosenModel, usage: { cost } });
       return;

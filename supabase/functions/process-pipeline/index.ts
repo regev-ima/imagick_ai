@@ -440,6 +440,7 @@ serve(async (req: Request) => {
           body: JSON.stringify({
             mode: "culling", image, labels,
             tags: doTags ? tagsList : [], // VLM tagging (blue chips) — from the fixed list
+            extras: true,                 // eyes / expression / keeper / hero / technical flags
             ...(vlmModel ? { model: vlmModel } : {}), // per-test model choice
           }),
         });
@@ -470,6 +471,7 @@ serve(async (req: Request) => {
       // VLM-chosen tags → the old gallery_images.ai_tags column (text[]).
       const aiTags = Array.isArray(d.tags) ? (d.tags as unknown[]).filter((t): t is string => typeof t === "string") : [];
       try {
+        const boolOrNull = (v: unknown) => (typeof v === "boolean" ? v : null);
         await admin.from("gallery_images").update({
           culling_score: num(d.overall_score),
           culling_label: typeof d.label === "string" ? d.label : null,
@@ -478,6 +480,15 @@ serve(async (req: Request) => {
           thirds_rule: num(d.thirds_rule),
           intended_facial_expression: num(d.intended_facial_expression),
           ai_tags: aiTags,
+          // Extra VLM signals.
+          eyes_status: typeof d.eyes_status === "string" ? d.eyes_status : null,
+          expression: typeof d.expression === "string" ? d.expression : null,
+          looking_at_camera: boolOrNull(d.looking_at_camera),
+          is_keeper: boolOrNull(d.is_keeper),
+          is_hero: boolOrNull(d.is_hero),
+          has_blur_issue: boolOrNull(d.has_blur_issue),
+          has_exposure_issue: boolOrNull(d.has_exposure_issue),
+          people_count: typeof d.people_count === "number" ? d.people_count : null,
         }).eq("id", img.id);
         cullProcessed++;
         // Cost/model telemetry for the test dashboard.

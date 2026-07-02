@@ -1248,6 +1248,14 @@ export default function GalleryEditorPage() {
             thirds_rule: null,
             intended_facial_expression: null,
             ai_tags: null,
+            eyes_status: null,
+            expression: null,
+            looking_at_camera: null,
+            is_keeper: null,
+            is_hero: null,
+            has_blur_issue: null,
+            has_exposure_issue: null,
+            people_count: null,
           })
           .eq("gallery_id", id!);
         // Reset filter selections that referenced the now-cleared data.
