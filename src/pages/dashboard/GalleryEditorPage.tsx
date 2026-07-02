@@ -297,6 +297,15 @@ export default function GalleryEditorPage() {
         "background_sharpness",
         "thirds_rule",
         "intended_facial_expression",
+        "ai_tags",
+        "eyes_status",
+        "expression",
+        "looking_at_camera",
+        "is_keeper",
+        "ai_hero_candidate",
+        "has_blur_issue",
+        "has_exposure_issue",
+        "people_count",
         "width",
         "height",
         "sort_order",
@@ -616,6 +625,21 @@ export default function GalleryEditorPage() {
 
     if (filters.showHeroOnly) {
       result = result.filter(img => img.is_hero);
+    }
+
+    // VLM extra-signal filters.
+    if (filters.showKeeperOnly) {
+      result = result.filter(img => (img as any).is_keeper === true);
+    }
+    if (filters.eyesOpenOnly) {
+      // Keep photos with open eyes (or where eyes aren't applicable/unknown).
+      result = result.filter(img => {
+        const e = (img as any).eyes_status;
+        return e !== "closed" && e !== "mixed";
+      });
+    }
+    if (filters.hideIssues) {
+      result = result.filter(img => !(img as any).has_blur_issue && !(img as any).has_exposure_issue);
     }
 
     if (filters.selectedTags.length > 0) {
@@ -1252,7 +1276,7 @@ export default function GalleryEditorPage() {
             expression: null,
             looking_at_camera: null,
             is_keeper: null,
-            is_hero: null,
+            ai_hero_candidate: null,
             has_blur_issue: null,
             has_exposure_issue: null,
             people_count: null,

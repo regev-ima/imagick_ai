@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
+import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Info, Clock, Upload, ImageIcon, Scissors, ScanFace, Eye, CheckCircle2, AlertTriangle } from "lucide-react";
 import { estimateCullingMs, formatCountdown } from "@/lib/cullingEta";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -652,6 +652,9 @@ function UnifiedFilterPanel({
     filters.selectedTags.length > 0 ||
     filters.showHeroOnly ||
     filters.showLikedOnly ||
+    filters.showKeeperOnly ||
+    filters.eyesOpenOnly ||
+    filters.hideIssues ||
     (filters.selectedRatings?.length || 0) > 0 ||
     (filters.selectedLabels?.length || 0) > 0 ||
     duplicateLimit !== 0;
@@ -685,6 +688,43 @@ function UnifiedFilterPanel({
           >
             <Star className={cn("w-3.5 h-3.5", filters.showHeroOnly && "fill-rating")} />
             Hero
+          </button>
+          {/* VLM extra-signal filters */}
+          <button
+            onClick={() => onFiltersChange({ ...filters, showKeeperOnly: !filters.showKeeperOnly })}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+              filters.showKeeperOnly
+                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-500"
+                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Keepers
+          </button>
+          <button
+            onClick={() => onFiltersChange({ ...filters, eyesOpenOnly: !filters.eyesOpenOnly })}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+              filters.eyesOpenOnly
+                ? "bg-primary/15 border-primary/30 text-primary"
+                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Eyes open
+          </button>
+          <button
+            onClick={() => onFiltersChange({ ...filters, hideIssues: !filters.hideIssues })}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+              filters.hideIssues
+                ? "bg-red-500/15 border-red-500/30 text-red-500"
+                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            No issues
           </button>
         </div>
       </div>
@@ -955,6 +995,9 @@ function UnifiedFilterPanel({
               selectedTags: [],
               showHeroOnly: false,
               showLikedOnly: false,
+              showKeeperOnly: false,
+              eyesOpenOnly: false,
+              hideIssues: false,
             });
             onDuplicateLimitChange(0);
           }}

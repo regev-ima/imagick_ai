@@ -485,7 +485,7 @@ serve(async (req: Request) => {
           expression: typeof d.expression === "string" ? d.expression : null,
           looking_at_camera: boolOrNull(d.looking_at_camera),
           is_keeper: boolOrNull(d.is_keeper),
-          is_hero: boolOrNull(d.is_hero),
+          ai_hero_candidate: boolOrNull(d.is_hero), // VLM suggestion — NOT the manual is_hero
           has_blur_issue: boolOrNull(d.has_blur_issue),
           has_exposure_issue: boolOrNull(d.has_exposure_issue),
           people_count: typeof d.people_count === "number" ? d.people_count : null,

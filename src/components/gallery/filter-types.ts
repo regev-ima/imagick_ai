@@ -7,6 +7,10 @@ export interface FilterOptions {
   selectedLabels: string[];
   showLikedOnly: boolean;
   showHeroOnly: boolean;
+  // VLM extra signals.
+  showKeeperOnly: boolean;   // only photos the AI recommends keeping
+  eyesOpenOnly: boolean;     // hide closed-eye shots
+  hideIssues: boolean;       // hide unintended blur / bad exposure
   groupingLevel: "none" | "loose" | "medium" | "strict";
   selectedGroup: number | null;
 }
@@ -22,6 +26,9 @@ export const defaultFilters: FilterOptions = {
   selectedLabels: [],
   showLikedOnly: false,
   showHeroOnly: false,
+  showKeeperOnly: false,
+  eyesOpenOnly: false,
+  hideIssues: false,
   groupingLevel: "none",
   selectedGroup: null,
 };
