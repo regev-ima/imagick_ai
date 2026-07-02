@@ -278,7 +278,10 @@ serve(async (req) => {
         input_dir: link,
         output_dir: finalOutputDir,
         direction: "gd2b2",
-        use_uuid4: true,
+        // Style training matches before/after pairs by original filename, so
+        // it must keep the Drive names. Galleries dedupe/store by the
+        // UUID-renamed key, so they keep UUID renaming.
+        use_uuid4: !isStyleTransfer,
       };
 
       if (isStyleTransfer && styleId) {
