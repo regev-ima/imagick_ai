@@ -981,17 +981,18 @@ export default function CreateGalleryPage() {
                             </span>
                             <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", cullingAdvancedOpen && "rotate-180")} />
                           </CollapsibleTrigger>
-                          <CollapsibleContent className="space-y-4 pt-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <Tag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                                <span className="text-sm font-medium">What should I look for?</span>
-                                <span className="caption text-primary">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Globe className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+                          <CollapsibleContent className="space-y-3 pt-4">
+                            {/* One compact row: hint + language + select-all */}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs text-muted-foreground">
+                                {galleryType
+                                  ? "Categories Aura detects — keep, remove, or add your own."
+                                  : "Pick a shoot type in step one for suggestions."}
+                              </p>
+                              <div className="flex items-center gap-1.5 shrink-0">
                                 <Select value={cullingLanguage} onValueChange={(v) => handleLanguageChange(v as LanguageCode)}>
-                                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                                  <SelectTrigger className="h-7 w-[112px] text-xs">
+                                    <Globe className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1002,34 +1003,27 @@ export default function CreateGalleryPage() {
                                     ))}
                                   </SelectContent>
                                 </Select>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 shrink-0 px-2 text-xs"
+                                  onClick={() => {
+                                    const currentLabels = getCullingLabels(galleryType || "wedding", cullingLanguage);
+                                    const allSelected = currentLabels.every((l) => selectedCategories.includes(l));
+                                    if (allSelected) {
+                                      setSelectedCategories((prev) => prev.filter((c) => !currentLabels.includes(c)));
+                                    } else {
+                                      setSelectedCategories((prev) => {
+                                        const custom = prev.filter((c) => !currentLabels.includes(c));
+                                        const remaining = 20 - custom.length;
+                                        return [...custom, ...currentLabels.slice(0, remaining)];
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {getCullingLabels(galleryType || "wedding", cullingLanguage).every((l) => selectedCategories.includes(l)) ? "Clear" : "Select all"}
+                                </Button>
                               </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs text-muted-foreground">
-                                {galleryType
-                                  ? "I suggested labels for this shoot type. Keep the ones you want or add your own."
-                                  : "Pick a shoot type in step one and I'll suggest labels."}
-                              </p>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 shrink-0 px-2 text-xs"
-                                onClick={() => {
-                                  const currentLabels = getCullingLabels(galleryType || "wedding", cullingLanguage);
-                                  const allSelected = currentLabels.every((l) => selectedCategories.includes(l));
-                                  if (allSelected) {
-                                    setSelectedCategories((prev) => prev.filter((c) => !currentLabels.includes(c)));
-                                  } else {
-                                    setSelectedCategories((prev) => {
-                                      const custom = prev.filter((c) => !currentLabels.includes(c));
-                                      const remaining = 20 - custom.length;
-                                      return [...custom, ...currentLabels.slice(0, remaining)];
-                                    });
-                                  }
-                                }}
-                              >
-                                {getCullingLabels(galleryType || "wedding", cullingLanguage).every((l) => selectedCategories.includes(l)) ? "Clear all" : "Select all"}
-                              </Button>
                             </div>
 
                             <div className="flex flex-wrap gap-2">
