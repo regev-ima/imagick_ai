@@ -1027,19 +1027,19 @@ export default function CreateGalleryPage() {
                           </label>
                         </div>
 
-                        {/* Advanced (optional) — detailed label controls, collapsed by default */}
-                        <Collapsible open={cullingAdvancedOpen} onOpenChange={setCullingAdvancedOpen}>
-                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-left transition-colors hover:bg-muted/50">
-                            <span className="flex items-center gap-2">
-                              <Tag className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                              <span className="text-sm font-medium">Advanced (optional)</span>
-                              {selectedCategories.length > 0 && (
-                                <span className="caption text-primary">{String(selectedCategories.length).padStart(2, "0")}<span className="text-muted-foreground/50"> / 20</span></span>
-                              )}
-                            </span>
-                            <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", cullingAdvancedOpen && "rotate-180")} />
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="space-y-3 pt-4">
+                        {/* Tags — a toggle row like the steps above. On reveals the
+                            category/label controls; off lets Aura pick automatically. */}
+                        <label className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2.5">
+                          <span className="text-sm text-foreground">
+                            Tags
+                            {selectedCategories.length > 0 && (
+                              <span className="ms-2 text-xs text-primary">{selectedCategories.length} selected</span>
+                            )}
+                          </span>
+                          <Switch checked={cullingAdvancedOpen} onCheckedChange={setCullingAdvancedOpen} />
+                        </label>
+                        {cullingAdvancedOpen && (
+                          <div className="space-y-3 pt-1">
                             {/* One compact row: hint + language + select-all */}
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <p className="text-xs text-muted-foreground">
@@ -1121,8 +1121,8 @@ export default function CreateGalleryPage() {
                                 <Plus className="h-4 w-4" />
                               </Button>
                             </div>
-                          </CollapsibleContent>
-                        </Collapsible>
+                          </div>
+                        )}
 
                         <p className="text-xs text-muted-foreground">
                           You can also do this later in the editor.
