@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, memo } from "react";
 import { motion } from "framer-motion";
-import { Check, ZoomIn, Star, Heart, Upload, AlertTriangle, Clock, Info } from "lucide-react";
+import { Check, ZoomIn, Star, Heart, Upload, AlertTriangle, Clock, Info, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cullingScoreToStars } from "@/lib/cullingScore";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
@@ -23,6 +23,10 @@ interface ImageCardProps {
     width?: number | null;
     height?: number | null;
   };
+  /** Number of similar photos in this image's group at the active sensitivity
+   *  (>1). Renders a "stacked frames ×N" badge so the user can see the photo
+   *  is one of a burst/near-duplicate set. Undefined = not in a group. */
+  groupSize?: number;
   index: number;
   thumbnailUrl: string;
   viewMode: "grid" | "masonry";
@@ -61,6 +65,7 @@ const MAX_MANUAL_RETRIES = 2;
 
 function ImageCardImpl({
   image,
+  groupSize,
   index,
   thumbnailUrl,
   viewMode,
@@ -258,7 +263,10 @@ function ImageCardImpl({
   }, [hasFailed, image.id, image.filename, reportFailed, reportRecovered, handleManualRetry]);
 
   const { mode: cullingScoreMode } = useCullingScoreMode();
-  const starRating = cullingScoreToStars(image.culling_score, cullingScoreMode);
+  // Match the star mapping used by the sidebar counts, rating filter and the
+  // detail panel: culling_score → stars, falling back to legacy ai_rating so a
+  // photo's star presence is identical everywhere it appears.
+  const starRating = cullingScoreToStars(image.culling_score, cullingScoreMode) || (image.ai_rating || 0);
   const hasRating = starRating > 0;
   const showRawScore = cullingScoreMode === "raw" && typeof image.culling_score === "number";
 
@@ -472,7 +480,7 @@ function ImageCardImpl({
                 "absolute top-1.5 px-1.5 py-0.5 rounded-sm font-mono text-[8px] font-semibold uppercase tracking-[0.14em] bg-primary text-primary-foreground",
                 isSelected ? "left-8" : "left-1.5 group-hover:left-8"
               )} style={{ transition: "left 0.2s ease" }}>
-                Pick
+                Hero
               </div>
             )}
 
@@ -584,6 +592,22 @@ function ImageCardImpl({
                 )}
               </div>
             )}
+
+            {/* Similar-group badge — this photo is one of N near-duplicate
+                frames at the active sensitivity. Bottom-right, out of the way
+                of the star rating (bottom-left) and Pick/like badges. */}
+            {groupSize && groupSize > 1 && (
+              <div
+                className={cn(
+                  "absolute bottom-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm bg-black/55 backdrop-blur-sm text-white/90 transition-opacity duration-200",
+                  isSelected ? "opacity-100" : "opacity-80 group-hover:opacity-100"
+                )}
+                title={`One of ${groupSize} similar photos`}
+              >
+                <Layers className="w-2.5 h-2.5" />
+                <span className="font-mono text-[10px] tabular-nums folio">{groupSize}</span>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
@@ -619,7 +643,8 @@ export const ImageCard = memo(ImageCardImpl, (prev, next) => {
     prev.computedWidth !== next.computedWidth ||
     prev.computedHeight !== next.computedHeight ||
     prev.status !== next.status ||
-    prev.index !== next.index
+    prev.index !== next.index ||
+    prev.groupSize !== next.groupSize
   ) {
     return false;
   }

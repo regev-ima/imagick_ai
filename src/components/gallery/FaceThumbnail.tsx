@@ -7,6 +7,11 @@ interface BoundingBox {
   left: number;
   width: number;
   height: number;
+  // Pixel space the bbox coords are expressed in (original-image pixels when
+  // known, else the detection frame). The thumbnail is a RESIZED preview, so we
+  // rescale the box from this space into the loaded image's natural dimensions.
+  source_width?: number | null;
+  source_height?: number | null;
 }
 
 interface FaceThumbnailProps {
@@ -41,10 +46,27 @@ export function FaceThumbnail({ imageUrl, bbox, size = 80, className }: FaceThum
     const { w: natW, h: natH } = naturalDims;
 
     // Ensure bbox values are numbers (DB jsonb can return strings)
-    const bboxTop = Number(bbox.top) || 0;
-    const bboxLeft = Number(bbox.left) || 0;
-    const bboxWidth = Number(bbox.width) || 0;
-    const bboxHeight = Number(bbox.height) || 0;
+    let bboxTop = Number(bbox.top) || 0;
+    let bboxLeft = Number(bbox.left) || 0;
+    let bboxWidth = Number(bbox.width) || 0;
+    let bboxHeight = Number(bbox.height) || 0;
+
+    // The bbox is stored in ORIGINAL-image (or detection-frame) pixels, but the
+    // <img> we render is a smaller preview with different natural dimensions.
+    // Rescale the box from its source space into the loaded image's natural
+    // dims, otherwise the crop offsets are computed against the wrong scale and
+    // the face lands entirely off-frame (blank/garbage circle). If source dims
+    // are missing (legacy rows) we assume the box already matches the image.
+    const srcW = Number(bbox.source_width) || 0;
+    const srcH = Number(bbox.source_height) || 0;
+    if (srcW > 0 && srcH > 0) {
+      const sx = natW / srcW;
+      const sy = natH / srcH;
+      bboxLeft *= sx;
+      bboxWidth *= sx;
+      bboxTop *= sy;
+      bboxHeight *= sy;
+    }
 
     // If bbox is invalid, show center-cropped image
     if (bboxWidth <= 0 || bboxHeight <= 0) {

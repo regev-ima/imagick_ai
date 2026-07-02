@@ -746,11 +746,11 @@ export function ImageDetailsPanel({
           {/* Extra VLM signals */}
           {(image.eyes_status || image.is_keeper != null || image.ai_hero_candidate != null ||
             image.has_blur_issue || image.has_exposure_issue || image.expression ||
-            image.people_count != null || (image.ai_tags?.length ?? 0) > 0) && (
+            image.people_count != null) && (
             <div className="mt-3 pt-3 border-t border-primary/15 space-y-2 text-xs">
               <div className="flex flex-wrap gap-1.5">
                 {image.is_keeper && <span className="rounded px-1.5 py-0.5 bg-emerald-500/15 text-emerald-500 font-medium">Keeper</span>}
-                {image.ai_hero_candidate && <span className="rounded px-1.5 py-0.5 bg-yellow-500/15 text-yellow-600 dark:text-yellow-500 font-medium">Hero candidate</span>}
+                {image.ai_hero_candidate && <span className="rounded px-1.5 py-0.5 bg-yellow-500/15 text-yellow-600 dark:text-yellow-500 font-medium">AI hero</span>}
                 {image.has_blur_issue && <span className="rounded px-1.5 py-0.5 bg-red-500/15 text-red-500 font-medium">Blur</span>}
                 {image.has_exposure_issue && <span className="rounded px-1.5 py-0.5 bg-red-500/15 text-red-500 font-medium">Exposure</span>}
               </div>
@@ -760,11 +760,8 @@ export function ImageDetailsPanel({
                 {image.looking_at_camera != null && <span>Looking: <span className="text-foreground">{image.looking_at_camera ? "yes" : "no"}</span></span>}
                 {image.people_count != null && <span>People: <span className="text-foreground">{image.people_count}</span></span>}
               </div>
-              {(image.ai_tags?.length ?? 0) > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {image.ai_tags!.map((t) => <span key={t} className="rounded px-1.5 py-0.5 bg-blue-600/90 text-white font-medium">{t}</span>)}
-                </div>
-              )}
+              {/* ai_tags are shown once, in the dedicated "AI Tags" card below —
+                  not duplicated here. */}
             </div>
           )}
         </SectionCard>

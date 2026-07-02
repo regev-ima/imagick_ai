@@ -213,9 +213,14 @@ export function GalleryRightSidebar({
       (filters.minRating > 0 ? 1 : 0) +
       (filters.showLikedOnly ? 1 : 0) +
       (filters.showHeroOnly ? 1 : 0) +
+      (filters.showKeeperOnly ? 1 : 0) +
+      (filters.eyesOpenOnly ? 1 : 0) +
+      (filters.hideIssues ? 1 : 0) +
+      (filters.showPeopleOnly ? 1 : 0) +
       (filters.selectedTags.length > 0 ? 1 : 0) +
       (filters.selectedLabels.length > 0 ? 1 : 0) +
-      (filters.groupingLevel !== "none" ? 1 : 0)
+      (filters.groupingLevel !== "none" ? 1 : 0) +
+      (duplicateLimit !== 0 ? 1 : 0)
     : 0;
 
   // In mobile sheet mode, always show expanded content
@@ -672,55 +677,61 @@ function UnifiedFilterPanel({
             <Star className={cn("w-3.5 h-3.5", filters.showHeroOnly && "fill-rating")} />
             Hero
           </button>
-          {/* VLM extra-signal filters */}
-          <button
-            onClick={() => onFiltersChange({ ...filters, showKeeperOnly: !filters.showKeeperOnly })}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
-              filters.showKeeperOnly
-                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-500"
-                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            )}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Keepers
-          </button>
-          <button
-            onClick={() => onFiltersChange({ ...filters, eyesOpenOnly: !filters.eyesOpenOnly })}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
-              filters.eyesOpenOnly
-                ? "bg-primary/15 border-primary/30 text-primary"
-                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            )}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            Eyes open
-          </button>
-          <button
-            onClick={() => onFiltersChange({ ...filters, hideIssues: !filters.hideIssues })}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
-              filters.hideIssues
-                ? "bg-red-500/15 border-red-500/30 text-red-500"
-                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            )}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            No issues
-          </button>
-          <button
-            onClick={() => onFiltersChange({ ...filters, showPeopleOnly: !filters.showPeopleOnly })}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
-              filters.showPeopleOnly
-                ? "bg-primary/15 border-primary/30 text-primary"
-                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            )}
-          >
-            <ScanFace className="w-3.5 h-3.5" />
-            People
-          </button>
+          {/* VLM extra-signal filters — only meaningful once culling has run
+              (they read AI signals that are null before then, so showing them
+              pre-culling would silently empty the grid on click). */}
+          {hasCullingData && (
+            <>
+              <button
+                onClick={() => onFiltersChange({ ...filters, showKeeperOnly: !filters.showKeeperOnly })}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+                  filters.showKeeperOnly
+                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-500"
+                    : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Keepers
+              </button>
+              <button
+                onClick={() => onFiltersChange({ ...filters, eyesOpenOnly: !filters.eyesOpenOnly })}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+                  filters.eyesOpenOnly
+                    ? "bg-primary/15 border-primary/30 text-primary"
+                    : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Eyes open
+              </button>
+              <button
+                onClick={() => onFiltersChange({ ...filters, hideIssues: !filters.hideIssues })}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+                  filters.hideIssues
+                    ? "bg-red-500/15 border-red-500/30 text-red-500"
+                    : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                No issues
+              </button>
+              <button
+                onClick={() => onFiltersChange({ ...filters, showPeopleOnly: !filters.showPeopleOnly })}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+                  filters.showPeopleOnly
+                    ? "bg-primary/15 border-primary/30 text-primary"
+                    : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Has people
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -971,6 +982,11 @@ function UnifiedFilterPanel({
                     <SelectItem value="0">No limit</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-[10px] text-muted-foreground mt-1.5 leading-snug">
+                  {duplicateLimit > 0
+                    ? `Showing the best ${duplicateLimit} of each group; the rest are hidden.`
+                    : "Showing every photo. Pick a limit to hide extra near-duplicate frames, or open the Groups view to browse them."}
+                </p>
               </div>
             </div>
           </div>

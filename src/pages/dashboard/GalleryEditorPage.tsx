@@ -63,7 +63,8 @@ import { ProblemImagesSection } from "@/components/gallery/ProblemImagesSection"
 import { VirtualizedImageGrid } from "@/components/gallery/VirtualizedImageGrid";
 import { CullingStatusBanner } from "@/components/gallery/CullingStatusBanner";
 import { CullingProgressOverlay } from "@/components/gallery/CullingProgressOverlay";
-import { type CatalogMode } from "@/components/gallery/CatalogModeSelector";
+import { CatalogModeSelector, type CatalogMode } from "@/components/gallery/CatalogModeSelector";
+import { GroupingView } from "@/components/gallery/GroupingView";
 import { FaceGallery } from "@/components/gallery/FaceGallery";
 import { FaceClusterImages } from "@/components/gallery/FaceClusterImages";
 import { useFaceSearch } from "@/hooks/useFaceSearch";
@@ -849,10 +850,26 @@ export default function GalleryEditorPage() {
       (filters.selectedLabels?.length || 0) > 0 ||
       filters.showLikedOnly ||
       filters.showHeroOnly ||
+      // VLM quick filters — previously omitted, which broke the toolbar reset
+      // button, the filtered/total header readout and the empty-state "Clear
+      // Filters" whenever only one of these was active.
+      filters.showKeeperOnly ||
+      filters.eyesOpenOnly ||
+      filters.hideIssues ||
+      filters.showPeopleOnly ||
       filters.groupingLevel !== "none" ||
-      filters.selectedGroup !== null
+      filters.selectedGroup !== null ||
+      duplicateLimit > 0
     );
-  }, [filters]);
+  }, [filters, duplicateLimit]);
+
+  // Single source of truth for clearing every filter, so the toolbar reset,
+  // the empty-state Clear button and the sidebar Reset can't drift apart and
+  // leave a stray duplicate-limit or grouping selection applied.
+  const clearAllFilters = useCallback(() => {
+    setFilters(defaultFilters);
+    setDuplicateLimit(0);
+  }, []);
 
   // Extract available groups from images
   const availableGroups = useMemo(() => {
@@ -927,6 +944,28 @@ export default function GalleryEditorPage() {
     });
     return { loose: loose.size, medium: medium.size, strict: strict.size };
   }, [images]);
+
+  // Group size per image at the ACTIVE similarity level, so the grid card can
+  // show a "1 of N similar" badge. Only images that belong to a group of >1 are
+  // included; singletons get no badge.
+  const groupSizeByImage = useMemo(() => {
+    const field = sidebarSimilarityLevel === "loose" ? "similarity_group_1"
+                : sidebarSimilarityLevel === "strict" ? "similarity_group_3"
+                : "similarity_group_2";
+    const counts = new Map<number, number>();
+    images.forEach(img => {
+      const g = (img as any)[field];
+      if (g != null) counts.set(g, (counts.get(g) || 0) + 1);
+    });
+    const byImage = new Map<string, number>();
+    images.forEach(img => {
+      const g = (img as any)[field];
+      if (g == null) return;
+      const c = counts.get(g) || 0;
+      if (c > 1) byImage.set(img.id, c);
+    });
+    return byImage;
+  }, [images, sidebarSimilarityLevel]);
 
   const getSimilarImages = useCallback((imageId: string) => {
     const image = images.find(img => img.id === imageId);
@@ -1687,6 +1726,20 @@ export default function GalleryEditorPage() {
             </h1>
           </div>
 
+          {/* Center: view switcher (Photos / Groups / People). Only shown once
+              there's something to switch to — culling data (Groups) or detected
+              faces (People) — so a plain hosting gallery stays uncluttered. */}
+          {(hasCullingData || (faceClusters.data?.length ?? 0) > 0) && (
+            <div className="hidden md:flex items-center mx-auto shrink-0">
+              <CatalogModeSelector
+                mode={catalogMode}
+                onModeChange={(m) => { setSelectedFaceCluster(null); setCatalogMode(m); }}
+                hasAIData={hasCullingData}
+                faceCount={faceClusters.data?.length ?? 0}
+              />
+            </div>
+          )}
+
           {/* Right: Sort, View Mode, Count */}
           <div className="flex items-center gap-1 ml-auto shrink-0">
             <TooltipProvider delayDuration={300}>
@@ -1743,7 +1796,7 @@ export default function GalleryEditorPage() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setFilters(defaultFilters);
+                      clearAllFilters();
                     }}
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -2273,7 +2326,18 @@ export default function GalleryEditorPage() {
           )}
         </AnimatePresence>
 
-        {filteredImages.length === 0 ? (
+        {catalogMode === "grouping" ? (
+          // Similar-photo Groups view — burst/near-duplicate frames stacked
+          // under a representative, click to expand. Fed the full image set
+          // (not filteredImages, whose keep-N-per-group limit would collapse
+          // each group to one frame and defeat the whole view).
+          <GroupingView
+            images={images as any}
+            onImageClick={openLightbox}
+            onSelectionToggle={handleSelectionToggle}
+            selectedImages={selectedImages}
+          />
+        ) : filteredImages.length === 0 && catalogMode !== "faces" ? (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             {images.length === 0 && gallery.status === "transferring" ? (
               <>
@@ -2302,7 +2366,7 @@ export default function GalleryEditorPage() {
                     : "Try adjusting your filter criteria"}
                 </p>
                 {hasActiveFilters && (
-                  <Button variant="outline" onClick={() => setFilters(defaultFilters)}>
+                  <Button variant="outline" onClick={clearAllFilters}>
                     Clear Filters
                   </Button>
                 )}
@@ -2353,6 +2417,7 @@ export default function GalleryEditorPage() {
                     width: image.width,
                     height: image.height,
                   }}
+                  groupSize={groupSizeByImage.get(image.id)}
                   index={index}
                   thumbnailUrl={getImageThumbnail(image)}
                   viewMode={viewMode}

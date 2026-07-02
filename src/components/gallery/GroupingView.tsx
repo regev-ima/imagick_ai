@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { getThumbnailUrl } from "@/lib/imageUrls";
+import { cullingScoreToStars } from "@/lib/cullingScore";
 
 export type GroupingLevel = "loose" | "medium" | "strict";
 
@@ -64,11 +65,9 @@ export function GroupingView({
       });
   }, [images, level]);
 
-  // Get star rating from culling score
-  const getStars = (score: number | null) => {
-    if (score === null) return 0;
-    return Math.max(1, Math.min(5, Math.round(score * 5)));
-  };
+  // Star rating from culling score — use the shared mapping so the group
+  // view agrees with the grid, sidebar and detail panel.
+  const getStars = (score: number | null) => cullingScoreToStars(score);
 
   const renderStars = (score: number | null) => {
     const stars = getStars(score);
@@ -92,21 +91,21 @@ export function GroupingView({
       {/* Level Selector */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <span className="aura-microlabel">Similarity Level</span>
+          <span className="aura-microlabel">Grouping</span>
           <ToggleGroup
-            type="single" 
-            value={level} 
+            type="single"
+            value={level}
             onValueChange={(v) => v && setLevel(v as GroupingLevel)}
             className="gap-1"
           >
             <ToggleGroupItem value="loose" className="px-3 text-xs">
-              Loose (50%)
+              Broad
             </ToggleGroupItem>
             <ToggleGroupItem value="medium" className="px-3 text-xs">
-              Medium (70%)
+              Balanced
             </ToggleGroupItem>
             <ToggleGroupItem value="strict" className="px-3 text-xs">
-              Strict (90%)
+              Near-identical
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
