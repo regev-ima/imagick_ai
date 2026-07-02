@@ -8,7 +8,7 @@ interface FaceClusterImagesProps {
   clusterId: string;
   onBack: () => void;
   onBackToGallery?: () => void;
-  onImageClick?: (imageId: string) => void;
+  onImageClick?: (imageId: string, scopeIds?: string[]) => void;
 }
 
 export function FaceClusterImages({ clusterId, onBack, onBackToGallery, onImageClick }: FaceClusterImagesProps) {
@@ -63,7 +63,7 @@ export function FaceClusterImages({ clusterId, onBack, onBackToGallery, onImageC
                 "aspect-square overflow-hidden cursor-pointer rounded-sm border border-border/40 plate-keyline",
                 "hover:ring-2 hover:ring-primary/50 transition-all"
               )}
-              onClick={() => onImageClick?.(image.id)}
+              onClick={() => onImageClick?.(image.id, images.map((i) => i.id))}
             >
               <img
                 src={getThumbnailUrl(image.original_url)}

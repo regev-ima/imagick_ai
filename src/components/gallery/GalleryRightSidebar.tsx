@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Info, Clock, Upload, ImageIcon, Scissors, ScanFace } from "lucide-react";
+import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Info, Clock, Upload, ImageIcon, Scissors, ScanFace, Eye, CheckCircle2, AlertTriangle } from "lucide-react";
 import { estimateCullingMs, formatCountdown } from "@/lib/cullingEta";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -217,9 +217,14 @@ export function GalleryRightSidebar({
       (filters.minRating > 0 ? 1 : 0) +
       (filters.showLikedOnly ? 1 : 0) +
       (filters.showHeroOnly ? 1 : 0) +
+      (filters.showKeeperOnly ? 1 : 0) +
+      (filters.eyesOpenOnly ? 1 : 0) +
+      (filters.hideIssues ? 1 : 0) +
+      (filters.showPeopleOnly ? 1 : 0) +
       (filters.selectedTags.length > 0 ? 1 : 0) +
       (filters.selectedLabels.length > 0 ? 1 : 0) +
-      (filters.groupingLevel !== "none" ? 1 : 0)
+      (filters.groupingLevel !== "none" ? 1 : 0) +
+      (duplicateLimit !== 0 ? 1 : 0)
     : 0;
 
   // In mobile sheet mode, always show expanded content
@@ -246,18 +251,6 @@ export function GalleryRightSidebar({
                 <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onOpenFaceSearch}>
                   {faceSearchStatus === "processing" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanFace className="w-3.5 h-3.5" />}
                   Faces
-                </Button>
-              )}
-              {onChooseClientPhotos && (
-                <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onChooseClientPhotos}>
-                  <Images className="w-3.5 h-3.5" />
-                  Client photos
-                </Button>
-              )}
-              {onShare && (
-                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={onShare}>
-                  <Share2 className="w-3.5 h-3.5" />
-                  Share
                 </Button>
               )}
             </div>
@@ -311,7 +304,7 @@ export function GalleryRightSidebar({
   return (
     <div
       className={cn(
-        "shrink-0 border-l border-border/50 glass-card grid grid-rows-[auto_minmax(0,1fr)_auto] w-[300px] h-full",
+        "shrink-0 border-l border-border/50 glass-card grid grid-rows-[auto_minmax(0,1fr)_auto] w-[340px] h-full",
         className,
       )}
     >
@@ -429,12 +422,6 @@ export function GalleryRightSidebar({
               label="Faces"
               onClick={onOpenFaceSearch}
             />
-          )}
-          {onChooseClientPhotos && (
-            <ActionButton icon={<Images className="w-3 h-3" />} label="Client" onClick={onChooseClientPhotos} />
-          )}
-          {onShare && (
-            <ActionButton icon={<Share2 className="w-3 h-3" />} label="Share" onClick={onShare} />
           )}
           {onDownload && (
             <ActionButton icon={<Download className="w-3 h-3" />} label="Download" onClick={onDownload} />
@@ -660,6 +647,10 @@ function UnifiedFilterPanel({
     filters.selectedTags.length > 0 ||
     filters.showHeroOnly ||
     filters.showLikedOnly ||
+    filters.showKeeperOnly ||
+    filters.eyesOpenOnly ||
+    filters.hideIssues ||
+    filters.showPeopleOnly ||
     (filters.selectedRatings?.length || 0) > 0 ||
     (filters.selectedLabels?.length || 0) > 0 ||
     duplicateLimit !== 0;
@@ -694,6 +685,61 @@ function UnifiedFilterPanel({
             <Star className={cn("w-3.5 h-3.5", filters.showHeroOnly && "fill-rating")} />
             Hero
           </button>
+          {/* VLM extra-signal filters — only meaningful once culling has run
+              (they read AI signals that are null before then, so showing them
+              pre-culling would silently empty the grid on click). */}
+          {hasCullingData && (
+            <>
+              <button
+                onClick={() => onFiltersChange({ ...filters, showKeeperOnly: !filters.showKeeperOnly })}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+                  filters.showKeeperOnly
+                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-500"
+                    : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Keepers
+              </button>
+              <button
+                onClick={() => onFiltersChange({ ...filters, eyesOpenOnly: !filters.eyesOpenOnly })}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+                  filters.eyesOpenOnly
+                    ? "bg-primary/15 border-primary/30 text-primary"
+                    : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Eyes open
+              </button>
+              <button
+                onClick={() => onFiltersChange({ ...filters, hideIssues: !filters.hideIssues })}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+                  filters.hideIssues
+                    ? "bg-red-500/15 border-red-500/30 text-red-500"
+                    : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                No issues
+              </button>
+              <button
+                onClick={() => onFiltersChange({ ...filters, showPeopleOnly: !filters.showPeopleOnly })}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+                  filters.showPeopleOnly
+                    ? "bg-primary/15 border-primary/30 text-primary"
+                    : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Has people
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -889,71 +935,40 @@ function UnifiedFilterPanel({
         </>
       )}
 
-      {/* Duplicates (only show section when culling data exists) */}
+      {/* Hide duplicates — a FILTER on the main grid (distinct from the
+          "Groups" view up top, which is for browsing). It collapses
+          near-identical burst frames and keeps only the best N of each, so the
+          photographer doesn't deliver ten shots of the same moment. */}
       {hasCullingData && (
         <>
           <Separator />
           <div className="space-y-2">
-            <Label className="aura-microlabel">Duplicates</Label>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-1.5 block">Sensitivity</label>
-                <div className="flex gap-1">
-                  {(
-                    [
-                      { value: "loose", label: "Low", desc: "50%" },
-                      { value: "medium", label: "Med", desc: "70%" },
-                      { value: "strict", label: "High", desc: "90%" },
-                    ] as const
-                  ).map((opt) => (
-                    <Button
-                      key={opt.value}
-                      variant={similarityLevel === opt.value ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1 text-xs h-7 px-1"
-                      onClick={() => onSimilarityLevelChange(opt.value)}
-                    >
-                      {opt.label}
-                    </Button>
-                  ))}
-                </div>
-                <div className="flex justify-between mt-1">
-                  {(
-                    [
-                      { value: "loose", count: groupCounts.loose },
-                      { value: "medium", count: groupCounts.medium },
-                      { value: "strict", count: groupCounts.strict },
-                    ] as const
-                  ).map((g) => (
-                    <span
-                      key={g.value}
-                      className="text-[10px] text-muted-foreground flex-1 text-center tabular-nums"
-                    >
-                      {g.count} groups
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-1.5 block">Limit</label>
-                <Select
-                  value={String(duplicateLimit)}
-                  onValueChange={(v) => onDuplicateLimitChange(Number(v))}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Keep 1 per group</SelectItem>
-                    <SelectItem value="2">Keep 2 per group</SelectItem>
-                    <SelectItem value="3">Keep 3 per group</SelectItem>
-                    <SelectItem value="5">Keep 5 per group</SelectItem>
-                    <SelectItem value="0">No limit</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <Label className="aura-microlabel">Hide duplicates</Label>
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              Collapse near-identical burst frames in this grid and keep only the
+              best of each. To browse the full groups, use the{" "}
+              <span className="text-foreground">Groups</span> view up top.
+            </p>
+            <Select
+              value={String(duplicateLimit)}
+              onValueChange={(v) => onDuplicateLimitChange(Number(v))}
+            >
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Show all frames</SelectItem>
+                <SelectItem value="1">Keep 1 best per burst</SelectItem>
+                <SelectItem value="2">Keep 2 best per burst</SelectItem>
+                <SelectItem value="3">Keep 3 best per burst</SelectItem>
+                <SelectItem value="5">Keep 5 best per burst</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+              {duplicateLimit > 0
+                ? `Keeping the best ${duplicateLimit} of each burst; the extra frames are hidden.`
+                : "Showing every frame."}
+            </p>
           </div>
         </>
       )}
@@ -975,6 +990,10 @@ function UnifiedFilterPanel({
               selectedTags: [],
               showHeroOnly: false,
               showLikedOnly: false,
+              showKeeperOnly: false,
+              eyesOpenOnly: false,
+              hideIssues: false,
+              showPeopleOnly: false,
             });
             onDuplicateLimitChange(0);
           }}

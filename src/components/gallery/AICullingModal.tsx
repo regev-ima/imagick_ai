@@ -31,10 +31,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+export interface CullingRunOptions {
+  tags: string[];      // category labels the model picks from
+  cluster: boolean;    // group similar images
+  faces: boolean;      // people / face recognition (heavier)
+  // True when this is an explicit re-run on an already-fully-culled gallery
+  // (no new photos). Scoring is skipped; the parent uses this to force a fresh
+  // face re-detection so people clusters rebuild.
+  redetect?: boolean;
+}
+
 interface AICullingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (tags: string[]) => void;
+  onConfirm: (opts: CullingRunOptions) => void;
   isProcessing: boolean;
   imageCount: number;
   showCullingRequiredNote?: boolean;
@@ -56,6 +66,9 @@ interface AICullingModalProps {
    *  since the last culling — if not, re-running is almost always a
    *  no-op and we steer them away from it. */
   uploadCompletedAt?: string | null;
+  /** Per-gallery step defaults chosen at creation (seed the toggles). */
+  defaultCluster?: boolean;
+  defaultFaces?: boolean;
 }
 
 export function AICullingModal({
@@ -72,15 +85,22 @@ export function AICullingModal({
   hasCompletedCulling = false,
   cullingCompletedAt = null,
   uploadCompletedAt = null,
+  defaultCluster = true,
+  defaultFaces = false,
 }: AICullingModalProps) {
   const { user } = useAuth();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
+  // Photographer-chosen steps. Rating + tags always run (the core); grouping is on
+  // by default; faces (people) is the heavier, opt-in step.
+  const [doCluster, setDoCluster] = useState(defaultCluster);
+  const [doFaces, setDoFaces] = useState(defaultFaces);
+  // Re-seed from the gallery's saved prefs each time the modal opens.
+  useEffect(() => {
+    if (isOpen) { setDoCluster(defaultCluster); setDoFaces(defaultFaces); }
+  }, [isOpen, defaultCluster, defaultFaces]);
   const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
   const [languageLoaded, setLanguageLoaded] = useState(false);
-  /** Required check before triggering a re-run that would overwrite
-   *  existing ratings/labels. Reset on every modal open. */
-  const [acknowledgeRerun, setAcknowledgeRerun] = useState(false);
   /** Tick every second so the countdown on the running button ticks
    *  smoothly. Cheap — runs only while the modal is open AND culling
    *  is in progress. */
@@ -90,11 +110,6 @@ export function AICullingModal({
     const id = setInterval(() => setNowTick((t) => t + 1), 1_000);
     return () => clearInterval(id);
   }, [cullingStatus]);
-  // Reset the re-run acknowledgement whenever the modal re-opens.
-  useEffect(() => {
-    if (!isOpen) setAcknowledgeRerun(false);
-  }, [isOpen]);
-
   const isCurrentlyRunning = cullingStatus === "processing" && !isCullingStuck;
   const elapsedText = useMemo(() => {
     if (!cullingStartedAt) return "";
@@ -103,18 +118,19 @@ export function AICullingModal({
     const seconds = Math.max(0, Math.floor((elapsedMs / 1000) % 60));
     return minutes > 0 ? `${minutes} min ${seconds}s` : `${seconds}s`;
   }, [cullingStartedAt, cullingStatus]);
-  // The re-run guard only applies AFTER a successful run AND when not
-  // currently re-running. While processing the button is disabled
-  // anyway. Stuck / fresh galleries don't need the extra confirmation.
-  const requireRerunAck = hasCompletedCulling && !isCurrentlyRunning;
-
   // Detect "nothing changed since last culling": last upload batch
-  // completed before the last culling completion. Re-running in this
-  // state would just produce the same ratings, so we hint to the user
-  // they probably don't need to do this.
+  // completed before the last culling completion — every current photo
+  // already has a rating.
   const noNewImagesSinceCulling =
     !!cullingCompletedAt &&
     (!uploadCompletedAt || new Date(uploadCompletedAt).getTime() <= new Date(cullingCompletedAt).getTime());
+
+  // Fully lock re-running: once a gallery is completely culled with no new
+  // photos, NOTHING re-runs — not scoring, not grouping, not faces. The whole
+  // run is blocked. Adding new photos is the only thing that re-enables it (and
+  // then it processes only those new photos). This is a deliberate policy choice
+  // to avoid any accidental/wasteful re-runs on a finished gallery.
+  const allAlreadyCulled = hasCompletedCulling && noNewImagesSinceCulling && !isCurrentlyRunning;
 
   // Estimated wall-clock for this run, shown next to the button so
   // users know what to expect ("up to ~3 min for 2,000 photos").
@@ -208,7 +224,12 @@ export function AICullingModal({
   };
 
   const handleConfirm = () => {
-    onConfirm(selectedTags);
+    // When the photographer picked no categories, fall back to the curated
+    // shoot-type label set (same behaviour as the create-gallery wizard) so the
+    // model always culls against sensible topics instead of the pipeline's
+    // stale built-in defaults.
+    const tags = selectedTags.length > 0 ? selectedTags : labels;
+    onConfirm({ tags, cluster: doCluster, faces: doFaces, redetect: allAlreadyCulled });
   };
 
   const handleClose = () => {
@@ -274,15 +295,6 @@ export function AICullingModal({
             </div>
           )}
 
-          {/* Re-run Warning */}
-          {cullingStatus === "ready" && (
-            <div className="p-3 rounded-sm bg-rating/10 border border-rating/25 mb-4">
-              <p className="text-sm text-rating font-medium">
-                ⚠️ Re-running AI Culling will overwrite existing ratings and groupings.
-              </p>
-            </div>
-          )}
-
           {/* Culling Required Note */}
           {showCullingRequiredNote && cullingStatus !== "processing" && cullingStatus !== "ready" && (
             <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 mb-4">
@@ -292,19 +304,42 @@ export function AICullingModal({
             </div>
           )}
 
-          {/* Description */}
-          <div className="p-4 rounded-[--radius] surface-2 border border-border/60 mb-6">
-            <p className="text-sm text-muted-foreground">
-              AI Culling will analyze your images and provide:
-            </p>
-            <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-              <li>• Quality ratings (1-5 stars)</li>
-              <li>• Smart tags and categorization</li>
-              <li>• Duplicate/similar image detection</li>
-            </ul>
-          </div>
+          {/* Description — only relevant when scoring will actually run. */}
+          {!allAlreadyCulled && (
+            <div className="p-4 rounded-[--radius] surface-2 border border-border/60 mb-4">
+              <p className="text-sm text-muted-foreground">
+                AI Culling will analyze your images and provide:
+              </p>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                <li>• Quality ratings (1-5 stars) & smart tags</li>
+                <li>• Category for each photo</li>
+              </ul>
+            </div>
+          )}
 
-          {/* Tag Selection */}
+          {/* Steps the photographer can toggle. Rating + tags always run; grouping
+              and people (faces) are optional. Model/timing are admin settings.
+              Hidden once the gallery is fully culled — nothing re-runs then. */}
+          {!allAlreadyCulled && (
+          <div className="mb-6 space-y-2">
+            <label className="flex items-center justify-between p-3 rounded-[--radius] surface-2 border border-border/60 cursor-pointer">
+              <span className="text-sm text-foreground">Group similar images</span>
+              <input type="checkbox" checked={doCluster} onChange={(e) => setDoCluster(e.target.checked)}
+                className="w-4 h-4 rounded accent-primary" disabled={isCurrentlyRunning} />
+            </label>
+            <label className="flex items-center justify-between p-3 rounded-[--radius] surface-2 border border-border/60 cursor-pointer">
+              <span className="text-sm text-foreground">
+                Recognize people (faces)
+                <span className="ms-2 text-xs text-muted-foreground">heavier step</span>
+              </span>
+              <input type="checkbox" checked={doFaces} onChange={(e) => setDoFaces(e.target.checked)}
+                className="w-4 h-4 rounded accent-primary" disabled={isCurrentlyRunning} />
+            </label>
+          </div>
+          )}
+
+          {/* Tag Selection — only when scoring will run (topics guide the VLM). */}
+          {!allAlreadyCulled && (
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -384,6 +419,7 @@ export function AICullingModal({
               </Button>
             </div>
           </div>
+          )}
 
           {/* In-progress panel — shown ONLY when culling is currently
               running (status=processing && not stuck). Replaces the
@@ -406,49 +442,27 @@ export function AICullingModal({
             </div>
           )}
 
-          {/* "Nothing changed since last culling" hint — appears when
-              the user re-opens the modal on a gallery whose last
-              culling already covered every image currently in it. We
-              don't block them (RAW workflows sometimes want a re-run
-              with different topics), but we steer them away from a
-              wasted run. */}
-          {!isCurrentlyRunning && noNewImagesSinceCulling && (
+          {/* Fully-culled note. Once every photo is culled and nothing new was
+              added, the whole run is locked — no scoring, grouping or faces
+              re-run. Adding photos is what re-enables it. */}
+          {allAlreadyCulled && (
             <div className="flex items-start gap-3 p-4 mb-4 rounded-sm border border-border/60 surface-2">
               <Check className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">
-                  No new photos since last culling
+                  This gallery is fully culled
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  This gallery was already culled and no images have been added since.
-                  Re-running will only refresh the AI ratings — usually you don't need to.
+                  Every photo already has an AI rating and no new photos were
+                  added, so there's nothing to run. Add photos to cull new ones.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Re-run guard — shown when this gallery has already been
-              culled successfully and we're NOT currently running.
-              Requires an explicit checkbox so a stray double-click
-              never overwrites manual ratings/labels. */}
-          {requireRerunAck && (
-            <label className="flex items-start gap-2.5 p-3 mb-4 rounded-lg border border-rating/30 bg-rating/5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={acknowledgeRerun}
-                onChange={(e) => setAcknowledgeRerun(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded accent-primary"
-              />
-              <span className="text-xs text-foreground/90 leading-relaxed">
-                <span className="font-semibold">Re-running will overwrite the existing AI ratings, categories, and duplicate detection</span>{" "}
-                on this gallery. Manual edits will be reset. Tick to confirm.
-              </span>
-            </label>
-          )}
-
           {/* Actions */}
           <div className="flex items-center justify-end gap-3">
-            {!isCurrentlyRunning && (
+            {!isCurrentlyRunning && !allAlreadyCulled && (
               <span className="text-xs text-muted-foreground mr-auto">
                 Estimated time: <span className="text-foreground font-medium">~{etaText}</span> for{" "}
                 {imageCount.toLocaleString()} photos
@@ -460,7 +474,7 @@ export function AICullingModal({
             <Button
               variant="glow"
               onClick={handleConfirm}
-              disabled={isProcessing || isCurrentlyRunning || (requireRerunAck && !acknowledgeRerun)}
+              disabled={isProcessing || isCurrentlyRunning || allAlreadyCulled}
               aria-busy={isCurrentlyRunning || undefined}
               className="gap-2 min-w-[180px]"
             >
@@ -474,10 +488,15 @@ export function AICullingModal({
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Processing...
                 </>
+              ) : allAlreadyCulled ? (
+                <>
+                  <Sparkle size={15} className="text-current" />
+                  Nothing to run
+                </>
               ) : hasCompletedCulling ? (
                 <>
                   <Sparkle size={15} className="text-current" />
-                  Re-run AI Culling
+                  Cull new photos
                 </>
               ) : (
                 <>

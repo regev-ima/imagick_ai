@@ -29,6 +29,16 @@ interface ImageDetails {
   subject_sharpness?: number | null;
   thirds_rule?: number | null;
   intended_facial_expression?: number | null;
+  // VLM extra signals
+  ai_tags?: string[] | null;
+  eyes_status?: string | null;
+  expression?: string | null;
+  looking_at_camera?: boolean | null;
+  is_keeper?: boolean | null;
+  ai_hero_candidate?: boolean | null;
+  has_blur_issue?: boolean | null;
+  has_exposure_issue?: boolean | null;
+  people_count?: number | null;
   similarity_group_1?: number | null;
   similarity_group_2?: number | null;
   similarity_group_3?: number | null;
@@ -733,6 +743,27 @@ export function ImageDetailsPanel({
             similarityLevel={similarityLevel}
             onSimilarityLevelChange={onSimilarityLevelChange}
           />
+          {/* Extra VLM signals */}
+          {(image.eyes_status || image.is_keeper != null || image.ai_hero_candidate != null ||
+            image.has_blur_issue || image.has_exposure_issue || image.expression ||
+            image.people_count != null) && (
+            <div className="mt-3 pt-3 border-t border-primary/15 space-y-2 text-xs">
+              <div className="flex flex-wrap gap-1.5">
+                {image.is_keeper && <span className="rounded px-1.5 py-0.5 bg-emerald-500/15 text-emerald-500 font-medium">Keeper</span>}
+                {image.ai_hero_candidate && <span className="rounded px-1.5 py-0.5 bg-yellow-500/15 text-yellow-600 dark:text-yellow-500 font-medium">AI hero</span>}
+                {image.has_blur_issue && <span className="rounded px-1.5 py-0.5 bg-red-500/15 text-red-500 font-medium">Blur</span>}
+                {image.has_exposure_issue && <span className="rounded px-1.5 py-0.5 bg-red-500/15 text-red-500 font-medium">Exposure</span>}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+                {image.eyes_status && <span>Eyes: <span className="text-foreground">{image.eyes_status}</span></span>}
+                {image.expression && <span>Expression: <span className="text-foreground">{image.expression}</span></span>}
+                {image.looking_at_camera != null && <span>Looking: <span className="text-foreground">{image.looking_at_camera ? "yes" : "no"}</span></span>}
+                {image.people_count != null && <span>People: <span className="text-foreground">{image.people_count}</span></span>}
+              </div>
+              {/* ai_tags are shown once, in the dedicated "AI Tags" card below —
+                  not duplicated here. */}
+            </div>
+          )}
         </SectionCard>
       );
     }

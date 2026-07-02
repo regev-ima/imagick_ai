@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
+import { triggerCullingPipeline } from "../_shared/trigger-culling.ts";
 // Notification helpers (email templates + Resend + WhatsApp) are imported
 // dynamically inside the handler so they never evaluate at module boot —
 // same boot-safety fix as gd-transfer (a heavy module here crashed the worker).
@@ -289,6 +290,38 @@ serve(async (req) => {
     if (updateError) {
       console.error("Error updating gallery:", updateError);
       throw updateError;
+    }
+
+    // Auto-start AI Culling for Drive galleries now that the originals exist.
+    // Local uploads dispatch this from the create page; Drive images only land
+    // here, so this is the trigger point (and it fixes hosting-only Drive
+    // galleries that never got culled). Runs in parallel with any style edits;
+    // guarded on culling_started_at so a later edit-completion webhook won't
+    // double-run it.
+    try {
+      const { data: gd } = await supabase
+        .from("galleries")
+        .select("ai_culling_enabled, ai_grouping_enabled, ai_faces_enabled, culling_labels, culling_status, culling_started_at, culling_completed_at")
+        .eq("id", galleryId)
+        .single();
+      const cullingUntouched =
+        gd?.culling_status !== "processing" && !gd?.culling_started_at && !gd?.culling_completed_at;
+      if (gd?.ai_culling_enabled && cullingUntouched) {
+        console.log("Drive transfer complete — dispatching AI culling for gallery:", galleryId);
+        await triggerCullingPipeline(
+          supabase,
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+          galleryId,
+          {
+            cluster: gd.ai_grouping_enabled ?? true,
+            faces: gd.ai_faces_enabled ?? false,
+            labels: gd.culling_labels || [],
+          },
+        );
+      }
+    } catch (cullErr) {
+      console.error("Drive auto-culling trigger failed (non-fatal):", cullErr);
     }
 
     // Don't pass imageIds — let process-images query by status with cursor pagination

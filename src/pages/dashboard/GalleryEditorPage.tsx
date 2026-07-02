@@ -30,7 +30,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { cullingScoreToStars } from "@/lib/cullingScore";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
-import { CullingScoreModeToggle } from "@/components/gallery/CullingScoreModeToggle";
 import { Card } from "@/components/ui/card";
 import {
   Tooltip,
@@ -64,11 +63,11 @@ import { ProblemImagesSection } from "@/components/gallery/ProblemImagesSection"
 import { VirtualizedImageGrid } from "@/components/gallery/VirtualizedImageGrid";
 import { CullingStatusBanner } from "@/components/gallery/CullingStatusBanner";
 import { CullingProgressOverlay } from "@/components/gallery/CullingProgressOverlay";
-import { type CatalogMode } from "@/components/gallery/CatalogModeSelector";
+import { CatalogModeSelector, type CatalogMode } from "@/components/gallery/CatalogModeSelector";
+import { GroupingView } from "@/components/gallery/GroupingView";
 import { FaceGallery } from "@/components/gallery/FaceGallery";
 import { FaceClusterImages } from "@/components/gallery/FaceClusterImages";
 import { useFaceSearch } from "@/hooks/useFaceSearch";
-import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { GalleryRightSidebar } from "@/components/gallery/GalleryRightSidebar";
 import { DownloadGalleryModal } from "@/components/gallery/DownloadGalleryModal";
 import { DockFilmstrip } from "@/components/gallery/DockFilmstrip";
@@ -119,6 +118,10 @@ export default function GalleryEditorPage() {
     () => (localStorage.getItem("imagick-gallery-view-mode") as "grid" | "masonry") || "grid"
   );
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  // Ordered image ids the lightbox should page through. Set when opening from a
+  // scoped context (a person's photos, a similarity group) so prev/next stay
+  // within that set; null = the main (filtered/sorted) grid.
+  const [lightboxScopeIds, setLightboxScopeIds] = useState<string[] | null>(null);
   const [compareMode, setCompareMode] = useState<"slider" | "edited" | "side-by-side">(
     () => (localStorage.getItem("imagick-gallery-compare-mode") as "slider" | "edited" | "side-by-side") || "slider"
   );
@@ -151,7 +154,10 @@ export default function GalleryEditorPage() {
   const stallCheckRef = useRef<{ lastReady: number; unchangedCount: number }>({ lastReady: -1, unchangedCount: 0 });
   const autoRetryCountRef = useRef(0);
   // activeCullingFilter removed - now using multi-select ratings in filters.selectedRatings
-  const [sidebarSimilarityLevel, setSidebarSimilarityLevel] = useState<"loose" | "medium" | "strict">("medium");
+  // The main-grid "Hide duplicates" filter always collapses at the near-identical
+  // (burst) level — that's the tightness you want for de-duping a delivery. The
+  // separate Groups view has its own tightness selector for browsing.
+  const [sidebarSimilarityLevel, setSidebarSimilarityLevel] = useState<"loose" | "medium" | "strict">("strict");
   const [detailsSimilarityLevel, setDetailsSimilarityLevel] = useState<"loose" | "medium" | "strict">("medium");
   const [duplicateLimit, setDuplicateLimit] = useState(0);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -213,20 +219,19 @@ export default function GalleryEditorPage() {
     }
   });
 
-  // Face search hooks
-  const { startDetection, isRunning: isFaceDetectionRunning, progress: faceDetectionProgress, abort: abortFaceDetection } = useFaceDetection(id);
-  const { faceClusters, resetFaceSearch } = useFaceSearch(id, isFaceDetectionRunning);
-  const faceSearchStatus = (gallery as any)?.face_search_status || "idle";
-  const faceSearchError = (gallery as any)?.face_search_error || null;
-  const faceSearchStartedAt = (gallery as any)?.face_search_started_at || null;
-
-  // Refresh clusters when client-side detection completes
-  useEffect(() => {
-    if (faceDetectionProgress?.phase === "done") {
-      queryClient.invalidateQueries({ queryKey: ["face-clusters", id] });
-      queryClient.invalidateQueries({ queryKey: ["gallery", id] });
-    }
-  }, [faceDetectionProgress?.phase]);
+  // Faces are produced by the AI Culling pipeline (ArcFace) — the OLD in-browser
+  // face-detection engine is gone. We only READ the resulting clusters here; the
+  // "people" view is pure navigation, and (re)detecting faces is done by running
+  // AI Culling with "Recognize people" enabled.
+  // Poll face clusters while a run is processing, so they populate the moment
+  // detection lands at the end of the run instead of needing a page refresh.
+  const { faceClusters } = useFaceSearch(id, gallery?.culling_status === "processing");
+  const isFaceDetectionRunning = false;
+  // Derive the people-view state from culling + whether clusters exist (the old
+  // face_search_status field is no longer written by anything).
+  const faceSearchStatus =
+    gallery?.culling_status === "processing" ? "processing"
+      : (faceClusters.data?.length ? "ready" : "idle");
 
   // Poll for transfer progress when gallery is in transferring status
   useEffect(() => {
@@ -295,6 +300,19 @@ export default function GalleryEditorPage() {
         "ai_rating",
         "culling_score",
         "culling_label",
+        "subject_sharpness",
+        "background_sharpness",
+        "thirds_rule",
+        "intended_facial_expression",
+        "ai_tags",
+        "eyes_status",
+        "expression",
+        "looking_at_camera",
+        "is_keeper",
+        "ai_hero_candidate",
+        "has_blur_issue",
+        "has_exposure_issue",
+        "people_count",
         "width",
         "height",
         "sort_order",
@@ -616,6 +634,24 @@ export default function GalleryEditorPage() {
       result = result.filter(img => img.is_hero);
     }
 
+    // VLM extra-signal filters.
+    if (filters.showKeeperOnly) {
+      result = result.filter(img => (img as any).is_keeper === true);
+    }
+    if (filters.eyesOpenOnly) {
+      // Keep photos with open eyes (or where eyes aren't applicable/unknown).
+      result = result.filter(img => {
+        const e = (img as any).eyes_status;
+        return e !== "closed" && e !== "mixed";
+      });
+    }
+    if (filters.hideIssues) {
+      result = result.filter(img => !(img as any).has_blur_issue && !(img as any).has_exposure_issue);
+    }
+    if (filters.showPeopleOnly) {
+      result = result.filter(img => ((img as any).people_count ?? 0) > 0);
+    }
+
     if (filters.selectedTags.length > 0) {
       result = result.filter(img => {
         if (!img.ai_tags) return false;
@@ -825,10 +861,26 @@ export default function GalleryEditorPage() {
       (filters.selectedLabels?.length || 0) > 0 ||
       filters.showLikedOnly ||
       filters.showHeroOnly ||
+      // VLM quick filters — previously omitted, which broke the toolbar reset
+      // button, the filtered/total header readout and the empty-state "Clear
+      // Filters" whenever only one of these was active.
+      filters.showKeeperOnly ||
+      filters.eyesOpenOnly ||
+      filters.hideIssues ||
+      filters.showPeopleOnly ||
       filters.groupingLevel !== "none" ||
-      filters.selectedGroup !== null
+      filters.selectedGroup !== null ||
+      duplicateLimit > 0
     );
-  }, [filters]);
+  }, [filters, duplicateLimit]);
+
+  // Single source of truth for clearing every filter, so the toolbar reset,
+  // the empty-state Clear button and the sidebar Reset can't drift apart and
+  // leave a stray duplicate-limit or grouping selection applied.
+  const clearAllFilters = useCallback(() => {
+    setFilters(defaultFilters);
+    setDuplicateLimit(0);
+  }, []);
 
   // Extract available groups from images
   const availableGroups = useMemo(() => {
@@ -870,9 +922,12 @@ export default function GalleryEditorPage() {
     if (source.length === 0) return [];
     const want = 7;
     const step = Math.max(1, Math.floor(source.length / want));
-    const picked: string[] = [];
+    const picked: { thumb: string; full: string }[] = [];
     for (let i = 0; i < source.length && picked.length < want; i += step) {
-      picked.push(getThumbnailUrl(source[i].original_url));
+      const url = source[i].original_url;
+      // Pass the original as a fallback so a thumbnail still being generated
+      // during processing never renders as a broken image in the overlay.
+      picked.push({ thumb: getThumbnailUrl(url), full: url });
     }
     return picked;
   }, [images]);
@@ -881,11 +936,14 @@ export default function GalleryEditorPage() {
   const cullingCounts = useMemo(() => {
     const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     images.forEach(img => {
-      const rating = cullingScoreToStars((img as any).culling_score, cullingScoreMode);
-      counts[rating || 1]++;
+      // Use the EXACT same star mapping the rating filter uses, so a tier's
+      // count always matches the number of photos selecting it reveals. An
+      // image with no score (rating 0) belongs to no tier and is not counted.
+      const rating = cullingScoreToStars((img as any).culling_score, cullingScoreMode) || (img.ai_rating || 0);
+      if (rating >= 1 && rating <= 5) counts[rating]++;
     });
     return counts;
-  }, [images]);
+  }, [images, cullingScoreMode]);
 
   // Group counts for sidebar
   const sidebarGroupCounts = useMemo(() => {
@@ -900,6 +958,28 @@ export default function GalleryEditorPage() {
     });
     return { loose: loose.size, medium: medium.size, strict: strict.size };
   }, [images]);
+
+  // Group size per image at the ACTIVE similarity level, so the grid card can
+  // show a "1 of N similar" badge. Only images that belong to a group of >1 are
+  // included; singletons get no badge.
+  const groupSizeByImage = useMemo(() => {
+    const field = sidebarSimilarityLevel === "loose" ? "similarity_group_1"
+                : sidebarSimilarityLevel === "strict" ? "similarity_group_3"
+                : "similarity_group_2";
+    const counts = new Map<number, number>();
+    images.forEach(img => {
+      const g = (img as any)[field];
+      if (g != null) counts.set(g, (counts.get(g) || 0) + 1);
+    });
+    const byImage = new Map<string, number>();
+    images.forEach(img => {
+      const g = (img as any)[field];
+      if (g == null) return;
+      const c = counts.get(g) || 0;
+      if (c > 1) byImage.set(img.id, c);
+    });
+    return byImage;
+  }, [images, sidebarSimilarityLevel]);
 
   const getSimilarImages = useCallback((imageId: string) => {
     const image = images.find(img => img.id === imageId);
@@ -1201,7 +1281,19 @@ export default function GalleryEditorPage() {
   // Runs once per render when the inconsistency is detected.
   useEffect(() => {
     if (!gallery?.id) return;
-    if (gallery.culling_status === "processing" && hasCullingData) {
+    // Only heal a 'processing' row to 'ready' when it's genuinely stale, not
+    // merely mid-run. process-pipeline writes ratings incrementally per batch
+    // (so hasCullingData flips true after the FIRST batch) and self-chains until
+    // it stamps status='ready' itself. Flipping to 'ready' the moment ANY data
+    // exists would cut the run short — the overlay would vanish and the clock
+    // stop after a few seconds even though most photos are still unscored. So we
+    // only step in as a recovery net once the full "stuck" window has elapsed.
+    if (
+      gallery.culling_status === "processing" &&
+      hasCullingData &&
+      gallery.culling_started_at &&
+      cullingNow - new Date(gallery.culling_started_at).getTime() > stuckThresholdMs(images.length)
+    ) {
       supabase
         .from("galleries")
         .update({ culling_status: "ready" } as any)
@@ -1220,11 +1312,45 @@ export default function GalleryEditorPage() {
           queryClient.invalidateQueries({ queryKey: ["gallery", id] });
         });
     }
-  }, [gallery?.id, gallery?.culling_status, gallery?.culling_started_at, hasCullingData, id, queryClient]);
+  }, [gallery?.id, gallery?.culling_status, gallery?.culling_started_at, hasCullingData, images.length, cullingNow, id, queryClient]);
 
-  // AI Culling mutation - calls the start-grouping function
+  // When a culling run starts, snap back to the Photos view. Groups/People are
+  // computed only at the end of the run, so leaving the user stranded in those
+  // (empty) views mid-run is what made a healthy run look broken.
+  useEffect(() => {
+    if (gallery?.culling_status === "processing") {
+      setCatalogMode("default");
+      setSelectedFaceCluster(null);
+    }
+    // Intentionally keyed on culling_status only — fire on the transition into
+    // processing, not on every catalogMode change (which would trap the user).
+    // Intentionally keyed on culling_status only — fire on the transition into
+    // processing, not on every catalogMode change (which would trap the user).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gallery?.culling_status]);
+
+  // When a run FINISHES (processing → ready), face clusters + representatives
+  // were just written server-side, but the face-clusters query isn't polled —
+  // so the People view stayed on its intro screen until a manual refresh.
+  // Refetch faces (and images) on that transition so everything appears the
+  // moment the overlay clears, no refresh needed.
+  const prevCullingStatusRef = useRef<string | null | undefined>(gallery?.culling_status);
+  useEffect(() => {
+    const prev = prevCullingStatusRef.current;
+    const cur = gallery?.culling_status;
+    if (prev === "processing" && cur === "ready") {
+      queryClient.invalidateQueries({ queryKey: ["face-clusters", id] });
+      queryClient.invalidateQueries({ queryKey: ["face-search-progress", id] });
+      queryClient.invalidateQueries({ queryKey: ["gallery", id] });
+    }
+    prevCullingStatusRef.current = cur;
+  }, [gallery?.culling_status, id, queryClient]);
+
+  // AI Culling mutation — runs the NEW pipeline (process-pipeline: Modal CLIP
+  // grouping + ArcFace faces + OpenRouter culling/tagging).
   const runAICulling = useMutation({
-    mutationFn: async (tags: string[]) => {
+    mutationFn: async (opts: { tags: string[]; cluster: boolean; faces: boolean; redetect?: boolean }) => {
+      const { tags, cluster, faces, redetect } = opts;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
@@ -1236,45 +1362,55 @@ export default function GalleryEditorPage() {
           .eq("id", id!);
       }
 
-      // Reset existing culling output before kicking off a new run.
-      // The user explicitly opted-in via the re-run-acknowledge
-      // checkbox, so wiping ratings/labels is intended. Clearing
-      // these makes hasCullingData=false, which:
-      //   - hides the post-culling Star Rating + Categories panels
-      //   - lets the in-progress banner show normally
-      //   - prevents the user from filtering against stale numbers
-      // Fields below match exactly what grouping-webhook writes back.
-      if (hasCullingData) {
-        await supabase
-          .from("gallery_images")
-          .update({
-            culling_score: null,
-            culling_label: null,
-            similarity_group_1: null,
-            similarity_group_2: null,
-            similarity_group_3: null,
-            background_sharpness: null,
-            subject_sharpness: null,
-            thirds_rule: null,
-            intended_facial_expression: null,
-          })
+      // Incremental by design: we DO NOT wipe existing culling output.
+      // process-pipeline skips any image that already has a culling_score
+      // (and any image whose faces are already done), so re-running only
+      // processes photos added since the last run — no wasted spend and no
+      // overwriting of ratings the photographer may have already reviewed.
+      //
+      // EXCEPTION: an explicit re-detect (re-running faces on an already-culled
+      // gallery). The pipeline skips images whose faces are already done, so to
+      // actually rebuild people we clear the faces_done marker first — this
+      // forces a fresh ArcFace pass, which then re-clusters with the current
+      // (tighter) algorithm + smart representative. Ratings are untouched.
+      if (redetect && faces) {
+        await (supabase as any)
+          .from("image_features")
+          .update({ faces_done: false })
           .eq("gallery_id", id!);
-        // Reset filter selections that referenced the now-cleared data.
-        setFilters((prev) => ({
-          ...prev,
-          selectedRatings: [],
-          minRating: 0,
-          selectedLabels: [],
-        }));
       }
 
-      const { data, error } = await supabase.functions.invoke('start-grouping', {
-        body: { 
-          galleryId: id,
-          labels: tags,
-          thresholds: [0.5, 0.7, 0.9],
-          timeThreshold: 60
+      // Admin-configured model + EXIF time gate (platform_settings.culling_config).
+      let adminModel: string | undefined;
+      let adminTime = 600;
+      try {
+        const { data: cfgRow } = await supabase
+          .from("platform_settings").select("value").eq("key", "culling_config").single();
+        if (cfgRow?.value) {
+          const cfg = JSON.parse(cfgRow.value);
+          if (typeof cfg.model === "string") adminModel = cfg.model;
+          if (typeof cfg.timeThreshold === "number") adminTime = cfg.timeThreshold;
         }
+      } catch { /* fall back to defaults */ }
+
+      // NEW engine: process-pipeline (Modal CLIP grouping + ArcFace + OpenRouter
+      // culling/tagging). scoreVisionUrl lets the edge fn reach the VLM layer; the
+      // edge's own SCORE_VISION_URL secret takes precedence when set.
+      const { data, error } = await supabase.functions.invoke('process-pipeline', {
+        body: {
+          galleryId: id,
+          options: {
+            culling: true,
+            tags: true,
+            cluster,
+            faces,
+            labels: tags,
+            thresholds: [0.5, 0.7, 0.9],
+            timeThreshold: adminTime,
+            ...(adminModel ? { model: adminModel } : {}),
+            scoreVisionUrl: `${window.location.origin}/api/score-vision`,
+          },
+        },
       });
       if (error) throw error;
       return data;
@@ -1306,8 +1442,11 @@ export default function GalleryEditorPage() {
     toggleLike.mutate(imageId);
   }, [toggleLike]);
 
-  // Open lightbox directly (details panel closed by default)
-  const openLightbox = useCallback((imageId: string) => {
+  // Open lightbox directly (details panel closed by default). `scopeIds` is the
+  // ordered set the lightbox should page through (a person's / group's photos);
+  // omit it to page through the main filtered grid.
+  const openLightbox = useCallback((imageId: string, scopeIds?: string[]) => {
+    setLightboxScopeIds(scopeIds && scopeIds.length ? scopeIds : null);
     setLightboxImage(imageId);
     setDetailsImageId(imageId);
     setShowDetailsPanel(!isMobile);
@@ -1402,11 +1541,20 @@ export default function GalleryEditorPage() {
     setShowDownloadModal(true);
   };
 
-  const currentLightboxIndex = lightboxImage 
-    ? filteredImages.findIndex(img => img.id === lightboxImage)
+  // The ordered set the lightbox pages through: the scoped context (person /
+  // group) when set, else the main filtered+sorted grid — so navigation always
+  // matches what the user was looking at, in that exact order.
+  const lightboxItems = useMemo(() => {
+    if (!lightboxScopeIds) return filteredImages;
+    const byId = new Map(images.map(i => [i.id, i]));
+    return lightboxScopeIds.map(id => byId.get(id)).filter(Boolean) as typeof filteredImages;
+  }, [lightboxScopeIds, filteredImages, images]);
+
+  const currentLightboxIndex = lightboxImage
+    ? lightboxItems.findIndex(img => img.id === lightboxImage)
     : -1;
 
-  const currentDetailsImage = detailsImageId 
+  const currentDetailsImage = detailsImageId
     ? filteredImages.find(img => img.id === detailsImageId) ?? images.find(img => img.id === detailsImageId)
     : null;
 
@@ -1414,44 +1562,45 @@ export default function GalleryEditorPage() {
   const [swipeDirection, setSwipeDirection] = useState<1 | -1>(1);
 
   const navigatePrev = useCallback(() => {
-    if (filteredImages.length === 0) return;
+    if (lightboxItems.length === 0) return;
     setSwipeDirection(-1);
-    const prevIndex = currentLightboxIndex > 0 ? currentLightboxIndex - 1 : filteredImages.length - 1;
-    setLightboxImage(filteredImages[prevIndex].id);
-    setDetailsImageId(filteredImages[prevIndex].id);
-  }, [currentLightboxIndex, filteredImages]);
+    const prevIndex = currentLightboxIndex > 0 ? currentLightboxIndex - 1 : lightboxItems.length - 1;
+    setLightboxImage(lightboxItems[prevIndex].id);
+    setDetailsImageId(lightboxItems[prevIndex].id);
+  }, [currentLightboxIndex, lightboxItems]);
 
   const navigateNext = useCallback(() => {
-    if (filteredImages.length === 0) return;
+    if (lightboxItems.length === 0) return;
     setSwipeDirection(1);
-    const nextIndex = currentLightboxIndex < filteredImages.length - 1 ? currentLightboxIndex + 1 : 0;
-    setLightboxImage(filteredImages[nextIndex].id);
-    setDetailsImageId(filteredImages[nextIndex].id);
-  }, [currentLightboxIndex, filteredImages]);
+    const nextIndex = currentLightboxIndex < lightboxItems.length - 1 ? currentLightboxIndex + 1 : 0;
+    setLightboxImage(lightboxItems[nextIndex].id);
+    setDetailsImageId(lightboxItems[nextIndex].id);
+  }, [currentLightboxIndex, lightboxItems]);
 
   const goToImage = useCallback((index: number) => {
-    if (filteredImages[index]) {
-      setLightboxImage(filteredImages[index].id);
-      setDetailsImageId(filteredImages[index].id);
+    if (lightboxItems[index]) {
+      setLightboxImage(lightboxItems[index].id);
+      setDetailsImageId(lightboxItems[index].id);
     }
-  }, [filteredImages]);
+  }, [lightboxItems]);
 
   const closeLightbox = useCallback(() => {
     setLightboxImage(null);
+    setLightboxScopeIds(null);
     setShowDetailsPanel(false);
   }, []);
 
   // Preload adjacent images in lightbox for instant navigation
   // Always preload BOTH original and edited versions for current + prev/next
   useEffect(() => {
-    if (currentLightboxIndex < 0 || filteredImages.length === 0) return;
+    if (currentLightboxIndex < 0 || lightboxItems.length === 0) return;
     const toPreload: string[] = [];
-    
+
     // Collect active style API IDs
     const activeApiIds = Object.values(styleApiIdMap);
-    
+
     // Current image: preload the version NOT currently displayed
-    const currentImg = filteredImages[currentLightboxIndex];
+    const currentImg = lightboxItems[currentLightboxIndex];
     if (currentImg) {
       if (selectedViewStyle === "original") {
         // Currently showing original → preload edited versions
@@ -1465,12 +1614,12 @@ export default function GalleryEditorPage() {
     }
     
     // Previous & next images: preload BOTH original AND edited
-    const prevIdx = currentLightboxIndex > 0 ? currentLightboxIndex - 1 : filteredImages.length - 1;
-    const nextIdx = currentLightboxIndex < filteredImages.length - 1 ? currentLightboxIndex + 1 : 0;
-    
+    const prevIdx = currentLightboxIndex > 0 ? currentLightboxIndex - 1 : lightboxItems.length - 1;
+    const nextIdx = currentLightboxIndex < lightboxItems.length - 1 ? currentLightboxIndex + 1 : 0;
+
     for (const idx of [prevIdx, nextIdx]) {
       if (idx === currentLightboxIndex) continue;
-      const img = filteredImages[idx];
+      const img = lightboxItems[idx];
       if (!img) continue;
       // Always preload original
       toPreload.push(getPreviewUrl(img.original_url));
@@ -1484,7 +1633,7 @@ export default function GalleryEditorPage() {
       const i = new Image();
       i.src = url;
     });
-  }, [currentLightboxIndex, filteredImages, selectedViewStyle, styleApiIdMap]);
+  }, [currentLightboxIndex, lightboxItems, selectedViewStyle, styleApiIdMap]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -1662,9 +1811,26 @@ export default function GalleryEditorPage() {
             </h1>
           </div>
 
+          {/* Center: view switcher (Photos / Groups / People). Only shown once
+              there's something to switch to — culling data (Groups) or detected
+              faces (People) — AND only when a run isn't mid-flight: grouping and
+              faces are computed at the very END of culling, so exposing those
+              tabs during processing would show empty/half-baked results and make
+              a healthy run look broken. They appear when the run is fully done. */}
+          {gallery?.culling_status !== "processing" &&
+            (hasCullingData || (faceClusters.data?.length ?? 0) > 0) && (
+            <div className="hidden md:flex items-center mx-auto shrink-0">
+              <CatalogModeSelector
+                mode={catalogMode}
+                onModeChange={(m) => { setSelectedFaceCluster(null); setCatalogMode(m); }}
+                hasAIData={hasCullingData}
+                faceCount={faceClusters.data?.length ?? 0}
+              />
+            </div>
+          )}
+
           {/* Right: Sort, View Mode, Count */}
           <div className="flex items-center gap-1 ml-auto shrink-0">
-            <CullingScoreModeToggle />
             <TooltipProvider delayDuration={300}>
             {/* Sort Dropdown */}
             <DropdownMenu>
@@ -1674,7 +1840,7 @@ export default function GalleryEditorPage() {
                     <Button variant="outline" size="sm" className="gap-1 h-7 px-2 text-xs">
                       <ArrowUpDown className="w-3 h-3" />
                       <span className="hidden md:inline">
-                        {filters.sortBy === "date" || filters.sortBy === "date_taken" ? "Date Taken" : filters.sortBy === "date_added" ? "Date Added" : filters.sortBy === "name" ? "Name" : filters.sortBy === "size" ? "Size" : "Rating"}
+                        {filters.sortBy === "date_added" ? "Date Added" : filters.sortBy === "name" ? "Name" : filters.sortBy === "size" ? "Size" : filters.sortBy === "rating" ? "Rating" : "Name"}
                       </span>
                     </Button>
                   </DropdownMenuTrigger>
@@ -1682,10 +1848,8 @@ export default function GalleryEditorPage() {
                 <TooltipContent side="bottom"><p>Sort</p></TooltipContent>
               </Tooltip>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setFilters(prev => ({ ...prev, sortBy: "date" }))}>
-                  {filters.sortBy === "date" && <Check className="w-3 h-3 mr-2" />}
-                  Date Taken
-                </DropdownMenuItem>
+                {/* "Date Taken" removed — photos don't carry a reliable EXIF
+                    capture date, so sorting by it was meaningless. */}
                 <DropdownMenuItem onClick={() => setFilters(prev => ({ ...prev, sortBy: "date_added" }))}>
                   {filters.sortBy === "date_added" && <Check className="w-3 h-3 mr-2" />}
                   Date Added
@@ -1719,7 +1883,7 @@ export default function GalleryEditorPage() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setFilters(defaultFilters);
+                      clearAllFilters();
                     }}
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -1823,8 +1987,8 @@ export default function GalleryEditorPage() {
             className={cn(
               "fixed bottom-20 left-0 z-30 flex justify-center px-4 pointer-events-none",
               // Center over the photo area, not the whole viewport — otherwise
-              // the 300px desktop sidebar pushes the pill visibly off-center.
-              isMobile ? "right-0" : "right-[300px]",
+              // the 340px desktop sidebar pushes the pill visibly off-center.
+              isMobile ? "right-0" : "right-[340px]",
             )}
           >
             <div className="pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-[--radius] glass-card border border-primary/25 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.3)] text-sm max-w-lg w-full">
@@ -2254,7 +2418,18 @@ export default function GalleryEditorPage() {
           )}
         </AnimatePresence>
 
-        {filteredImages.length === 0 ? (
+        {catalogMode === "grouping" ? (
+          // Similar-photo Groups view — burst/near-duplicate frames stacked
+          // under a representative, click to expand. Fed the full image set
+          // (not filteredImages, whose keep-N-per-group limit would collapse
+          // each group to one frame and defeat the whole view).
+          <GroupingView
+            images={images as any}
+            onImageClick={openLightbox}
+            onSelectionToggle={handleSelectionToggle}
+            selectedImages={selectedImages}
+          />
+        ) : filteredImages.length === 0 && catalogMode !== "faces" ? (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             {images.length === 0 &&
             (gallery.status === "transferring" ||
@@ -2284,7 +2459,7 @@ export default function GalleryEditorPage() {
                     : "Try adjusting your filter criteria"}
                 </p>
                 {hasActiveFilters && (
-                  <Button variant="outline" onClick={() => setFilters(defaultFilters)}>
+                  <Button variant="outline" onClick={clearAllFilters}>
                     Clear Filters
                   </Button>
                 )}
@@ -2303,18 +2478,19 @@ export default function GalleryEditorPage() {
           ) : (
             <FaceGallery
               clusters={faceClusters.data || []}
-              faceSearchStatus={isFaceDetectionRunning ? "processing" : faceSearchStatus}
-              faceSearchError={faceSearchError}
-              faceSearchStartedAt={faceSearchStartedAt}
+              galleryId={id}
+              faceSearchStatus={faceSearchStatus}
+              faceSearchError={null}
+              faceSearchStartedAt={null}
               isLoading={faceClusters.isLoading}
               totalImages={gallery?.total_images}
-              detectionProgress={faceDetectionProgress}
+              detectionProgress={null}
               onClusterSelect={setSelectedFaceCluster}
-              onStartFaceSearch={() => startDetection()}
-              onResetFaceSearch={() => resetFaceSearch.mutate()}
+              // Detecting/re-detecting faces = running AI Culling with people on.
+              onStartFaceSearch={() => setShowAICullingModal(true)}
+              onResetFaceSearch={() => setShowAICullingModal(true)}
               onBackToGallery={() => setCatalogMode("default")}
-              onCancel={abortFaceDetection}
-              isStarting={isFaceDetectionRunning}
+              isStarting={false}
             />
           )
         ) : (
@@ -2335,6 +2511,7 @@ export default function GalleryEditorPage() {
                     width: image.width,
                     height: image.height,
                   }}
+                  groupSize={groupSizeByImage.get(image.id)}
                   index={index}
                   thumbnailUrl={getImageThumbnail(image)}
                   viewMode={viewMode}
@@ -2484,7 +2661,7 @@ export default function GalleryEditorPage() {
 
       {/* Mobile Sidebar Sheet */}
       <Sheet open={showMobileSidebar} onOpenChange={setShowMobileSidebar}>
-        <SheetContent side="right" className="p-0 w-[300px]">
+        <SheetContent side="right" className="p-0 w-[340px]">
           <GalleryRightSidebar
             availableStyles={galleryStylesData.map((s) => ({
               id: s.id,
@@ -2505,6 +2682,8 @@ export default function GalleryEditorPage() {
             isCullingRunning={runAICulling.isPending || (gallery?.culling_status === "processing" && !isCullingStuck)}
             isCullingStuck={isCullingStuck}
             isCullingQueued={isCullingQueued}
+            cullingStartedAt={gallery?.culling_started_at as string | null | undefined}
+            cullingImageCount={images.length}
             hasActiveFilters={hasActiveFilters}
             onOpenFaceSearch={() => { setCatalogMode("faces"); setShowMobileSidebar(false); }}
             faceSearchStatus={isFaceDetectionRunning ? "processing" : faceSearchStatus}
@@ -2617,7 +2796,7 @@ export default function GalleryEditorPage() {
                 <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
                   {currentDetailsImage && (() => {
                     const stars = cullingScoreToStars((currentDetailsImage as any).culling_score, cullingScoreMode) || currentDetailsImage.ai_rating || 0;
-                    const total = filteredImages.length;
+                    const total = lightboxItems.length;
                     const position = currentLightboxIndex >= 0 ? currentLightboxIndex + 1 : 1;
                     return (
                       <div className="hidden sm:flex items-center gap-2 shrink-0">
@@ -2895,7 +3074,7 @@ export default function GalleryEditorPage() {
 
               {/* Bottom Filmstrip with Dock Magnification */}
               <DockFilmstrip
-                images={filteredImages}
+                images={lightboxItems}
                 currentIndex={currentLightboxIndex}
                 onGoToImage={goToImage}
                 getThumbnailUrl={(url) => getThumbnailUrl(url)}
@@ -3041,14 +3220,14 @@ export default function GalleryEditorPage() {
           <AICullingModal
             isOpen={showAICullingModal}
             onClose={() => { setShowAICullingModal(false); setCullingRequiredNote(false); }}
-            onConfirm={(tags) => {
+            onConfirm={(opts) => {
               setShowAICullingModal(false);
               setCullingRequiredNote(false);
               // Surface the live "AI is working" overlay for this run even
               // if a previous run had been minimized away.
               setCullingProgressMinimized(false);
               toast.success("Starting AI Culling... We'll update you when it's done in a few minutes.");
-              runAICulling.mutate(tags);
+              runAICulling.mutate(opts);
             }}
             isProcessing={false}
             imageCount={images.length}
@@ -3060,6 +3239,8 @@ export default function GalleryEditorPage() {
             cullingCompletedAt={gallery?.culling_completed_at as string | null | undefined}
             uploadCompletedAt={gallery?.upload_completed_at as string | null | undefined}
             hasCompletedCulling={hasCullingData}
+            defaultCluster={(gallery as any)?.ai_grouping_enabled ?? true}
+            defaultFaces={(gallery as any)?.ai_faces_enabled ?? false}
           />
         )}
       </AnimatePresence>
@@ -3074,7 +3255,6 @@ export default function GalleryEditorPage() {
       <AnimatePresence>
         {gallery?.culling_status === "processing" &&
           !isCullingStuck &&
-          !hasCullingData &&
           !cullingProgressMinimized && (
             <CullingProgressOverlay
               isOpen

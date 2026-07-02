@@ -33,3 +33,4 @@ supabase/.temp/
 # Playwright
 playwright-report/
 test-results/
+__pycache__/

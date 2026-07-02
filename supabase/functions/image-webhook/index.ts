@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email-sender.ts";
 import { galleryImagesReadyTemplate, reEditCompleteTemplate } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
+import { triggerCullingPipeline } from "../_shared/trigger-culling.ts";
 import { captureException } from "../_shared/sentry.ts";
 import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
 
@@ -359,64 +360,29 @@ serve(async (req: Request) => {
           // Fetch culling settings now that we know import is complete
           const { data: galleryData } = await supabase
             .from("galleries")
-            .select("ai_culling_enabled, culling_status, culling_labels")
+            .select("ai_culling_enabled, culling_status, culling_labels, ai_grouping_enabled, ai_faces_enabled, culling_started_at, culling_completed_at")
             .eq("id", galleryId)
             .single();
 
-          if (galleryData?.ai_culling_enabled && galleryData?.culling_status !== "processing") {
-          console.log("AI culling enabled, triggering grouping for gallery:", galleryId);
-          
-          await supabase
-            .from("galleries")
-            .update({ culling_status: "processing" })
-            .eq("id", galleryId);
+          // Only auto-trigger culling if it was never kicked off. The gallery
+          // creation flow (and the in-editor modal) already dispatch the NEW
+          // pipeline and stamp culling_started_at, so re-triggering here would
+          // (a) double-run and (b) risk clobbering fresh results with a second
+          // engine. We fire ONLY when nothing has started/finished culling yet
+          // (e.g. a gallery created before auto-culling, or an edit-completion
+          // that beat any other trigger).
+          const cullingUntouched =
+            galleryData?.culling_status !== "processing" &&
+            !galleryData?.culling_started_at &&
+            !galleryData?.culling_completed_at;
 
-          const apiUsername = Deno.env.get("IMAGICK_API_USERNAME")!;
-          const apiPassword = Deno.env.get("IMAGICK_API_PASSWORD")!;
-          const apiEndpoint = "https://imagick-api-endpoint.rx8rq49b5c.workers.dev/make-grouping/";
-          const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
-          const webhookUrl = appendWebhookSecret(`${supabaseUrl}/functions/v1/grouping-webhook`);
-
-          const groupingRequest = {
-            collectionId: galleryId,
-            thresholds: [0.5, 0.7, 0.9],
-            timeThreshold: 60,
-            labels: galleryData.culling_labels || [],
-            callbackURL: webhookUrl,
-            callbackArgs: { 
-              galleryId, 
-              userId 
-            },
-            callbackHeaders: {}
-          };
-
-          try {
-            const groupingResponse = await fetch(apiEndpoint, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Username": apiUsername,
-                "Password": apiPassword,
-              },
-              body: JSON.stringify(groupingRequest),
+          if (galleryData?.ai_culling_enabled && cullingUntouched) {
+            console.log("AI culling enabled, triggering process-pipeline for gallery:", galleryId);
+            await triggerCullingPipeline(supabase, supabaseUrl, supabaseServiceKey, galleryId, {
+              cluster: galleryData.ai_grouping_enabled ?? true,
+              faces: galleryData.ai_faces_enabled ?? false,
+              labels: galleryData.culling_labels || [],
             });
-
-            if (!groupingResponse.ok) {
-              console.error("Failed to start grouping:", await groupingResponse.text());
-              await supabase
-                .from("galleries")
-                .update({ culling_status: "idle" })
-                .eq("id", galleryId);
-            } else {
-              console.log("Grouping started successfully for gallery:", galleryId);
-            }
-          } catch (groupingError) {
-            console.error("Error calling grouping API:", groupingError);
-            await supabase
-              .from("galleries")
-              .update({ culling_status: "idle" })
-              .eq("id", galleryId);
-          }
           }
         }
       } else {

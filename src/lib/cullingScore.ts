@@ -9,9 +9,12 @@ export type CullingScoreMode = "normalized" | "linear" | "raw";
 const STORAGE_KEY = "admin_culling_score_mode";
 
 export function getStoredCullingScoreMode(): CullingScoreMode {
-  if (typeof window === "undefined") return "linear";
-  const v = window.localStorage.getItem(STORAGE_KEY);
-  if (v === "linear" || v === "raw" || v === "normalized") return v;
+  // The admin Norm/Linear/Raw toggle was removed — "linear" is now the single
+  // source of truth for star mapping across the grid, sidebar, lightbox and the
+  // image detail panel. We deliberately IGNORE any stale localStorage value
+  // (e.g. a "normalized" left over from the old toggle) so every surface always
+  // computes the same star count for a given culling_score. Do NOT reintroduce
+  // per-surface modes without unifying every call site.
   return "linear";
 }
 

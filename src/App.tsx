@@ -40,6 +40,7 @@ const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
 const PrivacyPage = lazy(() => import("./pages/legal/PrivacyPage"));
 const TermsPage = lazy(() => import("./pages/legal/TermsPage"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/admin/AdminDashboard"));
+const CullingSettingsPage = lazy(() => import("./pages/dashboard/admin/CullingSettingsPage"));
 const UsersManagement = lazy(() => import("./pages/dashboard/admin/UsersManagement"));
 const PlansManagement = lazy(() => import("./pages/dashboard/admin/PlansManagement"));
 const StylesManagement = lazy(() => import("./pages/dashboard/admin/StylesManagement"));
@@ -66,6 +67,10 @@ const CreateConceptChat = lazy(() => import("./pages/preview/CreateConceptChat")
 const CreateConceptCanvas = lazy(() => import("./pages/preview/CreateConceptCanvas"));
 // Internal design exploration — "compose the client collection" (DELIVER).
 const DeliverConcept = lazy(() => import("./pages/preview/DeliverConcept"));
+// In-browser AI image-scoring proof-of-concept (no backend; public preview).
+const AestheticScoreDemo = lazy(() => import("./pages/preview/AestheticScoreDemo"));
+// Pipeline results (reads Phase-A/B output from the DB).
+const PipelineResults = lazy(() => import("./pages/preview/PipelineResults"));
 
 const RouteFallback = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -126,6 +131,10 @@ const App = () => (
                 <Route path="/preview/create-b" element={<ProtectedRoute><CreateConceptChat /></ProtectedRoute>} />
                 <Route path="/preview/create-c" element={<ProtectedRoute><CreateConceptCanvas /></ProtectedRoute>} />
                 <Route path="/preview/deliver" element={<ProtectedRoute><DeliverConcept /></ProtectedRoute>} />
+                {/* In-browser AI scoring demo — public so it's clickable in the Vercel preview without login. */}
+                <Route path="/preview/aesthetic" element={<AestheticScoreDemo />} />
+                {/* Pipeline results — reads gallery pipeline output (auth required for RLS). */}
+                <Route path="/preview/pipeline" element={<ProtectedRoute><PipelineResults /></ProtectedRoute>} />
                 <Route
                   path="/dashboard"
                   element={(
@@ -145,6 +154,7 @@ const App = () => (
                   <Route path="settings" element={<SettingsPage />} />
                   {/* Admin Routes */}
                   <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                  <Route path="admin/culling" element={<AdminRoute><CullingSettingsPage /></AdminRoute>} />
                   <Route path="admin/users" element={<AdminRoute><UsersManagement /></AdminRoute>} />
                   <Route path="admin/users/:userId" element={<AdminRoute><UserDetailPage /></AdminRoute>} />
                   <Route path="admin/plans" element={<AdminRoute><PlansManagement /></AdminRoute>} />

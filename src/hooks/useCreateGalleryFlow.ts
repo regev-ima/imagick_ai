@@ -124,6 +124,12 @@ export function useCreateGalleryFlow() {
             categories: params.categories ?? [],
             culling_labels: effectiveCullingLabels,
             ai_culling_enabled: params.aiCulling,
+            // The create flow has ONE culling switch — when it's on, the run
+            // includes grouping AND people (faces), so the gallery arrives with
+            // the full experience. The backend transfer webhook reads these to
+            // auto-start culling when the Drive import lands.
+            ai_grouping_enabled: true,
+            ai_faces_enabled: params.aiCulling,
             total_images: source.totalImageCount,
             status: "transferring",
           })
@@ -168,6 +174,9 @@ export function useCreateGalleryFlow() {
           categories: params.categories ?? [],
           culling_labels: effectiveCullingLabels,
           ai_culling_enabled: params.aiCulling,
+          // One culling switch = the full experience (grouping + people).
+          ai_grouping_enabled: true,
+          ai_faces_enabled: params.aiCulling,
           total_images: files.length,
           status: "uploading",
         })
@@ -260,6 +269,58 @@ export function useCreateGalleryFlow() {
       } else {
         await supabase.from("gallery_images").update({ status: "ready" }).in("id", imageIds);
         toast.success("Gallery created successfully!");
+      }
+
+      // 8. Auto-start AI Culling when opted in. Culling reads the ORIGINAL
+      // photos (independent of the style editor) so it runs in parallel the
+      // moment uploads land — the photographer shouldn't have to open the
+      // gallery and press "AI Culling" by hand. Covers local uploads with or
+      // without styles (the style-edit webhook only fires for styled
+      // galleries; Drive galleries are auto-started by the transfer webhook).
+      // We flag the gallery optimistically so the overlay/clock are already up
+      // when they navigate in, then dispatch fire-and-forget — process-pipeline
+      // self-chains server-side and falls back to originals while thumbnails
+      // are still being generated.
+      if (params.aiCulling && imageIds.length > 0) {
+        try {
+          // Admin-configured model + EXIF time gate (platform_settings.culling_config).
+          let adminModel: string | undefined;
+          let adminTime = 600;
+          try {
+            const { data: cfgRow } = await supabase
+              .from("platform_settings").select("value").eq("key", "culling_config").single();
+            if (cfgRow?.value) {
+              const cfg = JSON.parse(cfgRow.value);
+              if (typeof cfg.model === "string") adminModel = cfg.model;
+              if (typeof cfg.timeThreshold === "number") adminTime = cfg.timeThreshold;
+            }
+          } catch { /* fall back to defaults */ }
+
+          await supabase
+            .from("galleries")
+            .update({ culling_status: "processing", culling_started_at: new Date().toISOString() } as any)
+            .eq("id", gallery.id);
+
+          void supabase.functions.invoke("process-pipeline", {
+            body: {
+              galleryId: gallery.id,
+              options: {
+                culling: true,
+                tags: true,
+                cluster: true,
+                faces: true,
+                labels: effectiveCullingLabels,
+                thresholds: [0.5, 0.7, 0.9],
+                timeThreshold: adminTime,
+                ...(adminModel ? { model: adminModel } : {}),
+                scoreVisionUrl: `${window.location.origin}/api/score-vision`,
+              },
+            },
+          });
+        } catch (err) {
+          // Non-fatal: the photographer can still start culling from the editor.
+          console.error("Auto-culling dispatch failed:", err);
+        }
       }
 
       navigate(`/dashboard/galleries/${gallery.id}`);

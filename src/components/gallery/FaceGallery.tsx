@@ -26,12 +26,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FaceThumbnail } from "./FaceThumbnail";
+import { useNameFaceCluster } from "@/hooks/useFaceSearch";
+
+// Preset family/wedding roles the photographer can tap to name a person, plus
+// free text for anything else.
+const PERSON_ROLES = [
+  "חתן", "כלה",
+  "אב החתן", "אם החתן",
+  "אב הכלה", "אם הכלה",
+  "הורי החתן", "הורי הכלה",
+  "משפחה", "אח/אחות", "סבא", "סבתא",
+];
 
 interface FaceCluster {
   id: string;
   face_count: number;
+  label?: string | null;
   representative_bbox: { top: number; left: number; width: number; height: number } | null;
   representative_image: {
     id: string;
@@ -49,6 +63,7 @@ interface DetectionProgress {
 
 interface FaceGalleryProps {
   clusters: FaceCluster[];
+  galleryId?: string;
   faceSearchStatus: string;
   faceSearchError?: string | null;
   faceSearchStartedAt?: string | null;
@@ -84,6 +99,7 @@ const FEATURES = [
 
 export function FaceGallery({
   clusters,
+  galleryId,
   faceSearchStatus,
   faceSearchError,
   isLoading,
@@ -99,6 +115,7 @@ export function FaceGallery({
   isStarting,
 }: FaceGalleryProps) {
   const [showConfirm, setShowConfirm] = useState(false);
+  const renameCluster = useNameFaceCluster(galleryId);
 
   // Back button rendered at the top of every state
   const backButton = (
@@ -159,19 +176,19 @@ export function FaceGallery({
             </div>
           </div>
 
-          {/* CTA */}
+          {/* CTA — faces are detected by AI Culling ("Recognize people"), one engine. */}
           <Button
             variant="glow"
             size="lg"
-            onClick={() => setShowConfirm(true)}
+            onClick={() => onStartFaceSearch()}
             disabled={isStarting}
             className="gap-2 px-8"
           >
             <Sparkle size={15} className="text-current" />
-            Start Face Detection
+            Detect people (AI Culling)
           </Button>
           <p className="text-xs text-muted-foreground mt-2">
-            This process may take a few minutes depending on the number of photos.
+            Faces are detected as part of AI Culling — enable “Recognize people” when you run it.
           </p>
         </div>
 
@@ -204,73 +221,28 @@ export function FaceGallery({
     );
   }
 
-  // --- PROCESSING STATE: Progress tracking ---
-  if (faceSearchStatus === "processing" || (detectionProgress && detectionProgress.phase !== "done" && detectionProgress.phase !== "error")) {
-    const dp = detectionProgress;
-    const facesFound = dp?.facesFound ?? detectedFacesCount ?? 0;
-    const processed = dp?.processedImages ?? 0;
-    const total = dp?.totalImages ?? totalImages ?? 0;
-    const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
-    const phaseLabel = dp?.phase === "loading-models" ? "Loading AI models..."
-      : dp?.phase === "clustering" ? "Grouping faces..."
-      : "Detecting faces...";
-
+  // --- PROCESSING STATE ---
+  // Faces are detected SERVER-SIDE as part of AI Culling (ArcFace), not in the
+  // browser. While culling runs we don't have partial people to show and there
+  // is nothing for the user to do — so we show a calm "it's running, come back
+  // when it's done" state (no fake 0/211 counts, no button, no "keep this tab
+  // open"). People appear automatically when the whole run finishes.
+  if (faceSearchStatus === "processing") {
     return (
       <div>
         {backButton}
         <div className="flex flex-col items-center justify-center py-16 gap-6">
           <Orb className="w-20 h-20" />
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-semibold">{phaseLabel}</h3>
-            <p className="text-sm text-muted-foreground max-w-sm">
-              {dp?.phase === "loading-models"
-                ? "Downloading face detection models to your browser. This happens once."
-                : dp?.phase === "clustering"
-                ? "Grouping similar faces together..."
-                : "AI is scanning your photos in your browser. Please keep this tab open."
-              }
+          <div className="text-center space-y-2 max-w-sm">
+            <h3 className="text-lg font-semibold">AI Culling is running…</h3>
+            <p className="text-sm text-muted-foreground">
+              People are detected as part of AI Culling. They'll appear here
+              automatically when the run finishes — nothing to do, you can keep working.
             </p>
           </div>
-
-          {/* Live stats */}
-          <div className="w-full max-w-xs space-y-3">
-            <div className="flex items-center justify-center gap-6">
-              <div className="text-center">
-                <p className="font-mono text-2xl font-bold text-foreground folio tabular-nums">{processed}/{total}</p>
-                <p className="aura-microlabel mt-0.5">Photos scanned</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-2xl font-bold text-primary folio tabular-nums">{facesFound}</p>
-                <p className="aura-microlabel mt-0.5">Faces found</p>
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            <div className="space-y-1">
-              <div className="flex justify-between font-mono text-xs text-muted-foreground tabular-nums">
-                <span>Progress</span>
-                <span className="text-foreground folio">{percentage}%</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground surface-2 border border-border/60 rounded-sm px-4 py-2">
-              <Check className="w-3.5 h-3.5 text-secondary" />
-              <span>Processing happens in your browser — keep this tab open</span>
-            </div>
-            {onCancel && (
-              <Button variant="ghost" size="sm" onClick={onCancel} className="gap-1.5 text-xs text-muted-foreground">
-                <StopCircle className="w-3.5 h-3.5" />
-                Cancel
-              </Button>
-            )}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground surface-2 border border-border/60 rounded-sm px-4 py-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+            <span>Detecting people…</span>
           </div>
         </div>
       </div>
@@ -368,6 +340,11 @@ export function FaceGallery({
                 <ScanFace className="w-6 h-6 text-muted-foreground" />
               </div>
             )}
+            {/* Person name / role — click to assign, doesn't open the cluster. */}
+            <ClusterNamePicker
+              label={cluster.label ?? null}
+              onSelect={(label) => renameCluster.mutate({ clusterId: cluster.id, label })}
+            />
             <span className="aura-chip">
               <span className="folio text-foreground">{cluster.face_count}</span> {cluster.face_count === 1 ? "photo" : "photos"}
             </span>
@@ -375,5 +352,82 @@ export function FaceGallery({
         ))}
       </div>
     </div>
+  );
+}
+
+// Names a detected person: tap to open preset wedding roles + free text.
+// Stops click propagation so naming never opens the cluster.
+function ClusterNamePicker({
+  label,
+  onSelect,
+}: {
+  label: string | null;
+  onSelect: (label: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [custom, setCustom] = useState("");
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "max-w-full truncate rounded-full px-2 py-0.5 text-xs font-medium transition-colors",
+            label
+              ? "bg-primary/15 text-primary hover:bg-primary/25"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          dir="rtl"
+        >
+          {label || "+ שם / תפקיד"}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-60 p-3" dir="rtl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-2 flex flex-wrap gap-1">
+          {PERSON_ROLES.map((role) => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => { onSelect(role); setOpen(false); }}
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-xs transition-colors",
+                label === role
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/40"
+              )}
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (custom.trim()) { onSelect(custom.trim()); setCustom(""); setOpen(false); }
+          }}
+          className="flex gap-1.5"
+        >
+          <Input
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            placeholder="שם מותאם אישית…"
+            className="h-7 text-xs"
+          />
+          <Button type="submit" size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={!custom.trim()}>
+            שמור
+          </Button>
+        </form>
+        {label && (
+          <button
+            type="button"
+            onClick={() => { onSelect(null); setOpen(false); }}
+            className="mt-2 w-full text-center text-[11px] text-muted-foreground hover:text-destructive"
+          >
+            הסר שם
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

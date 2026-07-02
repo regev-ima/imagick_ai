@@ -95,15 +95,8 @@ export function AIAnalysisSection({
         </div>
       )}
 
-      {/* Category */}
-      {metrics.culling_label && (
-        <div>
-          <span className="aura-microlabel block mb-1.5">Category</span>
-           <span className="aura-chip text-foreground normal-case tracking-normal">
-            {normalizeLabel(metrics.culling_label)}
-          </span>
-        </div>
-      )}
+      {/* Category is shown once, in the editable Category card of the details
+          panel — not duplicated here. */}
 
       {/* Quality Metrics */}
       {hasQualityMetrics && (
@@ -182,7 +175,7 @@ export function AIAnalysisSection({
                         : "surface-2 text-muted-foreground border-border/60 hover:text-foreground"
                     )}
                   >
-                    {level === "loose" ? "Low" : level === "medium" ? "Med" : "High"}
+                    {level === "loose" ? "Broad" : level === "medium" ? "Balanced" : "Near-identical"}
                   </button>
                 ))}
               </div>

@@ -1,33 +1,31 @@
 /**
  * AI Culling time estimation.
  *
- * Real-world culling is dominated by per-image analysis time, not a flat
- * fee — the API scores every photo (sharpness, composition, expression,
- * similarity grouping) and that work scales linearly with the gallery.
- * Photographers reported runs that legitimately take many minutes, so the
- * old "~90s per 1000 photos" estimate was far too optimistic and tripped
- * the "looks stuck" warning long before a healthy run could finish.
+ * The current engine (Modal CLIP grouping + ArcFace faces + batched
+ * OpenRouter culling/tagging) is an order of magnitude faster than the
+ * old per-image API. Real runs land around ~1 second per photo end to
+ * end (e.g. ~1–2 min for 200 photos, dominated by the batched VLM pass),
+ * plus a small fixed floor for cold-start and dispatch.
  *
- * The model is intentionally simple and generous:
+ * The displayed estimate is intentionally realistic:
  *
- *   expected time = 5 minute floor + 10 seconds per image
+ *   expected time = 20 second floor + 1 second per image
  *
- *   0     images →  5:00   (floor: cold-start + signed-URL fetch + dispatch)
- *   25    images →  9:10
- *   200   images →  38:20
- *   1000  images →  2h 51m
+ *   0     images →  0:20
+ *   25    images →  0:45
+ *   200   images →  3:40
+ *   1000  images →  17:00
  *
- * "Stuck" detection uses the SAME estimate: we only tell the user a run
- * looks stuck once the entire expected window has elapsed with no result.
- * Leaning long here is deliberate — a premature "stuck — retry" prompt is
- * far more harmful (it invites a duplicate run that overwrites ratings)
- * than waiting a little longer for a slow-but-healthy run to land.
+ * "Stuck" detection uses a SEPARATE, much more generous window (see
+ * stuckThresholdMs) so a slow-but-healthy run is never flagged early —
+ * a premature "stuck — retry" prompt is far more harmful (it invites a
+ * duplicate run) than waiting a little longer.
  */
 
 /** Floor that covers cold-start + dispatch even on a tiny gallery. */
-const BASE_CULLING_MS = 5 * 60 * 1000;
-/** Marginal cost the API spends analyzing each additional photo. */
-const MS_PER_IMAGE = 10 * 1000;
+const BASE_CULLING_MS = 20 * 1000;
+/** Marginal wall-clock the engine spends per additional photo. */
+const MS_PER_IMAGE = 1000;
 
 function normalizeCount(imageCount: number): number {
   return Number.isFinite(imageCount) && imageCount > 0 ? Math.floor(imageCount) : 0;
@@ -35,7 +33,7 @@ function normalizeCount(imageCount: number): number {
 
 /**
  * Estimated milliseconds the culling run will take:
- *   5 minute floor + 10 seconds per image.
+ *   20 second floor + 1 second per image.
  */
 export function estimateCullingMs(imageCount: number): number {
   return BASE_CULLING_MS + normalizeCount(imageCount) * MS_PER_IMAGE;
@@ -44,13 +42,12 @@ export function estimateCullingMs(imageCount: number): number {
 /**
  * Threshold past which we consider an in-flight culling run "stuck".
  *
- * Equal to the estimate: we don't surface the retry prompt until the
- * whole expected window has passed. Kept as a separate export so the
- * "stuck" policy can diverge from the displayed ETA later without
- * touching every call site.
+ * Deliberately far more generous than the displayed estimate (3 min
+ * floor + 3 s/image ≈ 3–4× the ETA) so we only surface the retry prompt
+ * once a run is genuinely hung, never merely slow.
  */
 export function stuckThresholdMs(imageCount: number): number {
-  return estimateCullingMs(imageCount);
+  return 3 * 60 * 1000 + normalizeCount(imageCount) * 3 * 1000;
 }
 
 /** Format ms as a human-friendly duration like "2h 51m", "38 min" or "45 s". */
