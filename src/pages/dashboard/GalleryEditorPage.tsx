@@ -1287,7 +1287,8 @@ export default function GalleryEditorPage() {
     }
   }, [gallery?.id, gallery?.culling_status, gallery?.culling_started_at, hasCullingData, images.length, cullingNow, id, queryClient]);
 
-  // AI Culling mutation - calls the start-grouping function
+  // AI Culling mutation — runs the NEW pipeline (process-pipeline: Modal CLIP
+  // grouping + ArcFace faces + OpenRouter culling/tagging).
   const runAICulling = useMutation({
     mutationFn: async (opts: { tags: string[]; cluster: boolean; faces: boolean }) => {
       const { tags, cluster, faces } = opts;

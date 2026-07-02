@@ -265,8 +265,12 @@ serve(async (req: Request) => {
     // Finalize a fully-processed gallery: group images, cluster faces, mark ready.
     async function finalize() {
       if (doCluster) {
+        // Grouping goes through the NEW Modal community-detection engine ONLY.
+        // We never fall back to the old SQL clusterer (removed) — if the Modal
+        // group endpoint isn't configured we skip grouping and log, rather than
+        // silently produce old-engine results.
         if (modalGroupUrl) await groupViaModal();
-        else await admin.rpc("cluster_gallery_images", { p_gallery_id: galleryId });
+        else console.error("MODAL_GROUP_URL not set — skipping grouping (new engine unavailable)");
       }
       if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
       // Mirror to the legacy culling_* fields the gallery UI watches.
