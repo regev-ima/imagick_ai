@@ -221,73 +221,28 @@ export function FaceGallery({
     );
   }
 
-  // --- PROCESSING STATE: Progress tracking ---
-  if (faceSearchStatus === "processing" || (detectionProgress && detectionProgress.phase !== "done" && detectionProgress.phase !== "error")) {
-    const dp = detectionProgress;
-    const facesFound = dp?.facesFound ?? detectedFacesCount ?? 0;
-    const processed = dp?.processedImages ?? 0;
-    const total = dp?.totalImages ?? totalImages ?? 0;
-    const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
-    const phaseLabel = dp?.phase === "loading-models" ? "Loading AI models..."
-      : dp?.phase === "clustering" ? "Grouping faces..."
-      : "Detecting faces...";
-
+  // --- PROCESSING STATE ---
+  // Faces are detected SERVER-SIDE as part of AI Culling (ArcFace), not in the
+  // browser. While culling runs we don't have partial people to show and there
+  // is nothing for the user to do — so we show a calm "it's running, come back
+  // when it's done" state (no fake 0/211 counts, no button, no "keep this tab
+  // open"). People appear automatically when the whole run finishes.
+  if (faceSearchStatus === "processing") {
     return (
       <div>
         {backButton}
         <div className="flex flex-col items-center justify-center py-16 gap-6">
           <Orb className="w-20 h-20" />
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-semibold">{phaseLabel}</h3>
-            <p className="text-sm text-muted-foreground max-w-sm">
-              {dp?.phase === "loading-models"
-                ? "Downloading face detection models to your browser. This happens once."
-                : dp?.phase === "clustering"
-                ? "Grouping similar faces together..."
-                : "AI is scanning your photos in your browser. Please keep this tab open."
-              }
+          <div className="text-center space-y-2 max-w-sm">
+            <h3 className="text-lg font-semibold">AI Culling is running…</h3>
+            <p className="text-sm text-muted-foreground">
+              People are detected as part of AI Culling. They'll appear here
+              automatically when the run finishes — nothing to do, you can keep working.
             </p>
           </div>
-
-          {/* Live stats */}
-          <div className="w-full max-w-xs space-y-3">
-            <div className="flex items-center justify-center gap-6">
-              <div className="text-center">
-                <p className="font-mono text-2xl font-bold text-foreground folio tabular-nums">{processed}/{total}</p>
-                <p className="aura-microlabel mt-0.5">Photos scanned</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-2xl font-bold text-primary folio tabular-nums">{facesFound}</p>
-                <p className="aura-microlabel mt-0.5">Faces found</p>
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            <div className="space-y-1">
-              <div className="flex justify-between font-mono text-xs text-muted-foreground tabular-nums">
-                <span>Progress</span>
-                <span className="text-foreground folio">{percentage}%</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground surface-2 border border-border/60 rounded-sm px-4 py-2">
-              <Check className="w-3.5 h-3.5 text-secondary" />
-              <span>Processing happens in your browser — keep this tab open</span>
-            </div>
-            {onCancel && (
-              <Button variant="ghost" size="sm" onClick={onCancel} className="gap-1.5 text-xs text-muted-foreground">
-                <StopCircle className="w-3.5 h-3.5" />
-                Cancel
-              </Button>
-            )}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground surface-2 border border-border/60 rounded-sm px-4 py-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+            <span>Detecting people…</span>
           </div>
         </div>
       </div>

@@ -1290,6 +1290,19 @@ export default function GalleryEditorPage() {
     }
   }, [gallery?.id, gallery?.culling_status, gallery?.culling_started_at, hasCullingData, images.length, cullingNow, id, queryClient]);
 
+  // When a culling run starts, snap back to the Photos view. Groups/People are
+  // computed only at the end of the run, so leaving the user stranded in those
+  // (empty) views mid-run is what made a healthy run look broken.
+  useEffect(() => {
+    if (gallery?.culling_status === "processing") {
+      setCatalogMode("default");
+      setSelectedFaceCluster(null);
+    }
+    // Intentionally keyed on culling_status only — fire on the transition into
+    // processing, not on every catalogMode change (which would trap the user).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gallery?.culling_status]);
+
   // AI Culling mutation — runs the NEW pipeline (process-pipeline: Modal CLIP
   // grouping + ArcFace faces + OpenRouter culling/tagging).
   const runAICulling = useMutation({
@@ -1744,8 +1757,12 @@ export default function GalleryEditorPage() {
 
           {/* Center: view switcher (Photos / Groups / People). Only shown once
               there's something to switch to — culling data (Groups) or detected
-              faces (People) — so a plain hosting gallery stays uncluttered. */}
-          {(hasCullingData || (faceClusters.data?.length ?? 0) > 0) && (
+              faces (People) — AND only when a run isn't mid-flight: grouping and
+              faces are computed at the very END of culling, so exposing those
+              tabs during processing would show empty/half-baked results and make
+              a healthy run look broken. They appear when the run is fully done. */}
+          {gallery?.culling_status !== "processing" &&
+            (hasCullingData || (faceClusters.data?.length ?? 0) > 0) && (
             <div className="hidden md:flex items-center mx-auto shrink-0">
               <CatalogModeSelector
                 mode={catalogMode}
