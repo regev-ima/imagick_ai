@@ -113,8 +113,5 @@ verify_jwt = false
 [functions.paypal-webhook]
 verify_jwt = false
 
-[functions.process-gallery-faces]
-verify_jwt = false
-
 [functions.sentry-telegram-relay]
 verify_jwt = false
