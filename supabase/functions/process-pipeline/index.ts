@@ -291,7 +291,17 @@ serve(async (req: Request) => {
         if (modalGroupUrl) await groupViaModal();
         else console.error("MODAL_GROUP_URL not set — skipping grouping (new engine unavailable)");
       }
-      if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
+      if (doFaces) {
+        // Surface clustering failures — a swallowed error here leaves the gallery
+        // "ready" with detections but zero people, which reads as "faces never ran".
+        const { error: clusterErr } = await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
+        if (clusterErr) {
+          console.error("face clustering failed:", clusterErr.message);
+          await admin.from("galleries").update({
+            pipeline_error: `face clustering failed: ${clusterErr.message}`,
+          }).eq("id", galleryId);
+        }
+      }
       // Mirror to the legacy culling_* fields the gallery UI watches.
       await admin.from("galleries").update({
         pipeline_status: "ready",
@@ -345,11 +355,15 @@ serve(async (req: Request) => {
       (doneRows || []).filter((r: { faces_done?: boolean }) => r.faces_done).map((r: { image_id: string }) => r.image_id),
     );
 
-    // Images that already have an OLD culling score (so we don't re-pay the VLM).
+    // Images that already have a REAL culling score (so we don't re-pay the
+    // VLM). Strictly > 0: a zero means the old fallback wrote zeros for an
+    // unreadable/truncated response — those photos were never actually scored,
+    // so they must be picked up again (this also retro-repairs galleries hit
+    // by the zero-fallback bug on their next run).
     let cullDone = new Set<string>();
     if (doCulling) {
       const { data: cullRows } = await admin
-        .from("gallery_images").select("id").eq("gallery_id", galleryId).not("culling_score", "is", null);
+        .from("gallery_images").select("id").eq("gallery_id", galleryId).gt("culling_score", 0);
       cullDone = new Set((cullRows || []).map((r: { id: string }) => r.id));
     }
 
@@ -524,15 +538,20 @@ serve(async (req: Request) => {
       // cheap thumbnail call; only early, pre-compression images pay for the
       // heavier original.
       let { data: d, error } = await callScoreVision(toThumbnailUrl(img.original_url));
-      if ((error || !d) && img.original_url) {
+      // score-vision's zero-fallback (fallback:true) means the VLM never
+      // produced a usable answer — often because the THUMBNAIL doesn't exist
+      // yet (async compression lag) so the model saw a broken image. Treat it
+      // as a failure so we retry with the ORIGINAL instead of persisting zeros
+      // that leave the photo silently "unscored" in the gallery.
+      if ((error || !d || d.fallback === true) && img.original_url) {
         const retry = await callScoreVision(img.original_url);
         d = retry.data;
         error = retry.error;
       }
-      if (error || !d) {
-        if (!cullFirstError) cullFirstError = error ?? "unknown culling error";
-        console.error("Culling call failed:", img.id, error);
-        return; // leave for next invocation
+      if (error || !d || d.fallback === true) {
+        if (!cullFirstError) cullFirstError = error ?? "VLM returned fallback (unparseable/unreadable image)";
+        console.error("Culling call failed:", img.id, error ?? "fallback");
+        return; // leave for next invocation — never write fallback zeros
       }
       const num = (v: unknown) => (typeof v === "number" ? v : 0);
       // VLM-chosen tags → the old gallery_images.ai_tags column (text[]).
@@ -615,11 +634,15 @@ serve(async (req: Request) => {
       .from("gallery_images").select("id", { count: "exact", head: true }).eq("gallery_id", galleryId);
     const clipRemaining = (totalCount ?? 0) - (doneRows2 || []).length;
     let cullRemaining = 0;
+    let cullDoneTotal = 0;
     if (doCulling) {
+      // Same strict > 0 definition as the skip-check: zero = the old fallback,
+      // not a real score.
       const { count: cullDoneCount } = await admin
         .from("gallery_images").select("id", { count: "exact", head: true })
-        .eq("gallery_id", galleryId).not("culling_score", "is", null);
-      cullRemaining = (totalCount ?? 0) - (cullDoneCount ?? 0);
+        .eq("gallery_id", galleryId).gt("culling_score", 0);
+      cullDoneTotal = cullDoneCount ?? 0;
+      cullRemaining = (totalCount ?? 0) - cullDoneTotal;
     }
     let facesRemaining = 0;
     if (doFaces) {
@@ -638,6 +661,16 @@ serve(async (req: Request) => {
       // burning invocations/credits.
       const nextStall = madeProgress ? 0 : stall + 1;
       if (nextStall >= 3) {
+        // Partial-success grace: if everything is done EXCEPT a handful of
+        // culling stragglers (images whose VLM call keeps failing — broken
+        // file, model refusal), don't fail the whole gallery. Finalize as
+        // ready; the stragglers stay unscored and the AI Culling modal offers
+        // "Cull remaining N photos" to pick them up later.
+        if (clipRemaining === 0 && facesRemaining === 0 && cullRemaining > 0 && cullDoneTotal > 0) {
+          console.warn(`finalizing with ${cullRemaining} unscored stragglers (VLM kept failing)`);
+          await finalize();
+          return json({ success: true, processed, cullProcessed, unscored: cullRemaining, partial: true });
+        }
         // Point the finger at the step that actually failed to progress.
         let msg: string;
         if (doCulling && cullRemaining > 0 && cullProcessed === 0) {

@@ -32,6 +32,12 @@ on:
       - "supabase/migrations/**"
       - ".github/workflows/deploy-pipeline.yml"
 
+# Duplicate push deliveries fire this twice for the same commit; two parallel
+# `functions deploy` calls collide (409 "deployed concurrently"). Serialize.
+concurrency:
+  group: deploy-pipeline
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

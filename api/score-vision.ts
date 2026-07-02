@@ -142,7 +142,10 @@ async function handleCulling(res: any, key: string, image: string, body: any) {
           { type: "text", text: prompt },
           { type: "image_url", image_url: { url: image } },
         ] }],
-        max_tokens: extras ? 320 : 220, // headroom for the tags array + signals object
+        // Generous headroom: busy group shots with many tags + the signals
+        // object were TRUNCATING at 320 → unparseable JSON → zero-fallback,
+        // which silently left photos "unscored" (score 0) in the gallery.
+        max_tokens: extras ? 640 : 320,
         temperature: 0.2,
         usage: { include: true },
       }),

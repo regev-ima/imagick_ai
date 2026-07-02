@@ -3239,6 +3239,7 @@ export default function GalleryEditorPage() {
             cullingCompletedAt={gallery?.culling_completed_at as string | null | undefined}
             uploadCompletedAt={gallery?.upload_completed_at as string | null | undefined}
             hasCompletedCulling={hasCullingData}
+            unculledCount={images.filter((img) => !((img as any).culling_score > 0)).length}
             defaultCluster={(gallery as any)?.ai_grouping_enabled ?? true}
             defaultFaces={(gallery as any)?.ai_faces_enabled ?? false}
           />

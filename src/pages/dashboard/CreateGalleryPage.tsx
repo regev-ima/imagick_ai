@@ -177,12 +177,12 @@ export default function CreateGalleryPage() {
   const [items, setItems] = useState<SelImg[]>([]);
   const [styleIds, setStyleIds] = useState<string[]>([]);
   const [styleTouched, setStyleTouched] = useState(false);
-  const [cull, setCull] = useState(true);
-  // Culling sub-steps (mirror the AI Culling modal's toggles): grouping collapses
-  // burst duplicates; faces powers the People view. Both on by default so a
-  // culled collection arrives with the full experience.
-  const [cullGrouping, setCullGrouping] = useState(true);
-  const [cullFaces, setCullFaces] = useState(true);
+  // All culling toggles start OFF — the photographer opts in explicitly.
+  const [cull, setCull] = useState(false);
+  // Culling sub-steps (mirror the AI Culling modal's toggles): grouping
+  // collapses burst duplicates; faces powers the People view.
+  const [cullGrouping, setCullGrouping] = useState(false);
+  const [cullFaces, setCullFaces] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [uploadSource, setUploadSource] = useState<UploadSource>("local");
   const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
@@ -570,8 +570,8 @@ export default function CreateGalleryPage() {
                 >
                   <Layers className={cn("h-3.5 w-3.5", cullGrouping ? "text-primary" : "text-muted-foreground")} />
                   <span className="caption flex-1 text-foreground">Group similar images</span>
-                  <span className={cn("h-5 w-9 rounded-full p-0.5 transition-colors", cullGrouping ? "bg-primary" : "bg-muted")}>
-                    <motion.span layout className="block h-4 w-4 rounded-full bg-white shadow" style={{ marginLeft: cullGrouping ? "auto" : 0 }} />
+                  <span className={cn("h-6 w-11 rounded-full p-0.5 transition-colors", cullGrouping ? "bg-primary" : "bg-muted")}>
+                    <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cullGrouping ? "auto" : 0 }} />
                   </span>
                 </button>
                 <button
@@ -584,8 +584,8 @@ export default function CreateGalleryPage() {
                     Recognize people (faces)
                     <span className="ms-1.5 text-muted-foreground/60">heavier step</span>
                   </span>
-                  <span className={cn("h-5 w-9 rounded-full p-0.5 transition-colors", cullFaces ? "bg-primary" : "bg-muted")}>
-                    <motion.span layout className="block h-4 w-4 rounded-full bg-white shadow" style={{ marginLeft: cullFaces ? "auto" : 0 }} />
+                  <span className={cn("h-6 w-11 rounded-full p-0.5 transition-colors", cullFaces ? "bg-primary" : "bg-muted")}>
+                    <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cullFaces ? "auto" : 0 }} />
                   </span>
                 </button>
 
