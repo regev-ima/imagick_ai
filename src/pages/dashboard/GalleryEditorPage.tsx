@@ -1290,8 +1290,8 @@ export default function GalleryEditorPage() {
   // AI Culling mutation — runs the NEW pipeline (process-pipeline: Modal CLIP
   // grouping + ArcFace faces + OpenRouter culling/tagging).
   const runAICulling = useMutation({
-    mutationFn: async (opts: { tags: string[]; cluster: boolean; faces: boolean }) => {
-      const { tags, cluster, faces } = opts;
+    mutationFn: async (opts: { tags: string[]; cluster: boolean; faces: boolean; redetect?: boolean }) => {
+      const { tags, cluster, faces, redetect } = opts;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
@@ -1308,6 +1308,18 @@ export default function GalleryEditorPage() {
       // (and any image whose faces are already done), so re-running only
       // processes photos added since the last run — no wasted spend and no
       // overwriting of ratings the photographer may have already reviewed.
+      //
+      // EXCEPTION: an explicit re-detect (re-running faces on an already-culled
+      // gallery). The pipeline skips images whose faces are already done, so to
+      // actually rebuild people we clear the faces_done marker first — this
+      // forces a fresh ArcFace pass, which then re-clusters with the current
+      // (tighter) algorithm + smart representative. Ratings are untouched.
+      if (redetect && faces) {
+        await (supabase as any)
+          .from("image_features")
+          .update({ faces_done: false })
+          .eq("gallery_id", id!);
+      }
 
       // Admin-configured model + EXIF time gate (platform_settings.culling_config).
       let adminModel: string | undefined;
