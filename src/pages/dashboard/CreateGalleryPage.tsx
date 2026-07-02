@@ -148,6 +148,8 @@ export default function CreateGalleryPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [customLabels, setCustomLabels] = useState<string[]>([]);
   const [aiCulling, setAiCulling] = useState(false);
+  const [cullGrouping, setCullGrouping] = useState(true);   // group similar images
+  const [cullFaces, setCullFaces] = useState(false);        // recognize people (heavier)
   const [cullingAdvancedOpen, setCullingAdvancedOpen] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -349,6 +351,8 @@ export default function CreateGalleryPage() {
             categories: selectedCategories,
             culling_labels: effectiveCullingLabels,
             ai_culling_enabled: aiCulling,
+            ai_grouping_enabled: cullGrouping,
+            ai_faces_enabled: cullFaces,
             total_images: driveFolderInfo.totalImageCount,
             status: "transferring",
           })
@@ -414,6 +418,8 @@ export default function CreateGalleryPage() {
           categories: selectedCategories,
           culling_labels: effectiveCullingLabels,
           ai_culling_enabled: aiCulling,
+          ai_grouping_enabled: cullGrouping,
+          ai_faces_enabled: cullFaces,
           total_images: uppyFileCount,
           status: "uploading",
         })
@@ -944,8 +950,23 @@ export default function CreateGalleryPage() {
                         <div className="flex items-center gap-2.5">
                           <Sparkle size={14} className="shrink-0 text-accent" />
                           <p className="text-sm text-muted-foreground">
-                            Aura will tag and rank your best shots automatically.
+                            Aura will rate, tag and categorize your best shots automatically.
                           </p>
+                        </div>
+
+                        {/* AI steps — mirror the AI Culling run options */}
+                        <div className="space-y-2">
+                          <label className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2.5">
+                            <span className="text-sm text-foreground">Group similar images</span>
+                            <Switch checked={cullGrouping} onCheckedChange={setCullGrouping} />
+                          </label>
+                          <label className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2.5">
+                            <span className="text-sm text-foreground">
+                              Recognize people (faces)
+                              <span className="ms-2 text-xs text-muted-foreground">heavier step</span>
+                            </span>
+                            <Switch checked={cullFaces} onCheckedChange={setCullFaces} />
+                          </label>
                         </div>
 
                         {/* Advanced (optional) — detailed label controls, collapsed by default */}

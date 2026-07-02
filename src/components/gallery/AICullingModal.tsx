@@ -62,6 +62,9 @@ interface AICullingModalProps {
    *  since the last culling — if not, re-running is almost always a
    *  no-op and we steer them away from it. */
   uploadCompletedAt?: string | null;
+  /** Per-gallery step defaults chosen at creation (seed the toggles). */
+  defaultCluster?: boolean;
+  defaultFaces?: boolean;
 }
 
 export function AICullingModal({
@@ -78,14 +81,20 @@ export function AICullingModal({
   hasCompletedCulling = false,
   cullingCompletedAt = null,
   uploadCompletedAt = null,
+  defaultCluster = true,
+  defaultFaces = false,
 }: AICullingModalProps) {
   const { user } = useAuth();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
   // Photographer-chosen steps. Rating + tags always run (the core); grouping is on
   // by default; faces (people) is the heavier, opt-in step.
-  const [doCluster, setDoCluster] = useState(true);
-  const [doFaces, setDoFaces] = useState(false);
+  const [doCluster, setDoCluster] = useState(defaultCluster);
+  const [doFaces, setDoFaces] = useState(defaultFaces);
+  // Re-seed from the gallery's saved prefs each time the modal opens.
+  useEffect(() => {
+    if (isOpen) { setDoCluster(defaultCluster); setDoFaces(defaultFaces); }
+  }, [isOpen, defaultCluster, defaultFaces]);
   const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
   const [languageLoaded, setLanguageLoaded] = useState(false);
   /** Required check before triggering a re-run that would overwrite
