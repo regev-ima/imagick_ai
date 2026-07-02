@@ -1025,19 +1025,20 @@ export default function CreateGalleryPage() {
                             </span>
                             <Switch checked={cullFaces} onCheckedChange={setCullFaces} />
                           </label>
+                          {/* Tags — a toggle row like the steps above (kept inside
+                              the same group so all three rows are evenly spaced).
+                              On reveals the category controls; off lets Aura pick. */}
+                          <label className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2.5">
+                            <span className="text-sm text-foreground">
+                              Tags
+                              {selectedCategories.length > 0 && (
+                                <span className="ms-2 text-xs text-primary">{selectedCategories.length} selected</span>
+                              )}
+                            </span>
+                            <Switch checked={cullingAdvancedOpen} onCheckedChange={setCullingAdvancedOpen} />
+                          </label>
                         </div>
 
-                        {/* Tags — a toggle row like the steps above. On reveals the
-                            category/label controls; off lets Aura pick automatically. */}
-                        <label className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2.5">
-                          <span className="text-sm text-foreground">
-                            Tags
-                            {selectedCategories.length > 0 && (
-                              <span className="ms-2 text-xs text-primary">{selectedCategories.length} selected</span>
-                            )}
-                          </span>
-                          <Switch checked={cullingAdvancedOpen} onCheckedChange={setCullingAdvancedOpen} />
-                        </label>
                         {cullingAdvancedOpen && (
                           <div className="space-y-3 pt-1">
                             {/* One compact row: hint + language + select-all */}

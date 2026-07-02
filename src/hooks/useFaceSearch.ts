@@ -63,6 +63,9 @@ export function useFaceSearch(galleryId: string | undefined, isDetectionRunning 
       return (data as unknown as FaceCluster[]) || [];
     },
     enabled: !!galleryId,
+    // While a run is processing, poll so clusters appear the moment detection
+    // lands at the end of the run — no manual page refresh needed.
+    refetchInterval: isDetectionRunning ? 4000 : false,
   });
 
   return { faceClusters, faceSearchProgress };

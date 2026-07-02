@@ -217,7 +217,9 @@ export default function GalleryEditorPage() {
   // face-detection engine is gone. We only READ the resulting clusters here; the
   // "people" view is pure navigation, and (re)detecting faces is done by running
   // AI Culling with "Recognize people" enabled.
-  const { faceClusters } = useFaceSearch(id, false);
+  // Poll face clusters while a run is processing, so they populate the moment
+  // detection lands at the end of the run instead of needing a page refresh.
+  const { faceClusters } = useFaceSearch(id, gallery?.culling_status === "processing");
   const isFaceDetectionRunning = false;
   // Derive the people-view state from culling + whether clusters exist (the old
   // face_search_status field is no longer written by anything).
@@ -1303,8 +1305,27 @@ export default function GalleryEditorPage() {
     }
     // Intentionally keyed on culling_status only — fire on the transition into
     // processing, not on every catalogMode change (which would trap the user).
+    // Intentionally keyed on culling_status only — fire on the transition into
+    // processing, not on every catalogMode change (which would trap the user).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gallery?.culling_status]);
+
+  // When a run FINISHES (processing → ready), face clusters + representatives
+  // were just written server-side, but the face-clusters query isn't polled —
+  // so the People view stayed on its intro screen until a manual refresh.
+  // Refetch faces (and images) on that transition so everything appears the
+  // moment the overlay clears, no refresh needed.
+  const prevCullingStatusRef = useRef<string | null | undefined>(gallery?.culling_status);
+  useEffect(() => {
+    const prev = prevCullingStatusRef.current;
+    const cur = gallery?.culling_status;
+    if (prev === "processing" && cur === "ready") {
+      queryClient.invalidateQueries({ queryKey: ["face-clusters", id] });
+      queryClient.invalidateQueries({ queryKey: ["face-search-progress", id] });
+      queryClient.invalidateQueries({ queryKey: ["gallery", id] });
+    }
+    prevCullingStatusRef.current = cur;
+  }, [gallery?.culling_status, id, queryClient]);
 
   // AI Culling mutation — runs the NEW pipeline (process-pipeline: Modal CLIP
   // grouping + ArcFace faces + OpenRouter culling/tagging).
@@ -1787,7 +1808,7 @@ export default function GalleryEditorPage() {
                     <Button variant="outline" size="sm" className="gap-1 h-7 px-2 text-xs">
                       <ArrowUpDown className="w-3 h-3" />
                       <span className="hidden md:inline">
-                        {filters.sortBy === "date" || filters.sortBy === "date_taken" ? "Date Taken" : filters.sortBy === "date_added" ? "Date Added" : filters.sortBy === "name" ? "Name" : filters.sortBy === "size" ? "Size" : "Rating"}
+                        {filters.sortBy === "date_added" ? "Date Added" : filters.sortBy === "name" ? "Name" : filters.sortBy === "size" ? "Size" : filters.sortBy === "rating" ? "Rating" : "Name"}
                       </span>
                     </Button>
                   </DropdownMenuTrigger>
@@ -1795,10 +1816,8 @@ export default function GalleryEditorPage() {
                 <TooltipContent side="bottom"><p>Sort</p></TooltipContent>
               </Tooltip>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setFilters(prev => ({ ...prev, sortBy: "date" }))}>
-                  {filters.sortBy === "date" && <Check className="w-3 h-3 mr-2" />}
-                  Date Taken
-                </DropdownMenuItem>
+                {/* "Date Taken" removed — photos don't carry a reliable EXIF
+                    capture date, so sorting by it was meaningless. */}
                 <DropdownMenuItem onClick={() => setFilters(prev => ({ ...prev, sortBy: "date_added" }))}>
                   {filters.sortBy === "date_added" && <Check className="w-3 h-3 mr-2" />}
                   Date Added
