@@ -330,6 +330,51 @@ export default function CreateGalleryPage() {
           : getCullingLabels(galleryType || "wedding", cullingLanguage))
       : [];
 
+    // Kick off AI Culling automatically when the photographer enabled it at
+    // creation. Culling reads the ORIGINAL photos (independent of the style
+    // editor), so it can run in parallel the moment uploads land — the user
+    // shouldn't have to open the gallery and press "AI Culling" by hand.
+    // process-pipeline stamps culling_status='processing' + culling_started_at
+    // itself, so the gallery overlay/clock light up as soon as we navigate in.
+    const startAutoCulling = async (galleryId: string) => {
+      if (!aiCulling) return;
+      try {
+        // Admin-configured model + EXIF time gate (platform_settings.culling_config).
+        let adminModel: string | undefined;
+        let adminTime = 600;
+        try {
+          const { data: cfgRow } = await supabase
+            .from("platform_settings").select("value").eq("key", "culling_config").single();
+          if (cfgRow?.value) {
+            const cfg = JSON.parse(cfgRow.value);
+            if (typeof cfg.model === "string") adminModel = cfg.model;
+            if (typeof cfg.timeThreshold === "number") adminTime = cfg.timeThreshold;
+          }
+        } catch { /* fall back to defaults */ }
+
+        await supabase.functions.invoke("process-pipeline", {
+          body: {
+            galleryId,
+            options: {
+              culling: true,
+              tags: true,
+              cluster: cullGrouping,
+              faces: cullFaces,
+              labels: effectiveCullingLabels,
+              thresholds: [0.5, 0.7, 0.9],
+              timeThreshold: adminTime,
+              ...(adminModel ? { model: adminModel } : {}),
+              scoreVisionUrl: `${window.location.origin}/api/score-vision`,
+            },
+          },
+        });
+      } catch (err) {
+        // Non-fatal: the photographer can still start culling manually from the
+        // gallery. Don't block gallery creation on a culling dispatch hiccup.
+        console.error("Auto-culling dispatch failed:", err);
+      }
+    };
+
     // Handle Google Drive upload
     if (uploadSource === "drive") {
       if (!driveFolderInfo || driveLinks.length === 0) {
@@ -530,6 +575,19 @@ export default function CreateGalleryPage() {
           .update({ status: "ready" })
           .in("id", imageIds);
         toast.success("Gallery created successfully!");
+      }
+
+      // 8. Auto-start AI Culling if enabled (runs in parallel with style edits).
+      // Optimistically flag the gallery as culling so the progress overlay +
+      // clock are already up the instant we navigate in, then dispatch the
+      // pipeline fire-and-forget so navigation stays snappy (process-pipeline
+      // self-chains server-side and the gallery page polls for completion).
+      if (aiCulling && imageIds.length > 0) {
+        await supabase
+          .from("galleries")
+          .update({ culling_status: "processing", culling_started_at: new Date().toISOString() } as any)
+          .eq("id", gallery.id);
+        void startAutoCulling(gallery.id);
       }
 
       navigate(`/dashboard/galleries/${gallery.id}`);

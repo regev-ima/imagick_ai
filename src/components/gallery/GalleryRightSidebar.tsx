@@ -244,18 +244,6 @@ export function GalleryRightSidebar({
                   Faces
                 </Button>
               )}
-              {onChooseClientPhotos && (
-                <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={onChooseClientPhotos}>
-                  <Images className="w-3.5 h-3.5" />
-                  Client photos
-                </Button>
-              )}
-              {onShare && (
-                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={onShare}>
-                  <Share2 className="w-3.5 h-3.5" />
-                  Share
-                </Button>
-              )}
             </div>
             <Separator />
             <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} />
@@ -306,7 +294,7 @@ export function GalleryRightSidebar({
   return (
     <div
       className={cn(
-        "shrink-0 border-l border-border/50 glass-card grid grid-rows-[auto_minmax(0,1fr)_auto] w-[300px] h-full",
+        "shrink-0 border-l border-border/50 glass-card grid grid-rows-[auto_minmax(0,1fr)_auto] w-[340px] h-full",
         className,
       )}
     >
@@ -423,12 +411,6 @@ export function GalleryRightSidebar({
               label="Faces"
               onClick={onOpenFaceSearch}
             />
-          )}
-          {onChooseClientPhotos && (
-            <ActionButton icon={<Images className="w-3 h-3" />} label="Client" onClick={onChooseClientPhotos} />
-          )}
-          {onShare && (
-            <ActionButton icon={<Share2 className="w-3 h-3" />} label="Share" onClick={onShare} />
           )}
           {onDownload && (
             <ActionButton icon={<Download className="w-3 h-3" />} label="Download" onClick={onDownload} />
@@ -927,16 +909,20 @@ function UnifiedFilterPanel({
         <>
           <Separator />
           <div className="space-y-2">
-            <Label className="aura-microlabel">Duplicates</Label>
+            <Label className="aura-microlabel">Similar shots</Label>
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              AI groups look-alike photos (e.g. burst frames) so you can keep the
+              best and hide the rest. Choose how alike they must be to be grouped.
+            </p>
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] text-muted-foreground mb-1.5 block">Sensitivity</label>
+                <label className="text-[10px] text-muted-foreground mb-1.5 block">Grouping</label>
                 <div className="flex gap-1">
                   {(
                     [
-                      { value: "loose", label: "Low", desc: "50%" },
-                      { value: "medium", label: "Med", desc: "70%" },
-                      { value: "strict", label: "High", desc: "90%" },
+                      { value: "loose", label: "Broad" },
+                      { value: "medium", label: "Balanced" },
+                      { value: "strict", label: "Near-identical" },
                     ] as const
                   ).map((opt) => (
                     <Button

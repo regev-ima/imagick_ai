@@ -30,7 +30,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { cullingScoreToStars } from "@/lib/cullingScore";
 import { useCullingScoreMode } from "@/hooks/useCullingScoreMode";
-import { CullingScoreModeToggle } from "@/components/gallery/CullingScoreModeToggle";
 import { Card } from "@/components/ui/card";
 import {
   Tooltip,
@@ -906,11 +905,14 @@ export default function GalleryEditorPage() {
   const cullingCounts = useMemo(() => {
     const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     images.forEach(img => {
-      const rating = cullingScoreToStars((img as any).culling_score, cullingScoreMode);
-      counts[rating || 1]++;
+      // Use the EXACT same star mapping the rating filter uses, so a tier's
+      // count always matches the number of photos selecting it reveals. An
+      // image with no score (rating 0) belongs to no tier and is not counted.
+      const rating = cullingScoreToStars((img as any).culling_score, cullingScoreMode) || (img.ai_rating || 0);
+      if (rating >= 1 && rating <= 5) counts[rating]++;
     });
     return counts;
-  }, [images]);
+  }, [images, cullingScoreMode]);
 
   // Group counts for sidebar
   const sidebarGroupCounts = useMemo(() => {
@@ -1213,7 +1215,19 @@ export default function GalleryEditorPage() {
   // Runs once per render when the inconsistency is detected.
   useEffect(() => {
     if (!gallery?.id) return;
-    if (gallery.culling_status === "processing" && hasCullingData) {
+    // Only heal a 'processing' row to 'ready' when it's genuinely stale, not
+    // merely mid-run. process-pipeline writes ratings incrementally per batch
+    // (so hasCullingData flips true after the FIRST batch) and self-chains until
+    // it stamps status='ready' itself. Flipping to 'ready' the moment ANY data
+    // exists would cut the run short — the overlay would vanish and the clock
+    // stop after a few seconds even though most photos are still unscored. So we
+    // only step in as a recovery net once the full "stuck" window has elapsed.
+    if (
+      gallery.culling_status === "processing" &&
+      hasCullingData &&
+      gallery.culling_started_at &&
+      cullingNow - new Date(gallery.culling_started_at).getTime() > stuckThresholdMs(images.length)
+    ) {
       supabase
         .from("galleries")
         .update({ culling_status: "ready" } as any)
@@ -1232,7 +1246,7 @@ export default function GalleryEditorPage() {
           queryClient.invalidateQueries({ queryKey: ["gallery", id] });
         });
     }
-  }, [gallery?.id, gallery?.culling_status, gallery?.culling_started_at, hasCullingData, id, queryClient]);
+  }, [gallery?.id, gallery?.culling_status, gallery?.culling_started_at, hasCullingData, images.length, cullingNow, id, queryClient]);
 
   // AI Culling mutation - calls the start-grouping function
   const runAICulling = useMutation({
@@ -1249,54 +1263,11 @@ export default function GalleryEditorPage() {
           .eq("id", id!);
       }
 
-      // Reset existing culling output before kicking off a new run.
-      // The user explicitly opted-in via the re-run-acknowledge
-      // checkbox, so wiping ratings/labels is intended. Clearing
-      // these makes hasCullingData=false, which:
-      //   - hides the post-culling Star Rating + Categories panels
-      //   - lets the in-progress banner show normally
-      //   - prevents the user from filtering against stale numbers
-      // Fields below match exactly what grouping-webhook writes back.
-      if (hasCullingData) {
-        await supabase
-          .from("gallery_images")
-          .update({
-            culling_score: null,
-            culling_label: null,
-            similarity_group_1: null,
-            similarity_group_2: null,
-            similarity_group_3: null,
-            background_sharpness: null,
-            subject_sharpness: null,
-            thirds_rule: null,
-            intended_facial_expression: null,
-            ai_tags: null,
-            eyes_status: null,
-            expression: null,
-            looking_at_camera: null,
-            is_keeper: null,
-            ai_hero_candidate: null,
-            has_blur_issue: null,
-            has_exposure_issue: null,
-            people_count: null,
-          })
-          .eq("gallery_id", id!);
-        // Reset filter selections that referenced the now-cleared data.
-        setFilters((prev) => ({
-          ...prev,
-          selectedRatings: [],
-          minRating: 0,
-          selectedLabels: [],
-        }));
-      }
-      // Culling runs need image_features (CLIP) recomputed only when clip is missing;
-      // the pipeline self-manages that. Force a fresh faces recompute on re-run.
-      if (hasCullingData) {
-        await (supabase as any)
-          .from("image_features")
-          .update({ faces_done: false })
-          .eq("gallery_id", id!);
-      }
+      // Incremental by design: we DO NOT wipe existing culling output.
+      // process-pipeline skips any image that already has a culling_score
+      // (and any image whose faces are already done), so re-running only
+      // processes photos added since the last run — no wasted spend and no
+      // overwriting of ratings the photographer may have already reviewed.
 
       // Admin-configured model + EXIF time gate (platform_settings.culling_config).
       let adminModel: string | undefined;
@@ -1718,7 +1689,6 @@ export default function GalleryEditorPage() {
 
           {/* Right: Sort, View Mode, Count */}
           <div className="flex items-center gap-1 ml-auto shrink-0">
-            <CullingScoreModeToggle />
             <TooltipProvider delayDuration={300}>
             {/* Sort Dropdown */}
             <DropdownMenu>
@@ -2531,7 +2501,7 @@ export default function GalleryEditorPage() {
 
       {/* Mobile Sidebar Sheet */}
       <Sheet open={showMobileSidebar} onOpenChange={setShowMobileSidebar}>
-        <SheetContent side="right" className="p-0 w-[300px]">
+        <SheetContent side="right" className="p-0 w-[340px]">
           <GalleryRightSidebar
             availableStyles={galleryStylesData.map((s) => ({
               id: s.id,
@@ -2551,6 +2521,8 @@ export default function GalleryEditorPage() {
             onRunCulling={() => { if (gallery?.culling_status === "processing" && !isCullingStuck) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); setShowMobileSidebar(false); }}
             isCullingRunning={runAICulling.isPending || (gallery?.culling_status === "processing" && !isCullingStuck)}
             isCullingStuck={isCullingStuck}
+            cullingStartedAt={gallery?.culling_started_at as string | null | undefined}
+            cullingImageCount={images.length}
             hasActiveFilters={hasActiveFilters}
             onOpenFaceSearch={() => { setCatalogMode("faces"); setShowMobileSidebar(false); }}
             faceSearchStatus={isFaceDetectionRunning ? "processing" : faceSearchStatus}
@@ -3122,7 +3094,6 @@ export default function GalleryEditorPage() {
       <AnimatePresence>
         {gallery?.culling_status === "processing" &&
           !isCullingStuck &&
-          !hasCullingData &&
           !cullingProgressMinimized && (
             <CullingProgressOverlay
               isOpen
