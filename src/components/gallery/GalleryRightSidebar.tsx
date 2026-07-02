@@ -915,82 +915,40 @@ function UnifiedFilterPanel({
         </>
       )}
 
-      {/* Duplicates (only show section when culling data exists) */}
+      {/* Hide duplicates — a FILTER on the main grid (distinct from the
+          "Groups" view up top, which is for browsing). It collapses
+          near-identical burst frames and keeps only the best N of each, so the
+          photographer doesn't deliver ten shots of the same moment. */}
       {hasCullingData && (
         <>
           <Separator />
           <div className="space-y-2">
-            <Label className="aura-microlabel">Similar shots</Label>
+            <Label className="aura-microlabel">Hide duplicates</Label>
             <p className="text-[10px] text-muted-foreground leading-snug">
-              AI groups look-alike photos so you can keep the best and hide the
-              rest. <span className="text-foreground">Near-identical</span> catches
-              true burst frames (same moment, shot within seconds);
-              <span className="text-foreground"> Broad</span> groups a whole scene.
+              Collapse near-identical burst frames in this grid and keep only the
+              best of each. To browse the full groups, use the{" "}
+              <span className="text-foreground">Groups</span> view up top.
             </p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-1.5 block">Grouping</label>
-                <div className="flex gap-1">
-                  {(
-                    [
-                      { value: "loose", label: "Broad" },
-                      { value: "medium", label: "Balanced" },
-                      { value: "strict", label: "Near-identical" },
-                    ] as const
-                  ).map((opt) => (
-                    <Button
-                      key={opt.value}
-                      variant={similarityLevel === opt.value ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1 text-xs h-7 px-1"
-                      onClick={() => onSimilarityLevelChange(opt.value)}
-                    >
-                      {opt.label}
-                    </Button>
-                  ))}
-                </div>
-                <div className="flex justify-between mt-1">
-                  {(
-                    [
-                      { value: "loose", count: groupCounts.loose },
-                      { value: "medium", count: groupCounts.medium },
-                      { value: "strict", count: groupCounts.strict },
-                    ] as const
-                  ).map((g) => (
-                    <span
-                      key={g.value}
-                      className="text-[10px] text-muted-foreground flex-1 text-center tabular-nums"
-                    >
-                      {g.count} groups
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-1.5 block">Limit</label>
-                <Select
-                  value={String(duplicateLimit)}
-                  onValueChange={(v) => onDuplicateLimitChange(Number(v))}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Keep 1 per group</SelectItem>
-                    <SelectItem value="2">Keep 2 per group</SelectItem>
-                    <SelectItem value="3">Keep 3 per group</SelectItem>
-                    <SelectItem value="5">Keep 5 per group</SelectItem>
-                    <SelectItem value="0">No limit</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-muted-foreground mt-1.5 leading-snug">
-                  {duplicateLimit > 0
-                    ? `Showing the best ${duplicateLimit} of each group; the rest are hidden.`
-                    : "Showing every photo. Pick a limit to hide extra near-duplicate frames, or open the Groups view to browse them."}
-                </p>
-              </div>
-            </div>
+            <Select
+              value={String(duplicateLimit)}
+              onValueChange={(v) => onDuplicateLimitChange(Number(v))}
+            >
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Show all frames</SelectItem>
+                <SelectItem value="1">Keep 1 best per burst</SelectItem>
+                <SelectItem value="2">Keep 2 best per burst</SelectItem>
+                <SelectItem value="3">Keep 3 best per burst</SelectItem>
+                <SelectItem value="5">Keep 5 best per burst</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+              {duplicateLimit > 0
+                ? `Keeping the best ${duplicateLimit} of each burst; the extra frames are hidden.`
+                : "Showing every frame."}
+            </p>
           </div>
         </>
       )}

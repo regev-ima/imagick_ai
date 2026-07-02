@@ -148,7 +148,10 @@ export default function GalleryEditorPage() {
   const stallCheckRef = useRef<{ lastReady: number; unchangedCount: number }>({ lastReady: -1, unchangedCount: 0 });
   const autoRetryCountRef = useRef(0);
   // activeCullingFilter removed - now using multi-select ratings in filters.selectedRatings
-  const [sidebarSimilarityLevel, setSidebarSimilarityLevel] = useState<"loose" | "medium" | "strict">("medium");
+  // The main-grid "Hide duplicates" filter always collapses at the near-identical
+  // (burst) level — that's the tightness you want for de-duping a delivery. The
+  // separate Groups view has its own tightness selector for browsing.
+  const [sidebarSimilarityLevel, setSidebarSimilarityLevel] = useState<"loose" | "medium" | "strict">("strict");
   const [detailsSimilarityLevel, setDetailsSimilarityLevel] = useState<"loose" | "medium" | "strict">("medium");
   const [duplicateLimit, setDuplicateLimit] = useState(0);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
