@@ -68,7 +68,6 @@ import { type CatalogMode } from "@/components/gallery/CatalogModeSelector";
 import { FaceGallery } from "@/components/gallery/FaceGallery";
 import { FaceClusterImages } from "@/components/gallery/FaceClusterImages";
 import { useFaceSearch } from "@/hooks/useFaceSearch";
-import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { GalleryRightSidebar } from "@/components/gallery/GalleryRightSidebar";
 import { DownloadGalleryModal } from "@/components/gallery/DownloadGalleryModal";
 import { DockFilmstrip } from "@/components/gallery/DockFilmstrip";
@@ -211,12 +210,17 @@ export default function GalleryEditorPage() {
     }
   });
 
-  // Face search hooks
-  const { startDetection, isRunning: isFaceDetectionRunning, progress: faceDetectionProgress, abort: abortFaceDetection } = useFaceDetection(id);
-  const { faceClusters, resetFaceSearch } = useFaceSearch(id, isFaceDetectionRunning);
-  const faceSearchStatus = (gallery as any)?.face_search_status || "idle";
-  const faceSearchError = (gallery as any)?.face_search_error || null;
-  const faceSearchStartedAt = (gallery as any)?.face_search_started_at || null;
+  // Faces are produced by the AI Culling pipeline (ArcFace) — the OLD in-browser
+  // face-detection engine is gone. We only READ the resulting clusters here; the
+  // "people" view is pure navigation, and (re)detecting faces is done by running
+  // AI Culling with "Recognize people" enabled.
+  const { faceClusters } = useFaceSearch(id, false);
+  const isFaceDetectionRunning = false;
+  // Derive the people-view state from culling + whether clusters exist (the old
+  // face_search_status field is no longer written by anything).
+  const faceSearchStatus =
+    gallery?.culling_status === "processing" ? "processing"
+      : (faceClusters.data?.length ? "ready" : "idle");
 
   // Refresh clusters when client-side detection completes
   useEffect(() => {
@@ -2352,18 +2356,18 @@ export default function GalleryEditorPage() {
           ) : (
             <FaceGallery
               clusters={faceClusters.data || []}
-              faceSearchStatus={isFaceDetectionRunning ? "processing" : faceSearchStatus}
-              faceSearchError={faceSearchError}
-              faceSearchStartedAt={faceSearchStartedAt}
+              faceSearchStatus={faceSearchStatus}
+              faceSearchError={null}
+              faceSearchStartedAt={null}
               isLoading={faceClusters.isLoading}
               totalImages={gallery?.total_images}
-              detectionProgress={faceDetectionProgress}
+              detectionProgress={null}
               onClusterSelect={setSelectedFaceCluster}
-              onStartFaceSearch={() => startDetection()}
-              onResetFaceSearch={() => resetFaceSearch.mutate()}
+              // Detecting/re-detecting faces = running AI Culling with people on.
+              onStartFaceSearch={() => setShowAICullingModal(true)}
+              onResetFaceSearch={() => setShowAICullingModal(true)}
               onBackToGallery={() => setCatalogMode("default")}
-              onCancel={abortFaceDetection}
-              isStarting={isFaceDetectionRunning}
+              isStarting={false}
             />
           )
         ) : (

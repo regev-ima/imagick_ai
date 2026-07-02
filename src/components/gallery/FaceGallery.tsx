@@ -159,19 +159,19 @@ export function FaceGallery({
             </div>
           </div>
 
-          {/* CTA */}
+          {/* CTA — faces are detected by AI Culling ("Recognize people"), one engine. */}
           <Button
             variant="glow"
             size="lg"
-            onClick={() => setShowConfirm(true)}
+            onClick={() => onStartFaceSearch()}
             disabled={isStarting}
             className="gap-2 px-8"
           >
             <Sparkle size={15} className="text-current" />
-            Start Face Detection
+            Detect people (AI Culling)
           </Button>
           <p className="text-xs text-muted-foreground mt-2">
-            This process may take a few minutes depending on the number of photos.
+            Faces are detected as part of AI Culling — enable “Recognize people” when you run it.
           </p>
         </div>
 
