@@ -9,8 +9,9 @@ import { useImageUpload } from "@/hooks/useImageUpload";
 import { useSubscription } from "@/hooks/useSubscription";
 import { getCullingLabels, type LanguageCode } from "@/lib/cullingLabels";
 
-// Shared "create a collection" engine for the design-concept prototypes.
-// It mirrors the real CreateGalleryPage local-upload path exactly (gallery
+// Shared "create a collection" engine. Powers the production CreateGalleryPage
+// (the live-plan create flow) and the internal design-concept prototypes.
+// It runs the real local-upload path (gallery
 // insert → upload via Uppy → hero → status → upload-complete email → AI
 // processing → navigate to the gallery), and also the Google Drive
 // server-transfer path (gallery → transferring → gd-transfer). The import
@@ -45,7 +46,7 @@ export function useCreateGalleryFlow() {
 
   // The user's preferred culling-label language, so curated tags match what
   // they'd see in the real wizard. Defaults to English until loaded.
-  const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
+  const [cullingLanguage, setCullingLang] = useState<LanguageCode>("en");
   useEffect(() => {
     if (!user) return;
     supabase
@@ -54,9 +55,22 @@ export function useCreateGalleryFlow() {
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
-        if (data?.preferred_language) setCullingLanguage(data.preferred_language as LanguageCode);
+        if (data?.preferred_language) setCullingLang(data.preferred_language as LanguageCode);
       });
   }, [user]);
+
+  // Change the preferred language and persist it, so the choice sticks for the
+  // next collection (mirrors the production wizard's language selector).
+  const setCullingLanguage = (lang: LanguageCode) => {
+    setCullingLang(lang);
+    if (user) {
+      supabase
+        .from("user_subscriptions")
+        .update({ preferred_language: lang })
+        .eq("user_id", user.id)
+        .then(({ error }) => { if (error) console.error("Failed to save language preference:", error); });
+    }
+  };
 
   // Same source + cache key as the real wizard, so styles are shared.
   const { data: styles = [], isLoading: stylesLoading } = useQuery({
@@ -110,6 +124,12 @@ export function useCreateGalleryFlow() {
             categories: params.categories ?? [],
             culling_labels: effectiveCullingLabels,
             ai_culling_enabled: params.aiCulling,
+            // The create flow has ONE culling switch — when it's on, the run
+            // includes grouping AND people (faces), so the gallery arrives with
+            // the full experience. The backend transfer webhook reads these to
+            // auto-start culling when the Drive import lands.
+            ai_grouping_enabled: true,
+            ai_faces_enabled: params.aiCulling,
             total_images: source.totalImageCount,
             status: "transferring",
           })
@@ -154,6 +174,9 @@ export function useCreateGalleryFlow() {
           categories: params.categories ?? [],
           culling_labels: effectiveCullingLabels,
           ai_culling_enabled: params.aiCulling,
+          // One culling switch = the full experience (grouping + people).
+          ai_grouping_enabled: true,
+          ai_faces_enabled: params.aiCulling,
           total_images: files.length,
           status: "uploading",
         })
@@ -248,6 +271,58 @@ export function useCreateGalleryFlow() {
         toast.success("Gallery created successfully!");
       }
 
+      // 8. Auto-start AI Culling when opted in. Culling reads the ORIGINAL
+      // photos (independent of the style editor) so it runs in parallel the
+      // moment uploads land — the photographer shouldn't have to open the
+      // gallery and press "AI Culling" by hand. Covers local uploads with or
+      // without styles (the style-edit webhook only fires for styled
+      // galleries; Drive galleries are auto-started by the transfer webhook).
+      // We flag the gallery optimistically so the overlay/clock are already up
+      // when they navigate in, then dispatch fire-and-forget — process-pipeline
+      // self-chains server-side and falls back to originals while thumbnails
+      // are still being generated.
+      if (params.aiCulling && imageIds.length > 0) {
+        try {
+          // Admin-configured model + EXIF time gate (platform_settings.culling_config).
+          let adminModel: string | undefined;
+          let adminTime = 600;
+          try {
+            const { data: cfgRow } = await supabase
+              .from("platform_settings").select("value").eq("key", "culling_config").single();
+            if (cfgRow?.value) {
+              const cfg = JSON.parse(cfgRow.value);
+              if (typeof cfg.model === "string") adminModel = cfg.model;
+              if (typeof cfg.timeThreshold === "number") adminTime = cfg.timeThreshold;
+            }
+          } catch { /* fall back to defaults */ }
+
+          await supabase
+            .from("galleries")
+            .update({ culling_status: "processing", culling_started_at: new Date().toISOString() } as any)
+            .eq("id", gallery.id);
+
+          void supabase.functions.invoke("process-pipeline", {
+            body: {
+              galleryId: gallery.id,
+              options: {
+                culling: true,
+                tags: true,
+                cluster: true,
+                faces: true,
+                labels: effectiveCullingLabels,
+                thresholds: [0.5, 0.7, 0.9],
+                timeThreshold: adminTime,
+                ...(adminModel ? { model: adminModel } : {}),
+                scoreVisionUrl: `${window.location.origin}/api/score-vision`,
+              },
+            },
+          });
+        } catch (err) {
+          // Non-fatal: the photographer can still start culling from the editor.
+          console.error("Auto-culling dispatch failed:", err);
+        }
+      }
+
       navigate(`/dashboard/galleries/${gallery.id}`);
       return true;
     } catch (error) {
@@ -263,6 +338,7 @@ export function useCreateGalleryFlow() {
     styles,
     stylesLoading,
     cullingLanguage,
+    setCullingLanguage,
     uploadProgress,
     isUploading,
     isSubmitting,

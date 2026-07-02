@@ -95,16 +95,19 @@ const App = () => (
           position="bottom-right"
           toastOptions={{
             classNames: {
-              toast: "group border-border bg-background text-foreground",
+              // Toasts must be fully opaque — they float over arbitrary content
+              // (e.g. the gallery Actions panel), so any translucency makes them
+              // read as a confusing see-through overlay. Solid fills + shadow.
+              toast: "group !bg-background !text-foreground border-border !shadow-lg",
               description: "!opacity-100 group-[.toast]:!text-current",
               success:
-                "!bg-green-50 !border-green-500/60 !text-green-800 dark:!bg-green-500/10 dark:!border-green-500/50 dark:!text-green-300",
+                "!bg-green-50 !border-green-500/60 !text-green-800 dark:!bg-green-950 dark:!border-green-500/50 dark:!text-green-200",
               error:
-                "!bg-red-50 !border-destructive/60 !text-red-800 dark:!bg-destructive/10 dark:!border-destructive/50 dark:!text-destructive",
+                "!bg-red-50 !border-destructive/60 !text-red-800 dark:!bg-red-950 dark:!border-destructive/50 dark:!text-red-200",
               warning:
-                "!bg-yellow-50 !border-yellow-500/60 !text-yellow-800 dark:!bg-yellow-500/10 dark:!border-yellow-500/50 dark:!text-yellow-300",
+                "!bg-yellow-50 !border-yellow-500/60 !text-yellow-800 dark:!bg-yellow-950 dark:!border-yellow-500/50 dark:!text-yellow-200",
               info:
-                "!bg-primary/5 !border-primary/60 !text-primary dark:!bg-primary/10 dark:!border-primary/50",
+                "!bg-blue-50 !border-primary/60 !text-blue-900 dark:!bg-blue-950 dark:!border-primary/50 dark:!text-blue-100",
             }
           }}
         />

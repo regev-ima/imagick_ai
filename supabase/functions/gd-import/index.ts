@@ -7,7 +7,10 @@ import { corsHeaders } from "../_shared/cors.ts";
 // the core functions — a heavy module here was crashing the worker at boot
 // (503 on the OPTIONS preflight, no execution), which broke Drive imports.
 
-const GD_TO_B2_URL = "https://us-central1-wesnapp-editing-server.cloudfunctions.net/gd-to-b2";
+// File-transfer service (Google Drive ↔ B2). Lives on Fly alongside the
+// /download service used by DownloadGalleryModal. B2 credentials are stored
+// as Fly secrets, so we never send them in the request body.
+const FILE_TRANSFER_URL = "https://downloadfiles.fly.dev/file-transfer";
 
 interface TransferRequest {
   driveLink?: string;
@@ -115,17 +118,18 @@ serve(async (req) => {
     if (metadataOnly) {
       const singleLink = links[0];
       
-      const gcpRequestBody = {
+      const transferRequestBody = {
         input_dir: singleLink,
+        direction: "gd2b2",
         metadata_only: true,
       };
 
-      console.log("Calling GCP function for metadata:", JSON.stringify(gcpRequestBody));
+      console.log("Calling file-transfer service for metadata:", JSON.stringify(transferRequestBody));
 
-      const gcpResponse = await fetch(GD_TO_B2_URL, {
+      const gcpResponse = await fetch(FILE_TRANSFER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(gcpRequestBody),
+        body: JSON.stringify(transferRequestBody),
       });
 
       if (!gcpResponse.ok) {
@@ -265,15 +269,21 @@ serve(async (req) => {
     }
 
     // Fire and forget - start transfers without waiting for completion
-    // Every folder gets a callback so the webhook can register all images
+    // Every folder gets a callback so the webhook can register all images.
+    // Resolve the webhook-signing helper once (await is only valid here, in the
+    // async handler — not inside the non-async forEach callback below).
+    const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
     links.forEach((link, index) => {
       const gcpRequestBody: Record<string, unknown> = {
         input_dir: link,
         output_dir: finalOutputDir,
-        use_uuid4: true,
+        direction: "gd2b2",
+        // Style training matches before/after pairs by original filename, so
+        // it must keep the Drive names. Galleries dedupe/store by the
+        // UUID-renamed key, so they keep UUID renaming.
+        use_uuid4: !isStyleTransfer,
       };
 
-      const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
       if (isStyleTransfer && styleId) {
         gcpRequestBody.callback_url = appendWebhookSecret(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/train-webhook`
@@ -302,7 +312,7 @@ serve(async (req) => {
       console.log(`Starting transfer ${index + 1}/${links.length}:`, JSON.stringify(gcpRequestBody));
 
       // Fire and forget - don't await!
-      fetch(GD_TO_B2_URL, {
+      fetch(FILE_TRANSFER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(gcpRequestBody),
