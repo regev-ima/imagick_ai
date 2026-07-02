@@ -10,44 +10,52 @@ const MIN = 60 * 1000;
 
 describe("cullingEta", () => {
   describe("estimateCullingMs", () => {
-    // The model is "5 minute floor + 10 seconds per image". A premature
-    // "looks stuck" prompt was the production bug (it invited a
-    // duplicate run that wiped ratings), so the estimate must never dip
+    // The model is "20 second floor + 1 second per image" — the current
+    // engine (Modal CLIP + batched VLM) lands around ~1s/photo end to end,
+    // and the old 5min+10s/image estimate read as "~40 min" for a 200-photo
+    // gallery, which users rightly called wrong. The estimate must never dip
     // below the floor and must scale linearly with the gallery.
-    it("returns the 5 minute floor for an empty gallery", () => {
-      expect(estimateCullingMs(0)).toBe(5 * MIN);
+    it("returns the 20 second floor for an empty gallery", () => {
+      expect(estimateCullingMs(0)).toBe(20_000);
     });
 
     it("never dips below the floor for invalid / negative counts", () => {
-      expect(estimateCullingMs(-10)).toBe(5 * MIN);
-      expect(estimateCullingMs(Number.NaN)).toBe(5 * MIN);
+      expect(estimateCullingMs(-10)).toBe(20_000);
+      expect(estimateCullingMs(Number.NaN)).toBe(20_000);
     });
 
-    it("adds 10 seconds per image on top of the floor", () => {
-      // 25 photos → 5:00 + 25 × 10s = 5:00 + 4:10 = 9:10
-      expect(estimateCullingMs(25)).toBe(5 * MIN + 25 * 10_000);
-      // 200 photos → 5:00 + 2000s
-      expect(estimateCullingMs(200)).toBe(5 * MIN + 200 * 10_000);
+    it("adds 1 second per image on top of the floor", () => {
+      // 25 photos → 0:20 + 25s = 0:45
+      expect(estimateCullingMs(25)).toBe(20_000 + 25 * 1_000);
+      // 200 photos → 0:20 + 200s = 3:40
+      expect(estimateCullingMs(200)).toBe(20_000 + 200 * 1_000);
     });
 
     it("scales linearly with the image count", () => {
       const base = estimateCullingMs(0);
-      expect(estimateCullingMs(100) - base).toBe(estimateCullingMs(50) - base + 50 * 10_000);
+      expect(estimateCullingMs(100) - base).toBe(estimateCullingMs(50) - base + 50 * 1_000);
     });
   });
 
   describe("stuckThresholdMs", () => {
-    // "Only after this time has passed can we say it's stuck" — so the
-    // threshold is the full estimate, not a fraction of it.
-    it("equals the estimate (the whole expected window must elapse)", () => {
+    // The stuck window is deliberately DECOUPLED from (and much larger than)
+    // the displayed ETA: a premature "looks stuck" prompt was the production
+    // bug (it invited a duplicate run), so we only call a run stuck well past
+    // any realistic completion — 3 minute floor + 3 seconds per image.
+    it("is far more generous than the displayed estimate", () => {
       [0, 25, 200, 1000].forEach((n) => {
-        expect(stuckThresholdMs(n)).toBe(estimateCullingMs(n));
+        expect(stuckThresholdMs(n)).toBeGreaterThan(estimateCullingMs(n));
       });
     });
 
-    it("is always at least five minutes", () => {
-      expect(stuckThresholdMs(0)).toBeGreaterThanOrEqual(5 * MIN);
-      expect(stuckThresholdMs(1)).toBeGreaterThanOrEqual(5 * MIN);
+    it("is 3 minutes + 3 seconds per image", () => {
+      expect(stuckThresholdMs(0)).toBe(3 * MIN);
+      expect(stuckThresholdMs(200)).toBe(3 * MIN + 200 * 3_000);
+    });
+
+    it("is always at least three minutes", () => {
+      expect(stuckThresholdMs(0)).toBeGreaterThanOrEqual(3 * MIN);
+      expect(stuckThresholdMs(1)).toBeGreaterThanOrEqual(3 * MIN);
     });
   });
 
