@@ -7,32 +7,39 @@ on:
   push:
     branches: [claude/image-scoring-tagging-0cszyi]
     paths: ['.github/workflows/db-diagnose.yml']
+concurrency:
+  group: db-diagnose
+  cancel-in-progress: true
 jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: Query pipeline state for newest galleries
+      - name: Diagnose zero-cluster faces
         env:
           TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           REF: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
           run_q() {
-            local sql="$1"
+            echo "== $1"
+            local sql="$2"
             curl -s -X POST "https://api.supabase.com/v1/projects/$REF/database/query" \
               -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
               -d "$(jq -n --arg q "$sql" '{query:$q}')" | jq .
             echo "----"
           }
-          run_q "select left(name,24) name, culling_status, pipeline_status, left(coalesce(pipeline_error,''),160) err,
-                 (select count(*) from gallery_images i where i.gallery_id=g.id) total,
-                 (select count(*) from gallery_images i where i.gallery_id=g.id and i.culling_score>0) scored,
-                 (select count(*) from gallery_images i where i.gallery_id=g.id and i.culling_score=0) zeroed,
-                 (select count(*) from gallery_images i where i.gallery_id=g.id and i.culling_score is null) unscored,
-                 (select count(*) from image_features f where f.gallery_id=g.id) clip,
-                 (select count(*) from image_features f where f.gallery_id=g.id and f.faces_done) faces_done,
-                 (select count(*) from face_detections d where d.gallery_id=g.id) detections,
-                 (select count(*) from face_detections d where d.gallery_id=g.id and d.arcface_vector is not null) det_vec,
-                 (select count(*) from face_clusters c where c.gallery_id=g.id) clusters,
-                 ai_faces_enabled, ai_grouping_enabled
-                 from galleries g order by created_at desc limit 4"
-          run_q "select left(name,24) name, left(coalesce(pipeline_timing::text,''),400) timing from galleries order by created_at desc limit 2"
+          G="(select id from galleries where culling_status='ready' order by created_at desc limit 1)"
+          run_q "det_score distribution (is the >=0.5 clustering gate dropping everything?)" \
+                "select count(*) total, count(*) filter (where det_score is null) null_score,
+                        count(*) filter (where det_score >= 0.5) ge_05,
+                        count(*) filter (where det_score >= 0.5 and arcface_vector is not null) ge_05_with_vec,
+                        round(min(det_score)::numeric,3) min_s, round(max(det_score)::numeric,3) max_s,
+                        round(avg(det_score)::numeric,3) avg_s
+                 from face_detections where gallery_id = $G"
+          run_q "applied migrations (did the smart-representative migration land?)" \
+                "select version from supabase_migrations.schema_migrations order by version desc limit 8"
+          run_q "invoke cluster_gallery_faces_arcface directly (returns cluster count, or the SQL error)" \
+                "select cluster_gallery_faces_arcface($G) as clusters_created"
+          run_q "clusters after direct invoke" \
+                "select count(*) clusters,
+                        count(*) filter (where representative_image_id is not null) with_rep
+                 from face_clusters where gallery_id = $G"
