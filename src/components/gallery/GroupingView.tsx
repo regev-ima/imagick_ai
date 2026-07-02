@@ -20,7 +20,7 @@ interface GalleryImage {
 
 interface GroupingViewProps {
   images: GalleryImage[];
-  onImageClick: (imageId: string) => void;
+  onImageClick: (imageId: string, scopeIds?: string[]) => void;
   onSelectionToggle: (imageId: string, index: number, event: React.MouseEvent) => void;
   selectedImages: string[];
 }
@@ -194,7 +194,7 @@ export function GroupingView({
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
-                            onImageClick(img.id);
+                            onImageClick(img.id, group.images.map((g) => g.id));
                           }}
                         >
                           <img

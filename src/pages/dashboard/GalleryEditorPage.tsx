@@ -116,6 +116,10 @@ export default function GalleryEditorPage() {
     () => (localStorage.getItem("imagick-gallery-view-mode") as "grid" | "masonry") || "grid"
   );
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  // Ordered image ids the lightbox should page through. Set when opening from a
+  // scoped context (a person's photos, a similarity group) so prev/next stay
+  // within that set; null = the main (filtered/sorted) grid.
+  const [lightboxScopeIds, setLightboxScopeIds] = useState<string[] | null>(null);
   const [compareMode, setCompareMode] = useState<"slider" | "edited" | "side-by-side">(
     () => (localStorage.getItem("imagick-gallery-compare-mode") as "slider" | "edited" | "side-by-side") || "slider"
   );
@@ -1423,8 +1427,11 @@ export default function GalleryEditorPage() {
     toggleLike.mutate(imageId);
   }, [toggleLike]);
 
-  // Open lightbox directly (details panel closed by default)
-  const openLightbox = useCallback((imageId: string) => {
+  // Open lightbox directly (details panel closed by default). `scopeIds` is the
+  // ordered set the lightbox should page through (a person's / group's photos);
+  // omit it to page through the main filtered grid.
+  const openLightbox = useCallback((imageId: string, scopeIds?: string[]) => {
+    setLightboxScopeIds(scopeIds && scopeIds.length ? scopeIds : null);
     setLightboxImage(imageId);
     setDetailsImageId(imageId);
     setShowDetailsPanel(!isMobile);
@@ -1519,11 +1526,20 @@ export default function GalleryEditorPage() {
     setShowDownloadModal(true);
   };
 
-  const currentLightboxIndex = lightboxImage 
-    ? filteredImages.findIndex(img => img.id === lightboxImage)
+  // The ordered set the lightbox pages through: the scoped context (person /
+  // group) when set, else the main filtered+sorted grid — so navigation always
+  // matches what the user was looking at, in that exact order.
+  const lightboxItems = useMemo(() => {
+    if (!lightboxScopeIds) return filteredImages;
+    const byId = new Map(images.map(i => [i.id, i]));
+    return lightboxScopeIds.map(id => byId.get(id)).filter(Boolean) as typeof filteredImages;
+  }, [lightboxScopeIds, filteredImages, images]);
+
+  const currentLightboxIndex = lightboxImage
+    ? lightboxItems.findIndex(img => img.id === lightboxImage)
     : -1;
 
-  const currentDetailsImage = detailsImageId 
+  const currentDetailsImage = detailsImageId
     ? filteredImages.find(img => img.id === detailsImageId) ?? images.find(img => img.id === detailsImageId)
     : null;
 
@@ -1531,44 +1547,45 @@ export default function GalleryEditorPage() {
   const [swipeDirection, setSwipeDirection] = useState<1 | -1>(1);
 
   const navigatePrev = useCallback(() => {
-    if (filteredImages.length === 0) return;
+    if (lightboxItems.length === 0) return;
     setSwipeDirection(-1);
-    const prevIndex = currentLightboxIndex > 0 ? currentLightboxIndex - 1 : filteredImages.length - 1;
-    setLightboxImage(filteredImages[prevIndex].id);
-    setDetailsImageId(filteredImages[prevIndex].id);
-  }, [currentLightboxIndex, filteredImages]);
+    const prevIndex = currentLightboxIndex > 0 ? currentLightboxIndex - 1 : lightboxItems.length - 1;
+    setLightboxImage(lightboxItems[prevIndex].id);
+    setDetailsImageId(lightboxItems[prevIndex].id);
+  }, [currentLightboxIndex, lightboxItems]);
 
   const navigateNext = useCallback(() => {
-    if (filteredImages.length === 0) return;
+    if (lightboxItems.length === 0) return;
     setSwipeDirection(1);
-    const nextIndex = currentLightboxIndex < filteredImages.length - 1 ? currentLightboxIndex + 1 : 0;
-    setLightboxImage(filteredImages[nextIndex].id);
-    setDetailsImageId(filteredImages[nextIndex].id);
-  }, [currentLightboxIndex, filteredImages]);
+    const nextIndex = currentLightboxIndex < lightboxItems.length - 1 ? currentLightboxIndex + 1 : 0;
+    setLightboxImage(lightboxItems[nextIndex].id);
+    setDetailsImageId(lightboxItems[nextIndex].id);
+  }, [currentLightboxIndex, lightboxItems]);
 
   const goToImage = useCallback((index: number) => {
-    if (filteredImages[index]) {
-      setLightboxImage(filteredImages[index].id);
-      setDetailsImageId(filteredImages[index].id);
+    if (lightboxItems[index]) {
+      setLightboxImage(lightboxItems[index].id);
+      setDetailsImageId(lightboxItems[index].id);
     }
-  }, [filteredImages]);
+  }, [lightboxItems]);
 
   const closeLightbox = useCallback(() => {
     setLightboxImage(null);
+    setLightboxScopeIds(null);
     setShowDetailsPanel(false);
   }, []);
 
   // Preload adjacent images in lightbox for instant navigation
   // Always preload BOTH original and edited versions for current + prev/next
   useEffect(() => {
-    if (currentLightboxIndex < 0 || filteredImages.length === 0) return;
+    if (currentLightboxIndex < 0 || lightboxItems.length === 0) return;
     const toPreload: string[] = [];
-    
+
     // Collect active style API IDs
     const activeApiIds = Object.values(styleApiIdMap);
-    
+
     // Current image: preload the version NOT currently displayed
-    const currentImg = filteredImages[currentLightboxIndex];
+    const currentImg = lightboxItems[currentLightboxIndex];
     if (currentImg) {
       if (selectedViewStyle === "original") {
         // Currently showing original → preload edited versions
@@ -1582,12 +1599,12 @@ export default function GalleryEditorPage() {
     }
     
     // Previous & next images: preload BOTH original AND edited
-    const prevIdx = currentLightboxIndex > 0 ? currentLightboxIndex - 1 : filteredImages.length - 1;
-    const nextIdx = currentLightboxIndex < filteredImages.length - 1 ? currentLightboxIndex + 1 : 0;
-    
+    const prevIdx = currentLightboxIndex > 0 ? currentLightboxIndex - 1 : lightboxItems.length - 1;
+    const nextIdx = currentLightboxIndex < lightboxItems.length - 1 ? currentLightboxIndex + 1 : 0;
+
     for (const idx of [prevIdx, nextIdx]) {
       if (idx === currentLightboxIndex) continue;
-      const img = filteredImages[idx];
+      const img = lightboxItems[idx];
       if (!img) continue;
       // Always preload original
       toPreload.push(getPreviewUrl(img.original_url));
@@ -1601,7 +1618,7 @@ export default function GalleryEditorPage() {
       const i = new Image();
       i.src = url;
     });
-  }, [currentLightboxIndex, filteredImages, selectedViewStyle, styleApiIdMap]);
+  }, [currentLightboxIndex, lightboxItems, selectedViewStyle, styleApiIdMap]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -2756,7 +2773,7 @@ export default function GalleryEditorPage() {
                 <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
                   {currentDetailsImage && (() => {
                     const stars = cullingScoreToStars((currentDetailsImage as any).culling_score, cullingScoreMode) || currentDetailsImage.ai_rating || 0;
-                    const total = filteredImages.length;
+                    const total = lightboxItems.length;
                     const position = currentLightboxIndex >= 0 ? currentLightboxIndex + 1 : 1;
                     return (
                       <div className="hidden sm:flex items-center gap-2 shrink-0">
@@ -3034,7 +3051,7 @@ export default function GalleryEditorPage() {
 
               {/* Bottom Filmstrip with Dock Magnification */}
               <DockFilmstrip
-                images={filteredImages}
+                images={lightboxItems}
                 currentIndex={currentLightboxIndex}
                 onGoToImage={goToImage}
                 getThumbnailUrl={(url) => getThumbnailUrl(url)}
