@@ -26,12 +26,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FaceThumbnail } from "./FaceThumbnail";
+import { useNameFaceCluster } from "@/hooks/useFaceSearch";
+
+// Preset family/wedding roles the photographer can tap to name a person, plus
+// free text for anything else.
+const PERSON_ROLES = [
+  "חתן", "כלה",
+  "אב החתן", "אם החתן",
+  "אב הכלה", "אם הכלה",
+  "הורי החתן", "הורי הכלה",
+  "משפחה", "אח/אחות", "סבא", "סבתא",
+];
 
 interface FaceCluster {
   id: string;
   face_count: number;
+  label?: string | null;
   representative_bbox: { top: number; left: number; width: number; height: number } | null;
   representative_image: {
     id: string;
@@ -49,6 +63,7 @@ interface DetectionProgress {
 
 interface FaceGalleryProps {
   clusters: FaceCluster[];
+  galleryId?: string;
   faceSearchStatus: string;
   faceSearchError?: string | null;
   faceSearchStartedAt?: string | null;
@@ -84,6 +99,7 @@ const FEATURES = [
 
 export function FaceGallery({
   clusters,
+  galleryId,
   faceSearchStatus,
   faceSearchError,
   isLoading,
@@ -99,6 +115,7 @@ export function FaceGallery({
   isStarting,
 }: FaceGalleryProps) {
   const [showConfirm, setShowConfirm] = useState(false);
+  const renameCluster = useNameFaceCluster(galleryId);
 
   // Back button rendered at the top of every state
   const backButton = (
@@ -368,6 +385,11 @@ export function FaceGallery({
                 <ScanFace className="w-6 h-6 text-muted-foreground" />
               </div>
             )}
+            {/* Person name / role — click to assign, doesn't open the cluster. */}
+            <ClusterNamePicker
+              label={cluster.label ?? null}
+              onSelect={(label) => renameCluster.mutate({ clusterId: cluster.id, label })}
+            />
             <span className="aura-chip">
               <span className="folio text-foreground">{cluster.face_count}</span> {cluster.face_count === 1 ? "photo" : "photos"}
             </span>
@@ -375,5 +397,82 @@ export function FaceGallery({
         ))}
       </div>
     </div>
+  );
+}
+
+// Names a detected person: tap to open preset wedding roles + free text.
+// Stops click propagation so naming never opens the cluster.
+function ClusterNamePicker({
+  label,
+  onSelect,
+}: {
+  label: string | null;
+  onSelect: (label: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [custom, setCustom] = useState("");
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "max-w-full truncate rounded-full px-2 py-0.5 text-xs font-medium transition-colors",
+            label
+              ? "bg-primary/15 text-primary hover:bg-primary/25"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          dir="rtl"
+        >
+          {label || "+ שם / תפקיד"}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-60 p-3" dir="rtl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-2 flex flex-wrap gap-1">
+          {PERSON_ROLES.map((role) => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => { onSelect(role); setOpen(false); }}
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-xs transition-colors",
+                label === role
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/40"
+              )}
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (custom.trim()) { onSelect(custom.trim()); setCustom(""); setOpen(false); }
+          }}
+          className="flex gap-1.5"
+        >
+          <Input
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            placeholder="שם מותאם אישית…"
+            className="h-7 text-xs"
+          />
+          <Button type="submit" size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={!custom.trim()}>
+            שמור
+          </Button>
+        </form>
+        {label && (
+          <button
+            type="button"
+            onClick={() => { onSelect(null); setOpen(false); }}
+            className="mt-2 w-full text-center text-[11px] text-muted-foreground hover:text-destructive"
+          >
+            הסר שם
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

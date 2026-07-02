@@ -2386,6 +2386,7 @@ export default function GalleryEditorPage() {
           ) : (
             <FaceGallery
               clusters={faceClusters.data || []}
+              galleryId={id}
               faceSearchStatus={faceSearchStatus}
               faceSearchError={null}
               faceSearchStartedAt={null}

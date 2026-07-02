@@ -1,10 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 interface FaceCluster {
   id: string;
   gallery_id: string;
   face_count: number;
+  label: string | null;
   representative_bbox: { top: number; left: number; width: number; height: number } | null;
   representative_image: {
     id: string;
@@ -51,7 +52,7 @@ export function useFaceSearch(galleryId: string | undefined, isDetectionRunning 
       const { data, error } = await supabase
         .from("face_clusters" as any)
         .select(`
-          id, gallery_id, face_count, representative_bbox, created_at,
+          id, gallery_id, face_count, label, representative_bbox, created_at,
           representative_image:gallery_images!representative_image_id (
             id, original_url
           )
@@ -65,6 +66,24 @@ export function useFaceSearch(galleryId: string | undefined, isDetectionRunning 
   });
 
   return { faceClusters, faceSearchProgress };
+}
+
+// Name a detected person (set/clear a face cluster's label). Optimistic-ish:
+// invalidates the cluster list on success so the new name shows everywhere.
+export function useNameFaceCluster(galleryId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ clusterId, label }: { clusterId: string; label: string | null }) => {
+      const { error } = await supabase
+        .from("face_clusters" as any)
+        .update({ label: label && label.trim() ? label.trim() : null })
+        .eq("id", clusterId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["face-clusters", galleryId] });
+    },
+  });
 }
 
 // Separate hook for fetching images of a specific cluster.
