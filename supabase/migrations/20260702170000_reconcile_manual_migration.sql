@@ -1,0 +1,19 @@
+-- Reconciliation placeholder.
+--
+-- A migration with version 20260702170000 was applied DIRECTLY to the production
+-- database (outside this repo — e.g. via the Supabase SQL editor), so the remote
+-- migration-history table contained a version with no matching local file. That
+-- made `supabase db push` refuse to run ("Remote migration versions not found in
+-- local migrations directory"), blocking every pipeline deploy.
+--
+-- This file makes the repo's migration history match production for that version
+-- so pushes proceed. It is intentionally a NO-OP: the version is already recorded
+-- as applied on the remote, so `db push` skips it and this SQL never executes
+-- there. (On a brand-new database it also does nothing — see the caveat below.)
+--
+-- CAVEAT / TODO: the ACTUAL schema change that 20260702170000 made is NOT
+-- captured here (its contents are unknown). If it altered schema, run
+-- `supabase db pull` to capture the real state into a proper migration, or paste
+-- the original SQL so it can be committed. Until then a from-scratch rebuild
+-- would be missing whatever that manual change did.
+SELECT 1;
