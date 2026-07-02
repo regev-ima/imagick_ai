@@ -222,14 +222,6 @@ export default function GalleryEditorPage() {
     gallery?.culling_status === "processing" ? "processing"
       : (faceClusters.data?.length ? "ready" : "idle");
 
-  // Refresh clusters when client-side detection completes
-  useEffect(() => {
-    if (faceDetectionProgress?.phase === "done") {
-      queryClient.invalidateQueries({ queryKey: ["face-clusters", id] });
-      queryClient.invalidateQueries({ queryKey: ["gallery", id] });
-    }
-  }, [faceDetectionProgress?.phase]);
-
   // Poll for transfer progress when gallery is in transferring status
   useEffect(() => {
     if (!gallery || gallery.status !== "transferring" || !effectiveUserId) {
