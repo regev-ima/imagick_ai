@@ -911,9 +911,12 @@ export default function GalleryEditorPage() {
     if (source.length === 0) return [];
     const want = 7;
     const step = Math.max(1, Math.floor(source.length / want));
-    const picked: string[] = [];
+    const picked: { thumb: string; full: string }[] = [];
     for (let i = 0; i < source.length && picked.length < want; i += step) {
-      picked.push(getThumbnailUrl(source[i].original_url));
+      const url = source[i].original_url;
+      // Pass the original as a fallback so a thumbnail still being generated
+      // during processing never renders as a broken image in the overlay.
+      picked.push({ thumb: getThumbnailUrl(url), full: url });
     }
     return picked;
   }, [images]);

@@ -22,8 +22,10 @@ interface CullingProgressOverlayProps {
   isOpen: boolean;
   /** Total photos in the run — drives the ETA + copy. */
   imageCount: number;
-  /** A handful of thumbnail URLs to animate through the "scanner". */
-  thumbnails: string[];
+  /** A handful of thumbnails to animate through the "scanner". Each carries a
+   *  cheap thumb URL plus the original as a fallback, so a not-yet-generated
+   *  thumbnail (CDN lag mid-processing) never renders as a broken image. */
+  thumbnails: { thumb: string; full: string }[];
   /** ISO timestamp the run started (DB-backed). */
   startedAt: string | null | undefined;
   /** Hide the overlay but keep the run going. */
@@ -152,7 +154,7 @@ export function CullingProgressOverlay({
                 const active = i === activeIndex;
                 return (
                   <motion.div
-                    key={`${src}-${i}`}
+                    key={`${src.thumb}-${i}`}
                     className={cn(
                       "relative rounded-sm overflow-hidden border shrink-0",
                       active ? "border-primary" : "border-border/50",
@@ -165,7 +167,7 @@ export function CullingProgressOverlay({
                     style={reduceMotion ? { width: 60, height: 60, opacity: active ? 1 : 0.6 } : undefined}
                     transition={{ type: "spring", stiffness: 220, damping: 24 }}
                   >
-                    <img src={src} alt="" className="w-full h-full object-cover" draggable={false} />
+                    <ScanThumb thumb={src.thumb} full={src.full} />
                     {/* scan sweep over the focused frame */}
                     {active && !reduceMotion && (
                       <motion.div
@@ -238,5 +240,44 @@ export function CullingProgressOverlay({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/**
+ * A scanner thumbnail that never shows a broken image. It tries the cheap thumb
+ * first; if that 404s (a preview not yet generated mid-processing) it falls back
+ * to the original, and if that also fails it renders a subtle shimmer tile — so
+ * the strip always looks intentional, never broken.
+ */
+function ScanThumb({ thumb, full }: { thumb: string; full: string }) {
+  const [src, setSrc] = useState(thumb);
+  const [triedFull, setTriedFull] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Reset when the underlying image changes (the strip is stable, but be safe).
+  useEffect(() => {
+    setSrc(thumb);
+    setTriedFull(false);
+    setFailed(false);
+  }, [thumb, full]);
+
+  if (failed) {
+    return <div className="w-full h-full bg-gradient-to-br from-muted to-muted/40 animate-pulse" aria-hidden />;
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      className="w-full h-full object-cover"
+      draggable={false}
+      onError={() => {
+        if (!triedFull && full && full !== src) {
+          setTriedFull(true);
+          setSrc(full);
+        } else {
+          setFailed(true);
+        }
+      }}
+    />
   );
 }
