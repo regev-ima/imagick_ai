@@ -291,7 +291,17 @@ serve(async (req: Request) => {
         if (modalGroupUrl) await groupViaModal();
         else console.error("MODAL_GROUP_URL not set — skipping grouping (new engine unavailable)");
       }
-      if (doFaces) await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
+      if (doFaces) {
+        // Surface clustering failures — a swallowed error here leaves the gallery
+        // "ready" with detections but zero people, which reads as "faces never ran".
+        const { error: clusterErr } = await admin.rpc("cluster_gallery_faces_arcface", { p_gallery_id: galleryId });
+        if (clusterErr) {
+          console.error("face clustering failed:", clusterErr.message);
+          await admin.from("galleries").update({
+            pipeline_error: `face clustering failed: ${clusterErr.message}`,
+          }).eq("id", galleryId);
+        }
+      }
       // Mirror to the legacy culling_* fields the gallery UI watches.
       await admin.from("galleries").update({
         pipeline_status: "ready",
