@@ -11,6 +11,7 @@ export interface FilterOptions {
   showKeeperOnly: boolean;   // only photos the AI recommends keeping
   eyesOpenOnly: boolean;     // hide closed-eye shots
   hideIssues: boolean;       // hide unintended blur / bad exposure
+  showPeopleOnly: boolean;   // only photos that contain people/faces
   groupingLevel: "none" | "loose" | "medium" | "strict";
   selectedGroup: number | null;
 }
@@ -29,6 +30,7 @@ export const defaultFilters: FilterOptions = {
   showKeeperOnly: false,
   eyesOpenOnly: false,
   hideIssues: false,
+  showPeopleOnly: false,
   groupingLevel: "none",
   selectedGroup: null,
 };

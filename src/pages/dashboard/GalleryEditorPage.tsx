@@ -645,6 +645,9 @@ export default function GalleryEditorPage() {
     if (filters.hideIssues) {
       result = result.filter(img => !(img as any).has_blur_issue && !(img as any).has_exposure_issue);
     }
+    if (filters.showPeopleOnly) {
+      result = result.filter(img => ((img as any).people_count ?? 0) > 0);
+    }
 
     if (filters.selectedTags.length > 0) {
       result = result.filter(img => {

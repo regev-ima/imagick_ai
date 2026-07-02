@@ -655,6 +655,7 @@ function UnifiedFilterPanel({
     filters.showKeeperOnly ||
     filters.eyesOpenOnly ||
     filters.hideIssues ||
+    filters.showPeopleOnly ||
     (filters.selectedRatings?.length || 0) > 0 ||
     (filters.selectedLabels?.length || 0) > 0 ||
     duplicateLimit !== 0;
@@ -725,6 +726,18 @@ function UnifiedFilterPanel({
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             No issues
+          </button>
+          <button
+            onClick={() => onFiltersChange({ ...filters, showPeopleOnly: !filters.showPeopleOnly })}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-xs font-medium transition-all border",
+              filters.showPeopleOnly
+                ? "bg-primary/15 border-primary/30 text-primary"
+                : "bg-muted/30 border-border/50 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
+          >
+            <ScanFace className="w-3.5 h-3.5" />
+            People
           </button>
         </div>
       </div>
@@ -998,6 +1011,7 @@ function UnifiedFilterPanel({
               showKeeperOnly: false,
               eyesOpenOnly: false,
               hideIssues: false,
+              showPeopleOnly: false,
             });
             onDuplicateLimitChange(0);
           }}
