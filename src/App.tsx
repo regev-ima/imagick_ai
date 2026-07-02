@@ -40,6 +40,7 @@ const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
 const PrivacyPage = lazy(() => import("./pages/legal/PrivacyPage"));
 const TermsPage = lazy(() => import("./pages/legal/TermsPage"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/admin/AdminDashboard"));
+const CullingSettingsPage = lazy(() => import("./pages/dashboard/admin/CullingSettingsPage"));
 const UsersManagement = lazy(() => import("./pages/dashboard/admin/UsersManagement"));
 const PlansManagement = lazy(() => import("./pages/dashboard/admin/PlansManagement"));
 const StylesManagement = lazy(() => import("./pages/dashboard/admin/StylesManagement"));
@@ -150,6 +151,7 @@ const App = () => (
                   <Route path="settings" element={<SettingsPage />} />
                   {/* Admin Routes */}
                   <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                  <Route path="admin/culling" element={<AdminRoute><CullingSettingsPage /></AdminRoute>} />
                   <Route path="admin/users" element={<AdminRoute><UsersManagement /></AdminRoute>} />
                   <Route path="admin/users/:userId" element={<AdminRoute><UserDetailPage /></AdminRoute>} />
                   <Route path="admin/plans" element={<AdminRoute><PlansManagement /></AdminRoute>} />

@@ -60,6 +60,7 @@ const adminGroups: AdminGroup[] = [
       { title: "Styles & Showcase", description: "Manage styles, presets, and before/after previews", icon: Sparkles, href: "/dashboard/admin/styles" },
       { title: "Galleries", description: "View and manage all galleries", icon: Images, href: "/dashboard/admin/galleries" },
       { title: "Branding", description: "Customize platform logos and identity", icon: Paintbrush, href: "/dashboard/admin/branding" },
+      { title: "AI Culling", description: "Vision model + grouping time-gate for AI culling", icon: Sparkles, href: "/dashboard/admin/culling" },
     ],
   },
   {

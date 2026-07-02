@@ -1299,10 +1299,22 @@ export default function GalleryEditorPage() {
           .eq("gallery_id", id!);
       }
 
+      // Admin-configured model + EXIF time gate (platform_settings.culling_config).
+      let adminModel: string | undefined;
+      let adminTime = 600;
+      try {
+        const { data: cfgRow } = await supabase
+          .from("platform_settings").select("value").eq("key", "culling_config").single();
+        if (cfgRow?.value) {
+          const cfg = JSON.parse(cfgRow.value);
+          if (typeof cfg.model === "string") adminModel = cfg.model;
+          if (typeof cfg.timeThreshold === "number") adminTime = cfg.timeThreshold;
+        }
+      } catch { /* fall back to defaults */ }
+
       // NEW engine: process-pipeline (Modal CLIP grouping + ArcFace + OpenRouter
-      // culling/tagging). Model + EXIF time gate are admin settings (defaults here
-      // until the admin screen lands). scoreVisionUrl lets the edge fn reach the VLM
-      // layer; the edge's own SCORE_VISION_URL secret takes precedence when set.
+      // culling/tagging). scoreVisionUrl lets the edge fn reach the VLM layer; the
+      // edge's own SCORE_VISION_URL secret takes precedence when set.
       const { data, error } = await supabase.functions.invoke('process-pipeline', {
         body: {
           galleryId: id,
@@ -1313,7 +1325,8 @@ export default function GalleryEditorPage() {
             faces,
             labels: tags,
             thresholds: [0.5, 0.7, 0.9],
-            timeThreshold: 600,
+            timeThreshold: adminTime,
+            ...(adminModel ? { model: adminModel } : {}),
             scoreVisionUrl: `${window.location.origin}/api/score-vision`,
           },
         },
