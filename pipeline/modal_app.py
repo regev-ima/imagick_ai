@@ -575,13 +575,18 @@ def group(data: dict):
 
     thresholds = data.get("thresholds") or [0.5, 0.7, 0.9]
     time_threshold = data.get("time_threshold", None)
+    # Optional per-threshold time windows (seconds), aligned to `thresholds`.
+    # This is what lets "Near-identical" require an actual burst (a few seconds)
+    # while "Broad" groups a whole scene over minutes. Falls back to the single
+    # `time_threshold` for every level when absent.
+    time_thresholds = data.get("time_thresholds")
     times_in = data.get("times")
     # Missing EXIF → epoch 0 (matches the old 1970 fallback).
     times = (np.array([float(t) if t is not None else 0.0 for t in times_in], dtype=np.float64)
              if times_in is not None else None)
 
-    def ids_for(threshold):
-        comms = _community_detection(emb, threshold, times, time_threshold)
+    def ids_for(threshold, tt):
+        comms = _community_detection(emb, threshold, times, tt)
         if times is not None:                              # order group ids by earliest capture
             comms.sort(key=lambda members: min(times[m] for m in members))
         ids = [0] * n
@@ -590,6 +595,9 @@ def group(data: dict):
                 ids[m] = gid
         return ids
 
-    per_threshold = [ids_for(t) for t in thresholds]
+    per_threshold = []
+    for k, t in enumerate(thresholds):
+        tt = time_thresholds[k] if (time_thresholds and k < len(time_thresholds)) else time_threshold
+        per_threshold.append(ids_for(t, tt))
     groups = [[per_threshold[k][i] for k in range(len(thresholds))] for i in range(n)]
     return {"groups": groups}

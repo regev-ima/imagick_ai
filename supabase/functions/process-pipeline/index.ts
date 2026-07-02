@@ -237,10 +237,29 @@ serve(async (req: Request) => {
         times.push(t ? Math.floor(new Date(t).getTime() / 1000) : null); // epoch seconds; null→1970 in Modal
       }
       if (!ids.length) return;
+      // Three grouping levels with DISTINCT time windows — this is what makes
+      // "Near-identical" mean an actual camera BURST, not just two photos that
+      // look alike. CLIP visual similarity alone saturates (two different
+      // "white dress in the garden" moments score ~0.9), so the EXIF time gate
+      // is the real separator: burst frames are shot within a few seconds, while
+      // distinct moments are seconds-to-minutes apart.
+      //   • Broad (group_1)         – scene-level: high-ish sim, wide time window
+      //   • Balanced (group_2)      – very similar within ~90s
+      //   • Near-identical (group_3) – same burst: near-identical + within ~8s
+      const clipThresholds = [0.5, 0.78, 0.93];
+      const broadWindow = typeof timeThreshold === "number" ? timeThreshold : 600;
+      const timeWindows = [broadWindow, 90, 8]; // seconds, aligned to clipThresholds
       const res = await fetch(modalGroupUrl!, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: modalToken, embeddings, times, thresholds, time_threshold: timeThreshold }),
+        body: JSON.stringify({
+          token: modalToken,
+          embeddings,
+          times,
+          thresholds: clipThresholds,
+          time_thresholds: timeWindows,
+          time_threshold: timeThreshold, // backward-compat fallback
+        }),
       });
       const data = await res.json();
       const groups = data?.groups as number[][] | undefined;

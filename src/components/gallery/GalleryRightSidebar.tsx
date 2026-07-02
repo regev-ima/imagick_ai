@@ -922,8 +922,10 @@ function UnifiedFilterPanel({
           <div className="space-y-2">
             <Label className="aura-microlabel">Similar shots</Label>
             <p className="text-[10px] text-muted-foreground leading-snug">
-              AI groups look-alike photos (e.g. burst frames) so you can keep the
-              best and hide the rest. Choose how alike they must be to be grouped.
+              AI groups look-alike photos so you can keep the best and hide the
+              rest. <span className="text-foreground">Near-identical</span> catches
+              true burst frames (same moment, shot within seconds);
+              <span className="text-foreground"> Broad</span> groups a whole scene.
             </p>
             <div className="space-y-3">
               <div>
