@@ -20,7 +20,7 @@ export type GroupingLevel = "none" | "loose" | "medium" | "strict";
 
 export const defaultFilters: FilterOptions = {
   sortBy: "name",
-  sortOrder: "desc",
+  sortOrder: "asc",
   minRating: 0,
   selectedRatings: [],
   selectedTags: [],
