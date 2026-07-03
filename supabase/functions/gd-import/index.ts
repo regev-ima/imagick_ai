@@ -134,18 +134,22 @@ serve(async (req) => {
 
       if (!gcpResponse.ok) {
         const errorText = await gcpResponse.text();
-        console.error("GCP function error:", errorText);
-        
+        console.error("Transfer service error:", gcpResponse.status, errorText);
+
         if (errorText.includes("Invalid Google Drive folder link") || errorText.includes("404")) {
           return new Response(
             JSON.stringify({ error: "Cannot access this folder. Please make sure the folder is shared with 'Anyone with the link' as Viewer." }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        
+
+        // Pass the upstream status + body through so the client (and logs)
+        // show WHAT the transfer service said, not just that it failed.
         return new Response(
-          JSON.stringify({ error: "Failed to connect to transfer service" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({
+            error: `Transfer service error (HTTP ${gcpResponse.status}): ${errorText.slice(0, 300) || "no response body"}`,
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
