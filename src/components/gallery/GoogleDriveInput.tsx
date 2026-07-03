@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { extractFunctionError } from "@/lib/functionError";
 
 export interface SingleFolderInfo {
   folderName: string;
@@ -75,7 +76,11 @@ export function GoogleDriveInput({
       });
 
       if (response.error) {
-        throw new Error(response.error.message || "Failed to validate folder");
+        // Surface the function's real JSON error body — error.message alone is
+        // always the generic "Edge Function returned a non-2xx status code".
+        throw new Error(
+          await extractFunctionError(response.error, "Failed to validate folder"),
+        );
       }
 
       const data = response.data;
