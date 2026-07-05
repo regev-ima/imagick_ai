@@ -47,6 +47,19 @@ type StatusFilter = "all" | "working" | "ready" | "error";
 
 const WORKING_STATUSES = ["uploading", "processing", "culling", "transferring"];
 
+// A gallery is still "working" if galleries.status is a working status OR a
+// background AI stage is running. Culling / face search live on their own
+// status columns and never flip galleries.status, so a gallery mid-culling
+// would otherwise show as "Ready" in the list.
+type GalleryStatusFields = { status: string; culling_status?: string | null; face_search_status?: string | null };
+const isGalleryWorking = (g: GalleryStatusFields) =>
+  WORKING_STATUSES.includes(g.status) ||
+  g.culling_status === "processing" ||
+  g.face_search_status === "processing";
+// Effective badge status: error > working > ready.
+const effectiveStatus = (g: GalleryStatusFields) =>
+  g.status === "error" ? "error" : isGalleryWorking(g) ? "processing" : "ready";
+
 // LIGHTROOM motion — calm, responsive fades/slides. No bounce, no float.
 const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
 
@@ -137,8 +150,8 @@ export default function GalleriesPage() {
   const counts = useMemo(
     () => ({
       all: galleries.length,
-      working: galleries.filter((g) => WORKING_STATUSES.includes(g.status)).length,
-      ready: galleries.filter((g) => g.status === "ready").length,
+      working: galleries.filter(isGalleryWorking).length,
+      ready: galleries.filter((g) => effectiveStatus(g) === "ready").length,
       error: galleries.filter((g) => g.status === "error").length,
     }),
     [galleries],
@@ -154,8 +167,8 @@ export default function GalleriesPage() {
           statusFilter === "all"
             ? true
             : statusFilter === "working"
-              ? WORKING_STATUSES.includes(gallery.status)
-              : gallery.status === statusFilter;
+              ? isGalleryWorking(gallery)
+              : effectiveStatus(gallery) === statusFilter;
         return matchesQuery && matchesStatus;
       }),
     [galleries, searchQuery, statusFilter],
@@ -498,11 +511,12 @@ function ActionsMenu({
 
 /** Catalog cell — a Lightroom keyline plate: thumbnail, name, mono count, status dot. */
 function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryItemProps & { index: number }) {
-  const isReady = gallery.status === "ready";
-  const isError = gallery.status === "error";
-  const isWorking = !isReady && !isError;
+  const eff = effectiveStatus(gallery);
+  const isReady = eff === "ready";
+  const isError = eff === "error";
+  const isWorking = eff === "processing";
   const progress = gallery.total_images > 0 ? Math.round((gallery.processed_images / gallery.total_images) * 100) : 0;
-  const led = statusLed(gallery.status);
+  const led = statusLed(eff);
 
   const thumb = gallery.hero_image_url ? getThumbnailUrl(gallery.hero_image_url) : null;
   // A thin per-cell accent keyline picks up the hero image's hue (falls back to brand).
@@ -542,7 +556,7 @@ function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryItemP
               style={{ color: `hsl(${led})` }}
             >
               <span className={cn("aura-led", isWorking && "aura-led-pulse")} style={{ "--led": led } as CSSProperties} />
-              {statusLabel(gallery.status)}
+              {statusLabel(eff)}
             </span>
 
             {/* Actions */}
@@ -593,11 +607,12 @@ function GalleryCard({ gallery, index, onDelete, onEdit, onShare }: GalleryItemP
 
 /** Catalog row — a pro list line: thumbnail, name, mono count, status dot, actions. */
 function GalleryRow({ gallery, onDelete, onEdit, onShare }: GalleryItemProps) {
-  const isReady = gallery.status === "ready";
-  const isError = gallery.status === "error";
-  const isWorking = !isReady && !isError;
+  const eff = effectiveStatus(gallery);
+  const isReady = eff === "ready";
+  const isError = eff === "error";
+  const isWorking = eff === "processing";
   const progress = gallery.total_images > 0 ? Math.round((gallery.processed_images / gallery.total_images) * 100) : 0;
-  const led = statusLed(gallery.status);
+  const led = statusLed(eff);
 
   const thumb = gallery.hero_image_url ? getThumbnailUrl(gallery.hero_image_url) : null;
   // Each row carries a thin accent keyline from its hero image's hue.
