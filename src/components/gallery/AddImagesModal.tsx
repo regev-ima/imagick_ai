@@ -1,11 +1,10 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUppyState } from "@uppy/react";
 import { UppyUploadArea } from "@/components/upload/UppyUploadArea";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Check, Upload, Images, ChevronLeft, Loader2,
-  CloudIcon, AlertTriangle, Plus, FileImage, Eye, Palette, RefreshCw
+  X, Upload, Images, Loader2, CloudIcon, AlertTriangle, Check, Ban, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,29 +23,95 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { useImageProcessing } from "@/hooks/useImageProcessing";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { UploadSourceSelector, type UploadSource } from "./UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "./GoogleDriveInput";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 
+const MAX_LOOKS = 3;
+
 /** The AI mark — 4-point sparkle (the logo star), royal blue via currentColor. */
 function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      className={className}
-      aria-hidden
-      style={{ display: "block" }}
-    >
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
       <path
         d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
         fill="currentColor"
       />
     </svg>
+  );
+}
+
+// Live-plan pill — same language as the create-collection page.
+function Pill({ children, accent = false, danger = false }: { children: React.ReactNode; accent?: boolean; danger?: boolean }) {
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
+      danger
+        ? "border-destructive/50 bg-destructive/10 text-destructive"
+        : accent
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border bg-surface-2 text-muted-foreground",
+    )}>
+      {children}
+    </span>
+  );
+}
+
+// Selection indicator — filled check when chosen, empty ring otherwise.
+function SelectMark({ on }: { on: boolean }) {
+  return on ? (
+    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" strokeWidth={3} /></span>
+  ) : (
+    <span className="h-5 w-5 shrink-0 rounded-full border border-muted-foreground/40" aria-hidden />
+  );
+}
+
+// One AI-model tile — mirrors the create-collection LookTile so the two flows
+// feel identical: cover fills the tile, name overlaid, sparkle for no-cover.
+function LookTile({ name, cover, on, locked, mine = false, recommended = false, onClick }: {
+  name: string;
+  cover?: string;
+  on: boolean;
+  locked: boolean;
+  mine?: boolean;
+  recommended?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={locked}
+      title={name}
+      className={cn(
+        "group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[--radius] border text-left transition-all",
+        on
+          ? "border-primary ring-1 ring-inset ring-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.10)]"
+          : "border-border hover:border-primary/50",
+        locked && "cursor-not-allowed opacity-45 hover:border-border",
+      )}
+    >
+      {cover ? (
+        <img src={getThumbnailUrl(cover)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <span className="absolute inset-0 grid place-items-center bg-surface-2">
+          <span className="absolute inset-0 bg-gradient-to-br from-primary/30 to-transparent" />
+          <Sparkle size={18} className="relative text-primary" />
+        </span>
+      )}
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-1.5 pb-1.5 pt-5">
+        <span className="flex items-center gap-1">
+          <Sparkle size={8} className={mine ? "text-primary" : "text-accent"} />
+          <span className="truncate text-[11px] font-semibold leading-tight text-white">{name}</span>
+        </span>
+      </span>
+      <span className="absolute right-1.5 top-1.5"><SelectMark on={on} /></span>
+      {recommended && !on && (
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-primary-foreground shadow">Pick</span>
+      )}
+    </button>
   );
 }
 
@@ -59,8 +124,6 @@ interface AddImagesModalProps {
   onUploadComplete?: (count: number) => void;
 }
 
-type Step = "styles" | "upload";
-
 export function AddImagesModal({
   isOpen,
   onClose,
@@ -69,8 +132,10 @@ export function AddImagesModal({
   onDriveConfirm,
   onUploadComplete,
 }: AddImagesModalProps) {
-  const [step, setStep] = useState<Step>("styles");
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  // The look isn't pre-picked — the photographer must explicitly choose a look
+  // or "No editing", mirroring the create-collection flow.
+  const [styleTouched, setStyleTouched] = useState(false);
   const [uploadSource, setUploadSource] = useState<UploadSource>("local");
   const [driveLinks, setDriveLinks] = useState<string[]>([]);
   const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
@@ -81,7 +146,7 @@ export function AddImagesModal({
   const { uppy, uploadImages, uploadProgress, isUploading: hookIsUploading } = useImageUpload();
   const uppyFileCount = useUppyState(uppy, (state) => Object.keys(state.files).length);
   const { processImages } = useImageProcessing();
-  const { editsRemaining, availableEdits, editsReserved, isUnlimited, isFreePlan, canEdit, isSuspended, isExpired } = useSubscription();
+  const { availableEdits, editsReserved, isUnlimited, isFreePlan, canEdit, isSuspended, isExpired } = useSubscription();
 
   // Crash-recovery / dedupe: when this modal opens for an existing
   // gallery, pull the filenames already uploaded so we can detect
@@ -116,6 +181,8 @@ export function AddImagesModal({
   const editsNeeded = imageCount * stylesCount;
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
   const maxImages = isUnlimited ? Infinity : (stylesCount > 0 ? Math.floor(availableEdits / stylesCount) : 0);
+  const remaining = Math.max(0, availableEdits - editsNeeded);
+  const usedPct = availableEdits > 0 ? Math.min(100, Math.round((editsNeeded / availableEdits) * 100)) : (editsNeeded > 0 ? 100 : 0);
 
   const isProcessing = isUploadingLocal || hookIsUploading;
 
@@ -185,11 +252,18 @@ export function AddImagesModal({
 
   const { data: showcaseCovers = {} } = useShowcaseCovers({ enabled: isOpen });
 
+  // The photographer's own trained models vs the public Aura looks — same split
+  // as the create-collection look grid so the two flows read identically.
+  const mine = styles.filter((s: any) => user?.id != null && s.user_id === user.id && s.status === "ready");
+  const aura = styles.filter((s: any) => !(user?.id != null && s.user_id === user.id));
+  const bestId = styles[0]?.id;
+  const hosting = styleTouched && selectedStyles.length === 0;
+
   // Reset when modal opens
   useEffect(() => {
     if (isOpen) {
-      setStep("styles");
       setSelectedStyles([]);
+      setStyleTouched(false);
       uppy.cancelAll();
       setUploadSource("local");
       setDriveLinks([]);
@@ -199,22 +273,19 @@ export function AddImagesModal({
   }, [isOpen, uppy]);
 
   const toggleStyle = (styleId: string) => {
+    setStyleTouched(true);
     setSelectedStyles(prev => {
       if (prev.includes(styleId)) return prev.filter(id => id !== styleId);
-      if (prev.length >= 3) {
-        toast.error("Maximum 3 styles allowed");
+      if (prev.length >= MAX_LOOKS) {
+        toast.error(`Maximum ${MAX_LOOKS} styles allowed`);
         return prev;
       }
       return [...prev, styleId];
     });
   };
-
-  const handleContinueToUpload = () => {
-    if (selectedStyles.length === 0) {
-      toast.error("Please select at least one style");
-      return;
-    }
-    setStep("upload");
+  const pickHosting = () => {
+    setStyleTouched(true);
+    setSelectedStyles([]);
   };
 
   // Re-run AI culling incrementally after new photos land. Re-arms the
@@ -360,14 +431,14 @@ export function AddImagesModal({
 
         // Process any IDs that weren't streamed (last partial batch).
         if (selectedStyles.length > 0) {
-          const remaining = imageIds.filter((id) => !streamedProcessedIds.has(id));
-          if (remaining.length > 0) {
+          const remainingIds = imageIds.filter((id) => !streamedProcessedIds.has(id));
+          if (remainingIds.length > 0) {
             await supabase
               .from("gallery_images")
               .update({ status: "processing" })
-              .in("id", remaining)
+              .in("id", remainingIds)
               .eq("status", "uploading");
-            processImages(galleryId, remaining, selectedStyles);
+            processImages(galleryId, remainingIds, selectedStyles);
           }
           toast.success(`${imageIds.length} images uploaded! AI processing started...`);
         } else {
@@ -391,274 +462,113 @@ export function AddImagesModal({
 
   if (!isOpen) return null;
 
+  const looksLabel = !styleTouched
+    ? "choose a look"
+    : stylesCount === 0
+      ? "Hosting only"
+      : stylesCount === 1
+        ? (styles.find((s: any) => s.id === selectedStyles[0])?.name ?? "1 look")
+        : `${stylesCount} looks`;
+
+  const canSubmit =
+    !isProcessing &&
+    canEdit &&
+    !hasInsufficientEdits &&
+    styleTouched &&
+    (uploadSource === "local" ? uppyFileCount > 0 : !!driveFolderInfo);
+
   return (
     <>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
       onClick={!isProcessing ? onClose : undefined}
     >
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
+        initial={{ scale: 0.97, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="w-full max-w-3xl max-h-[85vh] overflow-hidden"
+        exit={{ scale: 0.97, opacity: 0 }}
+        className="flex max-h-[90vh] w-full max-w-5xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <Card className="glass-card border-border rounded-[--radius] flex flex-col max-h-[85vh]">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-[--radius] border border-border bg-primary/10 flex items-center justify-center">
-                <Images className="w-4 h-4 text-primary" />
+        <Card className="glass-card flex max-h-[90vh] w-full flex-col rounded-[--radius] border-border">
+          {/* Header — collection name + live-plan pills, mirroring the create page */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[--radius] border border-border bg-primary/10">
+                <Images className="h-4 w-4 text-primary" />
               </div>
-              <div>
-                <h2 className="text-lg font-bold leading-tight">Add Images</h2>
-                <p className="text-xs text-muted-foreground truncate max-w-[200px]">{galleryName}</p>
+              <div className="min-w-0">
+                <span className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={11} /> Add to collection</span>
+                <h2 className="truncate text-lg font-bold leading-tight">{galleryName}</h2>
               </div>
             </div>
-            {!isProcessing && (
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="w-5 h-5" />
-              </Button>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Pill><Images className="h-3 w-3" /> {imageCount ? `${imageCount.toLocaleString()} new` : "no photos yet"}</Pill>
+              <Pill>{looksLabel}</Pill>
+              <Pill accent={!hasInsufficientEdits} danger={hasInsufficientEdits}>
+                <Sparkle size={11} /> {isUnlimited ? `${editsNeeded.toLocaleString()} edits` : `${editsNeeded.toLocaleString()} / ${availableEdits.toLocaleString()} edits`}
+              </Pill>
+              {!isProcessing && (
+                <Button variant="ghost" size="icon" onClick={onClose} className="ml-1"><X className="h-5 w-5" /></Button>
+              )}
+            </div>
+          </div>
+
+          {/* Body — two working columns, each scrolls internally so the modal
+              itself never grows. Locked once upload starts. */}
+          <div
+            className={cn(
+              "grid min-h-0 flex-1 gap-4 overflow-hidden p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]",
+              isProcessing && "pointer-events-none select-none opacity-60",
             )}
-          </div>
+          >
+            {/* LEFT — photos */}
+            <div className="flex min-h-0 flex-col">
+              <div className="glass-card flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[--radius] p-4">
+                <div className="caption mb-2.5 shrink-0">Photos</div>
 
-          {/* Step Indicator */}
-          <div className="px-6 pt-2">
-            <div className="flex items-center justify-center gap-0">
-              {/* Step 1 */}
-              <div className="flex flex-col items-center">
-                <motion.div
-                  className={cn(
-                    "w-7 h-7 rounded-full flex items-center justify-center transition-all relative z-10",
-                    step === "styles" && "bg-primary shadow-[0_0_20px_hsl(var(--primary)/0.4)]",
-                    step === "upload" && "bg-primary/20"
-                  )}
-                  animate={step === "styles" ? { boxShadow: [
-                    "0 0 12px hsl(var(--primary) / 0.3)",
-                    "0 0 24px hsl(var(--primary) / 0.5)",
-                    "0 0 12px hsl(var(--primary) / 0.3)",
-                  ] } : {}}
-                  transition={step === "styles" ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
-                >
-                  {step === "upload" ? (
-                    <Check className="w-3.5 h-3.5 text-primary" />
-                  ) : (
-                    <Sparkle size={13} className="text-primary-foreground" />
-                  )}
-                </motion.div>
-                <span className={cn("text-[11px] font-semibold mt-1", step === "styles" ? "text-foreground" : "text-primary")}>
-                  Styles
-                </span>
-              </div>
-              {/* Connector */}
-              <div className="relative w-16 sm:w-24 h-0.5 mt-[-14px] mx-2 bg-muted overflow-hidden rounded-full">
-                <motion.div
-                  className="absolute inset-y-0 left-0 bg-primary rounded-full"
-                  initial={{ width: "0%" }}
-                  animate={{ width: step === "upload" ? "100%" : "0%" }}
-                  transition={{ duration: 0.5, ease: "easeInOut" }}
-                />
-              </div>
-              {/* Step 2 */}
-              <div className="flex flex-col items-center">
-                <motion.div
-                  className={cn(
-                    "w-7 h-7 rounded-full flex items-center justify-center transition-all relative z-10",
-                    step === "upload" && "bg-primary shadow-[0_0_20px_hsl(var(--primary)/0.4)]",
-                    step === "styles" && "bg-muted"
-                  )}
-                  animate={step === "upload" ? { boxShadow: [
-                    "0 0 12px hsl(var(--primary) / 0.3)",
-                    "0 0 24px hsl(var(--primary) / 0.5)",
-                    "0 0 12px hsl(var(--primary) / 0.3)",
-                  ] } : {}}
-                  transition={step === "upload" ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
-                >
-                  <Upload className={cn("w-3.5 h-3.5", step === "upload" ? "text-primary-foreground" : "text-muted-foreground")} />
-                </motion.div>
-                <span className={cn("text-[11px] font-semibold mt-1", step === "upload" ? "text-foreground" : "text-muted-foreground")}>
-                  Upload
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <AnimatePresence mode="wait">
-              {step === "styles" ? (
-                <motion.div
-                  key="styles"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="flex items-center gap-2 text-lg font-bold mb-1">
-                        <Sparkle size={15} className="text-accent" />
-                        Select AI Styles
-                      </h3>
-                      <p className="text-sm text-muted-foreground">Choose up to 3 styles to apply</p>
-                    </div>
-                    <div className={cn(
-                      "px-3 py-1.5 rounded-[--radius] font-mono text-sm font-semibold",
-                      selectedStyles.length > 0
-                        ? "bg-primary/15 text-primary"
-                        : "bg-muted text-muted-foreground"
-                    )}>
-                      {selectedStyles.length}/3
+                {/* Subscription warnings */}
+                {!canEdit && (isSuspended || isExpired) && (
+                  <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>Your subscription is {isSuspended ? "suspended" : "expired"}. Please update your plan.</span>
                     </div>
                   </div>
-
-                  {styles.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Palette className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-muted-foreground">No styles available yet.</p>
-                      <p className="text-sm text-muted-foreground mt-1">Create your first AI style to get started.</p>
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-[400px] pr-2">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {styles.map(style => {
-                          const coverUrl = showcaseCovers[style.id] || style.thumbnail_url || undefined;
-                          const isSelected = selectedStyles.includes(style.id);
-                          return (
-                            <motion.div
-                              key={style.id}
-                              role="checkbox"
-                              aria-checked={isSelected}
-                              aria-label={style.name}
-                              tabIndex={0}
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => toggleStyle(style.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  toggleStyle(style.id);
-                                }
-                              }}
-                              className={cn(
-                                "relative rounded-[--radius] overflow-hidden cursor-pointer transition-all h-36 flex flex-col justify-end group",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                isSelected
-                                  ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20"
-                                  : "ring-1 ring-border hover:ring-primary/40"
-                              )}
-                            >
-                              {coverUrl ? (
-                                <img
-                                  src={getThumbnailUrl(coverUrl)}
-                                  alt={style.name}
-                                  className="absolute inset-0 w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
-                              )}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                              {/* Eye icon */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(`/dashboard/styles/${style.id}`, "_blank");
-                                }}
-                                className="absolute top-2.5 left-2.5 w-8 h-8 rounded-full bg-background/60 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background/80"
-                              >
-                                <Eye className="w-4 h-4 text-foreground" />
-                              </button>
-
-                              <div className="relative z-10 p-3">
-                                <div className="flex items-center gap-2">
-                                  {style.is_preset ? (
-                                    <Palette className="w-4 h-4 text-primary" />
-                                  ) : (
-                                    <Sparkle size={14} className="text-accent" />
-                                  )}
-                                  <span className="font-semibold text-sm text-white">{style.name}</span>
-                                </div>
-                              </div>
-
-                              {isSelected && (
-                                <div className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                                  <Check className="w-4 h-4 text-primary-foreground" />
-                                </div>
-                              )}
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="upload"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="space-y-3"
-                >
-                  {/* Selected Styles Summary */}
-                  <div className="px-3 py-2 rounded-lg bg-muted/50 flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-medium">Selected styles:</span>
-                    {selectedStyles.map(id => {
-                      const style = styles.find(s => s.id === id);
-                      return style ? (
-                        <span key={id} className="px-2 py-1 rounded-full text-xs bg-primary/20 text-primary">
-                          {style.name}
-                        </span>
-                      ) : null;
-                    })}
-                  </div>
-
-                  {/* Subscription warnings */}
-                  {!canEdit && (isSuspended || isExpired) && (
-                    <div className="p-3 rounded-lg border text-sm bg-destructive/10 border-destructive/30">
+                )}
+                {isFreePlan && availableEdits === 0 && (
+                  <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-destructive">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span>Your subscription is {isSuspended ? "suspended" : "expired"}. Please update your plan.</span>
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span>You've used all 3,000 free edits.</span>
                       </div>
+                      <Button size="sm" variant="default" className="ml-3 shrink-0" onClick={() => navigate("/dashboard/billing")}>
+                        Upgrade Plan
+                      </Button>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {isFreePlan && availableEdits === 0 && (
-                    <div className="p-3 rounded-lg border text-sm bg-destructive/10 border-destructive/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-destructive">
-                          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                          <span>You've used all 3,000 free edits.</span>
-                        </div>
-                        <Button size="sm" variant="default" className="ml-3 flex-shrink-0" onClick={() => navigate("/dashboard/billing")}>
-                          Upgrade Plan
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                <UploadSourceSelector
+                  value={uploadSource}
+                  onChange={(source) => {
+                    setUploadSource(source);
+                    if (source === "local") {
+                      setDriveFolderInfo(null);
+                      setDriveLinks([]);
+                    } else {
+                      uppy.cancelAll();
+                    }
+                  }}
+                  disabled={isProcessing}
+                />
 
-                  {/* Upload Source Selector */}
-                  <UploadSourceSelector
-                    value={uploadSource}
-                    onChange={(source) => {
-                      setUploadSource(source);
-                      if (source === "local") {
-                        setDriveFolderInfo(null);
-                        setDriveLinks([]);
-                      } else {
-                        uppy.cancelAll();
-                      }
-                    }}
-                    disabled={isProcessing}
-                  />
-
-                  {/* Google Drive Input */}
-                  {uploadSource === "drive" && (
+                {uploadSource === "drive" ? (
+                  <div className="mt-3">
                     <GoogleDriveInput
                       folderInfo={driveFolderInfo}
                       onUpdate={(info, links) => {
@@ -667,159 +577,220 @@ export function AddImagesModal({
                       }}
                       disabled={isProcessing}
                     />
-                  )}
-
-                  {/* Local Upload Zone — Uppy Dashboard handles all of
-                       drag-drop, picker, lazy thumbnails, and per-file
-                       progress without rendering 1000 thumbnails into the
-                       DOM at once. */}
-                  {uploadSource === "local" && (
+                  </div>
+                ) : (
+                  <div className="mt-3">
                     <UppyUploadArea
                       uppy={uppy}
                       maxFiles={!isUnlimited && stylesCount > 0 ? maxImages : undefined}
                       disabled={isProcessing}
                     />
-                  )}
+                  </div>
+                )}
 
-                  {/* Aggregate Upload Progress Bar */}
-                  {uploadSource === "local" && (
-                    <AnimatePresence>
-                      {isProcessing && uploadProgress && (() => {
-                        const totalBytes = uploadProgress.totalBytes;
-                        const uploadedBytes = uploadProgress.bytesUploaded;
-                        const percentage = totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0;
-                        const formatMB = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
-                        return (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, height: 0 }}
-                            animate={{ opacity: 1, y: 0, height: "auto" }}
-                            exit={{ opacity: 0, y: -10, height: 0 }}
-                            className="space-y-3 p-4 bg-muted/50 rounded-xl border border-border/50 overflow-hidden"
-                          >
-                            <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
-                              <motion.div
-                                className="h-full bg-primary rounded-full animate-neon-pulse"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${percentage}%` }}
-                                transition={{ duration: 0.5, ease: "easeOut" }}
-                              />
-                            </div>
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Uploading: <span className="text-foreground font-medium">{uploadProgress.currentFile}</span>
-                              </span>
-                              <span className="font-medium text-primary">
-                                {percentage}% — {formatMB(uploadedBytes)} / {formatMB(totalBytes)} MB
-                              </span>
-                            </div>
-                          </motion.div>
-                        );
-                      })()}
-                    </AnimatePresence>
-                  )}
-
-                  {/* Edit Cost Summary */}
-                  {imageCount > 0 && stylesCount > 0 && (
-                    <div className={cn(
-                      "p-3 rounded-lg border text-sm",
-                      hasInsufficientEdits && !isUnlimited
-                        ? "bg-destructive/10 border-destructive/30"
-                        : "bg-muted/50 border-border/50"
-                    )}>
-                      <div className="flex items-center justify-between">
-                        <span>
-                          {imageCount} images × {stylesCount} style{stylesCount > 1 ? "s" : ""} = <strong>{editsNeeded} edits</strong>
-                        </span>
-                        {isUnlimited ? (
-                          <span className="flex items-center gap-1.5 text-primary">
-                            <Check className="w-4 h-4" />
-                            Included in your plan
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">
-                            You have <strong className={hasInsufficientEdits ? "text-destructive" : "text-primary"}>{availableEdits.toLocaleString()}</strong> available
-                            {editsReserved > 0 && <span className="text-xs ml-1">({editsReserved.toLocaleString()} reserved)</span>}
-                          </span>
-                        )}
-                      </div>
-                      {!isUnlimited && hasInsufficientEdits && (
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-destructive/20">
-                          <div className="flex items-center gap-2 text-destructive">
-                            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                            <span>Not enough edits. Max {maxImages} images with {stylesCount} style{stylesCount > 1 ? "s" : ""}.</span>
+                {/* Aggregate upload progress */}
+                {uploadSource === "local" && (
+                  <AnimatePresence>
+                    {isProcessing && uploadProgress && (() => {
+                      const totalBytes = uploadProgress.totalBytes;
+                      const uploadedBytes = uploadProgress.bytesUploaded;
+                      const percentage = totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0;
+                      const formatMB = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
+                      return (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-3 space-y-2 overflow-hidden rounded-xl border border-border/50 bg-muted/50 p-3"
+                        >
+                          <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                            <motion.div
+                              className="h-full rounded-full bg-primary animate-neon-pulse"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percentage}%` }}
+                              transition={{ duration: 0.5, ease: "easeOut" }}
+                            />
                           </div>
-                          <Button size="sm" variant="default" className="ml-3 flex-shrink-0" onClick={() => navigate("/dashboard/billing")}>
-                            Upgrade Plan
-                          </Button>
-                        </div>
-                      )}
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="truncate text-muted-foreground">
+                              Uploading: <span className="font-medium text-foreground">{uploadProgress.currentFile}</span>
+                            </span>
+                            <span className="shrink-0 font-medium text-primary">
+                              {percentage}% — {formatMB(uploadedBytes)} / {formatMB(totalBytes)} MB
+                            </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })()}
+                  </AnimatePresence>
+                )}
+
+                {/* Only-the-new-photos note — reassures that adding images
+                    won't re-spend on the existing collection. */}
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.05] p-3 text-xs text-muted-foreground">
+                  <Sparkle size={13} className="mt-0.5 shrink-0 text-primary" />
+                  <span>
+                    Only the new photos are processed. If this collection uses AI culling, the new photos are rated, grouped &amp; face-tagged and slotted into your existing groups — your current photos and edits aren't touched.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT — choose your AI look, full height */}
+            <div className="flex min-h-0 flex-col">
+              <div className="aura-ai-border glass-card flex min-h-0 flex-1 flex-col rounded-[--radius] p-4">
+                <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                      <Sparkle size={13} className="text-primary" /> Choose your AI look
+                    </div>
+                    <p className="caption mt-1">A trained AI model edits every new photo in this look — pick up to {MAX_LOOKS}.</p>
+                  </div>
+                  {stylesCount > 0 && <span className="aura-microlabel shrink-0 text-primary">{stylesCount}/{MAX_LOOKS}</span>}
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                  {mine.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="aura-microlabel flex items-center gap-1.5 text-primary"><Sparkle size={10} /> Your AI models</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {mine.map((s: any) => (
+                          <LookTile
+                            key={s.id}
+                            name={s.name}
+                            cover={showcaseCovers[s.id] || s.thumbnail_url || s.after_image_urls?.[0]}
+                            on={selectedStyles.includes(s.id)}
+                            locked={stylesCount >= MAX_LOOKS && !selectedStyles.includes(s.id)}
+                            mine
+                            recommended={s.id === bestId}
+                            onClick={() => toggleStyle(s.id)}
+                          />
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Only-the-new-photos note — reassures that adding images
-                      won't re-spend on the existing collection. */}
-                  <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.05] p-3 text-xs text-muted-foreground">
-                    <Sparkle size={13} className="mt-0.5 shrink-0 text-primary" />
-                    <span>
-                      Only the new photos are processed. If this collection uses AI culling, the new photos are rated, grouped &amp; face-tagged and slotted into your existing groups — your current photos and edits aren't touched.
-                    </span>
+                  {aura.length > 0 && (
+                    <div className="space-y-2">
+                      {mine.length > 0 && <div className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={10} /> Aura looks</div>}
+                      <div className="grid grid-cols-3 gap-2">
+                        {aura.map((s: any) => (
+                          <LookTile
+                            key={s.id}
+                            name={s.name}
+                            cover={showcaseCovers[s.id] || s.thumbnail_url || s.after_image_urls?.[0]}
+                            on={selectedStyles.includes(s.id)}
+                            locked={stylesCount >= MAX_LOOKS && !selectedStyles.includes(s.id)}
+                            recommended={s.id === bestId}
+                            onClick={() => toggleStyle(s.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {styles.length === 0 && (
+                    <p className="caption">No AI models available yet — add &amp; host as-is below, or train your own look later.</p>
+                  )}
+
+                  {/* Opt-out — dashed + separated so it never competes with the AI models. */}
+                  <div className="pt-0.5">
+                    <div className="aura-hairline mb-2" />
+                    <button
+                      type="button"
+                      onClick={pickHosting}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-[--radius] border border-dashed p-2 text-left transition-colors",
+                        hosting ? "border-primary bg-primary/10 ring-1 ring-inset ring-primary" : "border-border/70 hover:border-primary/40 hover:bg-surface-2/40",
+                      )}
+                    >
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground"><Ban className="h-4 w-4" strokeWidth={1.5} /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold">No editing</span>
+                        <span className="caption block">Add &amp; host as-is · 0 edits</span>
+                      </span>
+                      <SelectMark on={hosting} />
+                    </button>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+
+                {stylesCount >= 1 && (
+                  <p className="caption mt-3 shrink-0">{imageCount.toLocaleString()} photos × {stylesCount} look{stylesCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-border/50 flex items-center justify-between">
-            <div>
-              {step === "upload" && !isProcessing && (
-                <Button variant="ghost" onClick={() => setStep("styles")} className="gap-2">
-                  <ChevronLeft className="w-4 h-4" />
-                  Back
-                </Button>
+          {/* Footer — credits + the action, spanning both columns */}
+          <div className="flex flex-col gap-3 border-t border-border/50 p-4 lg:flex-row lg:items-stretch lg:justify-between">
+            {/* Credits */}
+            <div className="glass-card min-w-0 flex-1 rounded-[--radius] px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1.5 text-sm font-semibold"><Sparkle size={12} className="text-accent" /> Edits these photos will use</span>
+                <span className="font-mono text-sm font-semibold">{isUnlimited ? editsNeeded.toLocaleString() : `${editsNeeded.toLocaleString()} / ${availableEdits.toLocaleString()}`}</span>
+              </div>
+              {isUnlimited ? (
+                <p className="caption mt-1.5">Unlimited edits on your plan — add as many as you like.</p>
+              ) : (
+                <>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div className={cn("h-full rounded-full transition-[width] duration-300", hasInsufficientEdits ? "bg-destructive" : "bg-primary")} style={{ width: `${usedPct}%` }} />
+                  </div>
+                  <p className="caption mt-1.5">
+                    {stylesCount === 0 ? (
+                      "Hosting only — no edits used."
+                    ) : (
+                      <>{imageCount.toLocaleString()} photos × {stylesCount} look{stylesCount > 1 ? "s" : ""} = <span className="font-medium text-foreground">{editsNeeded.toLocaleString()} edits</span> · {remaining.toLocaleString()} left after
+                        {editsReserved > 0 && <span className="ml-1 text-muted-foreground/70">({editsReserved.toLocaleString()} reserved)</span>}</>
+                    )}
+                  </p>
+                </>
+              )}
+              {!isUnlimited && hasInsufficientEdits && (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-[--radius] border border-destructive/40 bg-destructive/[0.06] p-2.5 text-sm">
+                  <span className="flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Not enough edits — max {Number.isFinite(maxImages) ? maxImages.toLocaleString() : "—"} photos with {stylesCount} look{stylesCount > 1 ? "s" : ""}.
+                  </span>
+                  <Button size="sm" variant="glow" className="shrink-0" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
+                </div>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              {!isProcessing && (
-                <Button variant="outline" onClick={onClose}>Cancel</Button>
-              )}
-              {step === "styles" ? (
-                <Button
-                  variant="glow"
-                  disabled={selectedStyles.length === 0}
-                  onClick={handleContinueToUpload}
-                >
-                  Continue
-                </Button>
-              ) : (
-                <Button
-                  variant="glow"
-                  disabled={
-                    isProcessing ||
-                    !canEdit ||
-                    hasInsufficientEdits ||
-                    (uploadSource === "local" && uppyFileCount === 0) ||
-                    (uploadSource === "drive" && !driveFolderInfo)
-                  }
-                  onClick={handleConfirm}
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Uploading...
-                    </>
-                  ) : uploadSource === "drive" ? (
-                    <>
-                      <CloudIcon className="w-4 h-4 mr-2" />
-                      Import & Process
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload & Process
-                    </>
+
+            {/* Action */}
+            <div className="lg:flex lg:w-[320px] lg:shrink-0 lg:flex-col lg:justify-center">
+              {isProcessing ? (
+                <div className="space-y-3 rounded-[--radius] border border-border bg-card p-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      Uploading your photos…
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <motion.div
+                      className="h-full rounded-full bg-primary"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${uploadProgress && uploadProgress.totalBytes > 0 ? Math.round((uploadProgress.bytesUploaded / uploadProgress.totalBytes) * 100) : 100}%` }}
+                      transition={{ ease: "easeOut", duration: 0.4 }}
+                    />
+                  </div>
+                  {uploadProgress?.currentFile && (
+                    <p className="truncate text-xs text-muted-foreground">Receiving {uploadProgress.currentFile}</p>
                   )}
-                </Button>
+                </div>
+              ) : (
+                <div>
+                  <Button variant="glow" size="lg" disabled={!canSubmit} className="w-full gap-2" onClick={handleConfirm}>
+                    {uploadSource === "drive" ? <CloudIcon className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
+                    {uploadSource === "drive" ? "Import & process" : (stylesCount > 0 ? "Upload & start editing" : "Upload & host")}
+                  </Button>
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
+                    {canSubmit
+                      ? "Only the new photos are added & processed"
+                      : styleTouched ? "Add photos to continue" : "Pick a look (or “No editing”) to continue"}
+                  </p>
+                </div>
               )}
             </div>
           </div>
