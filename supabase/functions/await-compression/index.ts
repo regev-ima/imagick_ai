@@ -27,6 +27,48 @@ const PER_INVOCATION_BUDGET_MS = 90_000;
 const PER_IMAGE_ESTIMATE_MS = 1_500;
 const MIN_WAIT_MS = 60_000;
 const MAX_WAIT_MS = 15 * 60_000;
+// A few images can fail to compress (infra hiccup) and their compressed webp
+// never appears. Don't hang the whole gallery on stragglers: once all but a
+// small fraction are compressed AND progress has plateaued, proceed (the
+// pipeline falls back to the original for any missing compressed image). This
+// also makes the common case dispatch in the FIRST invocation, so it doesn't
+// depend on a long, fragile self-chain surviving many hops.
+const STALL_MS = 25_000;
+
+// Build the culling options from the gallery's own settings — used when a
+// re-kick (e.g. the frontend watchdog) invokes us without an options payload,
+// so the barrier is self-sufficient and can always recover.
+async function buildOptionsFromGallery(
+  admin: ReturnType<typeof createClient>,
+  galleryId: string,
+): Promise<Record<string, unknown>> {
+  const { data: g } = await admin
+    .from("galleries")
+    .select("ai_grouping_enabled, ai_faces_enabled, culling_labels")
+    .eq("id", galleryId)
+    .single();
+  let model: string | undefined;
+  let timeThreshold = 600;
+  try {
+    const { data: cfg } = await admin
+      .from("platform_settings").select("value").eq("key", "culling_config").single();
+    if (cfg?.value) {
+      const parsed = JSON.parse(cfg.value as string);
+      if (typeof parsed.model === "string") model = parsed.model;
+      if (typeof parsed.timeThreshold === "number") timeThreshold = parsed.timeThreshold;
+    }
+  } catch { /* defaults */ }
+  return {
+    culling: true,
+    tags: true,
+    cluster: (g as { ai_grouping_enabled?: boolean } | null)?.ai_grouping_enabled ?? true,
+    faces: (g as { ai_faces_enabled?: boolean } | null)?.ai_faces_enabled ?? false,
+    labels: (g as { culling_labels?: string[] } | null)?.culling_labels ?? [],
+    thresholds: [0.5, 0.7, 0.9],
+    timeThreshold,
+    ...(model ? { model } : {}),
+  };
+}
 
 // Canonical compressed ("preview") URL for an original — matches
 // src/lib/imageUrls.ts and process-pipeline's toPreviewUrl.
@@ -62,8 +104,14 @@ serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceKey);
 
   try {
-    const { galleryId, options } = await req.json();
+    const { galleryId, options: rawOptions } = await req.json();
     if (!galleryId) return json({ error: "galleryId is required" }, 400);
+
+    // Self-sufficient: if invoked without options (e.g. a frontend re-kick of a
+    // stalled barrier), rebuild them from the gallery's own culling settings.
+    const options = rawOptions && Object.keys(rawOptions).length > 0
+      ? rawOptions
+      : await buildOptionsFromGallery(admin, galleryId);
 
     // Already gated through? (idempotent re-entry / racing self-chain)
     const { data: g0 } = await admin
@@ -99,8 +147,13 @@ serve(async (req) => {
     const total = images.length;
 
     const maxWaitMs = Math.min(MAX_WAIT_MS, Math.max(MIN_WAIT_MS, total * PER_IMAGE_ESTIMATE_MS));
+    // Allow a small fraction of never-compressing stragglers before proceeding.
+    const stragglerAllowance = Math.max(2, Math.ceil(total * 0.02));
     const ready = new Set<string>();
     const invocationStart = Date.now();
+    // Track progress to detect a plateau (compression has effectively finished).
+    let lastReadySize = -1;
+    let lastProgressAt = Date.now();
 
     const sweep = async () => {
       const pending = images.filter((i) => !ready.has(i.id));
@@ -126,16 +179,29 @@ serve(async (req) => {
     // deno-lint-ignore no-constant-condition
     while (true) {
       await sweep();
+      if (ready.size !== lastReadySize) {
+        lastReadySize = ready.size;
+        lastProgressAt = Date.now();
+      }
       await admin
         .from("galleries")
         .update({ compression_ready_count: ready.size, compression_total_count: total })
         .eq("id", galleryId);
 
+      const elapsed = Date.now() - startedMs;
       const allReady = total === 0 || ready.size >= total;
-      const timedOut = Date.now() - startedMs > maxWaitMs;
+      const timedOut = elapsed > maxWaitMs;
+      // Everything but a few stragglers is compressed AND compression has
+      // plateaued (no new webp for STALL_MS) — proceed instead of hanging on
+      // images that may never compress. Dispatches in the first invocation for
+      // the common "N-1 of N compressed fast, 1 stuck" case.
+      const nearDoneStalled =
+        ready.size >= total - stragglerAllowance &&
+        elapsed > MIN_WAIT_MS &&
+        Date.now() - lastProgressAt > STALL_MS;
 
-      if (allReady || timedOut) {
-        return await dispatchCulling(admin, supabaseUrl, serviceKey, galleryId, options, ready.size, total, timedOut);
+      if (allReady || timedOut || nearDoneStalled) {
+        return await dispatchCulling(admin, supabaseUrl, serviceKey, galleryId, options, ready.size, total, timedOut || nearDoneStalled);
       }
 
       if (Date.now() - invocationStart > PER_INVOCATION_BUDGET_MS) {

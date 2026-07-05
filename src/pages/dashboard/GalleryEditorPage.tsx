@@ -1248,6 +1248,30 @@ export default function GalleryEditorPage() {
     return () => clearInterval(t);
   }, [gallery?.culling_status]);
 
+  // Compression-barrier watchdog. await-compression waits for every image's
+  // compressed webp then dispatches culling, but its server-side self-chain can
+  // die on a long Drive import (a stuck straggler + a dropped hop), leaving
+  // compression "in progress" and culling never dispatched. If it's been stalled
+  // well past a healthy barrier's window, re-kick it once — await-compression
+  // re-polls and (with its near-done/stall proceed) dispatches quickly. Passing
+  // only galleryId lets it rebuild the culling options from the gallery itself.
+  const compressionKickedRef = useRef(false);
+  useEffect(() => {
+    const g = gallery as any;
+    if (!g?.id) return;
+    if (!g.compression_started_at || g.compression_completed_at) {
+      compressionKickedRef.current = false; // re-arm for the next import
+      return;
+    }
+    const elapsed = cullingNow - new Date(g.compression_started_at).getTime();
+    if (elapsed > 3.5 * 60_000 && !compressionKickedRef.current) {
+      compressionKickedRef.current = true;
+      supabase.functions
+        .invoke("await-compression", { body: { galleryId: g.id } })
+        .catch((e) => console.error("compression barrier re-kick failed:", e));
+    }
+  }, [gallery, cullingNow]);
+
   // Detect stuck culling — the threshold is the full expected window
   // (5 min + 10s/photo, see lib/cullingEta.ts), so a large gallery is
   // never called "stuck" before its realistic completion window closes.
