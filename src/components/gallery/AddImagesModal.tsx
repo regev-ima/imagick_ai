@@ -166,7 +166,7 @@ function CullingTags({ type, language, value, onChange }: {
   };
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1">
+      <div className="flex max-h-[18vh] flex-wrap gap-1 overflow-y-auto pr-1">
         {all.map((label) => {
           const on = value.includes(label);
           const locked = value.length >= 20 && !on;
@@ -719,14 +719,16 @@ export function AddImagesModal({
               itself never grows. Locked once upload starts. */}
           <div
             className={cn(
-              "grid min-h-0 flex-1 gap-4 overflow-hidden p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]",
+              "grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden",
               isProcessing && "pointer-events-none select-none opacity-60",
             )}
           >
-            {/* LEFT — photos (top) + culling (bottom), mirrors the create page */}
-            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
+            {/* LEFT — photos (top, flexes & scrolls internally) + culling
+                (bottom, pinned so its toggles are always visible without
+                scrolling the column). Mirrors the create page. */}
+            <div className="flex min-h-0 flex-col gap-4">
               {/* Photos */}
-              <div className="glass-card flex flex-col rounded-[--radius] p-4">
+              <div className="glass-card flex min-h-0 flex-1 flex-col rounded-[--radius] p-4">
                 <div className="caption mb-2.5 shrink-0">Photos</div>
 
                 {/* Subscription warnings */}
@@ -778,11 +780,12 @@ export function AddImagesModal({
                     />
                   </div>
                 ) : (
-                  <div className="mt-3">
+                  <div className="mt-3 min-h-0 flex-1">
                     <UppyUploadArea
                       uppy={uppy}
                       maxFiles={!isUnlimited && stylesCount > 0 ? maxImages : undefined}
                       disabled={isProcessing}
+                      fill
                     />
                   </div>
                 )}
@@ -837,7 +840,7 @@ export function AddImagesModal({
               {/* Culling — same knobs as the create-collection flow, so the
                   new photos are culled exactly how you confirm here. Seeded
                   from the collection's current settings. */}
-              <div className={cn("glass-card rounded-[--radius] transition-colors", cull && "border-primary/40")}>
+              <div className={cn("glass-card shrink-0 rounded-[--radius] transition-colors", cull && "border-primary/40")}>
                 {/* Shoot type — seeds the auto culling tags */}
                 <div className="flex items-center justify-between gap-3 p-4">
                   <div className="min-w-0">

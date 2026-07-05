@@ -13,6 +13,13 @@ interface UppyUploadAreaProps {
   maxFiles?: number;
   /** Disable the area while uploads are in flight. */
   disabled?: boolean;
+  /**
+   * Fill the parent's height instead of the fixed DASHBOARD_HEIGHT_PX. Use when
+   * the area sits in a flex column that owns the height (e.g. the Add Images
+   * modal, where the Photos card flexes and the culling card stays pinned
+   * below). The parent must have a resolved height (flex-1 + min-h-0).
+   */
+  fill?: boolean;
 }
 
 // Dashboard height is responsive: small on phones, larger on desktop.
@@ -43,6 +50,7 @@ export function UppyUploadArea({
   uppy,
   maxFiles,
   disabled = false,
+  fill = false,
 }: UppyUploadAreaProps) {
   const targetRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
@@ -86,8 +94,10 @@ export function UppyUploadArea({
         inline: true,
         // The Dashboard plugin accepts numeric or string heights. We use
         // a CSS string so it tracks the parent's responsive width via
-        // its own internal layout.
-        height: DASHBOARD_HEIGHT_PX,
+        // its own internal layout. In `fill` mode it stretches to the
+        // parent (which owns the height), so the file grid scrolls
+        // internally and sibling chrome stays put.
+        height: fill ? "100%" : DASHBOARD_HEIGHT_PX,
         width: "100%",
         // Track the app's current theme so Dashboard text contrasts
         // correctly. Light mode renders Uppy's near-white text on a
@@ -118,7 +128,7 @@ export function UppyUploadArea({
         }
       }
     };
-  }, [uppy, resolvedTheme]);
+  }, [uppy, resolvedTheme, fill]);
 
   // Update plan-based file limit when it changes (e.g. user picks more
   // styles, which lowers maxImages on a free plan).
@@ -146,12 +156,13 @@ export function UppyUploadArea({
       // dimming the wrapper used to put a dark veil over the file
       // grid that blocked clicks (the user could not retry / remove
       // a failed file).
-      className="imagick-uppy-dashboard w-full max-w-none"
+      className={`imagick-uppy-dashboard w-full max-w-none${fill ? " h-full min-h-0" : ""}`}
       style={
         {
           "--uppy-c-primary": "#e85c9b",
           "--uppy-c-primary-light": "#ff7bbd",
           width: "100%",
+          ...(fill ? { height: "100%" } : {}),
         } as React.CSSProperties
       }
       ref={targetRef}
