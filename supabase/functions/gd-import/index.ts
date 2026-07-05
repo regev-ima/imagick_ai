@@ -12,6 +12,25 @@ import { corsHeaders } from "../_shared/cors.ts";
 // as Fly secrets, so we never send them in the request body.
 const FILE_TRANSFER_URL = "https://downloadfiles.fly.dev/file-transfer";
 
+// Photo + RAW extensions we process; everything else (and any hidden dotfile
+// like .DS_Store) is junk that rides along from Drive folders. Kept in sync
+// with gd-transfer-webhook's filter so the pre-import count matches the import.
+const IMAGE_EXTS = new Set([
+  "jpg", "jpeg", "jpe", "jfif", "png", "webp", "gif", "bmp", "tif", "tiff",
+  "heic", "heif", "avif",
+  "dng", "cr2", "cr3", "crw", "nef", "nrw", "arw", "srf", "sr2", "raf", "orf",
+  "rw2", "rwl", "pef", "srw", "x3f", "3fr", "fff", "iiq", "kdc", "dcr", "mos",
+  "mef", "mrw", "raw",
+]);
+function isRealImage(name: string | undefined | null): boolean {
+  if (!name) return false;
+  const base = (name.split("/").pop() || name).trim();
+  if (!base || base.startsWith(".")) return false;
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0) return false;
+  return IMAGE_EXTS.has(base.slice(dot + 1).toLowerCase());
+}
+
 interface TransferRequest {
   driveLink?: string;
   driveLinks?: string[];
@@ -154,8 +173,14 @@ serve(async (req) => {
       }
 
       const metadata: MetadataResponse = await gcpResponse.json();
-      
-      if (metadata.number_of_images === 0) {
+
+      // Drop non-image junk (.DS_Store, Thumbs.db, hidden dotfiles, anything
+      // without an image/RAW extension) so the count shown before import matches
+      // what actually gets imported — the transfer webhook filters the same way.
+      const realNames = (metadata.file_names ?? []).filter(isRealImage);
+      const realCount = realNames.length > 0 ? realNames.length : metadata.number_of_images;
+
+      if (realCount === 0) {
         return new Response(
           JSON.stringify({ error: "This folder is empty or contains no images." }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -166,9 +191,9 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           folderName: metadata.folder_name,
-          imageCount: metadata.number_of_images,
+          imageCount: realCount,
           totalSizeMB: Math.round(metadata.all_files_size * 10) / 10,
-          fileNames: metadata.file_names,
+          fileNames: realNames.length > 0 ? realNames : metadata.file_names,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
