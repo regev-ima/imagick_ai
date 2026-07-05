@@ -296,10 +296,12 @@ export default function CreateStylePage() {
     const files = localFiles.map((f) => f.file);
     const fileIds = localFiles.map((f) => f.id);
     const prefix = `styles/${userId}/${styleId}/${subDir}/`;
-    const fileNames = files.map((f) => {
-      const ext = f.name.split(".").pop() || "jpg";
-      return `${crypto.randomUUID()}.${ext}`;
-    });
+    // Training pairs before/after by ORIGINAL filename (stem) — same as the Google
+    // Drive path, which keeps Drive names (use_uuid4:false for styles). So NEVER
+    // UUID-rename here; keep the photographer's names and only neutralize path
+    // separators / whitespace, applied identically to before and after so a RAW
+    // "IMG_1234.CR2" still pairs with the edited "IMG_1234.jpg".
+    const fileNames = files.map((f) => f.name.replace(/[/\\]/g, "_").replace(/\s+/g, "_"));
 
     const { data, error } = await supabase.functions.invoke("image-upload", {
       body: { bucket: "imagick", prefix, names: fileNames },
