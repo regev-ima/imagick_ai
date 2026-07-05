@@ -375,7 +375,8 @@ export default function CreateGalleryPage() {
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset ring-border/60 transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 hover:ring-border focus:bg-surface-2 focus:ring-primary/60"
+                disabled={busy}
+                className="w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset ring-border/60 transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 hover:ring-border focus:bg-surface-2 focus:ring-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
                 placeholder="Untitled shoot"
                 aria-label="Collection name"
               />
@@ -395,7 +396,15 @@ export default function CreateGalleryPage() {
 
         {/* Two working columns that fit the viewport — each scrolls internally
             so the page itself never scrolls on desktop. */}
-        <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:grid-rows-[minmax(0,1fr)]">
+        <div
+          aria-disabled={busy}
+          className={cn(
+            "mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:grid-rows-[minmax(0,1fr)]",
+            // Once upload/creation starts the plan is locked in — freeze every
+            // control so nothing can be changed mid-flight.
+            busy && "pointer-events-none select-none opacity-60",
+          )}
+        >
           {/* LEFT — top half: photo selection · bottom half: culling */}
           <div className="flex min-h-0 flex-col gap-4">
           {/* Top half — photo selection (roomier now the shoot-type chips moved) */}
