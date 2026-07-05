@@ -317,6 +317,9 @@ export default function GalleryEditorPage() {
         "height",
         "sort_order",
         "file_size_bytes",
+        "created_at",
+        "taken_at",
+        "processing_completed_at",
         "last_processing_attempt_at",
         "processing_attempts",
         "last_processing_error",
@@ -1245,6 +1248,30 @@ export default function GalleryEditorPage() {
     return () => clearInterval(t);
   }, [gallery?.culling_status]);
 
+  // Compression-barrier watchdog. await-compression waits for every image's
+  // compressed webp then dispatches culling, but its server-side self-chain can
+  // die on a long Drive import (a stuck straggler + a dropped hop), leaving
+  // compression "in progress" and culling never dispatched. If it's been stalled
+  // well past a healthy barrier's window, re-kick it once — await-compression
+  // re-polls and (with its near-done/stall proceed) dispatches quickly. Passing
+  // only galleryId lets it rebuild the culling options from the gallery itself.
+  const compressionKickedRef = useRef(false);
+  useEffect(() => {
+    const g = gallery as any;
+    if (!g?.id) return;
+    if (!g.compression_started_at || g.compression_completed_at) {
+      compressionKickedRef.current = false; // re-arm for the next import
+      return;
+    }
+    const elapsed = cullingNow - new Date(g.compression_started_at).getTime();
+    if (elapsed > 3.5 * 60_000 && !compressionKickedRef.current) {
+      compressionKickedRef.current = true;
+      supabase.functions
+        .invoke("await-compression", { body: { galleryId: g.id } })
+        .catch((e) => console.error("compression barrier re-kick failed:", e));
+    }
+  }, [gallery, cullingNow]);
+
   // Detect stuck culling — the threshold is the full expected window
   // (5 min + 10s/photo, see lib/cullingEta.ts), so a large gallery is
   // never called "stuck" before its realistic completion window closes.
@@ -1577,9 +1604,14 @@ export default function GalleryEditorPage() {
     ? lightboxItems.findIndex(img => img.id === lightboxImage)
     : -1;
 
-  const currentDetailsImage = detailsImageId
+  const currentDetailsImageBase = detailsImageId
     ? filteredImages.find(img => img.id === detailsImageId) ?? images.find(img => img.id === detailsImageId)
     : null;
+  // The DB row often has null width/height; fall back to the dimensions we
+  // already detected from the thumbnail so the Details panel shows them.
+  const currentDetailsImage = currentDetailsImageBase && !(currentDetailsImageBase.width && currentDetailsImageBase.height)
+    ? { ...currentDetailsImageBase, ...(detectedDimensions.get(currentDetailsImageBase.id) ?? {}) }
+    : currentDetailsImageBase;
 
   // Lightbox navigation functions
   const [swipeDirection, setSwipeDirection] = useState<1 | -1>(1);
@@ -2947,7 +2979,7 @@ export default function GalleryEditorPage() {
                         animate={{ y: 0, scale: 1, opacity: 1 }}
                         exit={isMobile ? { y: swipeDirection * -300, opacity: 0 } : { scale: 0.95, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        onClick={(e) => e.stopPropagation()} className="relative flex flex-col items-center justify-center"
+                        onClick={(e) => e.stopPropagation()} className="relative flex h-full w-full flex-col items-center justify-center"
                       >
                         <img
                           src={displayUrl}
@@ -3009,9 +3041,9 @@ export default function GalleryEditorPage() {
                         animate={{ y: 0, scale: 1, opacity: 1 }}
                         exit={isMobile ? { y: swipeDirection * -300, opacity: 0 } : { scale: 0.95, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        onClick={(e) => e.stopPropagation()} className="flex items-center justify-center gap-2 px-4 w-full"
+                        onClick={(e) => e.stopPropagation()} className="flex h-full w-full items-center justify-center gap-2 px-4"
                       >
-                        <div className="relative flex-1 flex items-center justify-end min-w-0 overflow-hidden">
+                        <div className="relative flex-1 flex h-full items-center justify-end min-w-0 overflow-hidden">
                           <img
                             src={originalUrl}
                             alt="Original"
@@ -3025,7 +3057,7 @@ export default function GalleryEditorPage() {
                             Original
                           </span>
                         </div>
-                        <div className="relative flex-1 flex items-center justify-start min-w-0 overflow-hidden">
+                        <div className="relative flex-1 flex h-full items-center justify-start min-w-0 overflow-hidden">
                           <img
                             src={editedUrl}
                             alt={selectedStyleData?.name || "Edited"}
@@ -3074,7 +3106,7 @@ export default function GalleryEditorPage() {
                     animate={{ y: 0, scale: 1, opacity: 1 }}
                     exit={isMobile ? { y: swipeDirection * -300, opacity: 0 } : { scale: 0.95, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="flex items-center justify-center"
+                    className="flex h-full w-full items-center justify-center"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <img
