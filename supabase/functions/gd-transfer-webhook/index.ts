@@ -26,6 +26,28 @@ interface CallbackArgs {
   totalFolders?: number;
 }
 
+// Photo + RAW extensions we actually process. Everything else (and any hidden
+// dotfile like .DS_Store / Thumbs.db) is junk that rides along from Drive
+// folders — it never compresses, so it would stall the compression barrier and
+// show up as a "failed to load" tile. We drop it at import time.
+const IMAGE_EXTS = new Set([
+  "jpg", "jpeg", "jpe", "jfif", "png", "webp", "gif", "bmp", "tif", "tiff",
+  "heic", "heif", "avif",
+  // RAW
+  "dng", "cr2", "cr3", "crw", "nef", "nrw", "arw", "srf", "sr2", "raf", "orf",
+  "rw2", "rwl", "pef", "srw", "x3f", "3fr", "fff", "iiq", "kdc", "dcr", "mos",
+  "mef", "mrw", "raw",
+]);
+
+function isRealImage(name: string | undefined | null): boolean {
+  if (!name) return false;
+  const base = (name.split("/").pop() || name).trim();
+  if (!base || base.startsWith(".")) return false; // .DS_Store & other dotfiles
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0) return false;                       // no extension
+  return IMAGE_EXTS.has(base.slice(dot + 1).toLowerCase());
+}
+
 interface WebhookPayload {
   file_mappings: FileMapping[];
   callback_args: CallbackArgs;
@@ -80,8 +102,20 @@ serve(async (req) => {
 
     console.log(`Processing folder ${(folderIndex ?? 0) + 1}/${totalFolders ?? 1}`);
 
+    // Drop non-image junk (.DS_Store, Thumbs.db, hidden dotfiles, anything
+    // without an image/RAW extension) so it never becomes a gallery_images row —
+    // it never compresses and would stall culling / clutter the grid.
+    const imageMappings = file_mappings.filter((m) => isRealImage(m.original_name || m.new_name));
+    const dropped = file_mappings.length - imageMappings.length;
+    if (dropped > 0) {
+      console.warn(
+        `Skipping ${dropped} non-image file(s) from Drive:`,
+        file_mappings.filter((m) => !isRealImage(m.original_name || m.new_name)).map((m) => m.original_name).slice(0, 20),
+      );
+    }
+
     // Create gallery_images records for each transferred file
-    const imagesToInsert = file_mappings.map((mapping, index) => {
+    const imagesToInsert = imageMappings.map((mapping, index) => {
       const filePath = `galleries/${userId}/${galleryId}/${mapping.new_name}`;
       const originalUrl = `${B2_BASE_URL}/${filePath}`;
 
