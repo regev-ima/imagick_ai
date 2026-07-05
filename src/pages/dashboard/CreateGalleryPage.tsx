@@ -194,12 +194,6 @@ export default function CreateGalleryPage() {
   const objectUrls = useRef<string[]>([]);
   useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
-  // Progressive disclosure — sections appear as the previous one is filled, and
-  // the page eases down to each newly revealed section so it never feels long.
-  const lookSectionRef = useRef<HTMLDivElement>(null);
-  const finalSectionRef = useRef<HTMLDivElement>(null);
-  const prevPhotos = useRef(0);
-  const prevTouched = useRef(false);
 
   // ── Prefills ───────────────────────────────────────────────────────────────
   // Aura hand-off (⌘K "start a collection named X") → ?name=
@@ -353,26 +347,6 @@ export default function CreateGalleryPage() {
 
   useEffect(() => { if (photos === 0) setReviewOpen(false); }, [photos]);
 
-  // Ease down to the look section the first time photos are added…
-  useEffect(() => {
-    const was = prevPhotos.current;
-    prevPhotos.current = photos;
-    if (was === 0 && photos > 0) {
-      const id = setTimeout(() => lookSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
-      return () => clearTimeout(id);
-    }
-  }, [photos]);
-
-  // …and to the culling/credits/create section once a look choice is made.
-  useEffect(() => {
-    const was = prevTouched.current;
-    prevTouched.current = styleTouched;
-    if (!was && styleTouched) {
-      const id = setTimeout(() => finalSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
-      return () => clearTimeout(id);
-    }
-  }, [styleTouched]);
-
   const pct = uploadProgress && uploadProgress.totalBytes > 0
     ? Math.round((uploadProgress.bytesUploaded / uploadProgress.totalBytes) * 100)
     : 0;
@@ -385,38 +359,30 @@ export default function CreateGalleryPage() {
         : `${looksCount} looks`;
 
   return (
-    <div className="min-h-full bg-background px-4 py-8 lg:px-8">
+    <div className="min-h-full bg-background lg:h-full lg:overflow-hidden">
       <input ref={inputRef} type="file" multiple accept={IMAGE_ACCEPT} className="hidden" onChange={(e) => ingest(e.target.files)} />
 
-      <div className="mx-auto w-full max-w-2xl">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleLeave} aria-label="Back to collections">
+      <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-5 lg:h-full lg:min-h-0 lg:px-8">
+        {/* Header + live plan — one compact bar so the two working columns get
+            the height. Title is the editable name; summary pills sit alongside. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Button variant="ghost" size="icon" className="shrink-0" onClick={handleLeave} aria-label="Back to collections">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <span className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={11} /> New collection</span>
-            <h1 className="text-2xl font-bold tracking-tight">Plan your shoot</h1>
+          <div className="min-w-0 flex-1">
+            <span className="aura-microlabel flex items-center gap-1.5 text-accent"><SparklesIcon className="h-3 w-3" /> New collection · live plan</span>
+            <div className="group relative mt-0.5">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset ring-border/60 transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 hover:ring-border focus:bg-surface-2 focus:ring-primary/60"
+                placeholder="Untitled shoot"
+                aria-label="Collection name"
+              />
+              <Pencil className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 transition-colors group-hover:text-foreground/70" />
+            </div>
           </div>
-        </div>
-
-        {/* Plan hero — name, live summary, and the create action */}
-        <div className="glass-card mt-6 rounded-[--radius] p-6">
-          <span className="aura-microlabel flex items-center gap-1.5 text-accent"><SparklesIcon className="h-3 w-3" /> Live plan</span>
-          {/* Editable title — a subtle field + pencil so it clearly reads as
-              renameable (not a static heading), on desktop and mobile alike. */}
-          <div className="group relative mt-2">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-md bg-surface-2/40 py-1.5 pl-3 pr-11 text-3xl font-bold tracking-tight outline-none ring-1 ring-inset ring-border/60 transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 hover:ring-border focus:bg-surface-2 focus:ring-primary/60"
-              placeholder="Untitled shoot"
-              aria-label="Collection name"
-            />
-            <Pencil className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50 transition-colors group-hover:text-foreground/70" />
-          </div>
-          <p className="caption mt-1.5 pl-1">Tap to rename</p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
             <Pill><Images className="h-3 w-3" /> {photos ? `${photos.toLocaleString()} photos` : "no photos yet"}</Pill>
             <Pill>{typeLabel}</Pill>
             <Pill>{looksLabel}</Pill>
@@ -427,8 +393,11 @@ export default function CreateGalleryPage() {
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="mt-5 space-y-5">
+        {/* Two working columns that fit the viewport — each scrolls internally
+            so the page itself never scrolls on desktop. */}
+        <div className="mt-4 grid flex-1 gap-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+          {/* LEFT — photos → shoot type → AI look */}
+          <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           {/* Photos */}
           <div className="glass-card rounded-[--radius] p-5">
             <div className="caption mb-2.5">Photos</div>
@@ -478,14 +447,6 @@ export default function CreateGalleryPage() {
             )}
           </div>
 
-          {photos > 0 && (
-          <motion.div
-            ref={lookSectionRef}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: [0.22, 0.61, 0.36, 1] }}
-            className="scroll-mt-24 space-y-5"
-          >
           {/* Shoot type */}
           <div className="glass-card rounded-[--radius] p-5">
             <div className="caption mb-2.5">Shoot type</div>
@@ -534,17 +495,10 @@ export default function CreateGalleryPage() {
               <p className="caption mt-3">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
             )}
           </div>
-          </motion.div>
-          )}
+          </div>
 
-          {styleTouched && (
-          <motion.div
-            ref={finalSectionRef}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: [0.22, 0.61, 0.36, 1] }}
-            className="scroll-mt-24 space-y-5"
-          >
+          {/* RIGHT — cull → credits → create */}
+          <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           {/* Culling */}
           <div className={cn("glass-card rounded-[--radius] transition-colors", cull && "border-primary/40")}>
             <button type="button" onClick={toggleCull} className="flex w-full items-center gap-3 p-5 text-left">
@@ -677,8 +631,7 @@ export default function CreateGalleryPage() {
               </p>
             </div>
           )}
-          </motion.div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -743,22 +696,26 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
   const aura = styles.filter((s) => !(ownerId != null && s.user_id === ownerId));
 
   return (
-    <div className="max-h-[360px] space-y-4 overflow-y-auto pr-1">
+    <div className="max-h-[44vh] space-y-3 overflow-y-auto pr-1 lg:max-h-[calc(100dvh-25rem)]">
       {mine.length > 0 && (
         <div className="space-y-2">
           <div className="aura-microlabel flex items-center gap-1.5 text-primary"><Sparkle size={10} /> Your AI models</div>
-          {mine.map((s) => (
-            <LookRow key={s.id} style={s} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
-          ))}
+          <div className="grid grid-cols-3 gap-2">
+            {mine.map((s) => (
+              <LookTile key={s.id} style={s} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+            ))}
+          </div>
         </div>
       )}
 
       {aura.length > 0 && (
         <div className="space-y-2">
           {mine.length > 0 && <div className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={10} /> Aura looks</div>}
-          {aura.map((s) => (
-            <LookRow key={s.id} style={s} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
-          ))}
+          <div className="grid grid-cols-3 gap-2">
+            {aura.map((s) => (
+              <LookTile key={s.id} style={s} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -767,17 +724,17 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
       )}
 
       {/* Opt-out — dashed + separated so it never competes with the AI models. */}
-      <div className="pt-1">
-        <div className="aura-hairline mb-2.5" />
+      <div className="pt-0.5">
+        <div className="aura-hairline mb-2" />
         <button
           type="button"
           onClick={onHosting}
           className={cn(
-            "flex w-full items-center gap-3 rounded-[--radius] border border-dashed p-2.5 text-left transition-colors",
+            "flex w-full items-center gap-2.5 rounded-[--radius] border border-dashed p-2 text-left transition-colors",
             hosting ? "border-primary bg-primary/10 ring-1 ring-inset ring-primary" : "border-border/70 hover:border-primary/40 hover:bg-surface-2/40",
           )}
         >
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground"><Ban className="h-5 w-5" strokeWidth={1.5} /></span>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground"><Ban className="h-4 w-4" strokeWidth={1.5} /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold">No editing</span>
             <span className="caption block">Host &amp; share as-is · 0 edits</span>
@@ -789,9 +746,10 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
   );
 }
 
-// One AI-model row — premium, AI-forward (never says "preset"). No-cover models
-// get a subtle royal-blue aura tile with the sparkle so they read as AI engines.
-function LookRow({ style: s, on, locked, mine = false, recommended = false, onClick }: {
+// One AI-model tile — a compact, visual card so many looks fit at a glance.
+// The cover fills the tile with the name overlaid; no-cover models get a royal-
+// blue aura tile with the sparkle so they still read as AI engines.
+function LookTile({ style: s, on, locked, mine = false, recommended = false, onClick }: {
   style: StyleRow;
   on: boolean;
   locked: boolean;
@@ -805,35 +763,34 @@ function LookRow({ style: s, on, locked, mine = false, recommended = false, onCl
       type="button"
       onClick={onClick}
       disabled={locked}
+      title={s.name}
       className={cn(
-        "group flex w-full items-center gap-3 rounded-[--radius] border p-2.5 text-left transition-all",
+        "group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[--radius] border text-left transition-all",
         on
-          ? "border-primary bg-primary/10 ring-1 ring-inset ring-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.10)]"
-          : "border-border hover:border-primary/40 hover:bg-surface-2/40",
-        locked && "cursor-not-allowed opacity-45 hover:border-border hover:bg-transparent",
+          ? "border-primary ring-1 ring-inset ring-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.10)]"
+          : "border-border hover:border-primary/50",
+        locked && "cursor-not-allowed opacity-45 hover:border-border",
       )}
     >
-      <span className="plate-keyline relative h-12 w-12 shrink-0 overflow-hidden rounded-md">
-        {cover ? (
-          <img src={getThumbnailUrl(cover)} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span className="relative grid h-full w-full place-items-center bg-surface-2">
-            <span className="absolute inset-0 bg-gradient-to-br from-primary/30 to-transparent" />
-            <Sparkle size={15} className="relative text-primary" />
-          </span>
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold">{s.name}</span>
-          {recommended && !on && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">Aura pick</span>}
+      {cover ? (
+        <img src={getThumbnailUrl(cover)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <span className="absolute inset-0 grid place-items-center bg-surface-2">
+          <span className="absolute inset-0 bg-gradient-to-br from-primary/30 to-transparent" />
+          <Sparkle size={18} className="relative text-primary" />
         </span>
-        <span className="caption mt-0.5 flex items-center gap-1 truncate">
-          <Sparkle size={9} className={mine ? "text-primary" : "text-accent"} />
-          {mine ? "Your AI model" : s.category ? `Aura · ${s.category}` : "Aura AI model"}
+      )}
+      {/* Legibility gradient + name */}
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-1.5 pb-1.5 pt-5">
+        <span className="flex items-center gap-1">
+          <Sparkle size={8} className={mine ? "text-primary" : "text-accent"} />
+          <span className="truncate text-[11px] font-semibold leading-tight text-white">{s.name}</span>
         </span>
       </span>
-      <SelectMark on={on} />
+      <span className="absolute right-1.5 top-1.5"><SelectMark on={on} /></span>
+      {recommended && !on && (
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-primary-foreground shadow">Pick</span>
+      )}
     </button>
   );
 }
