@@ -395,11 +395,13 @@ export default function CreateGalleryPage() {
 
         {/* Two working columns that fit the viewport — each scrolls internally
             so the page itself never scrolls on desktop. */}
-        <div className="mt-4 grid flex-1 gap-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-          {/* LEFT — photos → shoot type → AI look */}
-          <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+        <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:grid-rows-[minmax(0,1fr)]">
+          {/* LEFT — top half: photo selection · bottom half: culling */}
+          <div className="flex min-h-0 flex-col gap-4">
+          {/* Top half — photo selection */}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 lg:overflow-y-auto lg:pr-1">
           {/* Photos */}
-          <div className="glass-card rounded-[--radius] p-5">
+          <div className="glass-card rounded-[--radius] p-5 lg:shrink-0">
             <div className="caption mb-2.5">Photos</div>
             <UploadSourceSelector value={uploadSource} onChange={onSourceChange} disabled={busy} />
             {uploadSource === "drive" ? (
@@ -470,35 +472,10 @@ export default function CreateGalleryPage() {
             </div>
           </div>
 
-          {/* AI editing model — the most important choice; given an AI-forward
-              treatment (rotating royal-blue keyline) to feel like the engine. */}
-          <div className="aura-ai-border glass-card rounded-[--radius] p-5">
-            <div className="mb-3.5 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  <Sparkle size={13} className="text-primary" /> Choose your AI look
-                </div>
-                <p className="caption mt-1">A trained AI model edits every photo in this look — pick up to {MAX_LOOKS}.</p>
-              </div>
-              {looksCount > 0 && <span className="aura-microlabel shrink-0 text-primary">{looksCount}/{MAX_LOOKS}</span>}
-            </div>
-            <LookGrid
-              styles={rankedStyles}
-              selectedIds={styleIds}
-              chosen={styleTouched}
-              ownerId={user?.id}
-              onToggle={toggleStyle}
-              onHosting={pickHosting}
-              max={MAX_LOOKS}
-            />
-            {looksCount >= 1 && (
-              <p className="caption mt-3">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
-            )}
-          </div>
-          </div>
+          </div>{/* end top half */}
 
-          {/* RIGHT — cull → credits → create */}
-          <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+          {/* Bottom half — culling */}
+          <div className="min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
           {/* Culling */}
           <div className={cn("glass-card rounded-[--radius] transition-colors", cull && "border-primary/40")}>
             <button type="button" onClick={toggleCull} className="flex w-full items-center gap-3 p-5 text-left">
@@ -562,20 +539,53 @@ export default function CreateGalleryPage() {
             )}
           </div>
 
-          {/* Credits — make the cost tangible right where you decide */}
-          <div className="glass-card rounded-[--radius] p-5">
+          </div>{/* end bottom half */}
+          </div>{/* end LEFT column */}
+
+          {/* RIGHT — choose your AI look, full height */}
+          <div className="flex min-h-0 flex-col">
+          <div className="aura-ai-border glass-card flex min-h-0 flex-1 flex-col rounded-[--radius] p-5">
+            <div className="mb-3.5 flex shrink-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                  <Sparkle size={13} className="text-primary" /> Choose your AI look
+                </div>
+                <p className="caption mt-1">A trained AI model edits every photo in this look — pick up to {MAX_LOOKS}.</p>
+              </div>
+              {looksCount > 0 && <span className="aura-microlabel shrink-0 text-primary">{looksCount}/{MAX_LOOKS}</span>}
+            </div>
+            <LookGrid
+              styles={rankedStyles}
+              selectedIds={styleIds}
+              chosen={styleTouched}
+              ownerId={user?.id}
+              onToggle={toggleStyle}
+              onHosting={pickHosting}
+              max={MAX_LOOKS}
+            />
+            {looksCount >= 1 && (
+              <p className="caption mt-3 shrink-0">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
+            )}
+          </div>
+          </div>
+        </div>{/* end grid */}
+
+        {/* Footer — cost + the create action, spanning both columns */}
+        <div className="mt-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-stretch lg:justify-between">
+          {/* Credits */}
+          <div className="glass-card min-w-0 flex-1 rounded-[--radius] px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5 text-sm font-semibold"><Sparkle size={12} className="text-accent" /> Edits this collection will use</span>
               <span className="font-mono text-sm font-semibold">{isUnlimited ? editsNeeded.toLocaleString() : `${editsNeeded.toLocaleString()} / ${availableEdits.toLocaleString()}`}</span>
             </div>
             {isUnlimited ? (
-              <p className="caption mt-2">Unlimited edits on your plan — edit as many as you like.</p>
+              <p className="caption mt-1.5">Unlimited edits on your plan — edit as many as you like.</p>
             ) : (
               <>
-                <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div className={cn("h-full rounded-full transition-[width] duration-300", hasInsufficientEdits ? "bg-destructive" : "bg-primary")} style={{ width: `${usedPct}%` }} />
                 </div>
-                <p className="caption mt-2">
+                <p className="caption mt-1.5">
                   {looksCount === 0 ? (
                     "Hosting only — no edits used."
                   ) : (
@@ -584,9 +594,8 @@ export default function CreateGalleryPage() {
                 </p>
               </>
             )}
-
             {!isUnlimited && hasInsufficientEdits && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[--radius] border border-destructive/40 bg-destructive/[0.06] p-3 text-sm">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-[--radius] border border-destructive/40 bg-destructive/[0.06] p-2.5 text-sm">
                 <span className="flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   Not enough edits — max {Number.isFinite(maxImages) ? maxImages.toLocaleString() : "—"} photos with {looksCount} look{looksCount > 1 ? "s" : ""}.
@@ -595,14 +604,15 @@ export default function CreateGalleryPage() {
               </div>
             )}
             {!isUnlimited && !hasInsufficientEdits && isFreePlan && availableEdits === 0 && looksCount > 0 && (
-              <p className="mt-3 text-xs text-muted-foreground">
+              <p className="mt-2 text-xs text-muted-foreground">
                 You're on the free plan with no edits left — pick "No editing" to host &amp; share, or{" "}
                 <button className="text-primary hover:underline" onClick={() => navigate("/dashboard/billing")}>upgrade</button> to let Aura edit.
               </p>
             )}
           </div>
 
-          {/* Create — greyed out until everything above is chosen */}
+          {/* Create */}
+          <div className="lg:flex lg:w-[320px] lg:shrink-0 lg:flex-col lg:justify-center">
           {busy ? (
             <div className="space-y-3 rounded-[--radius] border border-border bg-card p-4">
               <div className="flex items-center justify-between text-sm">
@@ -696,7 +706,7 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
   const aura = styles.filter((s) => !(ownerId != null && s.user_id === ownerId));
 
   return (
-    <div className="max-h-[44vh] space-y-3 overflow-y-auto pr-1 lg:max-h-[calc(100dvh-25rem)]">
+    <div className="max-h-[44vh] space-y-3 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">
       {mine.length > 0 && (
         <div className="space-y-2">
           <div className="aura-microlabel flex items-center gap-1.5 text-primary"><Sparkle size={10} /> Your AI models</div>
