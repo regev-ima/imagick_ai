@@ -17,6 +17,15 @@ import { corsHeaders } from "../_shared/cors.ts";
 // trigger-culling) invoke this instead of process-pipeline directly; `options`
 // is forwarded verbatim so the pipeline behaves exactly as before, just gated.
 
+// Supabase Edge / Deno Deploy keeps the isolate alive for a promise handed to
+// EdgeRuntime.waitUntil. Without it, returning the Response can tear the isolate
+// down BEFORE a fire-and-forget self-chain fetch is actually sent — which is why
+// a long compression wait (a fresh large gallery) previously died at the
+// per-invocation budget and never dispatched culling.
+declare const EdgeRuntime:
+  | { waitUntil(promise: Promise<unknown>): void }
+  | undefined;
+
 const HEAD_CONCURRENCY = 24;
 const POLL_INTERVAL_MS = 5_000;
 // Stay well under the edge function wall-clock limit; hand off to a fresh
@@ -146,14 +155,23 @@ serve(async (req) => {
     const images = (imgs ?? []).filter((r) => !!r.original_url) as { id: string; original_url: string }[];
     const total = images.length;
 
-    const maxWaitMs = Math.min(MAX_WAIT_MS, Math.max(MIN_WAIT_MS, total * PER_IMAGE_ESTIMATE_MS));
-    // Allow a small fraction of never-compressing stragglers before proceeding.
-    const stragglerAllowance = Math.max(2, Math.ceil(total * 0.02));
     const ready = new Set<string>();
     const invocationStart = Date.now();
     // Track progress to detect a plateau (compression has effectively finished).
     let lastReadySize = -1;
     let lastProgressAt = Date.now();
+    // The safety timeout and straggler allowance are scaled to the images that
+    // are NOT yet compressed at the start of this barrier — not the whole
+    // gallery. This is critical for an INCREMENTAL add: a handful of new photos
+    // in an otherwise-compressed gallery must time out in ~MIN_WAIT_MS and
+    // dispatch, instead of inheriting the whole gallery's multi-minute budget.
+    // It also stops the straggler fast-path being defeated by the already-
+    // compressed old images all being instantly HEAD-200. Provisional values
+    // (whole-gallery) until the first sweep tells us how many are actually
+    // pending, then recomputed once below.
+    let maxWaitMs = Math.min(MAX_WAIT_MS, Math.max(MIN_WAIT_MS, total * PER_IMAGE_ESTIMATE_MS));
+    let stragglerAllowance = Math.max(2, Math.ceil(total * 0.02));
+    let scaledToPending = false;
 
     const sweep = async () => {
       const pending = images.filter((i) => !ready.has(i.id));
@@ -183,6 +201,14 @@ serve(async (req) => {
         lastReadySize = ready.size;
         lastProgressAt = Date.now();
       }
+      // First sweep reveals how many images actually still need compressing —
+      // scale the timeout & straggler allowance to THAT subset (see above).
+      if (!scaledToPending) {
+        scaledToPending = true;
+        const pendingAtStart = Math.max(0, total - ready.size);
+        maxWaitMs = Math.min(MAX_WAIT_MS, Math.max(MIN_WAIT_MS, pendingAtStart * PER_IMAGE_ESTIMATE_MS));
+        stragglerAllowance = Math.max(2, Math.ceil(pendingAtStart * 0.02));
+      }
       await admin
         .from("galleries")
         .update({ compression_ready_count: ready.size, compression_total_count: total })
@@ -206,11 +232,14 @@ serve(async (req) => {
 
       if (Date.now() - invocationStart > PER_INVOCATION_BUDGET_MS) {
         // Hand off to a fresh invocation so we don't hit the wall-clock limit.
-        fetch(`${supabaseUrl}/functions/v1/await-compression`, {
+        // waitUntil keeps the isolate alive until the continuation is actually
+        // sent — a bare fire-and-forget fetch can be dropped when we return.
+        const chain = fetch(`${supabaseUrl}/functions/v1/await-compression`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
           body: JSON.stringify({ galleryId, options }),
         }).catch((e) => console.error("await-compression self-chain failed:", e));
+        try { EdgeRuntime?.waitUntil(chain); } catch { /* not available in this runtime */ }
         return json({ pending: true, ready: ready.size, total, chained: true });
       }
 
