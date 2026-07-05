@@ -217,6 +217,67 @@ export function AddImagesModal({
     setStep("upload");
   };
 
+  // Re-run AI culling incrementally after new photos land. Re-arms the
+  // compression barrier (so it waits for the NEW photos to compress — the old
+  // ones already are), flips culling back to "processing", and dispatches the
+  // pipeline with the gallery's own culling settings. process-pipeline skips
+  // any image that already has a score/embedding/faces, so only the new photos
+  // cost VLM/GPU. No-op if the gallery doesn't use AI culling.
+  const triggerIncrementalCulling = async (gId: string) => {
+    try {
+      const { data: g } = await supabase
+        .from("galleries")
+        .select("ai_culling_enabled, ai_grouping_enabled, ai_faces_enabled, culling_labels")
+        .eq("id", gId)
+        .single();
+      if (!g?.ai_culling_enabled) return;
+
+      await supabase
+        .from("galleries")
+        .update({
+          compression_started_at: null,
+          compression_completed_at: null,
+          compression_ready_count: 0,
+          compression_total_count: 0,
+          culling_status: "processing",
+          culling_completed_at: null,
+        } as any)
+        .eq("id", gId);
+
+      // Admin-configured VLM model + EXIF time gate.
+      let adminModel: string | undefined;
+      let adminTime = 600;
+      try {
+        const { data: cfgRow } = await supabase
+          .from("platform_settings").select("value").eq("key", "culling_config").single();
+        if (cfgRow?.value) {
+          const cfg = JSON.parse(cfgRow.value);
+          if (typeof cfg.model === "string") adminModel = cfg.model;
+          if (typeof cfg.timeThreshold === "number") adminTime = cfg.timeThreshold;
+        }
+      } catch { /* fall back to defaults */ }
+
+      void supabase.functions.invoke("await-compression", {
+        body: {
+          galleryId: gId,
+          options: {
+            culling: true,
+            tags: true,
+            cluster: (g as any).ai_grouping_enabled ?? true,
+            faces: (g as any).ai_faces_enabled ?? false,
+            labels: (g as any).culling_labels || [],
+            thresholds: [0.5, 0.7, 0.9],
+            timeThreshold: adminTime,
+            ...(adminModel ? { model: adminModel } : {}),
+            scoreVisionUrl: `${window.location.origin}/api/score-vision`,
+          },
+        },
+      });
+    } catch (err) {
+      console.error("Incremental culling trigger failed (non-fatal):", err);
+    }
+  };
+
   const handleConfirm = async () => {
     if (!user) return;
 
@@ -289,6 +350,13 @@ export function AddImagesModal({
             selected_style_ids: selectedStyles,
           })
           .eq("id", galleryId);
+
+        // Rate/group/detect the NEW photos too, if this gallery uses AI culling.
+        // The pipeline is incremental — it only scores/embeds/detects images
+        // that don't have those outputs yet — so this spends VLM/GPU on the new
+        // photos ONLY; grouping + face clustering re-run over the gallery (cheap,
+        // reusing stored vectors) so the new photos join existing bursts/people.
+        await triggerIncrementalCulling(galleryId);
 
         // Process any IDs that weren't streamed (last partial batch).
         if (selectedStyles.length > 0) {
@@ -687,6 +755,15 @@ export function AddImagesModal({
                       )}
                     </div>
                   )}
+
+                  {/* Only-the-new-photos note — reassures that adding images
+                      won't re-spend on the existing collection. */}
+                  <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.05] p-3 text-xs text-muted-foreground">
+                    <Sparkle size={13} className="mt-0.5 shrink-0 text-primary" />
+                    <span>
+                      Only the new photos are processed. If this collection uses AI culling, the new photos are rated, grouped &amp; face-tagged and slotted into your existing groups — your current photos and edits aren't touched.
+                    </span>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

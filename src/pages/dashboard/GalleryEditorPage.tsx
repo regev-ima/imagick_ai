@@ -317,6 +317,9 @@ export default function GalleryEditorPage() {
         "height",
         "sort_order",
         "file_size_bytes",
+        "created_at",
+        "taken_at",
+        "processing_completed_at",
         "last_processing_attempt_at",
         "processing_attempts",
         "last_processing_error",
@@ -1577,9 +1580,14 @@ export default function GalleryEditorPage() {
     ? lightboxItems.findIndex(img => img.id === lightboxImage)
     : -1;
 
-  const currentDetailsImage = detailsImageId
+  const currentDetailsImageBase = detailsImageId
     ? filteredImages.find(img => img.id === detailsImageId) ?? images.find(img => img.id === detailsImageId)
     : null;
+  // The DB row often has null width/height; fall back to the dimensions we
+  // already detected from the thumbnail so the Details panel shows them.
+  const currentDetailsImage = currentDetailsImageBase && !(currentDetailsImageBase.width && currentDetailsImageBase.height)
+    ? { ...currentDetailsImageBase, ...(detectedDimensions.get(currentDetailsImageBase.id) ?? {}) }
+    : currentDetailsImageBase;
 
   // Lightbox navigation functions
   const [swipeDirection, setSwipeDirection] = useState<1 | -1>(1);
@@ -2947,7 +2955,7 @@ export default function GalleryEditorPage() {
                         animate={{ y: 0, scale: 1, opacity: 1 }}
                         exit={isMobile ? { y: swipeDirection * -300, opacity: 0 } : { scale: 0.95, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        onClick={(e) => e.stopPropagation()} className="relative flex flex-col items-center justify-center"
+                        onClick={(e) => e.stopPropagation()} className="relative flex h-full w-full flex-col items-center justify-center"
                       >
                         <img
                           src={displayUrl}
@@ -3009,9 +3017,9 @@ export default function GalleryEditorPage() {
                         animate={{ y: 0, scale: 1, opacity: 1 }}
                         exit={isMobile ? { y: swipeDirection * -300, opacity: 0 } : { scale: 0.95, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        onClick={(e) => e.stopPropagation()} className="flex items-center justify-center gap-2 px-4 w-full"
+                        onClick={(e) => e.stopPropagation()} className="flex h-full w-full items-center justify-center gap-2 px-4"
                       >
-                        <div className="relative flex-1 flex items-center justify-end min-w-0 overflow-hidden">
+                        <div className="relative flex-1 flex h-full items-center justify-end min-w-0 overflow-hidden">
                           <img
                             src={originalUrl}
                             alt="Original"
@@ -3025,7 +3033,7 @@ export default function GalleryEditorPage() {
                             Original
                           </span>
                         </div>
-                        <div className="relative flex-1 flex items-center justify-start min-w-0 overflow-hidden">
+                        <div className="relative flex-1 flex h-full items-center justify-start min-w-0 overflow-hidden">
                           <img
                             src={editedUrl}
                             alt={selectedStyleData?.name || "Edited"}
@@ -3074,7 +3082,7 @@ export default function GalleryEditorPage() {
                     animate={{ y: 0, scale: 1, opacity: 1 }}
                     exit={isMobile ? { y: swipeDirection * -300, opacity: 0 } : { scale: 0.95, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="flex items-center justify-center"
+                    className="flex h-full w-full items-center justify-center"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <img
