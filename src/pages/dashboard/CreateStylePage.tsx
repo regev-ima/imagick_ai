@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 import { Progress } from "@/components/ui/progress";
+import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
 
 interface UploadProgress {
   before: { uploaded: number; total: number };
@@ -165,17 +166,19 @@ function ButtonSparkles({ active }: { active: boolean }) {
 interface LocalFile {
   id: string;
   file: File;
-  preview: string;
+  /** Object URL for an <img> preview, or null for RAW/HEIC the browser can't render. */
+  preview: string | null;
 }
+
+// RAW/HEIC can't render as <img>; only build previews from web-renderable files.
+const isPreviewable = (f: File) => f.type.startsWith("image/") && !/heic|heif/i.test(f.type);
 
 export default function CreateStylePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   // Respect the OS "reduce motion" setting — gates all ambient/looping motion.
   const prefersReducedMotion = useReducedMotion();
-  const [currentStep, setCurrentStep] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [sparkleTarget, setSparkleTarget] = useState<string | null>(null);
   const [shimmerZone, setShimmerZone] = useState<"before" | "after" | null>(null);
   const [hoveringCreate, setHoveringCreate] = useState(false);
@@ -217,11 +220,6 @@ export default function CreateStylePage() {
     return total > 0 ? Math.round((uploaded / total) * 100) : 0;
   }, [uploadProgress]);
 
-  const steps = [
-    { number: 1, title: "Details", subtitle: "Name & style type", icon: FileText },
-    { number: 2, title: "Images", subtitle: "Upload training pairs", icon: Upload },
-  ];
-
   const toggleModelType = (value: string) => {
     setSparkleTarget(value);
     setTimeout(() => setSparkleTarget(null), 500);
@@ -248,11 +246,16 @@ export default function CreateStylePage() {
     else setIsDraggingAfter(false);
   }, []);
 
+  // Before = original captures (RAW/HEIC allowed); After = edited exports (raster
+  // only — a RAW "after" makes no sense as a training target).
+  const acceptsFile = (f: File, type: "before" | "after") =>
+    type === "before" ? isImageFile(f) : f.type.startsWith("image/");
+
   const handleDrop = useCallback((e: React.DragEvent, type: "before" | "after") => {
     e.preventDefault();
     if (type === "before") setIsDraggingBefore(false);
     else setIsDraggingAfter(false);
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+    const files = Array.from(e.dataTransfer.files).filter((f) => acceptsFile(f, type));
     if (files.length > 0) {
       setShimmerZone(type);
       setTimeout(() => setShimmerZone(null), 600);
@@ -261,14 +264,14 @@ export default function CreateStylePage() {
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: "before" | "after") => {
-    if (e.target.files) addFiles(Array.from(e.target.files), type);
+    if (e.target.files) addFiles(Array.from(e.target.files).filter((f) => acceptsFile(f, type)), type);
   };
 
   const addFiles = (files: File[], type: "before" | "after") => {
     const newFiles: LocalFile[] = files.map((file) => ({
       id: Math.random().toString(36).substr(2, 9),
       file,
-      preview: URL.createObjectURL(file),
+      preview: isPreviewable(file) ? URL.createObjectURL(file) : null,
     }));
     if (type === "before") setBeforeFiles((prev) => [...prev, ...newFiles]);
     else setAfterFiles((prev) => [...prev, ...newFiles]);
@@ -278,7 +281,7 @@ export default function CreateStylePage() {
     const setter = type === "before" ? setBeforeFiles : setAfterFiles;
     setter((prev) => {
       const file = prev.find((f) => f.id === id);
-      if (file) URL.revokeObjectURL(file.preview);
+      if (file?.preview) URL.revokeObjectURL(file.preview);
       return prev.filter((f) => f.id !== id);
     });
   };
@@ -507,26 +510,12 @@ export default function CreateStylePage() {
     }
   };
 
-  const canProceed = () => {
-    switch (currentStep) {
-      case 1:
-        return name.trim().length > 0;
-      case 2:
-        if (uploadSource === "local") {
-          return beforeFiles.length >= 5 && afterFiles.length >= 5;
-        }
-        return beforeDriveLinks.length > 0 && afterDriveLinks.length > 0;
-      default:
-        return false;
-    }
-  };
-
-  const goToStep = (step: number) => {
-    if (step > currentStep) {
-      setCompletedSteps((prev) => new Set([...prev, currentStep]));
-    }
-    setCurrentStep(step);
-  };
+  const hasName = name.trim().length > 0;
+  const hasImages =
+    uploadSource === "local"
+      ? beforeFiles.length >= 5 && afterFiles.length >= 5
+      : beforeDriveLinks.length > 0 && afterDriveLinks.length > 0;
+  const canCreate = hasName && hasImages;
 
   // Leaving mid-flow throws away typed details, staged files, and Drive links.
   // Intercept Cancel / back with a confirm when there's something to lose.
@@ -610,127 +599,27 @@ export default function CreateStylePage() {
       </div>
       )}
 
-      <div className="relative mx-auto w-full max-w-[1320px]">
-        {/* ════ MASTHEAD ═══════════════════════════════════════════════ */}
-        <div className="flex items-center justify-between gap-4 pb-3">
-          <span className="caption flex items-center gap-1.5 text-accent">
-            <Sparkle size={11} className="text-accent" />
-            Train an AI style
-          </span>
-          <span className="caption flex items-center gap-1.5">
-            <span className="aura-led" style={{ "--led": "var(--primary)" } as CSSProperties} />
-            Step {currentStep} / {steps.length}
-          </span>
-        </div>
-        <hr className="aura-hairline" />
-
-        <div className="mt-6 flex items-center gap-3">
+      <div className="relative mx-auto w-full max-w-[1100px]">
+        {/* ════ MASTHEAD — single page, inspired by the collection planner ══ */}
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={handleLeave} aria-label="Back to styles">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            <span className="aura-microlabel flex items-center gap-1.5 text-accent">
+              <Sparkle size={11} /> Train an AI style
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
               Train New <span className="text-accent">AI Style</span>
             </h1>
-            <p className="mt-1 font-sans text-sm text-muted-foreground">
-              Create a custom AI editing style from your images
-            </p>
           </div>
         </div>
 
-        {/* ════ STEPPER — mono instrument timeline ═══════════════════════ */}
-        <div className="relative mt-8 flex items-start justify-center px-4">
-          {steps.map((step, index) => {
-            const isActive = currentStep === step.number;
-            const isCompleted = currentStep > step.number || completedSteps.has(step.number);
-            const isUpcoming = !isActive && !isCompleted;
-
-            return (
-              <div key={step.number} className="flex items-start">
-                {/* Step node */}
-                <div className="flex flex-col items-center">
-                  <div className="relative">
-                    <motion.div
-                      className={cn(
-                        "relative z-10 flex h-11 w-11 items-center justify-center rounded-[--radius] border transition-all",
-                        isActive && "border-primary bg-primary text-primary-foreground",
-                        isCompleted && "border-primary/40 bg-primary/15",
-                        isUpcoming && "border-border bg-card",
-                      )}
-                      animate={isActive && !prefersReducedMotion ? {
-                        boxShadow: [
-                          "0 0 12px -4px hsl(var(--primary) / 0.4)",
-                          "0 0 24px -4px hsl(var(--primary) / 0.7)",
-                          "0 0 12px -4px hsl(var(--primary) / 0.4)",
-                        ],
-                      } : {}}
-                      transition={isActive && !prefersReducedMotion ? { duration: 2.2, repeat: Infinity, ease: "easeInOut" } : {}}
-                    >
-                      {isCompleted ? (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                        >
-                          <Check className="h-5 w-5 text-accent" />
-                        </motion.div>
-                      ) : (
-                        <step.icon className={cn(
-                          "h-5 w-5",
-                          isActive ? "text-primary-foreground" : "text-muted-foreground",
-                        )} />
-                      )}
-                    </motion.div>
-                    {/* Sparkle burst on completion */}
-                    <SparkleBurst active={isCompleted && completedSteps.has(step.number) && !prefersReducedMotion} />
-                  </div>
-                  <span className={cn(
-                    "mt-2 text-sm font-semibold tracking-tight",
-                    isActive ? "text-foreground" : isCompleted ? "text-accent" : "text-muted-foreground",
-                  )}>
-                    {step.title}
-                  </span>
-                  <span className="aura-microlabel mt-0.5 hidden sm:block">{step.subtitle}</span>
-                </div>
-
-                {/* Connector line */}
-                {index < steps.length - 1 && (
-                  <div className="relative mx-2 mt-[22px] h-0.5 w-16 overflow-hidden rounded-full bg-muted sm:w-24">
-                    <motion.div
-                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-accent"
-                      initial={{ width: "0%" }}
-                      animate={{ width: currentStep > step.number ? "100%" : "0%" }}
-                      transition={{ duration: 0.5, ease: EASE }}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ════ STEP CONTENT — pro panel ═════════════════════════════════ */}
-        <div className="relative mt-8 glass-card overflow-hidden rounded-[--radius]">
-          <div className="flex items-center justify-between gap-2 border-b border-border bg-background/40 px-4 py-2.5">
-            <span className="aura-microlabel flex items-center gap-2">
-              {currentStep === 1 ? <FileText className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
-              {currentStep === 1 ? "Step 01 — Details" : "Step 02 — Training pairs"}
-            </span>
-            <span className="caption">{steps[currentStep - 1]?.subtitle}</span>
-          </div>
-
+        {/* ════ SINGLE PANEL — Details + Training pairs stacked ══════════ */}
+        <div className="relative mt-6 glass-card overflow-hidden rounded-[--radius]">
+          {/* ── Section 1 · Details ── */}
           <div className="p-6 lg:p-8">
-            <AnimatePresence mode="wait">
-              {/* Step 1: Hero + Compact Form */}
-              {currentStep === 1 && (
-                <motion.div
-                  key="step1"
-                  initial={{ opacity: 0, x: 16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -16 }}
-                  transition={{ duration: 0.4, ease: EASE }}
-                  className="space-y-6"
-                >
+            <div className="space-y-6">
                   {/* Hero Section */}
                   <div className="mb-6 flex items-center gap-4">
                     <Orb className="h-10 w-10 shrink-0" />
@@ -823,19 +712,15 @@ export default function CreateStylePage() {
                       </p>
                     )}
                   </div>
-                </motion.div>
-              )}
+            </div>
+          </div>
 
-              {/* Step 2: Training Images */}
-              {currentStep === 2 && (
-                <motion.div
-                  key="step2"
-                  initial={{ opacity: 0, x: 16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -16 }}
-                  transition={{ duration: 0.4, ease: EASE }}
-                  className="space-y-6"
-                >
+          {/* ── divider between the two former steps ── */}
+          <hr className="aura-hairline" />
+
+          {/* ── Section 2 · Training pairs ── */}
+          <div className="p-6 lg:p-8">
+            <div className="space-y-6">
                   <div>
                     <h2 className="mb-1 text-xl font-semibold tracking-tight">Training Images</h2>
                     <p className="font-sans text-sm text-muted-foreground">
@@ -891,13 +776,13 @@ export default function CreateStylePage() {
                             <input
                               type="file"
                               multiple
-                              accept="image/*"
+                              accept={IMAGE_ACCEPT}
                               onChange={(e) => handleFileSelect(e, "before")}
                               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                             />
                             <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
                             <p className="font-sans text-sm text-muted-foreground">Drag & drop or click to upload</p>
-                            <p className="mt-1 font-mono text-[11px] text-muted-foreground">Minimum 5 unedited images</p>
+                            <p className="mt-1 font-mono text-[11px] text-muted-foreground">Minimum 5 unedited images · RAW supported</p>
                           </div>
                         )}
 
@@ -909,14 +794,25 @@ export default function CreateStylePage() {
                               const isFailed = uploadProgress?.failedIds.has(file.id);
                               return (
                                 <div key={file.id} className="group relative">
-                                  <img
-                                    src={file.preview}
-                                    alt="Before"
-                                    className={cn(
-                                      "aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity",
-                                      isActive && "opacity-60",
-                                    )}
-                                  />
+                                  {file.preview ? (
+                                    <img
+                                      src={file.preview}
+                                      alt="Before"
+                                      className={cn(
+                                        "aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity",
+                                        isActive && "opacity-60",
+                                      )}
+                                    />
+                                  ) : (
+                                    <div
+                                      className={cn(
+                                        "grid aspect-square w-full place-items-center rounded-sm bg-surface-2 plate-keyline transition-opacity",
+                                        isActive && "opacity-60",
+                                      )}
+                                    >
+                                      <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
+                                    </div>
+                                  )}
                                   {/* Upload status overlay */}
                                   {isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-background/40">
@@ -1017,7 +913,7 @@ export default function CreateStylePage() {
                               return (
                                 <div key={file.id} className="group relative">
                                   <img
-                                    src={file.preview}
+                                    src={file.preview ?? undefined}
                                     alt="After"
                                     className={cn(
                                       "aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity",
@@ -1116,52 +1012,26 @@ export default function CreateStylePage() {
                       {uploadSource === "local" ? " Minimum 5 pairs required." : " Each folder should contain at least 5 images."}
                     </p>
                   </div>
-                </motion.div>
-              )}
-
-            </AnimatePresence>
-
-            {/* Navigation */}
-            <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
-              <Button
-                variant="ghost"
-                onClick={() => goToStep(Math.max(currentStep - 1, 1))}
-                disabled={currentStep === 1}
-                className="gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
-
-              <div className="flex items-center gap-3">
-                <Button variant="outline" onClick={handleLeave}>
-                  Cancel
-                </Button>
-                {currentStep < 2 ? (
-                  <Button
-                    onClick={() => goToStep(currentStep + 1)}
-                    disabled={!canProceed()}
-                    className="gap-2"
-                  >
-                    Continue
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="glow"
-                    onClick={() => setShowConfirmDialog(true)}
-                    disabled={!canProceed() || isCreating}
-                    className="relative gap-2 overflow-hidden"
-                    onMouseEnter={() => setHoveringCreate(true)}
-                    onMouseLeave={() => setHoveringCreate(false)}
-                  >
-                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkle size={14} className="text-accent-foreground" />}
-                    {isCreating ? "Uploading..." : "Create Style"}
-                    <ButtonSparkles active={hoveringCreate && !isCreating && !prefersReducedMotion} />
-                  </Button>
-                )}
-              </div>
             </div>
+          </div>
+
+          {/* ════ ACTION BAR — single create, no wizard ══════════════════ */}
+          <div className="flex items-center justify-end gap-3 border-t border-border bg-background/40 px-6 py-4">
+            <Button variant="outline" onClick={handleLeave}>
+              Cancel
+            </Button>
+            <Button
+              variant="glow"
+              onClick={() => setShowConfirmDialog(true)}
+              disabled={!canCreate || isCreating}
+              className="relative gap-2 overflow-hidden"
+              onMouseEnter={() => setHoveringCreate(true)}
+              onMouseLeave={() => setHoveringCreate(false)}
+            >
+              {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkle size={14} className="text-accent-foreground" />}
+              {isCreating ? "Uploading..." : "Create Style"}
+              <ButtonSparkles active={hoveringCreate && !isCreating && !prefersReducedMotion} />
+            </Button>
           </div>
         </div>
       </div>
