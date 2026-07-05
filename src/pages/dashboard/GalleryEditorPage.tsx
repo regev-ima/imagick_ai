@@ -1305,6 +1305,43 @@ export default function GalleryEditorPage() {
     return gallery.status === "uploading" || gallery.status === "processing" || gallery.status === "transferring";
   }, [gallery?.ai_culling_enabled, gallery?.culling_status, gallery?.status, hasCullingData]);
 
+  // The compression barrier is armed and a culling run is queued behind it
+  // (await-compression is polling for the new photos' webps, then dispatches
+  // process-pipeline). During this window culling_started_at is intentionally
+  // null, so it must be tracked separately. Bounded to ~18m (just over the
+  // barrier's max wait) so a dead barrier doesn't pin this true forever.
+  const compressionBarrierActive = useMemo(() => {
+    const g = gallery as any;
+    if (!g?.compression_started_at || g.compression_completed_at) return false;
+    return cullingNow - new Date(g.compression_started_at).getTime() < 18 * 60_000;
+  }, [gallery, cullingNow]);
+
+  // Culling is genuinely in flight — queued behind upload, waiting on the
+  // compression barrier, or actively processing (and not stuck). Used to block a
+  // second, colliding manual trigger: after adding photos the incremental cull
+  // is ALREADY dispatched, so a manual "AI Culling" click would be duplicate work.
+  const cullingInFlight =
+    isCullingQueued ||
+    compressionBarrierActive ||
+    (gallery?.culling_status === "processing" && !isCullingStuck);
+
+  // Honest "analyzing N photos" count for the overlay: the images actually being
+  // culled this run — those without a score yet — snapshotted at run start. So an
+  // incremental add reads "analyzing 4", not the whole 221-photo gallery, and the
+  // number doesn't tick down to ~0 as scoring lands. Null until known (overlay
+  // then falls back to the gallery size, which is correct for a full re-cull).
+  const [cullRunCount, setCullRunCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!(gallery?.culling_status === "processing" || compressionBarrierActive)) {
+      setCullRunCount(null);
+      return;
+    }
+    if (cullRunCount != null) return;
+    if (images.length === 0) return;
+    const unculled = images.filter((img) => !((img as any).culling_score > 0)).length;
+    if (unculled > 0) setCullRunCount(unculled);
+  }, [gallery?.culling_status, compressionBarrierActive, images, cullRunCount]);
+
   // Self-healing for inconsistent culling rows:
   //   1. data present but status still 'processing' → flip to 'ready' so
   //      the banner clears for everyone who opens the gallery.
@@ -2689,10 +2726,10 @@ export default function GalleryEditorPage() {
           onDuplicateLimitChange={setDuplicateLimit}
           groupCounts={sidebarGroupCounts}
           onAddImages={() => setShowAddImagesModal(true)}
-          onRunCulling={() => { if (isCullingQueued || (gallery?.culling_status === "processing" && !isCullingStuck)) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); }}
-          isCullingRunning={runAICulling.isPending || (gallery?.culling_status === "processing" && !isCullingStuck)}
+          onRunCulling={() => { if (cullingInFlight) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); }}
+          isCullingRunning={runAICulling.isPending || cullingInFlight}
           isCullingStuck={isCullingStuck}
-          isCullingQueued={isCullingQueued}
+          isCullingQueued={isCullingQueued || compressionBarrierActive}
           cullingStartedAt={gallery?.culling_started_at as string | null | undefined}
           cullingImageCount={images.length}
           hasActiveFilters={hasActiveFilters}
@@ -2733,10 +2770,10 @@ export default function GalleryEditorPage() {
             onDuplicateLimitChange={setDuplicateLimit}
             groupCounts={sidebarGroupCounts}
             onAddImages={() => { setShowAddImagesModal(true); setShowMobileSidebar(false); }}
-            onRunCulling={() => { if (isCullingQueued || (gallery?.culling_status === "processing" && !isCullingStuck)) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); setShowMobileSidebar(false); }}
-            isCullingRunning={runAICulling.isPending || (gallery?.culling_status === "processing" && !isCullingStuck)}
+            onRunCulling={() => { if (cullingInFlight) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); setShowMobileSidebar(false); }}
+            isCullingRunning={runAICulling.isPending || cullingInFlight}
             isCullingStuck={isCullingStuck}
-            isCullingQueued={isCullingQueued}
+            isCullingQueued={isCullingQueued || compressionBarrierActive}
             cullingStartedAt={gallery?.culling_started_at as string | null | undefined}
             cullingImageCount={images.length}
             hasActiveFilters={hasActiveFilters}
@@ -3309,12 +3346,12 @@ export default function GalleryEditorPage() {
           elapses. Blocks a second run by occupying the screen, and the
           sidebar/banner trigger is guarded while processing. */}
       <AnimatePresence>
-        {gallery?.culling_status === "processing" &&
+        {(gallery?.culling_status === "processing" || compressionBarrierActive) &&
           !isCullingStuck &&
           !cullingProgressMinimized && (
             <CullingProgressOverlay
               isOpen
-              imageCount={images.length}
+              imageCount={cullRunCount ?? images.length}
               thumbnails={cullingPreviewThumbnails}
               startedAt={gallery?.culling_started_at as string | null | undefined}
               onMinimize={() => setCullingProgressMinimized(true)}
