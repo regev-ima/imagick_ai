@@ -20,6 +20,12 @@ interface UppyUploadAreaProps {
    * below). The parent must have a resolved height (flex-1 + min-h-0).
    */
   fill?: boolean;
+  /**
+   * Explicit dashboard height (CSS length) overriding the default. Lets an
+   * embedding surface (e.g. the Add Images modal, where a culling card sits
+   * below) request a more compact dashboard so its siblings stay on screen.
+   */
+  heightPx?: string;
 }
 
 // Dashboard height is responsive: small on phones, larger on desktop.
@@ -51,6 +57,7 @@ export function UppyUploadArea({
   maxFiles,
   disabled = false,
   fill = false,
+  heightPx,
 }: UppyUploadAreaProps) {
   const targetRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
@@ -97,7 +104,7 @@ export function UppyUploadArea({
         // its own internal layout. In `fill` mode it stretches to the
         // parent (which owns the height), so the file grid scrolls
         // internally and sibling chrome stays put.
-        height: fill ? "100%" : DASHBOARD_HEIGHT_PX,
+        height: heightPx ?? (fill ? "100%" : DASHBOARD_HEIGHT_PX),
         width: "100%",
         // Track the app's current theme so Dashboard text contrasts
         // correctly. Light mode renders Uppy's near-white text on a
@@ -128,7 +135,7 @@ export function UppyUploadArea({
         }
       }
     };
-  }, [uppy, resolvedTheme, fill]);
+  }, [uppy, resolvedTheme, fill, heightPx]);
 
   // Update plan-based file limit when it changes (e.g. user picks more
   // styles, which lowers maxImages on a free plan).

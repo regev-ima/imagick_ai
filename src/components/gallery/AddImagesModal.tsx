@@ -723,12 +723,12 @@ export function AddImagesModal({
               isProcessing && "pointer-events-none select-none opacity-60",
             )}
           >
-            {/* LEFT — photos (top, flexes & scrolls internally) + culling
-                (bottom, pinned so its toggles are always visible without
-                scrolling the column). Mirrors the create page. */}
-            <div className="flex min-h-0 flex-col gap-4">
+            {/* LEFT — photos (top) + culling (bottom). Compact fixed upload
+                area keeps both on screen; the column scrolls only as a gentle
+                fallback on short viewports. */}
+            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
               {/* Photos */}
-              <div className="glass-card flex min-h-0 flex-1 flex-col rounded-[--radius] p-4">
+              <div className="glass-card flex shrink-0 flex-col rounded-[--radius] p-4">
                 <div className="caption mb-2.5 shrink-0">Photos</div>
 
                 {/* Subscription warnings */}
@@ -780,12 +780,12 @@ export function AddImagesModal({
                     />
                   </div>
                 ) : (
-                  <div className="mt-3 min-h-0 flex-1">
+                  <div className="mt-3">
                     <UppyUploadArea
                       uppy={uppy}
                       maxFiles={!isUnlimited && stylesCount > 0 ? maxImages : undefined}
                       disabled={isProcessing}
-                      fill
+                      heightPx="min(26vh, 230px)"
                     />
                   </div>
                 )}
@@ -827,14 +827,6 @@ export function AddImagesModal({
                   </AnimatePresence>
                 )}
 
-                {/* Only-the-new-photos note — reassures that adding images
-                    won't re-spend on the existing collection. */}
-                <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.05] p-3 text-xs text-muted-foreground">
-                  <Sparkle size={13} className="mt-0.5 shrink-0 text-primary" />
-                  <span>
-                    Only the new photos are processed. If culling is on below, the new photos are rated, grouped &amp; face-tagged and slotted into your existing groups — your current photos and edits aren't touched.
-                  </span>
-                </div>
               </div>{/* end Photos card */}
 
               {/* Culling — same knobs as the create-collection flow, so the
@@ -908,6 +900,12 @@ export function AddImagesModal({
                   </div>
                 )}
               </div>{/* end Culling card */}
+
+              {/* Slim reassurance — only the new photos cost anything. */}
+              <p className="flex shrink-0 items-center gap-1.5 px-1 text-[11px] leading-snug text-muted-foreground/70">
+                <Sparkle size={11} className="shrink-0 text-primary/70" />
+                Only the new photos are processed — your existing photos &amp; edits stay untouched.
+              </p>
             </div>{/* end LEFT column */}
 
             {/* RIGHT — choose your AI look, full height */}
