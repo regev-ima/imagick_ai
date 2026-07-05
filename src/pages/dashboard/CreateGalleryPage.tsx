@@ -474,8 +474,8 @@ export default function CreateGalleryPage() {
               </Select>
             </div>
             <div className="border-t border-border/60" />
-            <button type="button" onClick={toggleCull} className="flex w-full items-center gap-3 p-5 text-left">
-              <div className={cn("grid h-10 w-10 place-items-center rounded-[--radius]", cull ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+            <button type="button" onClick={toggleCull} className="flex w-full items-center gap-3 p-4 text-left">
+              <div className={cn("grid h-9 w-9 place-items-center rounded-[--radius]", cull ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
                 <Scissors className="h-4 w-4" />
               </div>
               <div className="flex-1">
@@ -487,7 +487,7 @@ export default function CreateGalleryPage() {
               </span>
             </button>
             {cull && (
-              <div className="space-y-3 border-t border-border/60 p-5 pt-4">
+              <div className="space-y-2.5 border-t border-border/60 p-4 pt-3">
                 {/* Culling sub-steps — same options as the in-gallery AI Culling
                     modal, in this card's design language. */}
                 <button
@@ -831,8 +831,8 @@ function CullingTags({ type, language, value, onChange }: {
     if (t && !value.includes(t) && value.length < 20) { onChange([...value, t]); setCustom(""); }
   };
   return (
-    <div className="space-y-2.5">
-      <div className="flex flex-wrap gap-1.5">
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1">
         {all.map((label) => {
           const on = value.includes(label);
           const locked = value.length >= 20 && !on;
@@ -843,12 +843,12 @@ function CullingTags({ type, language, value, onChange }: {
               onClick={() => toggle(label)}
               disabled={locked}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95",
+                "inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-all active:scale-95",
                 on ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-surface-2 text-foreground/80 hover:border-primary/50 hover:text-foreground",
                 locked && "cursor-not-allowed opacity-50",
               )}
             >
-              {on && <Check className="mr-1 inline h-3 w-3" strokeWidth={2.5} />}
+              {on && <Check className="h-2.5 w-2.5" strokeWidth={2.5} />}
               {label}
             </button>
           );
@@ -861,15 +861,15 @@ function CullingTags({ type, language, value, onChange }: {
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
           placeholder="Add your own label…"
           disabled={value.length >= 20}
-          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface-2 px-3 text-base outline-none transition-colors focus:border-primary/50 sm:text-sm"
+          className="h-7 min-w-0 flex-1 rounded-md border border-border bg-surface-2 px-2.5 text-base outline-none transition-colors focus:border-primary/50 sm:text-xs"
         />
         <button
           type="button"
           onClick={addCustom}
           disabled={!custom.trim() || value.length >= 20}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>
