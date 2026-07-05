@@ -83,7 +83,7 @@ jobs:
         run: |
           B="https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1"
           fail=0
-          for fn in image-upload gd-import gd-transfer-webhook send-email image-webhook process-images process-pipeline extract-exif verify-gallery-password; do
+          for fn in image-upload gd-import gd-transfer-webhook await-compression send-email image-webhook process-images process-pipeline extract-exif verify-gallery-password; do
             code=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "$B/$fn" \
               -H "Origin: https://app.imagick.ai" \
               -H "Access-Control-Request-Method: POST" \

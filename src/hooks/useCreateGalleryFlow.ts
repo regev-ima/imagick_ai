@@ -279,10 +279,11 @@ export function useCreateGalleryFlow() {
       // gallery and press "AI Culling" by hand. Covers local uploads with or
       // without styles (the style-edit webhook only fires for styled
       // galleries; Drive galleries are auto-started by the transfer webhook).
-      // We flag the gallery optimistically so the overlay/clock are already up
-      // when they navigate in, then dispatch fire-and-forget — process-pipeline
-      // self-chains server-side and falls back to originals while thumbnails
-      // are still being generated.
+      // We flag the gallery optimistically so the overlay is already up when
+      // they navigate in, then dispatch the compression barrier fire-and-forget.
+      // The barrier waits until every image's compressed webp exists before it
+      // starts culling, so culling/tagging/faces only run once compression is
+      // fully done (with a safety-timeout fallback so it never hangs).
       if (params.aiCulling && imageIds.length > 0) {
         try {
           // Admin-configured model + EXIF time gate (platform_settings.culling_config).
@@ -298,12 +299,20 @@ export function useCreateGalleryFlow() {
             }
           } catch { /* fall back to defaults */ }
 
+          // Flag culling as engaged for the overlay + idempotency guard.
+          // culling_started_at is stamped later by the compression barrier at
+          // the REAL culling start (once every image is compressed).
           await supabase
             .from("galleries")
-            .update({ culling_status: "processing", culling_started_at: new Date().toISOString() } as any)
+            .update({ culling_status: "processing" } as any)
             .eq("id", gallery.id);
 
-          void supabase.functions.invoke("process-pipeline", {
+          // Gate culling behind the compression barrier: await-compression
+          // waits until every image's compressed webp exists, then dispatches
+          // process-pipeline with these exact options (safety-timeout fallback
+          // so it never hangs). Editing (process-images) already ran above,
+          // independently — the two pipelines are separate.
+          void supabase.functions.invoke("await-compression", {
             body: {
               galleryId: gallery.id,
               options: {
