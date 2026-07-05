@@ -398,11 +398,11 @@ export default function CreateGalleryPage() {
         <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:grid-rows-[minmax(0,1fr)]">
           {/* LEFT — top half: photo selection · bottom half: culling */}
           <div className="flex min-h-0 flex-col gap-4">
-          {/* Top half — photo selection */}
-          <div className="flex min-h-0 flex-1 flex-col gap-4 lg:overflow-y-auto lg:pr-1">
+          {/* Top half — photo selection (roomier now the shoot-type chips moved) */}
+          <div className="flex min-h-0 flex-1 flex-col">
           {/* Photos */}
-          <div className="glass-card rounded-[--radius] p-5 lg:shrink-0">
-            <div className="caption mb-2.5">Photos</div>
+          <div className="glass-card flex min-h-0 flex-1 flex-col rounded-[--radius] p-5">
+            <div className="caption mb-2.5 shrink-0">Photos</div>
             <UploadSourceSelector value={uploadSource} onChange={onSourceChange} disabled={busy} />
             {uploadSource === "drive" ? (
               <div className="mt-3">
@@ -442,42 +442,38 @@ export default function CreateGalleryPage() {
                 onClick={() => inputRef.current?.click()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => { e.preventDefault(); void filesFromDataTransfer(e.dataTransfer).then(ingest); }}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-[--radius] border-2 border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.03]"
+                className="mt-3 flex min-h-[160px] w-full flex-1 flex-col items-center justify-center gap-2 rounded-[--radius] border-2 border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.03]"
               >
-                <UploadCloud className="h-4 w-4" /> Select or drag your photos (or a whole folder)
+                <UploadCloud className="h-6 w-6" /> Select or drag your photos (or a whole folder)
               </button>
             )}
           </div>
 
-          {/* Shoot type */}
-          <div className="glass-card rounded-[--radius] p-5">
-            <div className="caption mb-2.5">Shoot type</div>
-            <div className="flex flex-wrap gap-2">
-              {galleryTypes.map((t) => {
-                const on = type === t.value;
-                return (
-                  <button
-                    key={t.value}
-                    type="button"
-                    onClick={() => changeType(t.value)}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-all active:scale-95",
-                      on ? "bg-primary text-primary-foreground shadow-sm" : "border border-border bg-surface-2 text-foreground/80 hover:border-primary/50 hover:text-foreground",
-                    )}
-                  >
-                    <t.icon className="h-3.5 w-3.5" strokeWidth={1.75} /> {t.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           </div>{/* end top half */}
 
-          {/* Bottom half — culling */}
-          <div className="min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
+          {/* Bottom half — culling (with the shoot type that seeds its tags) */}
+          <div className="shrink-0">
           {/* Culling */}
           <div className={cn("glass-card rounded-[--radius] transition-colors", cull && "border-primary/40")}>
+            {/* Shoot type — a compact dropdown that seeds the auto culling tags,
+                so it lives with culling instead of eating a whole row of chips. */}
+            <div className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <div className="caption flex items-center gap-1.5"><Tag className="h-3 w-3" /> Shoot type</div>
+                <div className="text-[11px] text-muted-foreground/70">Seeds what Aura looks for</div>
+              </div>
+              <Select value={type} onValueChange={(v) => changeType(v)}>
+                <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {galleryTypes.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      <span className="flex items-center gap-2"><t.icon className="h-3.5 w-3.5" strokeWidth={1.75} /> {t.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="border-t border-border/60" />
             <button type="button" onClick={toggleCull} className="flex w-full items-center gap-3 p-5 text-left">
               <div className={cn("grid h-10 w-10 place-items-center rounded-[--radius]", cull ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
                 <Scissors className="h-4 w-4" />
