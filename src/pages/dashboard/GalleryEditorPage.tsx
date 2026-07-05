@@ -3210,6 +3210,7 @@ export default function GalleryEditorPage() {
                         }}
                         onUpdateCategory={(imageId, label) => updateImageCategory.mutate({ imageIds: [imageId], label })}
                         availableLabels={availableLabels.map(l => l.label)}
+                        onFaceClusterClick={(clusterId) => { setSelectedFaceCluster(clusterId); setCatalogMode("faces"); setShowDetailsPanel(false); setLightboxImage(null); }}
                       />
                     )}
                   </div>
@@ -3241,6 +3242,7 @@ export default function GalleryEditorPage() {
                     }}
                     onUpdateCategory={(imageId, label) => updateImageCategory.mutate({ imageIds: [imageId], label })}
                     availableLabels={availableLabels.map(l => l.label)}
+                    onFaceClusterClick={(clusterId) => { setSelectedFaceCluster(clusterId); setCatalogMode("faces"); setShowDetailsPanel(false); setLightboxImage(null); }}
                   />
                 )}
               </AnimatePresence>

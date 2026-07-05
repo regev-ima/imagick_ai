@@ -89,6 +89,51 @@ export function useNameFaceCluster(galleryId: string | undefined) {
   });
 }
 
+export interface ImageFace {
+  id: string;
+  bounding_box: { top: number; left: number; width: number; height: number; source_width?: number | null; source_height?: number | null };
+  cluster_id: string | null;
+  /** The person's name, if their face cluster has been labelled. */
+  label: string | null;
+}
+
+/**
+ * The faces detected on ONE image (for the image details panel), each resolved
+ * to its person's name via the face cluster. Two plain queries (detections, then
+ * their clusters' labels) rather than an FK-embed, so it can't break if the
+ * embed relationship isn't declared. Empty when the image has no detected faces.
+ */
+export function useImageFaces(imageId: string | undefined) {
+  return useQuery({
+    queryKey: ["image-faces", imageId],
+    queryFn: async (): Promise<ImageFace[]> => {
+      const { data: dets, error } = await supabase
+        .from("face_detections" as any)
+        .select("id, bounding_box, cluster_id")
+        .eq("image_id", imageId!);
+      if (error) throw error;
+      const rows = (dets as unknown as { id: string; bounding_box: ImageFace["bounding_box"]; cluster_id: string | null }[]) || [];
+      const clusterIds = [...new Set(rows.map((r) => r.cluster_id).filter((v): v is string => !!v))];
+      let labels: Record<string, string | null> = {};
+      if (clusterIds.length > 0) {
+        const { data: clusters } = await supabase
+          .from("face_clusters" as any)
+          .select("id, label")
+          .in("id", clusterIds);
+        labels = Object.fromEntries(((clusters as unknown as { id: string; label: string | null }[]) || []).map((c) => [c.id, c.label]));
+      }
+      return rows.map((r) => ({
+        id: r.id,
+        bounding_box: r.bounding_box,
+        cluster_id: r.cluster_id,
+        label: r.cluster_id ? labels[r.cluster_id] ?? null : null,
+      }));
+    },
+    enabled: !!imageId,
+    staleTime: 30_000,
+  });
+}
+
 // Separate hook for fetching images of a specific cluster.
 export function useFaceClusterImages(clusterId: string | null) {
   return useQuery({
