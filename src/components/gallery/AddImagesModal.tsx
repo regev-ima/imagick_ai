@@ -4,10 +4,20 @@ import { useUppyState } from "@uppy/react";
 import { UppyUploadArea } from "@/components/upload/UppyUploadArea";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Upload, Images, Loader2, CloudIcon, AlertTriangle, Check, Ban, Zap,
+  X, Images, Loader2, CloudIcon, AlertTriangle, Check, Ban, Zap,
+  Tag, Scissors, Layers, ScanFace, Globe, Plus,
+  Heart, User as UserIcon, Baby, Users, PartyPopper, Briefcase, Home,
+  Shirt, UtensilsCrossed, Mountain, MapPin, Trophy, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -28,8 +38,28 @@ import { GoogleDriveInput, type DriveFolderInfo } from "./GoogleDriveInput";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 import { getThumbnailUrl } from "@/lib/imageUrls";
+import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
 
 const MAX_LOOKS = 3;
+
+// Shoot types (with icons) — mirrors the create-collection page so the shoot
+// type here seeds the same curated culling tags.
+const galleryTypes: { value: string; label: string; icon: LucideIcon }[] = [
+  { value: "wedding", label: "Wedding", icon: Heart },
+  { value: "portrait", label: "Portrait", icon: UserIcon },
+  { value: "newborn", label: "Newborn", icon: Baby },
+  { value: "family", label: "Family", icon: Users },
+  { value: "event", label: "Event", icon: PartyPopper },
+  { value: "commercial", label: "Commercial", icon: Briefcase },
+  { value: "real_estate", label: "Real Estate", icon: Home },
+  { value: "fashion", label: "Fashion", icon: Shirt },
+  { value: "food", label: "Food", icon: UtensilsCrossed },
+  { value: "landscape", label: "Landscape", icon: Mountain },
+  { value: "street", label: "Street", icon: MapPin },
+  { value: "sports", label: "Sports", icon: Trophy },
+];
+
+const curatedTags = (type: string, lang: LanguageCode) => getCullingLabels(type || "wedding", lang);
 
 /** The AI mark — 4-point sparkle (the logo star), royal blue via currentColor. */
 function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
@@ -115,6 +145,71 @@ function LookTile({ name, cover, on, locked, mine = false, recommended = false, 
   );
 }
 
+// Inline culling-tag picker — curated labels for the shoot type + custom
+// additions, capped at 20 (mirrors the create-collection page).
+function CullingTags({ type, language, value, onChange }: {
+  type: string;
+  language: LanguageCode;
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [custom, setCustom] = useState("");
+  const curated = getCullingLabels(type || "wedding", language);
+  const all = [...curated, ...value.filter((v) => !curated.includes(v))];
+  const toggle = (label: string) => {
+    if (value.includes(label)) onChange(value.filter((v) => v !== label));
+    else if (value.length < 20) onChange([...value, label]);
+  };
+  const addCustom = () => {
+    const t = custom.trim();
+    if (t && !value.includes(t) && value.length < 20) { onChange([...value, t]); setCustom(""); }
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1">
+        {all.map((label) => {
+          const on = value.includes(label);
+          const locked = value.length >= 20 && !on;
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => toggle(label)}
+              disabled={locked}
+              className={cn(
+                "inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-all active:scale-95",
+                on ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-surface-2 text-foreground/80 hover:border-primary/50 hover:text-foreground",
+                locked && "cursor-not-allowed opacity-50",
+              )}
+            >
+              {on && <Check className="h-2.5 w-2.5" strokeWidth={2.5} />}
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={custom}
+          onChange={(e) => setCustom(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
+          placeholder="Add your own label…"
+          disabled={value.length >= 20}
+          className="h-7 min-w-0 flex-1 rounded-md border border-border bg-surface-2 px-2.5 text-base outline-none transition-colors focus:border-primary/50 sm:text-xs"
+        />
+        <button
+          type="button"
+          onClick={addCustom}
+          disabled={!custom.trim() || value.length >= 20}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface AddImagesModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -140,6 +235,20 @@ export function AddImagesModal({
   const [driveLinks, setDriveLinks] = useState<string[]>([]);
   const [driveFolderInfo, setDriveFolderInfo] = useState<DriveFolderInfo | null>(null);
   const [isUploadingLocal, setIsUploadingLocal] = useState(false);
+
+  // Culling config — same knobs as the create-collection flow, so the
+  // photographer confirms how the NEW photos get culled (not silently reuse
+  // whatever the gallery was set to). Seeded from the gallery's current
+  // settings when the modal opens, editable here, and persisted on confirm.
+  const [type, setType] = useState("wedding");
+  const [cull, setCull] = useState(false);
+  const [cullGrouping, setCullGrouping] = useState(false);
+  const [cullFaces, setCullFaces] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [cullingLanguage, setCullingLanguage] = useState<LanguageCode>("en");
+  // Guards the initial seed from being clobbered by the tag-sync effect, so the
+  // gallery's existing custom labels survive until the user changes shoot type.
+  const seededSettings = useState(() => ({ done: false }))[0];
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -168,6 +277,46 @@ export function AddImagesModal({
     enabled: isOpen && !!galleryId,
     staleTime: 30_000,
   });
+
+  // The gallery's current culling config — seeds the culling card so the
+  // toggles reflect how this collection is already set up.
+  const { data: gallerySettings } = useQuery({
+    queryKey: ["gallery-culling-settings", galleryId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("galleries")
+        .select("gallery_type, ai_culling_enabled, ai_grouping_enabled, ai_faces_enabled, culling_labels")
+        .eq("id", galleryId)
+        .single();
+      return data as any;
+    },
+    enabled: isOpen && !!galleryId,
+    staleTime: 30_000,
+  });
+
+  // Seed the culling card from the gallery once its settings load.
+  useEffect(() => {
+    if (!isOpen || !gallerySettings) return;
+    setType(gallerySettings.gallery_type || "wedding");
+    setCull(!!gallerySettings.ai_culling_enabled);
+    setCullGrouping(gallerySettings.ai_grouping_enabled ?? true);
+    setCullFaces(!!gallerySettings.ai_faces_enabled);
+    setCategories(gallerySettings.culling_labels || []);
+    seededSettings.done = true;
+  }, [isOpen, gallerySettings, seededSettings]);
+
+  // The photographer's preferred culling-label language (persisted per user).
+  useEffect(() => {
+    if (!isOpen || !user) return;
+    supabase
+      .from("user_subscriptions")
+      .select("preferred_language")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.preferred_language) setCullingLanguage(data.preferred_language as LanguageCode);
+      });
+  }, [isOpen, user]);
 
   const [duplicatePrompt, setDuplicatePrompt] = useState<{
     duplicateIds: string[];
@@ -269,8 +418,34 @@ export function AddImagesModal({
       setDriveLinks([]);
       setDriveFolderInfo(null);
       setIsUploadingLocal(false);
+      seededSettings.done = false;
     }
-  }, [isOpen, uppy]);
+  }, [isOpen, uppy, seededSettings]);
+
+  // Explicit shoot-type / language changes reseed the curated culling tags
+  // (matches the create-collection page). The initial gallery seed is protected
+  // by seededSettings so stored custom labels aren't wiped on open.
+  const changeType = (value: string) => {
+    setType(value);
+    if (cull && seededSettings.done) setCategories(curatedTags(value, cullingLanguage));
+  };
+  const changeLanguage = (lang: LanguageCode) => {
+    setCullingLanguage(lang);
+    if (user) {
+      supabase
+        .from("user_subscriptions")
+        .update({ preferred_language: lang })
+        .eq("user_id", user.id)
+        .then(({ error }) => { if (error) console.error("Failed to save language preference:", error); });
+    }
+    if (cull && seededSettings.done) setCategories(curatedTags(type, lang));
+  };
+  const toggleCull = () => setCull((on) => {
+    const next = !on;
+    // Turning culling on with no labels yet → seed the curated set for the type.
+    if (next && categories.length === 0) setCategories(curatedTags(type, cullingLanguage));
+    return next;
+  });
 
   const toggleStyle = (styleId: string) => {
     setStyleTouched(true);
@@ -288,21 +463,38 @@ export function AddImagesModal({
     setSelectedStyles([]);
   };
 
+  // The culling labels that actually drive the cull — the picked tags, or the
+  // curated set for the shoot type if culling is on but none were picked.
+  const effectiveLabels = () =>
+    cull
+      ? (categories.length > 0 ? categories : curatedTags(type, cullingLanguage))
+      : [];
+
+  // Persist the confirmed culling config onto the gallery so both the incremental
+  // culling below AND the Drive transfer webhook use exactly what the user set
+  // here (not a stale gallery setting).
+  const persistCullingSettings = async (gId: string) => {
+    await supabase
+      .from("galleries")
+      .update({
+        gallery_type: type,
+        ai_culling_enabled: cull,
+        ai_grouping_enabled: cullGrouping,
+        ai_faces_enabled: cull && cullFaces,
+        culling_labels: effectiveLabels(),
+      } as any)
+      .eq("id", gId);
+  };
+
   // Re-run AI culling incrementally after new photos land. Re-arms the
   // compression barrier (so it waits for the NEW photos to compress — the old
   // ones already are), flips culling back to "processing", and dispatches the
-  // pipeline with the gallery's own culling settings. process-pipeline skips
-  // any image that already has a score/embedding/faces, so only the new photos
-  // cost VLM/GPU. No-op if the gallery doesn't use AI culling.
+  // pipeline with the confirmed culling config. process-pipeline skips any image
+  // that already has a score/embedding/faces, so only the new photos cost
+  // VLM/GPU. No-op when culling is off.
   const triggerIncrementalCulling = async (gId: string) => {
+    if (!cull) return;
     try {
-      const { data: g } = await supabase
-        .from("galleries")
-        .select("ai_culling_enabled, ai_grouping_enabled, ai_faces_enabled, culling_labels")
-        .eq("id", gId)
-        .single();
-      if (!g?.ai_culling_enabled) return;
-
       await supabase
         .from("galleries")
         .update({
@@ -334,9 +526,9 @@ export function AddImagesModal({
           options: {
             culling: true,
             tags: true,
-            cluster: (g as any).ai_grouping_enabled ?? true,
-            faces: (g as any).ai_faces_enabled ?? false,
-            labels: (g as any).culling_labels || [],
+            cluster: cullGrouping,
+            faces: cullFaces,
+            labels: effectiveLabels(),
             thresholds: [0.5, 0.7, 0.9],
             timeThreshold: adminTime,
             ...(adminModel ? { model: adminModel } : {}),
@@ -362,6 +554,9 @@ export function AddImagesModal({
         toast.error("Not enough edits remaining for this upload");
         return;
       }
+      // Persist the confirmed culling config first so the Drive transfer webhook
+      // auto-starts culling with exactly what the user set here.
+      await persistCullingSettings(galleryId);
       if (onDriveConfirm) {
         onDriveConfirm(selectedStyles, driveLinks[0], driveFolderInfo);
       }
@@ -422,11 +617,13 @@ export function AddImagesModal({
           })
           .eq("id", galleryId);
 
-        // Rate/group/detect the NEW photos too, if this gallery uses AI culling.
-        // The pipeline is incremental — it only scores/embeds/detects images
-        // that don't have those outputs yet — so this spends VLM/GPU on the new
-        // photos ONLY; grouping + face clustering re-run over the gallery (cheap,
-        // reusing stored vectors) so the new photos join existing bursts/people.
+        // Persist the confirmed culling config, then rate/group/detect the NEW
+        // photos if culling is on. The pipeline is incremental — it only
+        // scores/embeds/detects images that don't have those outputs yet — so
+        // this spends VLM/GPU on the new photos ONLY; grouping + face clustering
+        // re-run over the gallery (cheap, reusing stored vectors) so the new
+        // photos join existing bursts/people.
+        await persistCullingSettings(galleryId);
         await triggerIncrementalCulling(galleryId);
 
         // Process any IDs that weren't streamed (last partial batch).
@@ -508,6 +705,7 @@ export function AddImagesModal({
             <div className="flex flex-wrap items-center gap-1.5">
               <Pill><Images className="h-3 w-3" /> {imageCount ? `${imageCount.toLocaleString()} new` : "no photos yet"}</Pill>
               <Pill>{looksLabel}</Pill>
+              <Pill>{cull ? "Culling on" : "No culling"}</Pill>
               <Pill accent={!hasInsufficientEdits} danger={hasInsufficientEdits}>
                 <Sparkle size={11} /> {isUnlimited ? `${editsNeeded.toLocaleString()} edits` : `${editsNeeded.toLocaleString()} / ${availableEdits.toLocaleString()} edits`}
               </Pill>
@@ -525,9 +723,10 @@ export function AddImagesModal({
               isProcessing && "pointer-events-none select-none opacity-60",
             )}
           >
-            {/* LEFT — photos */}
-            <div className="flex min-h-0 flex-col">
-              <div className="glass-card flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[--radius] p-4">
+            {/* LEFT — photos (top) + culling (bottom), mirrors the create page */}
+            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
+              {/* Photos */}
+              <div className="glass-card flex flex-col rounded-[--radius] p-4">
                 <div className="caption mb-2.5 shrink-0">Photos</div>
 
                 {/* Subscription warnings */}
@@ -630,11 +829,83 @@ export function AddImagesModal({
                 <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.05] p-3 text-xs text-muted-foreground">
                   <Sparkle size={13} className="mt-0.5 shrink-0 text-primary" />
                   <span>
-                    Only the new photos are processed. If this collection uses AI culling, the new photos are rated, grouped &amp; face-tagged and slotted into your existing groups — your current photos and edits aren't touched.
+                    Only the new photos are processed. If culling is on below, the new photos are rated, grouped &amp; face-tagged and slotted into your existing groups — your current photos and edits aren't touched.
                   </span>
                 </div>
-              </div>
-            </div>
+              </div>{/* end Photos card */}
+
+              {/* Culling — same knobs as the create-collection flow, so the
+                  new photos are culled exactly how you confirm here. Seeded
+                  from the collection's current settings. */}
+              <div className={cn("glass-card rounded-[--radius] transition-colors", cull && "border-primary/40")}>
+                {/* Shoot type — seeds the auto culling tags */}
+                <div className="flex items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <div className="caption flex items-center gap-1.5"><Tag className="h-3 w-3" /> Shoot type</div>
+                    <div className="text-[11px] text-muted-foreground/70">Seeds what Aura looks for</div>
+                  </div>
+                  <Select value={type} onValueChange={changeType}>
+                    <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {galleryTypes.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          <span className="flex items-center gap-2"><t.icon className="h-3.5 w-3.5" strokeWidth={1.75} /> {t.label}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="border-t border-border/60" />
+                <button type="button" onClick={toggleCull} className="flex w-full items-center gap-3 p-4 text-left">
+                  <div className={cn("grid h-9 w-9 place-items-center rounded-[--radius]", cull ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                    <Scissors className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold">Cull {cull ? "· on" : "· off"}</div>
+                    <div className="caption">{cull ? "Aura rates & tags the new photos before editing" : "no culling — keep every new photo"}</div>
+                  </div>
+                  <span className={cn("h-6 w-11 rounded-full p-0.5 transition-colors", cull ? "bg-primary" : "bg-muted")}>
+                    <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cull ? "auto" : 0 }} />
+                  </span>
+                </button>
+                {cull && (
+                  <div className="space-y-2.5 border-t border-border/60 p-4 pt-3">
+                    <button type="button" onClick={() => setCullGrouping((v) => !v)} className="flex w-full items-center gap-2.5 text-left">
+                      <Layers className={cn("h-3.5 w-3.5", cullGrouping ? "text-primary" : "text-muted-foreground")} />
+                      <span className="caption flex-1 text-foreground">Group similar images</span>
+                      <span className={cn("h-6 w-11 rounded-full p-0.5 transition-colors", cullGrouping ? "bg-primary" : "bg-muted")}>
+                        <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cullGrouping ? "auto" : 0 }} />
+                      </span>
+                    </button>
+                    <button type="button" onClick={() => setCullFaces((v) => !v)} className="flex w-full items-center gap-2.5 text-left">
+                      <ScanFace className={cn("h-3.5 w-3.5", cullFaces ? "text-primary" : "text-muted-foreground")} />
+                      <span className="caption flex-1 text-foreground">
+                        Recognize people (faces)
+                        <span className="ms-1.5 text-muted-foreground/60">heavier step</span>
+                      </span>
+                      <span className={cn("h-6 w-11 rounded-full p-0.5 transition-colors", cullFaces ? "bg-primary" : "bg-muted")}>
+                        <motion.span layout className="block h-5 w-5 rounded-full bg-white shadow" style={{ marginLeft: cullFaces ? "auto" : 0 }} />
+                      </span>
+                    </button>
+                    <div className="flex items-center justify-between gap-3 border-t border-border/40 pt-3">
+                      <div className="caption flex items-center gap-1.5">
+                        <Tag className="h-3 w-3" /> What should I look for?
+                        <span className="text-primary">{categories.length}<span className="text-muted-foreground/50">/20</span></span>
+                      </div>
+                      <Select value={cullingLanguage} onValueChange={(v) => changeLanguage(v as LanguageCode)}>
+                        <SelectTrigger className="h-8 w-[150px] text-xs"><Globe className="h-3.5 w-3.5" /><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {supportedLanguages.map((lang) => (
+                            <SelectItem key={lang.code} value={lang.code} className="text-xs">{lang.name} ({lang.englishName})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <CullingTags type={type} language={cullingLanguage} value={categories} onChange={setCategories} />
+                  </div>
+                )}
+              </div>{/* end Culling card */}
+            </div>{/* end LEFT column */}
 
             {/* RIGHT — choose your AI look, full height */}
             <div className="flex min-h-0 flex-col">
