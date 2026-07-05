@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.gd-import]
 verify_jwt = false
 
+[functions.await-compression]
+verify_jwt = false
+
 [functions.gd-transfer-webhook]
 verify_jwt = false
 

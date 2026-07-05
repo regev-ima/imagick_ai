@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Info, Clock, Upload, ImageIcon, Scissors, ScanFace, Eye, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Layers, Star, Images, Wand2, Filter, Heart, Share2, Settings, Loader2, Tag, Check, RotateCcw, X, Download, Copy, Info, Clock, Upload, ImageIcon, Scissors, ScanFace, Eye, CheckCircle2, AlertTriangle, Minimize2 } from "lucide-react";
 import { estimateCullingMs, formatCountdown } from "@/lib/cullingEta";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -105,8 +105,14 @@ interface GalleryRightSidebarProps {
     uploadCompletedAt: string | null;
     processingStartedAt: string | null;
     processingCompletedAt: string | null;
+    compressionStartedAt: string | null;
+    compressionCompletedAt: string | null;
+    compressionReadyCount: number;
+    compressionTotalCount: number;
     cullingStartedAt: string | null;
     cullingCompletedAt: string | null;
+    facesStartedAt: string | null;
+    facesCompletedAt: string | null;
     sourceType: "google" | "upload";
     totalImages: number;
   };
@@ -1050,6 +1056,7 @@ function GalleryInfoPanel({
     status: StageStatus;
     color: string;
     bgColor: string;
+    subtitle?: string | null;
   }> = [
     {
       icon: <Upload className="w-3.5 h-3.5" />,
@@ -1062,12 +1069,26 @@ function GalleryInfoPanel({
     },
     {
       icon: <Scissors className="w-3.5 h-3.5" />,
-      label: "Processing",
+      label: "Editing",
       startedAt: data.processingStartedAt,
       completedAt: data.processingCompletedAt,
       status: data.processingCompletedAt ? "completed" : data.processingStartedAt ? "active" : "idle",
       color: "text-primary",
       bgColor: "bg-primary",
+    },
+    {
+      icon: <Minimize2 className="w-3.5 h-3.5" />,
+      label: "Compression",
+      startedAt: data.compressionStartedAt,
+      completedAt: data.compressionCompletedAt,
+      status: data.compressionCompletedAt ? "completed" : data.compressionStartedAt ? "active" : "idle",
+      color: "text-primary",
+      bgColor: "bg-primary",
+      // Live progress while the barrier is polling for compressed webp.
+      subtitle:
+        !data.compressionCompletedAt && data.compressionStartedAt && data.compressionTotalCount > 0
+          ? `${data.compressionReadyCount}/${data.compressionTotalCount} compressed`
+          : null,
     },
     {
       icon: <Wand2 className="w-3.5 h-3.5" />,
@@ -1077,12 +1098,26 @@ function GalleryInfoPanel({
       status: data.cullingCompletedAt ? "completed" : data.cullingStartedAt ? "active" : "idle",
       color: "text-primary",
       bgColor: "bg-primary",
+      // Make the compression gate explicit: culling is queued but held.
+      subtitle:
+        !data.cullingStartedAt && data.cullingCompletedAt === null && data.compressionStartedAt && !data.compressionCompletedAt
+          ? "Waiting for compression…"
+          : null,
+    },
+    {
+      icon: <ScanFace className="w-3.5 h-3.5" />,
+      label: "Faces",
+      startedAt: data.facesStartedAt,
+      completedAt: data.facesCompletedAt,
+      status: data.facesCompletedAt ? "completed" : data.facesStartedAt ? "active" : "idle",
+      color: "text-primary",
+      bgColor: "bg-primary",
     },
   ];
 
   // Total pipeline duration (from first start to last completion)
-  const allStarts = [data.uploadStartedAt, data.processingStartedAt, data.cullingStartedAt].filter(Boolean) as string[];
-  const allEnds = [data.uploadCompletedAt, data.processingCompletedAt, data.cullingCompletedAt].filter(Boolean) as string[];
+  const allStarts = [data.uploadStartedAt, data.processingStartedAt, data.compressionStartedAt, data.cullingStartedAt, data.facesStartedAt].filter(Boolean) as string[];
+  const allEnds = [data.uploadCompletedAt, data.processingCompletedAt, data.compressionCompletedAt, data.cullingCompletedAt, data.facesCompletedAt].filter(Boolean) as string[];
   const pipelineStart = allStarts.length > 0 ? allStarts.reduce((a, b) => a < b ? a : b) : null;
   const pipelineEnd = allEnds.length > 0 ? allEnds.reduce((a, b) => a > b ? a : b) : null;
   const totalDuration = duration(pipelineStart, pipelineEnd);
@@ -1207,6 +1242,9 @@ function GalleryInfoPanel({
                     {formatTime(stage.startedAt)}
                     {stage.completedAt && ` → ${formatTime(stage.completedAt)}`}
                   </p>
+                )}
+                {stage.subtitle && (
+                  <p className="text-[10px] text-rating/90 tabular-nums mt-0.5">{stage.subtitle}</p>
                 )}
               </div>
             </div>

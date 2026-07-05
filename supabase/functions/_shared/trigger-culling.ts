@@ -42,12 +42,19 @@ export async function triggerCullingPipeline(
 
     // Flag the gallery as culling up front so the UI reflects it immediately,
     // and so a racing trigger sees culling_status='processing' and backs off.
+    // culling_started_at is NOT stamped here — the compression barrier stamps it
+    // at the real culling start (after all images are compressed), so the
+    // timeline shows the compression wait as its own stage.
     await supabase
       .from("galleries")
-      .update({ culling_status: "processing", culling_started_at: new Date().toISOString() })
+      .update({ culling_status: "processing" })
       .eq("id", galleryId);
 
-    const res = await fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {
+    // Gate culling behind the compression barrier: await-compression waits for
+    // every image's compressed webp to exist, then dispatches process-pipeline
+    // with these exact options. It falls back after a safety timeout so culling
+    // can never hang.
+    const res = await fetch(`${supabaseUrl}/functions/v1/await-compression`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

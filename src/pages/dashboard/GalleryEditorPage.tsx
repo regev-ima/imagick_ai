@@ -586,14 +586,21 @@ export default function GalleryEditorPage() {
   // Gallery timing data for info panel
   const galleryTimingData = useMemo(() => {
     if (!gallery) return undefined;
+    const g = gallery as any;
     return {
       createdAt: gallery.created_at,
       uploadStartedAt: gallery.upload_started_at,
       uploadCompletedAt: gallery.upload_completed_at,
       processingStartedAt: gallery.processing_started_at,
       processingCompletedAt: gallery.processing_completed_at,
+      compressionStartedAt: g.compression_started_at ?? null,
+      compressionCompletedAt: g.compression_completed_at ?? null,
+      compressionReadyCount: g.compression_ready_count ?? 0,
+      compressionTotalCount: g.compression_total_count ?? 0,
       cullingStartedAt: gallery.culling_started_at,
       cullingCompletedAt: gallery.culling_completed_at,
+      facesStartedAt: g.face_search_started_at ?? null,
+      facesCompletedAt: g.face_search_completed_at ?? null,
       sourceType: (gallery.source_drive_links && gallery.source_drive_links.length > 0 ? "google" : "upload") as "google" | "upload",
       totalImages: gallery.total_images || 0,
     };
@@ -1303,7 +1310,23 @@ export default function GalleryEditorPage() {
         });
       return;
     }
-    if (gallery.culling_status === "processing" && !hasCullingData && !gallery.culling_started_at) {
+    // While the compression barrier is legitimately waiting for compression,
+    // culling_status is 'processing' but culling_started_at is intentionally
+    // null — the barrier stamps it at the REAL culling start (once every image
+    // is compressed). Don't back-fill it during that window, or the stuck clock
+    // would start ticking against a legitimate wait. Bounded to ~18m (just over
+    // the barrier's max wait) so a dead barrier still recovers afterwards.
+    const comp = gallery as any;
+    const compressionWaiting =
+      comp.compression_started_at &&
+      !comp.compression_completed_at &&
+      cullingNow - new Date(comp.compression_started_at).getTime() < 18 * 60_000;
+    if (
+      gallery.culling_status === "processing" &&
+      !hasCullingData &&
+      !gallery.culling_started_at &&
+      !compressionWaiting
+    ) {
       supabase
         .from("galleries")
         .update({ culling_started_at: new Date().toISOString() } as any)
