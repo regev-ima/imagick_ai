@@ -1,11 +1,13 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
-import { PanelRightClose, Star, Calendar, FileText, Tag, Camera, Heart, Download, Award, Maximize, Minimize, Trash2, GripHorizontal, Bot, Aperture, Layers, Clock, Zap, Image as ImageIcon, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { PanelRightClose, Star, Calendar, FileText, Tag, Camera, Heart, Download, Award, Maximize, Minimize, Trash2, GripHorizontal, Bot, Aperture, Layers, Clock, Zap, Image as ImageIcon, CheckCircle2, AlertCircle, Loader2, ScanFace } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { AIAnalysisSection, type SimilarityLevel } from "./AIAnalysisSection";
+import { FaceThumbnail } from "./FaceThumbnail";
+import { useImageFaces } from "@/hooks/useFaceSearch";
 import { getEditedThumbnailUrl, getPreviewUrl } from "@/lib/imageUrls";
 
 interface ImageDetails {
@@ -90,6 +92,8 @@ interface ImageDetailsPanelProps {
   hideHeader?: boolean;
   onUpdateCategory?: (imageId: string, label: string) => void;
   availableLabels?: string[];
+  /** Open the People view for a detected person's face cluster (optional). */
+  onFaceClusterClick?: (clusterId: string) => void;
 }
 
 // Reusable section card wrapper — a Lightroom develop sub-panel
@@ -173,8 +177,10 @@ export function ImageDetailsPanel({
   variant = "default",
   hideHeader = false,
   onUpdateCategory,
-  availableLabels = []
+  availableLabels = [],
+  onFaceClusterClick,
 }: ImageDetailsPanelProps) {
+  const { data: faces = [] } = useImageFaces(image.id);
   const [editingCategory, setEditingCategory] = useState(false);
   const [categoryInput, setCategoryInput] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -588,6 +594,74 @@ export function ImageDetailsPanel({
     );
   };
 
+  // The faces detected on this photo (from AI Culling's "Recognize people"
+  // pass), cropped from the image and labelled with the person's name when the
+  // face cluster has been named. Tapping a face opens that person in People.
+  const renderFaces = () => {
+    // No ArcFace faces detected on this image. If the VLM still counted people,
+    // the "Recognize people" step just hasn't run — surface that instead of a
+    // silently missing section, so it's clear WHY there are no faces to show.
+    if (!faces || faces.length === 0) {
+      if ((image.people_count ?? 0) > 0) {
+        return (
+          <SectionCard>
+            <SectionHeader icon={ScanFace} label="People" accent="violet" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {image.people_count} {image.people_count === 1 ? "person" : "people"} in this photo. Run{" "}
+              <span className="text-foreground font-medium">AI Culling</span> with{" "}
+              <span className="text-foreground font-medium">Recognize people</span> to detect &amp; tag who's here.
+            </p>
+          </SectionCard>
+        );
+      }
+      return null;
+    }
+    return (
+      <SectionCard>
+        <SectionHeader icon={ScanFace} label={`People (${faces.length})`} accent="violet" />
+        <div className="flex flex-wrap gap-2.5">
+          {faces.map((face) => {
+            const clickable = !!(onFaceClusterClick && face.cluster_id);
+            const inner = (
+              <>
+                <FaceThumbnail
+                  imageUrl={image.original_url}
+                  bbox={face.bounding_box}
+                  size={48}
+                  className={cn("ring-1 ring-border/60", clickable && "group-hover:ring-primary transition-all")}
+                />
+                <span
+                  className={cn(
+                    "block w-full truncate text-center text-[10px]",
+                    face.label ? "text-foreground" : "text-muted-foreground/60",
+                  )}
+                  title={face.label || "Unknown person"}
+                >
+                  {face.label || "Unknown"}
+                </span>
+              </>
+            );
+            return clickable ? (
+              <button
+                key={face.id}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onFaceClusterClick!(face.cluster_id!); }}
+                className="group flex w-12 flex-col items-center gap-1"
+              >
+                {inner}
+              </button>
+            ) : (
+              <div key={face.id} className="flex w-12 flex-col items-center gap-1">{inner}</div>
+            );
+          })}
+        </div>
+        {onFaceClusterClick && faces.some((f) => f.cluster_id) && (
+          <p className="mt-2 text-[10px] text-muted-foreground/50">Tap a face to see all their photos</p>
+        )}
+      </SectionCard>
+    );
+  };
+
   const renderAITags = () => {
     if (!image.ai_tags || image.ai_tags.length === 0) return null;
     return (
@@ -802,6 +876,7 @@ export function ImageDetailsPanel({
           {renderQuickActions()}
           {renderBadges()}
           {renderAIAnalysis()}
+          {renderFaces()}
           {renderCameraAndExposure()}
           {renderTimeline()}
           {renderFileInfo()}
