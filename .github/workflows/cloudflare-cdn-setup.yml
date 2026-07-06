@@ -33,11 +33,17 @@ jobs:
           TOKEN = os.environ["CF_TOKEN"]; ZONE_NAME = os.environ["ZONE_NAME"]
           CDN = os.environ["CDN_HOST"]; DL = os.environ["B2_DL_HOST"]; BUCKET = os.environ["BUCKET"]
 
+          # A browser UA so Cloudflare's bot protection (error 1010) doesn't block
+          # our own probes — the default python-urllib UA gets banned by signature.
+          UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/125.0 Safari/537.36")
+
           def cf(method, path, body=None):
               data = json.dumps(body).encode() if body is not None else None
               req = urllib.request.Request(CF + path, data=data, method=method)
               req.add_header("Authorization", "Bearer " + TOKEN)
               req.add_header("Content-Type", "application/json")
+              req.add_header("User-Agent", UA)
               try:
                   with urllib.request.urlopen(req) as r:
                       return r.status, json.load(r)
@@ -113,6 +119,7 @@ jobs:
                   data=json.dumps({"query": sql}).encode(), method="POST")
               req.add_header("Authorization", "Bearer " + os.environ["SB_TOKEN"])
               req.add_header("Content-Type", "application/json")
+              req.add_header("User-Agent", UA)
               with urllib.request.urlopen(req) as r:
                   return json.load(r)
 
@@ -132,6 +139,7 @@ jobs:
 
           def fetch(u, want_image):
               req = urllib.request.Request(u, method="GET")
+              req.add_header("User-Agent", UA)
               if want_image:
                   req.add_header("Range", "bytes=0-0")  # header-only, don't pull the whole image
               try:
