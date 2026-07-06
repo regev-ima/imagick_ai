@@ -177,6 +177,28 @@ jobs:
                   print("Verify FAILED: image did not load through the CDN.")
                   sys.exit(1)
               print("Verify OK: images serve through cdn.imagick.ai (cached at the edge).")
+
+              # CORS probe: face thumbnails draw to <canvas> and need
+              # Access-Control-Allow-Origin. Cache-bust so we see the header as
+              # served, and send a browser Origin like the app would.
+              cb = f"https://{CDN}/{key}" + ("&" if "?" in key else "?") + "cors_probe=1"
+              req = urllib.request.Request(cb, method="GET")
+              req.add_header("User-Agent", UA)
+              req.add_header("Origin", "https://app.imagick.ai")
+              req.add_header("Range", "bytes=0-0")
+              try:
+                  with urllib.request.urlopen(req) as r:
+                      acao = r.headers.get("access-control-allow-origin")
+                      acce = r.headers.get("access-control-allow-credentials")
+              except urllib.error.HTTPError as e:
+                  acao = e.headers.get("access-control-allow-origin")
+                  acce = None
+              print(f"  CORS: access-control-allow-origin={acao} allow-credentials={acce}")
+              if acao:
+                  print("CORS OK: canvas-based thumbnails (faces) will work through the CDN.")
+              else:
+                  print("CORS WARNING: no ACAO header — face thumbnails may taint the "
+                        "canvas. Add a bucket CORS rule before routing the app to the CDN.")
           else:
               # Plumbing check: no sample key available, but prove CDN -> transform -> B2
               # is wired. A missing object must come back as a Backblaze 404 *through*
