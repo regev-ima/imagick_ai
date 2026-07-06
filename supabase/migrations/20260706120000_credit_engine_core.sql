@@ -79,11 +79,22 @@ DECLARE
   v_new_id UUID;
   v_allowance INTEGER;
   v_features JSONB;
+  v_legacy_slug TEXT;
+  v_suffix INTEGER;
 BEGIN
   FOR r IN
     SELECT * FROM public.subscription_plans
     WHERE slug IN ('free', 'starter', 'pro', 'studio') AND version = 1
   LOOP
+    -- Idempotency / re-run safety: if a v2+ already exists for this family,
+    -- this family was already migrated — skip it.
+    IF EXISTS (
+      SELECT 1 FROM public.subscription_plans
+      WHERE family_slug = r.family_slug AND version >= 2
+    ) THEN
+      CONTINUE;
+    END IF;
+
     v_allowance := CASE r.slug
       WHEN 'free'    THEN 1500
       WHEN 'starter' THEN 5000
@@ -97,12 +108,21 @@ BEGIN
       WHEN 'studio'  THEN '["40,000 credits every month", "Everything in Pro", "10 Custom AI Models", "Up to 10 team members", "2TB cloud storage", "API access", "Dedicated account manager"]'::jsonb
     END;
 
-    -- Rename + unpublish the v1 row first (frees the slug).
+    -- Pick a collision-free legacy slug (slug is UNIQUE; a prior '<slug>-v1'
+    -- could already exist in messy data). Try -v1, then -v2, -v3, …
+    v_legacy_slug := r.slug || '-v1';
+    v_suffix := 1;
+    WHILE EXISTS (SELECT 1 FROM public.subscription_plans WHERE slug = v_legacy_slug) LOOP
+      v_suffix := v_suffix + 1;
+      v_legacy_slug := r.slug || '-v' || v_suffix;
+    END LOOP;
+
+    -- Rename + unpublish the v1 row first (frees the public slug).
     UPDATE public.subscription_plans
-    SET slug = r.slug || '-v1', is_published = false
+    SET slug = v_legacy_slug, is_published = false
     WHERE id = r.id;
 
-    -- Clone into v2 with the credit allowance, taking over the slug.
+    -- Clone into v2 with the credit allowance, taking over the public slug.
     INSERT INTO public.subscription_plans
       (name, slug, family_slug, version, is_published,
        price_monthly, price_yearly, edits_included, price_per_extra_edit,
@@ -127,6 +147,43 @@ BEGIN
     SET plan_id = v_new_id
     WHERE plan_id = r.id;
   END LOOP;
+END $$;
+
+-- ---------------------------------------------------------------
+-- 2b. SELF-VALIDATION — abort (transactional rollback) if this migration
+--     would leave production in a bad state. Since we can't dry-run against
+--     live billing data, the migration checks its own post-conditions and
+--     refuses to commit on any anomaly, so a bad run fails the deploy loudly
+--     instead of silently corrupting subscriptions.
+-- ---------------------------------------------------------------
+DO $$
+DECLARE
+  v_orphans INTEGER;
+  v_dupe_published INTEGER;
+  v_no_free INTEGER;
+BEGIN
+  -- Every subscription must still point at a real plan.
+  SELECT COUNT(*) INTO v_orphans
+  FROM public.user_subscriptions us
+  LEFT JOIN public.subscription_plans sp ON sp.id = us.plan_id
+  WHERE us.plan_id IS NOT NULL AND sp.id IS NULL;
+  IF v_orphans > 0 THEN
+    RAISE EXCEPTION 'credit-engine migration aborted: % subscription(s) orphaned from their plan', v_orphans;
+  END IF;
+
+  -- Published slugs must be unique — the pricing page & signup trigger key on them.
+  SELECT COUNT(*) INTO v_dupe_published
+  FROM (SELECT slug FROM public.subscription_plans WHERE is_published GROUP BY slug HAVING COUNT(*) > 1) d;
+  IF v_dupe_published > 0 THEN
+    RAISE EXCEPTION 'credit-engine migration aborted: % duplicate published slug(s)', v_dupe_published;
+  END IF;
+
+  -- Exactly one published 'free' plan must exist (the signup trigger needs it).
+  SELECT COUNT(*) INTO v_no_free
+  FROM public.subscription_plans WHERE slug = 'free' AND is_published;
+  IF v_no_free <> 1 THEN
+    RAISE EXCEPTION 'credit-engine migration aborted: expected exactly 1 published free plan, found %', v_no_free;
+  END IF;
 END $$;
 
 -- ---------------------------------------------------------------
