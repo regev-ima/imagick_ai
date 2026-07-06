@@ -1,0 +1,76 @@
+# TEMPORARY benchmark: times the SAME object fetched directly from Backblaze B2
+# vs through the Cloudflare CDN (cdn.imagick.ai). Prints timings only — no keys
+# or UUIDs (repo is public). Runs when this file changes; delete after use.
+name: CDN speed test
+on:
+  push:
+    branches: [claude/image-scoring-tagging-0cszyi]
+    paths: ['.github/workflows/cdn-speedtest.yml']
+concurrency:
+  group: cdn-speedtest
+  cancel-in-progress: true
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    env:
+      SB_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SB_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+      UA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+      S3: "https://s3.us-east-005.backblazeb2.com/imagick"
+      CDN: "https://cdn.imagick.ai"
+    steps:
+      - name: Benchmark direct B2 vs Cloudflare CDN
+        run: |
+          set -euo pipefail
+          echo "Runner region note: GitHub runners sit in US-East, physically close"
+          echo "to the B2 bucket (us-east-005). Real users (e.g. in Israel) are far"
+          echo "from B2 but near a Cloudflare edge, so their CDN win is LARGER than"
+          echo "what this same-region test shows."
+          echo
+
+          # --- get one real object key (retry transient Management API 5xx) ---
+          url=""
+          for i in 1 2 3 4 5; do
+            resp=$(curl -s -A "$UA" -X POST \
+              "https://api.supabase.com/v1/projects/$SB_REF/database/query" \
+              -H "Authorization: Bearer $SB_TOKEN" -H "Content-Type: application/json" \
+              -d '{"query":"select original_url from gallery_images where original_url is not null limit 1"}' || true)
+            url=$(echo "$resp" | jq -r '.[0].original_url // empty' 2>/dev/null || true)
+            [ -n "$url" ] && break
+            sleep 3
+          done
+          if [ -z "$url" ]; then echo "Could not fetch a sample object; aborting."; exit 1; fi
+
+          key="${url#*/imagick/}"
+          dir="${key%/*}"; base="${key##*/}"; stem="${base%.*}"
+          thumb_key="$dir/thumbnail/${stem}_reduced_thumbnail.webp"
+
+          cache_status() { # $1 url -> prints cf-cache-status (or '-')
+            curl -s -o /dev/null -A "$UA" -D - "$1" \
+              | tr -d '\r' | awk -F': ' 'tolower($1)=="cf-cache-status"{print $2}' | tail -1
+          }
+
+          measure() { # $1 label  $2 url  $3 warm(yes/no)
+            local label="$1" u="$2" warm="$3" n=8
+            if [ "$warm" = yes ]; then curl -s -o /dev/null -A "$UA" "$u" || true; curl -s -o /dev/null -A "$UA" "$u" || true; fi
+            local ttfb=0 tot=0 sz=0 code=0
+            for i in $(seq 1 $n); do
+              read code t1 t2 sz < <(curl -s -o /dev/null -A "$UA" \
+                -w "%{http_code} %{time_starttransfer} %{time_total} %{size_download}" "$u")
+              ttfb=$(awk "BEGIN{print $ttfb+$t1}")
+              tot=$(awk "BEGIN{print $tot+$t2}")
+            done
+            local cf; cf=$(cache_status "$u"); [ -z "$cf" ] && cf="-"
+            awk "BEGIN{printf \"  %-14s http=%s  avg TTFB=%6.1f ms  avg total=%6.1f ms  size=%d B  cf-cache=%s\n\", \"$label\", \"$code\", ($ttfb/$n)*1000, ($tot/$n)*1000, $sz, \"$cf\"}"
+          }
+
+          echo "=== THUMBNAIL (webp — what the gallery grid loads) ==="
+          measure "B2 direct"  "$S3/$thumb_key"  no
+          measure "CDN (warm)" "$CDN/$thumb_key" yes
+          echo
+          echo "=== ORIGINAL (full-size jpg — heaviest single asset) ==="
+          measure "B2 direct"  "$S3/$key"  no
+          measure "CDN (warm)" "$CDN/$key" yes
+          echo
+          echo "TTFB = time to first byte (latency); total = full download."
+          echo "CDN warm rows are served from the Cloudflare edge cache (cf-cache=HIT)."
