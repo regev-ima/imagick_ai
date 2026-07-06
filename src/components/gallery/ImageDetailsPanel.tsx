@@ -598,7 +598,24 @@ export function ImageDetailsPanel({
   // pass), cropped from the image and labelled with the person's name when the
   // face cluster has been named. Tapping a face opens that person in People.
   const renderFaces = () => {
-    if (!faces || faces.length === 0) return null;
+    // No ArcFace faces detected on this image. If the VLM still counted people,
+    // the "Recognize people" step just hasn't run — surface that instead of a
+    // silently missing section, so it's clear WHY there are no faces to show.
+    if (!faces || faces.length === 0) {
+      if ((image.people_count ?? 0) > 0) {
+        return (
+          <SectionCard>
+            <SectionHeader icon={ScanFace} label="People" accent="violet" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {image.people_count} {image.people_count === 1 ? "person" : "people"} in this photo. Run{" "}
+              <span className="text-foreground font-medium">AI Culling</span> with{" "}
+              <span className="text-foreground font-medium">Recognize people</span> to detect &amp; tag who's here.
+            </p>
+          </SectionCard>
+        );
+      }
+      return null;
+    }
     return (
       <SectionCard>
         <SectionHeader icon={ScanFace} label={`People (${faces.length})`} accent="violet" />
