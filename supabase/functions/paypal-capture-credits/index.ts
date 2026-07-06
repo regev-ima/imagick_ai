@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { captureOrder } from "../_shared/paypal.ts";
+import { captureOrder, getAccessToken, getPayPalMode } from "../_shared/paypal.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { captureException } from "../_shared/sentry.ts";
@@ -59,8 +59,31 @@ serve(async (req: Request) => {
       );
     }
 
-    // Capture the payment.
-    const capture = await captureOrder(orderId);
+    // Capture the payment. If PayPal says ORDER_ALREADY_CAPTURED, this is a
+    // retry after a crash BETWEEN capture and grant (the user is paid but
+    // uncredited, and the idempotency check above found no grant) — recover
+    // by reading the order instead of failing forever.
+    let capture: any;
+    try {
+      capture = await captureOrder(orderId);
+    } catch (capErr) {
+      const msg = capErr instanceof Error ? capErr.message : String(capErr);
+      // PayPal reports an already-captured order as a 422; the issue name
+      // isn't always in the message, so accept any 422 and verify the order
+      // is genuinely COMPLETED before recovering.
+      if (!msg.includes("ORDER_ALREADY_CAPTURED") && !msg.includes("(422)")) throw capErr;
+      console.warn(`Order ${orderId} capture 422 — checking if already captured`);
+      const token = await getAccessToken();
+      const mode = await getPayPalMode();
+      const apiBase = mode === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+      const res = await fetch(`${apiBase}/v2/checkout/orders/${orderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw capErr;
+      const order = await res.json();
+      if (order?.status !== "COMPLETED") throw capErr;
+      capture = order;
+    }
     const captureUnit = capture.purchase_units?.[0];
     const capturePayment = captureUnit?.payments?.captures?.[0];
     const captureId = capturePayment?.id;

@@ -85,9 +85,13 @@ serve(async (req: Request) => {
 
     const packs = await loadPacks(supabase);
 
-    // No packId → return the catalog (used by the BuyCreditsModal to render).
+    // No packId → return the catalog + the PayPal clientId in ONE round-trip
+    // (the clientId is pack-independent; the modal needs both to render).
     if (!body.packId) {
-      return new Response(JSON.stringify({ packs }), {
+      const mode = await getPayPalMode();
+      const prefix = mode === "live" ? "PAYPAL_LIVE" : "PAYPAL_SANDBOX";
+      const clientId = Deno.env.get(`${prefix}_CLIENT_ID`) || Deno.env.get("PAYPAL_CLIENT_ID");
+      return new Response(JSON.stringify({ packs, clientId }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

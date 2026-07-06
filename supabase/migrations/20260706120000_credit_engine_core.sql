@@ -147,6 +147,7 @@ DECLARE
   v_to_deduct INTEGER := NEW.edits_spent;
   v_grant     RECORD;
   v_take      INTEGER;
+  v_remaining INTEGER;
 BEGIN
   UPDATE public.user_subscriptions
   SET edits_used = edits_used + NEW.edits_spent,
@@ -156,7 +157,15 @@ BEGIN
       END,
       edits_reserved = GREATEST(0, edits_reserved - NEW.edits_spent),
       updated_at = now()
-  WHERE user_id = NEW.user_id;
+  WHERE user_id = NEW.user_id
+  RETURNING edits_remaining INTO v_remaining;
+
+  -- An unlimited (legacy) pool never draws on grants — otherwise a
+  -- grandfathered subscriber's purchased "never expires" credits would be
+  -- silently burned while buying them nothing.
+  IF v_remaining = -1 THEN
+    RETURN NEW;
+  END IF;
 
   IF v_to_deduct > 0 THEN
     FOR v_grant IN
@@ -342,6 +351,36 @@ BEGIN
 END;
 $$;
 REVOKE EXECUTE ON FUNCTION public.release_credits_simple(UUID, INTEGER) FROM PUBLIC, anon, authenticated;
+
+-- Deleting a gallery mid-run would take its pipeline_billing marker with it,
+-- permanently stranding the reserved credits (nothing else knows the amount).
+-- Release them on delete.
+CREATE OR REPLACE FUNCTION public.release_pipeline_billing_on_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_reserved INTEGER;
+BEGIN
+  IF OLD.pipeline_billing IS NOT NULL AND (OLD.pipeline_billing->>'unlimited') IS DISTINCT FROM 'true' THEN
+    v_reserved := COALESCE((OLD.pipeline_billing->>'reserved')::INTEGER, 0);
+    IF v_reserved > 0 AND (OLD.pipeline_billing ? 'released') = false THEN
+      UPDATE public.user_subscriptions
+      SET edits_reserved = GREATEST(0, edits_reserved - v_reserved),
+          updated_at = now()
+      WHERE user_id = OLD.user_id;
+    END IF;
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS release_pipeline_billing_on_delete ON public.galleries;
+CREATE TRIGGER release_pipeline_billing_on_delete
+  BEFORE DELETE ON public.galleries
+  FOR EACH ROW EXECUTE FUNCTION public.release_pipeline_billing_on_delete();
 
 -- ---------------------------------------------------------------
 -- 6. INVOICE TYPES — allow one-time credit purchases. Also adds

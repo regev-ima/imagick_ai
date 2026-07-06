@@ -253,7 +253,12 @@ export default function CreateGalleryPage() {
   const editsNeeded = estimateGalleryCredits(creditPricing, photos, looksCount, cull, cull && cullFaces);
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
   const creditsShort = hasInsufficientEdits ? editsNeeded - availableEdits : 0;
-  const maxImages = isUnlimited || looksCount === 0 ? Infinity : Math.floor(availableEdits / looksCount);
+  // Affordability cap uses the FULL per-photo cost (edits + culling + faces),
+  // so the cap always matches what the credits check will actually charge.
+  const perPhotoCost = looksCount * creditPricing.ai_edit +
+    (cull ? creditPricing.ai_culling : 0) +
+    (cull && cullFaces ? creditPricing.face_recognition : 0);
+  const maxImages = isUnlimited || perPhotoCost <= 0 ? Infinity : Math.floor(availableEdits / perPhotoCost);
   const typeLabel = galleryTypes.find((t) => t.value === type)?.label ?? type;
   const remaining = Math.max(0, availableEdits - editsNeeded);
   const usedPct = availableEdits > 0 ? Math.min(100, Math.round((editsNeeded / availableEdits) * 100)) : (editsNeeded > 0 ? 100 : 0);
@@ -576,7 +581,7 @@ export default function CreateGalleryPage() {
               max={MAX_LOOKS}
             />
             {looksCount >= 1 && (
-              <p className="caption mt-3 shrink-0">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
+              <p className="caption mt-3 shrink-0">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""}{cull ? " + culling" : ""}{cull && cullFaces ? " + faces" : ""} = {editsNeeded.toLocaleString()} credits</p>
             )}
           </div>
           </div>
@@ -601,7 +606,7 @@ export default function CreateGalleryPage() {
                   {looksCount === 0 ? (
                     "Hosting only — no edits used."
                   ) : (
-                    <>{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = <span className="font-medium text-foreground">{editsNeeded.toLocaleString()} edits</span> · {remaining.toLocaleString()} left after</>
+                    <>{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""}{cull ? " + culling" : ""}{cull && cullFaces ? " + faces" : ""} = <span className="font-medium text-foreground">{editsNeeded.toLocaleString()} credits</span> · {remaining.toLocaleString()} left after</>
                   )}
                 </p>
               </>

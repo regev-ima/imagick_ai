@@ -184,11 +184,28 @@ async function processEvent(supabase: any, event: any, studioUrl: string) {
       // unlimited plans) + the user's surviving gift/purchased credits.
       // NOTE: the column is edits_remaining — the old `credits_remaining`
       // key here was writing to a column that no longer exists post-rename.
+      // If the plan row lookup failed (transient error / dangling mapping),
+      // fall back to unlimited so a PAYING customer is always activated —
+      // degraded is better than a webhook crash that never activates them.
       const { data: grantSum } = await supabase
         .rpc("sum_active_grant_credits", { p_user_id: customId });
-      const allowance = plan.edits_included === -1
+      const allowance = !plan || plan.edits_included === -1
         ? -1
         : (plan.edits_included ?? 0) + (Number(grantSum) || 0);
+      if (!plan) {
+        console.error(`ACTIVATED: plan row ${mapping.plan_id} not found — activating with unlimited fallback`);
+      }
+
+      // A re-ACTIVATION of the SAME PayPal subscription (resume after
+      // suspension, or a re-delivered event) must NOT reset the credit pool —
+      // otherwise suspend/resume becomes a free mid-cycle refill exploit.
+      // Only a genuinely new/changed subscription gets the fresh allowance.
+      const { data: existingSub } = await supabase
+        .from("user_subscriptions")
+        .select("paypal_subscription_id")
+        .eq("user_id", customId)
+        .maybeSingle();
+      const isReactivation = existingSub?.paypal_subscription_id === paypalSubId;
 
       // Update user subscription (upsert to cover missing rows)
       await supabase
@@ -200,9 +217,11 @@ async function processEvent(supabase: any, event: any, studioUrl: string) {
           billing_cycle: mapping.billing_cycle,
           paypal_subscription_id: paypalSubId,
           paypal_plan_id: subDetails.plan_id,
-          edits_remaining: allowance,
-          edits_used: 0,
-          credits_refilled_at: now.toISOString(),
+          ...(isReactivation ? {} : {
+            edits_remaining: allowance,
+            edits_used: 0,
+            credits_refilled_at: now.toISOString(),
+          }),
           cancel_at_period_end: false,
           scheduled_plan_id: null,
           scheduled_change_at: null,
@@ -213,10 +232,11 @@ async function processEvent(supabase: any, event: any, studioUrl: string) {
         }, { onConflict: "user_id" });
 
       // Generate invoice
-      const price = mapping.billing_cycle === "yearly" ? plan.price_yearly : plan.price_monthly;
+      const price = mapping.billing_cycle === "yearly" ? (plan?.price_yearly ?? 0) : (plan?.price_monthly ?? 0);
+      const planName = plan?.name || "Paid";
       await generateInvoiceRecord(supabase, customId, {
         type: "subscription",
-        description: `${plan.name} Plan - ${mapping.billing_cycle === "yearly" ? "Annual" : "Monthly"}`,
+        description: `${planName} Plan - ${mapping.billing_cycle === "yearly" ? "Annual" : "Monthly"}`,
         amount: price,
         plan_id: mapping.plan_id,
         billing_cycle: mapping.billing_cycle,
@@ -227,7 +247,7 @@ async function processEvent(supabase: any, event: any, studioUrl: string) {
       const { data: userRecord } = await supabase.auth.admin.getUserById(customId);
       if (userRecord?.user?.email) {
         const template = subscriptionActivatedTemplate(
-          plan.name,
+          planName,
           mapping.billing_cycle,
           periodEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
           `${studioUrl}/dashboard/billing`
@@ -243,11 +263,11 @@ async function processEvent(supabase: any, event: any, studioUrl: string) {
 
         const userName = userRecord.user.user_metadata?.full_name || userRecord.user.email.split("@")[0];
         sendWhatsAppNotification(
-          `💰 New Subscriber!\nUser: ${userName} (${userRecord.user.email})\nPlan: ${plan.name} (${mapping.billing_cycle})\nAmount: $${price}`
+          `💰 New Subscriber!\nUser: ${userName} (${userRecord.user.email})\nPlan: ${planName} (${mapping.billing_cycle})\nAmount: $${price}`
         ).catch(err => console.error("WhatsApp failed:", err));
       }
 
-      console.log(`Subscription activated for user ${customId}: ${plan.name} (${mapping.billing_cycle})`);
+      console.log(`Subscription activated for user ${customId}: ${planName} (${mapping.billing_cycle})`);
       break;
     }
 

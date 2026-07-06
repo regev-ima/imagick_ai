@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/useSubscription";
 import { PayPalAddOnCheckoutModal } from "./PayPalAddOnCheckoutModal";
+import { tierOf } from "@/lib/planTier";
 
 interface AddOnModalProps {
   isOpen: boolean;
@@ -40,7 +41,9 @@ const getAddons = (planSlug: string) => [
 
 export function AddOnModal({ isOpen, onClose }: AddOnModalProps) {
   const { currentPlan, refetch } = useSubscription();
-  const planSlug = currentPlan?.slug || "free";
+  // Legacy plan versions ('studio-v1') must resolve to their tier for
+  // add-on availability & pricing.
+  const planSlug = tierOf(currentPlan?.slug) || "free";
   const ADDONS = getAddons(planSlug).filter(a => a.availableFor.includes(planSlug));
 
   const [selectedAddon, setSelectedAddon] = useState<{

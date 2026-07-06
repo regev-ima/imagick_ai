@@ -59,6 +59,7 @@ import { useInvoices } from "@/hooks/useInvoices";
 import { downloadInvoicePdf } from "@/lib/download-invoice-pdf";
 import { EDIT_LOW_THRESHOLD } from "@/lib/constants";
 import { toast } from "sonner";
+import { tierOf } from "@/lib/planTier";
 
 type CreditGrant = {
   id: string;
@@ -196,7 +197,9 @@ export default function BillingPage() {
   const queryClient = useQueryClient();
 
   const { data: invoices = [] } = useInvoices();
-  const planSlug = currentPlan?.slug || "free";
+  // Tier-normalized so a legacy 'pro-v1' subscriber still sees Pro as
+  // their current tier on the pricing grid.
+  const planSlug = tierOf(currentPlan?.slug) || "free";
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showBillingHistory, setShowBillingHistory] = useState(false);
   const [showStorageBreakdown, setShowStorageBreakdown] = useState(false);

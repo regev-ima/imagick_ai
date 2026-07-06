@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminLoading } from "@/components/admin/AdminLoading";
+import { tierOf } from "@/lib/planTier";
 
 interface SubscriberUser {
   id: string;
@@ -73,14 +74,14 @@ export default function SubscribersManagement() {
   // Only paid subscribers
   const subscribers = useMemo(() => {
     return allUsers.filter(
-      (u) => u.plan_slug && u.plan_slug !== "free"
+      (u) => u.plan_slug && tierOf(u.plan_slug) !== "free"
     );
   }, [allUsers]);
 
   const filtered = useMemo(() => {
     return subscribers.filter((u) => {
       if (search && !u.email.toLowerCase().includes(search.toLowerCase()) && !(u.full_name || "").toLowerCase().includes(search.toLowerCase())) return false;
-      if (planFilter !== "all" && u.plan_slug !== planFilter) return false;
+      if (planFilter !== "all" && tierOf(u.plan_slug) !== planFilter) return false;
       if (statusFilter !== "all" && u.subscription_status !== statusFilter) return false;
       if (cycleFilter !== "all" && u.billing_cycle !== cycleFilter) return false;
       return true;

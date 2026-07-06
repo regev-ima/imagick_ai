@@ -62,6 +62,13 @@ export function BuyCreditsModal({ isOpen, onClose, neededCredits, onSuccess }: B
   const selectedRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   selectedRef.current = selected;
+  // Callback refs: parents pass inline closures, and putting them in the
+  // effect deps would tear down + re-render the PayPal buttons on every
+  // parent re-render (upload progress ticks!) mid-checkout.
+  const onCloseRef = useRef(onClose);
+  const onSuccessRef = useRef(onSuccess);
+  onCloseRef.current = onClose;
+  onSuccessRef.current = onSuccess;
 
   const fnUrl = (name: string) => `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`;
 
@@ -79,13 +86,13 @@ export function BuyCreditsModal({ isOpen, onClose, neededCredits, onSuccess }: B
         Authorization: `Bearer ${session.access_token}`,
       };
 
-      // Catalog + PayPal config in one round-trip each.
+      // One round-trip: catalog + PayPal clientId together.
       const catalogRes = await fetch(fnUrl("paypal-create-credits-order"), {
         method: "POST", headers: authHeaders, body: JSON.stringify({}),
       });
-      const catalog = await catalogRes.json();
-      if (!catalogRes.ok) throw new Error(catalog.error || "Failed to load credit packs");
-      const loadedPacks: CreditPack[] = catalog.packs || [];
+      const config = await catalogRes.json();
+      if (!catalogRes.ok) throw new Error(config.error || "Failed to load credit packs");
+      const loadedPacks: CreditPack[] = config.packs || [];
       setPacks(loadedPacks);
 
       // Preselect: smallest pack that covers the shortfall, else the middle one.
@@ -93,13 +100,6 @@ export function BuyCreditsModal({ isOpen, onClose, neededCredits, onSuccess }: B
         ? loadedPacks.find((p) => p.credits >= neededCredits) ?? loadedPacks[loadedPacks.length - 1]
         : loadedPacks[1] ?? loadedPacks[0];
       setSelected((prev) => prev ?? preferred?.id ?? null);
-
-      const cfgRes = await fetch(fnUrl("paypal-create-credits-order"), {
-        method: "POST", headers: authHeaders,
-        body: JSON.stringify({ packId: (preferred ?? loadedPacks[0])?.id, inline: true }),
-      });
-      const config = await cfgRes.json();
-      if (!cfgRes.ok) throw new Error(config.error || "Failed to get PayPal config");
 
       // Load the PayPal SDK for one-time capture (same pattern as add-ons).
       const expectedSrc = `https://www.paypal.com/sdk/js?client-id=${config.clientId}&intent=capture&currency=USD`;
@@ -152,8 +152,8 @@ export function BuyCreditsModal({ isOpen, onClose, neededCredits, onSuccess }: B
           await queryClient.invalidateQueries({ queryKey: ["user-subscription"] });
           await queryClient.invalidateQueries({ queryKey: ["user-credit-grants"] });
           toast.success(`${Number(captureData.credits).toLocaleString()} credits added to your account!`);
-          onClose();
-          onSuccess?.(Number(captureData.credits) || 0);
+          onCloseRef.current();
+          onSuccessRef.current?.(Number(captureData.credits) || 0);
         },
         onCancel: () => {
           toast.info("Payment was cancelled.");
@@ -171,7 +171,9 @@ export function BuyCreditsModal({ isOpen, onClose, neededCredits, onSuccess }: B
     } finally {
       setLoading(false);
     }
-  }, [isOpen, neededCredits, onClose, onSuccess, queryClient]);
+    // Callbacks intentionally excluded (see refs above); queryClient is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, neededCredits]);
 
   useEffect(() => {
     if (isOpen) {

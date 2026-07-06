@@ -158,7 +158,8 @@ serve(async (req: Request) => {
         .select("id, name, slug, price_monthly, price_yearly")
         .eq("is_active", true)
         .eq("is_published", true)
-        .gt("price_monthly", 0)
+        // Paid = any nonzero price (covers yearly-only plans too).
+        .or("price_monthly.gt.0,price_yearly.gt.0")
         .order("sort_order");
       if (plansError || !plans?.length) {
         throw new Error("No paid plans found in database");

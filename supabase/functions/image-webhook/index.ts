@@ -7,6 +7,7 @@ import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { triggerCullingPipeline } from "../_shared/trigger-culling.ts";
 import { captureException } from "../_shared/sentry.ts";
 import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
+import { checkCreditThresholds } from "../_shared/credit-alerts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -213,50 +214,9 @@ serve(async (req: Request) => {
       }
 
       // Check edit thresholds for free users (warning emails)
-      try {
-        const { data: sub } = await supabase
-          .from("user_subscriptions")
-          .select("edits_remaining, plan_id, subscription_plans!inner(slug, edits_included, price_monthly)")
-          .eq("user_id", userId)
-          .single();
-
-        const remaining = sub?.edits_remaining;
-        const included = (sub as any)?.subscription_plans?.edits_included;
-
-        // Percentage-based low-credit alerts for every METERED plan (free
-        // welcome pool + monthly-allowance paid tiers). Crossing 50% → 80% →
-        // 100% used fires one email each; exact-threshold equality was the
-        // old scheme's bug (multi-credit debits could skip 500/100/0).
-        if (
-          remaining !== null && remaining !== undefined && remaining !== -1 &&
-          typeof included === "number" && included > 0
-        ) {
-          const usedPctBefore = 100 - Math.round(((remaining + 1) / included) * 100);
-          const usedPctNow = 100 - Math.round((remaining / included) * 100);
-          const crossed = [50, 80, 100].find((t) => usedPctBefore < t && usedPctNow >= t);
-          if (crossed) {
-            const emailType = crossed === 100 ? "edits_exhausted" : `credits_warning_${crossed}`;
-            const sendEmailUrl = `${supabaseUrl}/functions/v1/send-email`;
-            fetch(sendEmailUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${supabaseServiceKey}`,
-              },
-              body: JSON.stringify({ type: emailType, userId, remaining }),
-            }).catch(err => console.error("Failed to trigger credit warning email:", err));
-
-            if (crossed === 100) {
-              const { data: userRecord } = await supabase.auth.admin.getUserById(userId);
-              const userName = userRecord?.user?.user_metadata?.full_name || userRecord?.user?.email?.split("@")[0] || "Unknown";
-              const msg = `⚠️ Credits Exhausted\nUser: ${userName} (${userRecord?.user?.email})\nAll ${included.toLocaleString("en-US")} credits used.`;
-              sendWhatsAppNotification(msg).catch((err: any) => console.error("WhatsApp notification failed:", err));
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Failed to check credit thresholds:", err);
-      }
+      // Low-credit alerts at the debit choke point — shared with the pipeline's
+      // bulk culling/faces charges so no debit path can skip a threshold.
+      await checkCreditThresholds(supabase, supabaseUrl, supabaseServiceKey, userId, 1);
     }
 
     // Trigger EXIF extraction asynchronously (fire and forget)

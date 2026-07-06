@@ -229,7 +229,9 @@ Deno.serve(async (req) => {
     const subscriptionMap: Record<string, { status: string; isPaid: boolean }> = {};
     for (const row of subscriptionsResult.data ?? []) {
       const uid = (row as any).user_id;
-      const planSlug = (row as any).subscription_plans?.slug ?? "";
+      // Normalize legacy plan versions ('free-v1' etc.) to their tier so
+      // grandfathered free users aren't misclassified as paying customers.
+      const planSlug = String((row as any).subscription_plans?.slug ?? "").replace(/-v\d+$/, "");
       const isPaid = !["free", "pay_as_you_go", ""].includes(planSlug);
       subscriptionMap[uid] = { status: (row as any).status, isPaid };
     }

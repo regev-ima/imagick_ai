@@ -219,6 +219,47 @@ serve(async (req: Request) => {
       }
     }
 
+    // ── 3.2 Sweep stale pipeline billing markers ─────────────────────────
+    // A pipeline run that died without settling leaves galleries.pipeline_billing
+    // set and the user's edits_reserved inflated — blocking credits they own.
+    // After 2 hours with no live run, release the reservation and clear the
+    // marker. (We release WITHOUT charging: the books err in the user's favor
+    // for crashed runs; a healthy settle path already charged before this age.)
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    const { data: staleMarkers } = await supabase
+      .from("galleries")
+      .select("id, user_id, pipeline_billing, pipeline_status")
+      .not("pipeline_billing", "is", null);
+    for (const g of staleMarkers || []) {
+      try {
+        const marker = (g as any).pipeline_billing as Record<string, unknown>;
+        const ts = Number(marker?.ts) || 0;
+        if (ts > twoHoursAgo) continue;                 // fresh — a run may be live
+        if ((g as any).pipeline_status === "processing" && ts > Date.now() - 6 * 60 * 60 * 1000) continue;
+        const reserved = Number(marker?.reserved) || 0;
+        const released = marker?.released === true;
+        if (reserved > 0 && !released && !marker?.unlimited) {
+          // Deduct what was already charged for this run (trigger released that share).
+          const runTag = `run:${ts}`;
+          const { data: chargedRows } = await supabase
+            .from("edit_usage_logs").select("edits_spent")
+            .eq("gallery_id", g.id).like("description", `%${runTag}%`);
+          const charged = (chargedRows || []).reduce((s: number, r: any) => s + (r.edits_spent || 0), 0);
+          const leftover = Math.max(0, reserved - charged);
+          if (leftover > 0) {
+            await supabase.rpc("release_credits_simple", { p_user_id: g.user_id, p_amount: leftover });
+          }
+        }
+        await supabase.from("galleries").update({ pipeline_billing: null })
+          .eq("id", g.id).eq("pipeline_billing->>ts", String(marker?.ts));
+        stats.staleReservationsReleased = (stats.staleReservationsReleased || 0) + 1;
+        console.log(`Swept stale pipeline billing marker for gallery ${g.id}`);
+      } catch (err) {
+        console.error(`Error sweeping pipeline marker for gallery ${(g as any).id}:`, err);
+        stats.errors++;
+      }
+    }
+
     // ── 3.5 Monthly credit refill ────────────────────────────────────────
     // Calendar-anchored (credits_refilled_at), NOT payment-event-driven: a
     // YEARLY subscriber's PayPal payment event fires once a year, but their
@@ -274,13 +315,14 @@ serve(async (req: Request) => {
         // Check if user is expired or free with 0 edits
         const { data: userSub } = await supabase
           .from("user_subscriptions")
-          .select("status, edits_remaining, subscription_plans!inner(slug)")
+          .select("status, edits_remaining, subscription_plans!inner(price_monthly)")
           .eq("user_id", gallery.user_id)
           .single();
 
-        const planSlug = (userSub as any)?.subscription_plans?.slug;
+        // Free = zero-price plan (covers legacy 'free-v1' versions too).
+        const planPrice = Number((userSub as any)?.subscription_plans?.price_monthly ?? 0);
         const isExpired = userSub?.status === "expired";
-        const isFreeExhausted = planSlug === "free" && userSub?.edits_remaining === 0;
+        const isFreeExhausted = planPrice === 0 && userSub?.edits_remaining === 0;
 
         if (isExpired || isFreeExhausted) {
           await supabase
