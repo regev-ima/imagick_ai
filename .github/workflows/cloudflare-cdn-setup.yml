@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CF_ZONE: ${{ secrets.CLOUDFLARE_ZONE_ID }}
       SB_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SB_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+      ZONE_NAME: imagick.ai
       CDN_HOST: cdn.imagick.ai
       B2_DL_HOST: f005.backblazeb2.com
       BUCKET: imagick
@@ -29,7 +29,7 @@ jobs:
           import json, os, sys, time, urllib.request, urllib.error
 
           CF = "https://api.cloudflare.com/client/v4"
-          TOKEN = os.environ["CF_TOKEN"]; ZONE = os.environ["CF_ZONE"]
+          TOKEN = os.environ["CF_TOKEN"]; ZONE_NAME = os.environ["ZONE_NAME"]
           CDN = os.environ["CDN_HOST"]; DL = os.environ["B2_DL_HOST"]; BUCKET = os.environ["BUCKET"]
 
           def cf(method, path, body=None):
@@ -44,11 +44,14 @@ jobs:
                   try: return e.code, json.load(e)
                   except Exception: return e.code, {"success": False, "errors": [str(e)]}
 
-          # Sanity: token can see the zone
-          st, res = cf("GET", f"/zones/{ZONE}")
-          if not res.get("success"):
-              print("Token/zone check FAILED:", st, json.dumps(res.get("errors"))); sys.exit(1)
-          print("Zone reachable:", res["result"]["name"])
+          # Resolve the zone id from its name (the token is scoped to this zone).
+          st, res = cf("GET", f"/zones?name={ZONE_NAME}")
+          zones = res.get("result", []) if res.get("success") else []
+          if not zones:
+              print("Zone lookup FAILED:", st, json.dumps(res.get("errors")))
+              print("  (check the token has Zone:Read for", ZONE_NAME + ")"); sys.exit(1)
+          ZONE = zones[0]["id"]
+          print("Zone reachable:", zones[0]["name"])
 
           # ── 1) DNS: CNAME cdn -> B2 download host, proxied (orange cloud) ──
           st, res = cf("GET", f"/zones/{ZONE}/dns_records?type=CNAME&name={CDN}")
