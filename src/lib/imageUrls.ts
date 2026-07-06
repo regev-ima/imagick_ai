@@ -10,7 +10,18 @@
  * - Edited preview: galleries/{userId}/{galleryId}/{styleId}/compressed/{imageId}_reduced.webp
  */
 
+// Where the object bytes physically live (Backblaze B2, S3-style endpoint).
+// Stored URLs in the DB use this host; parseB2Url must always understand it.
 const B2_BASE_URL = "https://s3.us-east-005.backblazeb2.com/imagick";
+
+// Where the browser should FETCH images from. cdn.imagick.ai is Cloudflare in
+// front of the same bucket (edge-cached, free B2 egress). Overridable via
+// VITE_IMAGE_CDN_BASE (e.g. set back to B2_BASE_URL to roll back instantly).
+// No trailing slash, no bucket/`/file` segment — the Cloudflare Transform Rule
+// prepends `/file/imagick` to the path.
+const CDN_BASE_URL = "https://cdn.imagick.ai";
+const OUTPUT_BASE =
+  ((import.meta as any)?.env?.VITE_IMAGE_CDN_BASE as string | undefined) || CDN_BASE_URL;
 
 /**
  * Extract the base path and filename from a B2 URL
@@ -19,16 +30,20 @@ export function parseB2Url(url: string): { basePath: string; filename: string; e
   if (!url) return null;
   
   try {
-    // Remove the base URL to get the path
+    // Reduce any known host form to the bucket-relative key, so stored S3 URLs,
+    // CDN URLs (cdn.imagick.ai/<key>), and native friendly URLs (/file/imagick/)
+    // all parse identically.
     let path = url;
-    if (url.startsWith(B2_BASE_URL)) {
-      path = url.replace(B2_BASE_URL + "/", "");
-    } else if (url.startsWith("https://")) {
-      // Handle other URL formats
-      const urlObj = new URL(url);
-      path = urlObj.pathname.replace(/^\/file\/imagick\//, "");
+    try {
+      path = new URL(url).pathname;
+    } catch {
+      // not an absolute URL — treat the whole string as a path
     }
-    
+    path = path
+      .replace(/^\/+/, "")             // drop leading slashes
+      .replace(/^file\/imagick\//, "") // native friendly download prefix
+      .replace(/^imagick\//, "");      // S3 bucket segment
+
     // Split path into directory and filename
     const lastSlash = path.lastIndexOf("/");
     const basePath = lastSlash > 0 ? path.substring(0, lastSlash) : "";
@@ -90,7 +105,7 @@ export function getThumbnailUrl(originalUrl: string): string {
   if (!norm) return originalUrl;
 
   const pathPrefix = norm.basePath ? `${norm.basePath}/` : '';
-  return `${B2_BASE_URL}/${pathPrefix}thumbnail/${norm.coreFilename}_reduced_thumbnail.webp`;
+  return `${OUTPUT_BASE}/${pathPrefix}thumbnail/${norm.coreFilename}_reduced_thumbnail.webp`;
 }
 
 /**
@@ -108,7 +123,7 @@ export function getPreviewUrl(originalUrl: string): string {
   if (!norm) return originalUrl;
 
   const pathPrefix = norm.basePath ? `${norm.basePath}/` : '';
-  return `${B2_BASE_URL}/${pathPrefix}compressed/${norm.coreFilename}_reduced.webp`;
+  return `${OUTPUT_BASE}/${pathPrefix}compressed/${norm.coreFilename}_reduced.webp`;
 }
 
 /**
@@ -120,7 +135,7 @@ export function getEditedUrl(originalUrl: string, styleId: string): string {
   if (!parsed) return originalUrl;
   
   const { basePath, filename } = parsed;
-  return `${B2_BASE_URL}/${basePath}/${styleId}/${filename}.jpeg`;
+  return `${OUTPUT_BASE}/${basePath}/${styleId}/${filename}.jpeg`;
 }
 
 /**
@@ -131,7 +146,7 @@ export function getEditedThumbnailUrl(originalUrl: string, styleId: string): str
   if (!parsed) return originalUrl;
   
   const { basePath, filename } = parsed;
-  return `${B2_BASE_URL}/${basePath}/${styleId}/thumbnail/${filename}_reduced_thumbnail.webp`;
+  return `${OUTPUT_BASE}/${basePath}/${styleId}/thumbnail/${filename}_reduced_thumbnail.webp`;
 }
 
 /**
@@ -142,7 +157,7 @@ export function getEditedPreviewUrl(originalUrl: string, styleId: string): strin
   if (!parsed) return originalUrl;
   
   const { basePath, filename } = parsed;
-  return `${B2_BASE_URL}/${basePath}/${styleId}/compressed/${filename}_reduced.webp`;
+  return `${OUTPUT_BASE}/${basePath}/${styleId}/compressed/${filename}_reduced.webp`;
 }
 
 /**
