@@ -33,6 +33,8 @@
  export default function PlansManagement() {
    const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
    const [isDialogOpen, setIsDialogOpen] = useState(false);
+   const [isCreating, setIsCreating] = useState(false);
+   const [deleteTarget, setDeleteTarget] = useState<SubscriptionPlan | null>(null);
    const queryClient = useQueryClient();
  
    const { data: plans, isLoading } = useQuery({
@@ -118,13 +120,102 @@
      },
    });
  
+   // Create a brand-new plan (a new TIER, version 1). family_slug = slug so
+   // future price changes clone into new versions of this same family.
+   const createPlanMutation = useMutation({
+     mutationFn: async (plan: Partial<SubscriptionPlan>) => {
+       const maxSort = Math.max(0, ...(plans ?? []).map((p) => (p as any).sort_order ?? 0));
+       const { error } = await supabase.from("subscription_plans").insert({
+         ...plan,
+         family_slug: plan.slug,
+         version: 1,
+         is_published: true,
+         is_active: true,
+         sort_order: maxSort + 1,
+       } as any);
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["admin-plans"] });
+       queryClient.invalidateQueries({ queryKey: ["admin-plan-subscriber-counts"] });
+       toast.success("Plan created. Run “Sync to PayPal” before anyone can subscribe to a paid plan.");
+       setIsDialogOpen(false);
+       setEditingPlan(null);
+       setIsCreating(false);
+     },
+     onError: (error: any) => {
+       console.error("Error creating plan:", error);
+       toast.error(error?.message?.includes("duplicate") ? "That slug is already taken." : "Failed to create plan");
+     },
+   });
+
+   // Delete a plan. The DB trigger blocks deletion when subscribers exist —
+   // we surface that as a friendly "unpublish instead" message.
+   const deletePlanMutation = useMutation({
+     mutationFn: async (id: string) => {
+       const { error } = await supabase.from("subscription_plans").delete().eq("id", id);
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["admin-plans"] });
+       toast.success("Plan deleted");
+       setDeleteTarget(null);
+     },
+     onError: (error: any) => {
+       console.error("Error deleting plan:", error);
+       const msg = String(error?.message || "");
+       toast.error(msg.includes("cannot be deleted")
+         ? "This plan has subscribers — unpublish it instead of deleting."
+         : "Failed to delete plan");
+       setDeleteTarget(null);
+     },
+   });
+
+   // Create/refresh the PayPal billing plans for every published paid plan.
+   // Idempotent — safe to click repeatedly; only missing plans are created.
+   const syncPayPalMutation = useMutation({
+     mutationFn: async () => {
+       const { data: { session } } = await supabase.auth.getSession();
+       if (!session) throw new Error("Not authenticated");
+       const { data, error } = await supabase.functions.invoke("paypal-setup-plans");
+       if (error) throw error;
+       return data;
+     },
+     onSuccess: () => toast.success("PayPal plans synced — paid plans are now purchasable."),
+     onError: (error: any) => {
+       console.error("PayPal sync failed:", error);
+       toast.error("PayPal sync failed. Check that PayPal mode & credentials are configured.");
+     },
+   });
+
    const togglePlanActive = async (plan: SubscriptionPlan) => {
      updatePlanMutation.mutate({ id: plan.id, is_active: !plan.is_active });
    };
- 
+
+   const BLANK_PLAN = {
+     name: "", slug: "", price_monthly: 0, price_yearly: 0, edits_included: 0,
+     price_per_extra_edit: 0, max_styles: 0, max_storage_gb: 5,
+     has_ai_culling: true, has_team_access: false, has_api_access: false,
+     has_priority_support: false, has_full_style_library: false,
+   } as unknown as SubscriptionPlan;
+
+   const openCreate = () => {
+     setEditingPlan({ ...BLANK_PLAN });
+     setIsCreating(true);
+     setIsDialogOpen(true);
+   };
+
    const handleSavePlan = () => {
      if (!editingPlan) return;
-     updatePlanMutation.mutate(editingPlan);
+     if (isCreating) {
+       if (!editingPlan.name?.trim() || !editingPlan.slug?.trim()) {
+         toast.error("Name and slug are required");
+         return;
+       }
+       createPlanMutation.mutate(editingPlan);
+     } else {
+       updatePlanMutation.mutate(editingPlan);
+     }
    };
  
    return (
@@ -142,6 +233,23 @@
              <CreditCard className="h-3 w-3" />
              Manage pricing and plan features
            </p>
+         </div>
+         <div className="flex items-center gap-2">
+           <Button
+             variant="outline"
+             size="sm"
+             className="gap-1.5"
+             disabled={syncPayPalMutation.isPending}
+             onClick={() => syncPayPalMutation.mutate()}
+             title="Create the PayPal billing plans for every published paid plan. Run this after adding or publishing a paid plan."
+           >
+             <DollarSign className="h-4 w-4" />
+             {syncPayPalMutation.isPending ? "Syncing…" : "Sync to PayPal"}
+           </Button>
+           <Button size="sm" className="gap-1.5" onClick={openCreate}>
+             <Plus className="h-4 w-4" />
+             New plan
+           </Button>
          </div>
        </div>
 
@@ -200,17 +308,44 @@
                      <p className="truncate text-sm font-semibold tracking-tight">{plan.name}</p>
                      <span className="aura-microlabel">{plan.slug}</span>
                    </div>
-                   <Button
-                     variant="ghost"
-                     size="icon"
-                     aria-label="Edit plan" className="h-8 w-8 shrink-0"
-                     onClick={() => {
-                       setEditingPlan(plan);
-                       setIsDialogOpen(true);
-                     }}
-                   >
-                     <Edit className="w-4 h-4" />
-                   </Button>
+                   <div className="flex shrink-0 items-center gap-0.5">
+                     <Button
+                       variant="ghost"
+                       size="icon"
+                       aria-label="Edit plan" className="h-8 w-8"
+                       onClick={() => {
+                         setEditingPlan(plan);
+                         setIsCreating(false);
+                         setIsDialogOpen(true);
+                       }}
+                     >
+                       <Edit className="w-4 h-4" />
+                     </Button>
+                     {/* Delete is only offered when the plan has no subscribers.
+                         Otherwise the DB trigger blocks it — unpublish instead. */}
+                     {(subscriberCounts[plan.id] || 0) === 0 ? (
+                       <Button
+                         variant="ghost"
+                         size="icon"
+                         aria-label="Delete plan"
+                         className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                         onClick={() => setDeleteTarget(plan)}
+                       >
+                         <Trash2 className="w-4 h-4" />
+                       </Button>
+                     ) : (
+                       <Button
+                         variant="ghost"
+                         size="icon"
+                         aria-label="Cannot delete — has subscribers"
+                         className="h-8 w-8 cursor-not-allowed text-muted-foreground/30"
+                         disabled
+                         title="Has subscribers — unpublish instead of deleting."
+                       >
+                         <Trash2 className="w-4 h-4" />
+                       </Button>
+                     )}
+                   </div>
                  </div>
 
                  <div className="space-y-4 p-4">
@@ -327,12 +462,14 @@
        )}
  
        {/* Edit Plan Dialog */}
-       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+       <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) { setIsCreating(false); setEditingPlan(null); } }}>
          <DialogContent className="max-w-lg">
            <DialogHeader>
-             <DialogTitle>Edit Plan: {editingPlan?.name}</DialogTitle>
+             <DialogTitle>{isCreating ? "Create Plan" : `Edit Plan: ${editingPlan?.name}`}</DialogTitle>
              <DialogDescription>
-               Update the plan details and pricing
+               {isCreating
+                 ? "New paid plans need “Sync to PayPal” before anyone can subscribe. A price change to an existing plan should be a new version, not an edit here."
+                 : "Update the plan details and pricing"}
              </DialogDescription>
            </DialogHeader>
  
@@ -457,8 +594,30 @@
              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                Cancel
              </Button>
-             <Button onClick={handleSavePlan} disabled={updatePlanMutation.isPending}>
-               Save Changes
+             <Button onClick={handleSavePlan} disabled={updatePlanMutation.isPending || createPlanMutation.isPending}>
+               {isCreating ? "Create plan" : "Save Changes"}
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       {/* Delete confirmation (only reachable for plans with no subscribers) */}
+       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+         <DialogContent className="max-w-md">
+           <DialogHeader>
+             <DialogTitle>Delete “{deleteTarget?.name}”?</DialogTitle>
+             <DialogDescription>
+               This plan has no subscribers, so it can be permanently deleted. This can't be undone.
+             </DialogDescription>
+           </DialogHeader>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+             <Button
+               variant="destructive"
+               disabled={deletePlanMutation.isPending}
+               onClick={() => deleteTarget && deletePlanMutation.mutate(deleteTarget.id)}
+             >
+               Delete plan
              </Button>
            </DialogFooter>
          </DialogContent>
