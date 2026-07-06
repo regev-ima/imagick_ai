@@ -203,11 +203,28 @@ jobs:
               # Plumbing check: no sample key available, but prove CDN -> transform -> B2
               # is wired. A missing object must come back as a Backblaze 404 *through*
               # Cloudflare (server: cloudflare), not a Cloudflare-level error.
-              code, cache, ctype, server = fetch(f"https://{CDN}/__cdn_healthcheck_missing.jpg", False)
+              hc = f"https://{CDN}/__cdn_healthcheck_missing.jpg"
+              code, cache, ctype, server = fetch(hc, False)
               print(f"  plumbing: http={code} server={server} cf-cache-status={cache} content-type={ctype}")
               if (server or "").lower() == "cloudflare" and code in (404, 401, 403, 200, 206):
                   print("Verify OK (plumbing): cdn.imagick.ai routes through Cloudflare to B2.")
               else:
                   print("Verify FAILED: cdn.imagick.ai did not route through Cloudflare to B2.")
                   sys.exit(1)
+              # CORS answer without needing a real key: B2 echoes ACAO per the
+              # bucket CORS rule even on a 404, if the Origin is allowed.
+              req = urllib.request.Request(hc + "?cors_probe=1", method="GET")
+              req.add_header("User-Agent", UA)
+              req.add_header("Origin", "https://app.imagick.ai")
+              try:
+                  with urllib.request.urlopen(req) as r:
+                      acao = r.headers.get("access-control-allow-origin")
+              except urllib.error.HTTPError as e:
+                  acao = e.headers.get("access-control-allow-origin")
+              print(f"  CORS: access-control-allow-origin={acao}")
+              if acao:
+                  print("CORS OK: canvas pixel reads (dominant colour, etc.) will work via the CDN.")
+              else:
+                  print("CORS NOTE: no ACAO on this response — confirm the bucket CORS rule "
+                        "before the app reads CDN image pixels on a <canvas>.")
           PY
