@@ -1,3 +1,4 @@
+# Re-run trigger: token updated with Transform Rules + Cache Rules edit perms.
 # Configures a Cloudflare CDN (cdn.imagick.ai) in front of the public Backblaze
 # B2 bucket, so image downloads are edge-cached and egress from B2 -> Cloudflare
 # is free (Bandwidth Alliance). Idempotent: safe to re-run. Talks to the
