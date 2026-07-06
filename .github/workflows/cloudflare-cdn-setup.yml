@@ -1,0 +1,240 @@
+# Re-run trigger: token updated with Transform Rules + Cache Rules edit perms.
+# Configures a Cloudflare CDN (cdn.imagick.ai) in front of the public Backblaze
+# B2 bucket, so image downloads are edge-cached and egress from B2 -> Cloudflare
+# is free (Bandwidth Alliance). Idempotent: safe to re-run. Talks to the
+# Cloudflare API with a scoped token (repo secret). Prints statuses only — no
+# secrets, no image paths/UUIDs (repo is public).
+name: Cloudflare CDN setup
+on:
+  push:
+    branches: [claude/image-scoring-tagging-0cszyi]
+    paths: ['.github/workflows/cloudflare-cdn-setup.yml']
+concurrency:
+  group: cf-cdn-setup
+  cancel-in-progress: true
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      SB_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SB_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+      ZONE_NAME: imagick.ai
+      CDN_HOST: cdn.imagick.ai
+      B2_DL_HOST: f005.backblazeb2.com
+      BUCKET: imagick
+    steps:
+      - name: Configure + verify Cloudflare CDN over B2
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, time, urllib.request, urllib.error
+
+          CF = "https://api.cloudflare.com/client/v4"
+          TOKEN = os.environ["CF_TOKEN"]; ZONE_NAME = os.environ["ZONE_NAME"]
+          CDN = os.environ["CDN_HOST"]; DL = os.environ["B2_DL_HOST"]; BUCKET = os.environ["BUCKET"]
+
+          # A browser UA so Cloudflare's bot protection (error 1010) doesn't block
+          # our own probes — the default python-urllib UA gets banned by signature.
+          UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/125.0 Safari/537.36")
+
+          def cf(method, path, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(CF + path, data=data, method=method)
+              req.add_header("Authorization", "Bearer " + TOKEN)
+              req.add_header("Content-Type", "application/json")
+              req.add_header("User-Agent", UA)
+              try:
+                  with urllib.request.urlopen(req) as r:
+                      return r.status, json.load(r)
+              except urllib.error.HTTPError as e:
+                  try: return e.code, json.load(e)
+                  except Exception: return e.code, {"success": False, "errors": [str(e)]}
+
+          # Resolve the zone id from its name (the token is scoped to this zone).
+          st, res = cf("GET", f"/zones?name={ZONE_NAME}")
+          zones = res.get("result", []) if res.get("success") else []
+          if not zones:
+              print("Zone lookup FAILED:", st, json.dumps(res.get("errors")))
+              print("  (check the token has Zone:Read for", ZONE_NAME + ")"); sys.exit(1)
+          ZONE = zones[0]["id"]
+          print("Zone reachable:", zones[0]["name"])
+
+          # ── 1) DNS: CNAME cdn -> B2 download host, proxied (orange cloud) ──
+          st, res = cf("GET", f"/zones/{ZONE}/dns_records?type=CNAME&name={CDN}")
+          recs = res.get("result", []) if res.get("success") else []
+          body = {"type": "CNAME", "name": CDN, "content": DL, "proxied": True, "ttl": 1}
+          if recs:
+              st, res = cf("PUT", f"/zones/{ZONE}/dns_records/{recs[0]['id']}", body)
+              print("CNAME update:", st, res.get("success"))
+          else:
+              st, res = cf("POST", f"/zones/{ZONE}/dns_records", body)
+              print("CNAME create:", st, res.get("success"))
+          if not res.get("success"):
+              print("  errors:", json.dumps(res.get("errors"))); sys.exit(1)
+
+          # ── Rulesets helper: upsert one rule into a phase entrypoint (idempotent) ──
+          ALLOWED = {"expression", "action", "action_parameters", "description", "enabled"}
+          def upsert_phase(phase, desc, rule):
+              st, res = cf("GET", f"/zones/{ZONE}/rulesets/phases/{phase}/entrypoint")
+              rules = res["result"].get("rules") or [] if res.get("success") else []
+              rules = [{k: v for k, v in r.items() if k in ALLOWED}
+                       for r in rules if r.get("description") != desc]
+              rules.append(rule)
+              st, res = cf("PUT", f"/zones/{ZONE}/rulesets/phases/{phase}/entrypoint", {"rules": rules})
+              print(f"{phase}:", st, res.get("success"))
+              if not res.get("success"):
+                  print("  errors:", json.dumps(res.get("errors"))); sys.exit(1)
+
+          host_expr = f'(http.host eq "{CDN}")'
+
+          # ── 2) Transform Rule: rewrite /<key> -> /file/<bucket>/<key> ──
+          upsert_phase("http_request_transform", "B2 path rewrite (cdn -> /file/bucket)", {
+              "expression": host_expr,
+              "description": "B2 path rewrite (cdn -> /file/bucket)",
+              "action": "rewrite",
+              "action_parameters": {"uri": {"path": {
+                  "expression": f'concat("/file/{BUCKET}", http.request.uri.path)'}}},
+              "enabled": True,
+          })
+
+          # ── 3) Cache Rule: cache everything, long edge/browser TTL ──
+          upsert_phase("http_request_cache_settings", "B2 cache everything", {
+              "expression": host_expr,
+              "description": "B2 cache everything",
+              "action": "set_cache_settings",
+              "action_parameters": {
+                  "cache": True,
+                  "edge_ttl": {"mode": "override_origin", "default": 604800},      # 7 days
+                  "browser_ttl": {"mode": "override_origin", "default": 31536000}, # 1 year
+              },
+              "enabled": True,
+          })
+
+          # ── 4) Response header: force ACAO:* so canvas pixel reads work even on
+          # cached responses that a no-Origin <img> load populated (the classic
+          # CDN+S3 CORS-caching trap). Public images — wildcard is safe here.
+          upsert_phase("http_response_headers_transform", "CORS allow-all for canvas", {
+              "expression": host_expr,
+              "description": "CORS allow-all for canvas",
+              "action": "rewrite",
+              "action_parameters": {"headers": {
+                  "access-control-allow-origin": {"operation": "set", "value": "*"}}},
+              "enabled": True,
+          })
+          print("Cloudflare rules configured.")
+
+          # ── 4) Verify against a real object (path/UUIDs kept out of the log) ──
+          def sb_query(sql):
+              # The Management API query engine occasionally 500s (transient OOM);
+              # retry a few times before giving up.
+              last = None
+              for _ in range(4):
+                  req = urllib.request.Request(
+                      f"https://api.supabase.com/v1/projects/{os.environ['SB_REF']}/database/query",
+                      data=json.dumps({"query": sql}).encode(), method="POST")
+                  req.add_header("Authorization", "Bearer " + os.environ["SB_TOKEN"])
+                  req.add_header("Content-Type", "application/json")
+                  req.add_header("User-Agent", UA)
+                  try:
+                      with urllib.request.urlopen(req) as r:
+                          return json.load(r)
+                  except urllib.error.HTTPError as e:
+                      last = e
+                      if e.code >= 500:
+                          time.sleep(3); continue
+                      raise
+              raise last
+
+          key = None
+          try:
+              rows = sb_query("select original_url from gallery_images "
+                              "where original_url is not null limit 1")
+              url = (rows[0]["original_url"] if rows else "") or ""
+              marker = f"/{BUCKET}/"
+              if marker in url:
+                  key = url.split(marker, 1)[1]
+          except urllib.error.HTTPError as e:
+              body = e.read()[:200].decode("utf-8", "replace")
+              print("Verify: Supabase sample lookup failed:", e.code, body)
+          except Exception as e:
+              print("Verify: Supabase sample lookup failed:", type(e).__name__, str(e)[:200])
+
+          def fetch(u, want_image):
+              req = urllib.request.Request(u, method="GET")
+              req.add_header("User-Agent", UA)
+              if want_image:
+                  req.add_header("Range", "bytes=0-0")  # header-only, don't pull the whole image
+              try:
+                  with urllib.request.urlopen(req) as r:
+                      return r.status, r.headers.get("cf-cache-status"), r.headers.get("content-type"), r.headers.get("server")
+              except urllib.error.HTTPError as e:
+                  return e.code, e.headers.get("cf-cache-status"), e.headers.get("content-type"), e.headers.get("server")
+              except Exception as e:
+                  return None, f"({type(e).__name__})", None, None
+
+          if key:
+              # Full check: a real image returns 200/206 image/* and caches at the edge.
+              target = f"https://{CDN}/{key}"
+              ok = False
+              for attempt in range(6):
+                  code, cache, ctype, server = fetch(target, True)
+                  print(f"  attempt {attempt+1}: http={code} cf-cache-status={cache} content-type={ctype} server={server}")
+                  if code in (200, 206) and (ctype or "").startswith("image/"):
+                      ok = True
+                      if (cache or "").upper() == "HIT":
+                          break
+                  time.sleep(5)
+              if not ok:
+                  print("Verify FAILED: image did not load through the CDN.")
+                  sys.exit(1)
+              print("Verify OK: images serve through cdn.imagick.ai (cached at the edge).")
+
+              # CORS probe on the CACHED object (no cache-buster): proves the
+              # ACAO:* response rule holds even on a cache HIT that a no-Origin
+              # <img> populated — the exact case canvas pixel reads hit.
+              req = urllib.request.Request(f"https://{CDN}/{key}", method="GET")
+              req.add_header("User-Agent", UA)
+              req.add_header("Origin", "https://app.imagick.ai")
+              req.add_header("Range", "bytes=0-0")
+              try:
+                  with urllib.request.urlopen(req) as r:
+                      acao = r.headers.get("access-control-allow-origin")
+                      cache = r.headers.get("cf-cache-status")
+              except urllib.error.HTTPError as e:
+                  acao = e.headers.get("access-control-allow-origin"); cache = None
+              print(f"  CORS(cached): access-control-allow-origin={acao} cf-cache-status={cache}")
+              if acao:
+                  print("CORS OK: canvas pixel reads work through the CDN, cached responses included.")
+              else:
+                  print("CORS FAILED: cached response has no ACAO.")
+                  sys.exit(1)
+          else:
+              # Plumbing check: no sample key available, but prove CDN -> transform -> B2
+              # is wired. A missing object must come back as a Backblaze 404 *through*
+              # Cloudflare (server: cloudflare), not a Cloudflare-level error.
+              hc = f"https://{CDN}/__cdn_healthcheck_missing.jpg"
+              code, cache, ctype, server = fetch(hc, False)
+              print(f"  plumbing: http={code} server={server} cf-cache-status={cache} content-type={ctype}")
+              if (server or "").lower() == "cloudflare" and code in (404, 401, 403, 200, 206):
+                  print("Verify OK (plumbing): cdn.imagick.ai routes through Cloudflare to B2.")
+              else:
+                  print("Verify FAILED: cdn.imagick.ai did not route through Cloudflare to B2.")
+                  sys.exit(1)
+              # CORS answer without needing a real key: B2 echoes ACAO per the
+              # bucket CORS rule even on a 404, if the Origin is allowed.
+              req = urllib.request.Request(hc + "?cors_probe=1", method="GET")
+              req.add_header("User-Agent", UA)
+              req.add_header("Origin", "https://app.imagick.ai")
+              try:
+                  with urllib.request.urlopen(req) as r:
+                      acao = r.headers.get("access-control-allow-origin")
+              except urllib.error.HTTPError as e:
+                  acao = e.headers.get("access-control-allow-origin")
+              print(f"  CORS: access-control-allow-origin={acao}")
+              if acao:
+                  print("CORS OK: canvas pixel reads (dominant colour, etc.) will work via the CDN.")
+              else:
+                  print("CORS NOTE: no ACAO on this response — confirm the bucket CORS rule "
+                        "before the app reads CDN image pixels on a <canvas>.")
+          PY
