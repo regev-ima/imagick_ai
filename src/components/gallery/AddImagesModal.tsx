@@ -39,6 +39,8 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
+import { BuyCreditsModal } from "@/components/billing/BuyCreditsModal";
+import { useCreditPricing, estimateGalleryCredits } from "@/hooks/useCreditPricing";
 
 const MAX_LOOKS = 3;
 
@@ -326,9 +328,13 @@ export function AddImagesModal({
 
   // Edit calculations
   const imageCount = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : uppyFileCount;
+  const creditPricing = useCreditPricing();
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
   const stylesCount = selectedStyles.length;
-  const editsNeeded = imageCount * stylesCount;
+  // Full credit cost — edits AND the metered culling/faces on the NEW photos.
+  const editsNeeded = estimateGalleryCredits(creditPricing, imageCount, stylesCount, cull, cull && cullFaces);
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
+  const creditsShort = hasInsufficientEdits ? editsNeeded - availableEdits : 0;
   const maxImages = isUnlimited ? Infinity : (stylesCount > 0 ? Math.floor(availableEdits / stylesCount) : 0);
   const remaining = Math.max(0, availableEdits - editsNeeded);
   const usedPct = availableEdits > 0 ? Math.min(100, Math.round((editsNeeded / availableEdits) * 100)) : (editsNeeded > 0 ? 100 : 0);
@@ -1022,9 +1028,12 @@ export function AddImagesModal({
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-[--radius] border border-destructive/40 bg-destructive/[0.06] p-2.5 text-sm">
                   <span className="flex items-center gap-2 text-destructive">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
-                    Not enough edits — max {Number.isFinite(maxImages) ? maxImages.toLocaleString() : "—"} photos with {stylesCount} look{stylesCount > 1 ? "s" : ""}.
+                    {creditsShort.toLocaleString()} credits short for these photos.
                   </span>
-                  <Button size="sm" variant="glow" className="shrink-0" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
+                  <span className="flex shrink-0 gap-2">
+                    <Button size="sm" variant="glow" onClick={() => setShowBuyCredits(true)}>Buy credits</Button>
+                    <Button size="sm" variant="outline" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
+                  </span>
                 </div>
               )}
             </div>
@@ -1076,6 +1085,15 @@ export function AddImagesModal({
           click on any AlertDialog button bubbles up to the backdrop's
           onClick={onClose} and closes the whole modal. Sibling
           placement under the Fragment breaks that bubbling path. */}
+      {/* In-flow top-up — buy exactly what's missing without leaving the modal.
+          Sibling placement (outside the backdrop) for the same event-bubbling
+          reason as the duplicate dialog below. */}
+      <BuyCreditsModal
+        isOpen={showBuyCredits}
+        onClose={() => setShowBuyCredits(false)}
+        neededCredits={creditsShort > 0 ? creditsShort : undefined}
+      />
+
       <AlertDialog open={!!duplicatePrompt} onOpenChange={(open) => !open && setDuplicatePrompt(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

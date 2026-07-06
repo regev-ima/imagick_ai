@@ -216,17 +216,26 @@ serve(async (req: Request) => {
       try {
         const { data: sub } = await supabase
           .from("user_subscriptions")
-          .select("edits_remaining, plan_id, subscription_plans!inner(slug)")
+          .select("edits_remaining, plan_id, subscription_plans!inner(slug, edits_included, price_monthly)")
           .eq("user_id", userId)
           .single();
 
-        const planSlug = (sub as any)?.subscription_plans?.slug;
         const remaining = sub?.edits_remaining;
+        const included = (sub as any)?.subscription_plans?.edits_included;
 
-        if (planSlug === "free" && remaining !== null && remaining !== undefined) {
-          if (remaining === 500 || remaining === 100 || remaining === 0) {
-            const emailType = remaining === 0 ? "edits_exhausted" : `edits_warning_${remaining}`;
-            // Fire-and-forget: send warning email
+        // Percentage-based low-credit alerts for every METERED plan (free
+        // welcome pool + monthly-allowance paid tiers). Crossing 50% → 80% →
+        // 100% used fires one email each; exact-threshold equality was the
+        // old scheme's bug (multi-credit debits could skip 500/100/0).
+        if (
+          remaining !== null && remaining !== undefined && remaining !== -1 &&
+          typeof included === "number" && included > 0
+        ) {
+          const usedPctBefore = 100 - Math.round(((remaining + 1) / included) * 100);
+          const usedPctNow = 100 - Math.round((remaining / included) * 100);
+          const crossed = [50, 80, 100].find((t) => usedPctBefore < t && usedPctNow >= t);
+          if (crossed) {
+            const emailType = crossed === 100 ? "edits_exhausted" : `credits_warning_${crossed}`;
             const sendEmailUrl = `${supabaseUrl}/functions/v1/send-email`;
             fetch(sendEmailUrl, {
               method: "POST",
@@ -235,19 +244,18 @@ serve(async (req: Request) => {
                 "Authorization": `Bearer ${supabaseServiceKey}`,
               },
               body: JSON.stringify({ type: emailType, userId, remaining }),
-            }).catch(err => console.error("Failed to trigger edit warning email:", err));
+            }).catch(err => console.error("Failed to trigger credit warning email:", err));
 
-            // WhatsApp notification for edits exhausted
-            if (remaining === 0) {
+            if (crossed === 100) {
               const { data: userRecord } = await supabase.auth.admin.getUserById(userId);
               const userName = userRecord?.user?.user_metadata?.full_name || userRecord?.user?.email?.split("@")[0] || "Unknown";
-              const msg = `⚠️ Free Edits Exhausted\nUser: ${userName} (${userRecord?.user?.email})\nAll 3,000 free edits used up.`;
+              const msg = `⚠️ Credits Exhausted\nUser: ${userName} (${userRecord?.user?.email})\nAll ${included.toLocaleString("en-US")} credits used.`;
               sendWhatsAppNotification(msg).catch((err: any) => console.error("WhatsApp notification failed:", err));
             }
           }
         }
       } catch (err) {
-        console.error("Failed to check edit thresholds:", err);
+        console.error("Failed to check credit thresholds:", err);
       }
     }
 

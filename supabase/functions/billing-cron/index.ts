@@ -40,6 +40,7 @@ serve(async (req: Request) => {
     expired: 0,
     downgrades: 0,
     staleReservationsReleased: 0,
+    refilled: 0,
     grantsExpired: 0,
     archived: 0,
     errors: 0,
@@ -74,12 +75,15 @@ serve(async (req: Request) => {
 
     for (const sub of expiring || []) {
       try {
+        // Gift/purchased credits are the user's — they survive expiry.
+        const { data: grantSum } = await supabase
+          .rpc("sum_active_grant_credits", { p_user_id: sub.user_id });
         await supabase
           .from("user_subscriptions")
           .update({
             status: "expired",
             plan_id: freePlan?.id || sub.plan_id,
-            edits_remaining: 0,
+            edits_remaining: Number(grantSum) || 0,
             cancel_at_period_end: false,
             paypal_subscription_id: null,
             paypal_plan_id: null,
@@ -213,6 +217,26 @@ serve(async (req: Request) => {
         console.error(`Error releasing stale reservation for gallery ${g.id}:`, err);
         stats.errors++;
       }
+    }
+
+    // ── 3.5 Monthly credit refill ────────────────────────────────────────
+    // Calendar-anchored (credits_refilled_at), NOT payment-event-driven: a
+    // YEARLY subscriber's PayPal payment event fires once a year, but their
+    // plan credits refill every month regardless. Refills only metered paid
+    // plans (edits_included > 0); legacy unlimited (-1) and free are skipped.
+    try {
+      const { data: refilled, error: refillErr } = await supabase
+        .rpc("refill_plan_credits");
+      if (refillErr) {
+        console.error("Error refilling plan credits:", refillErr);
+        stats.errors++;
+      } else if ((refilled || 0) > 0) {
+        stats.refilled = refilled || 0;
+        console.log(`Refilled monthly credits for ${refilled} subscription(s)`);
+      }
+    } catch (err) {
+      console.error("Error in monthly credit refill:", err);
+      stats.errors++;
     }
 
     // ── 4. Expire credit grants ──────────────────────────────────────────

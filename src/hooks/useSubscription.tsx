@@ -117,10 +117,14 @@ export function useSubscription() {
   const { data: plans, isLoading: plansLoading } = useQuery({
     queryKey: ["subscription-plans"],
     queryFn: async () => {
+      // Only PUBLISHED plan versions are offered to new subscribers; a user's
+      // own (possibly unpublished legacy) plan still resolves via plan_id on
+      // their subscription row, never through this list.
       const { data, error } = await supabase
         .from("subscription_plans")
         .select("*")
         .eq("is_active", true)
+        .eq("is_published" as never, true as never)
         .order("sort_order");
 
       if (error) {
@@ -236,7 +240,9 @@ export function useSubscription() {
     giftCreditsTotal,
     planCreditsRemaining,
   } = deriveEditCounters(subscription as any, currentPlan as any, creditGrants as any);
-  const isFreePlan = currentPlan?.slug === "free";
+  // Free = zero-price plan (covers legacy unpublished versions like
+  // free-v1, whose slug is no longer exactly "free").
+  const isFreePlan = currentPlan ? Number(currentPlan.price_monthly) === 0 : false;
   const isPaidPlan = !isFreePlan;
   const isCancelling = subscription?.cancel_at_period_end === true;
   const isSuspended = subscription?.status === "suspended";

@@ -47,6 +47,9 @@ const DowngradeConfirmModal = lazy(() =>
 const AddOnModal = lazy(() =>
   import("@/components/billing/AddOnModal").then(m => ({ default: m.AddOnModal }))
 );
+const BuyCreditsModal = lazy(() =>
+  import("@/components/billing/BuyCreditsModal").then(m => ({ default: m.BuyCreditsModal }))
+);
 const PayPalCheckoutModal = lazy(() =>
   import("@/components/billing/PayPalCheckoutModal").then(m => ({ default: m.PayPalCheckoutModal }))
 );
@@ -198,6 +201,7 @@ export default function BillingPage() {
   const [showBillingHistory, setShowBillingHistory] = useState(false);
   const [showStorageBreakdown, setShowStorageBreakdown] = useState(false);
   const [showEditsUsage, setShowEditsUsage] = useState(false);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [downgradeTarget, setDowngradeTarget] = useState<SubscriptionPlan | null>(null);
   const [showAddOnModal, setShowAddOnModal] = useState(false);
@@ -948,8 +952,14 @@ export default function BillingPage() {
             onClose={() => setShowEditsUsage(false)}
             onBuyCredits={() => {
               setShowEditsUsage(false);
-              scrollToPlans();
+              setShowBuyCredits(true);
             }}
+          />
+        )}
+        {showBuyCredits && (
+          <BuyCreditsModal
+            isOpen={showBuyCredits}
+            onClose={() => setShowBuyCredits(false)}
           />
         )}
         {showCancelModal && (
