@@ -209,6 +209,32 @@ jobs:
               else:
                   print("CORS FAILED: cached response has no ACAO.")
                   sys.exit(1)
+
+              # Browser-accurate check: full GET (no Range) of a THUMBNAIL — exactly
+              # what an <img> does. First view is expected MISS; a reload must HIT.
+              import posixpath
+              d = posixpath.dirname(key); b = posixpath.basename(key)
+              stem = b.rsplit(".", 1)[0]
+              thumb = f"https://{CDN}/{d}/thumbnail/{stem}_reduced_thumbnail.webp"
+              statuses = []
+              for i in range(4):
+                  code, cache, ctype, server = fetch(thumb, False)  # full GET, browser-style
+                  statuses.append((code, cache))
+                  print(f"  thumb GET {i+1}: http={code} cf-cache-status={cache} content-type={ctype}")
+                  if (cache or "").upper() == "HIT":
+                      break
+                  time.sleep(4)
+              got_hit = any((c or "").upper() == "HIT" for _, c in statuses)
+              got_200 = any(code == 200 for code, _ in statuses)
+              if got_200 and got_hit:
+                  print("CACHE OK: a repeat full GET of the same thumbnail is a HIT (edge-cached).")
+              elif got_200:
+                  print("CACHE NOTE: thumbnail served 200 but stayed MISS across repeats — "
+                        "inspect for a query string / Vary / cookie defeating the cache.")
+                  sys.exit(1)
+              else:
+                  print("CACHE NOTE: thumbnail not found for this sample (skipping); "
+                        "the real-image check above already proved caching.")
           else:
               # Plumbing check: no sample key available, but prove CDN -> transform -> B2
               # is wired. A missing object must come back as a Backblaze 404 *through*
