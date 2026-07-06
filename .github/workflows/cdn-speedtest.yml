@@ -1,0 +1,84 @@
+# TEMPORARY benchmark: times the SAME object direct from Backblaze B2 vs the
+# Cloudflare CDN on BOTH a cold cache (MISS -> CDN fetches from B2) and a warm
+# cache (HIT -> served from the edge). Timings only, no keys/UUIDs. Delete after.
+name: CDN speed test
+on:
+  push:
+    branches: [claude/image-scoring-tagging-0cszyi]
+    paths: ['.github/workflows/cdn-speedtest.yml']
+concurrency:
+  group: cdn-speedtest
+  cancel-in-progress: true
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    env:
+      SB_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SB_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+      UA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+      S3: "https://s3.us-east-005.backblazeb2.com/imagick"
+      CDN: "https://cdn.imagick.ai"
+    steps:
+      - name: Benchmark direct B2 vs Cloudflare CDN (cold + warm)
+        run: |
+          echo "Runner region: US-East, right next to the B2 bucket (us-east-005)."
+          echo "This is the WORST case for a CDN (client already next to origin) and"
+          echo "the cold/MISS hop shows most here. Distant real users see the opposite."
+          echo
+
+          url=""
+          for i in 1 2 3 4 5; do
+            resp=$(curl -s -A "$UA" -X POST \
+              "https://api.supabase.com/v1/projects/$SB_REF/database/query" \
+              -H "Authorization: Bearer $SB_TOKEN" -H "Content-Type: application/json" \
+              -d '{"query":"select original_url from gallery_images where original_url is not null limit 1"}' || true)
+            url=$(echo "$resp" | jq -r '.[0].original_url // empty' 2>/dev/null || true)
+            [ -n "$url" ] && break
+            sleep 3
+          done
+          [ -z "$url" ] && { echo "no sample object; abort"; exit 1; }
+
+          key="${url#*/imagick/}"
+          dir="${key%/*}"; base="${key##*/}"; stem="${base%.*}"
+          thumb_key="$dir/thumbnail/${stem}_reduced_thumbnail.webp"
+
+          # $1 label  $2 base-url  $3 mode: none|warm|cold
+          measure() {
+            label="$1"; base_u="$2"; mode="$3"; n=8
+            if [ "$mode" = warm ]; then
+              curl -s -o /dev/null --max-time 40 -A "$UA" "$base_u" >/dev/null 2>&1
+              curl -s -o /dev/null --max-time 40 -A "$UA" "$base_u" >/dev/null 2>&1
+            fi
+            ttfb=0; tot=0; sz=0; code=0
+            for i in $(seq 1 $n); do
+              u="$base_u"
+              # cold: a unique query per iteration forces a fresh cache key => MISS
+              [ "$mode" = cold ] && u="${base_u}?cb=${i}-${RANDOM}${RANDOM}"
+              line=$(curl -s -o /dev/null --max-time 40 -A "$UA" \
+                -w "%{http_code} %{time_starttransfer} %{time_total} %{size_download}" "$u" 2>/dev/null || echo "0 0 0 0")
+              set -- $line
+              code="${1:-0}"; t1="${2:-0}"; t2="${3:-0}"; sz="${4:-0}"
+              ttfb=$(awk -v a="$ttfb" -v b="$t1" 'BEGIN{print a+b}')
+              tot=$(awk -v a="$tot" -v b="$t2" 'BEGIN{print a+b}')
+            done
+            probe="$base_u"; [ "$mode" = cold ] && probe="${base_u}?cb=probe-${RANDOM}"
+            cf=$(curl -s -o /dev/null --max-time 40 -A "$UA" -D - "$probe" 2>/dev/null \
+                 | tr -d '\r' | awk -F': ' 'tolower($1)=="cf-cache-status"{print $2}' | tail -1)
+            [ -z "$cf" ] && cf="-"
+            awk -v l="$label" -v c="$code" -v tf="$ttfb" -v tt="$tot" -v n="$n" -v s="$sz" -v cf="$cf" \
+              'BEGIN{printf "  %-18s http=%s  avg TTFB=%7.1f ms  avg total=%7.1f ms  size=%s B  cf-cache=%s\n", l, c, (tf/n)*1000, (tt/n)*1000, s, cf}'
+          }
+
+          echo "=== THUMBNAIL (webp — the gallery grid) ==="
+          measure "B2 direct"        "$S3/$thumb_key"  none
+          measure "CDN cold (MISS)"  "$CDN/$thumb_key" cold
+          measure "CDN warm (HIT)"   "$CDN/$thumb_key" warm
+          echo
+          echo "=== ORIGINAL (full-size jpg) ==="
+          measure "B2 direct"        "$S3/$key"  none
+          measure "CDN cold (MISS)"  "$CDN/$key" cold
+          measure "CDN warm (HIT)"   "$CDN/$key" warm
+          echo
+          echo "cold = first-ever view (CDN pulls from B2, adds one hop). warm = every"
+          echo "later view, served from the edge. A distant user's browser->edge leg is"
+          echo "short, so even cold is competitive; every repeat view is a fast HIT."
