@@ -114,14 +114,25 @@ jobs:
 
           # ── 4) Verify against a real object (path/UUIDs kept out of the log) ──
           def sb_query(sql):
-              req = urllib.request.Request(
-                  f"https://api.supabase.com/v1/projects/{os.environ['SB_REF']}/database/query",
-                  data=json.dumps({"query": sql}).encode(), method="POST")
-              req.add_header("Authorization", "Bearer " + os.environ["SB_TOKEN"])
-              req.add_header("Content-Type", "application/json")
-              req.add_header("User-Agent", UA)
-              with urllib.request.urlopen(req) as r:
-                  return json.load(r)
+              # The Management API query engine occasionally 500s (transient OOM);
+              # retry a few times before giving up.
+              last = None
+              for _ in range(4):
+                  req = urllib.request.Request(
+                      f"https://api.supabase.com/v1/projects/{os.environ['SB_REF']}/database/query",
+                      data=json.dumps({"query": sql}).encode(), method="POST")
+                  req.add_header("Authorization", "Bearer " + os.environ["SB_TOKEN"])
+                  req.add_header("Content-Type", "application/json")
+                  req.add_header("User-Agent", UA)
+                  try:
+                      with urllib.request.urlopen(req) as r:
+                          return json.load(r)
+                  except urllib.error.HTTPError as e:
+                      last = e
+                      if e.code >= 500:
+                          time.sleep(3); continue
+                      raise
+              raise last
 
           key = None
           try:
