@@ -83,6 +83,7 @@ import { useJustifiedLayout } from "@/hooks/useJustifiedLayout";
 import { useImageDimensions } from "@/hooks/useImageDimensions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Orb } from "@/components/aura/Orb";
+import { BuyCreditsModal } from "@/components/billing/BuyCreditsModal";
 
 /** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
 function Sparkle({ size = 14, className }: { size?: number; className?: string }) {
@@ -133,6 +134,8 @@ export default function GalleryEditorPage() {
   const [detailsImageId, setDetailsImageId] = useState<string | null>(null);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [showAICullingModal, setShowAICullingModal] = useState(false);
+  // In-flow top-up prompt when a culling run is blocked on credits (402).
+  const [buyCreditsPrompt, setBuyCreditsPrompt] = useState<{ needed: number } | null>(null);
   const [cullingRequiredNote, setCullingRequiredNote] = useState(false);
   // When true the user has tucked the "AI is working" overlay away to
   // keep editing; the run continues and the banner offers to reopen it.
@@ -1516,6 +1519,23 @@ export default function GalleryEditorPage() {
         queryClient.invalidateQueries({ queryKey: ["gallery", id] });
         setCullingProgressMinimized(false);
         toast.info("AI Culling is already running for this gallery.");
+        return;
+      }
+      // 402 = not enough credits for this run — open the in-flow top-up
+      // with the exact shortfall instead of a dead-end generic error.
+      if (status === 402) {
+        let needed = 0;
+        const ctx = (err as { context?: unknown })?.context;
+        if (ctx instanceof Response) {
+          try {
+            const body = await ctx.clone().json();
+            needed = Math.max(0, (Number(body?.needed) || 0) - (Number(body?.available) || 0));
+          } catch { /* body wasn't JSON */ }
+        }
+        setBuyCreditsPrompt({ needed });
+        toast.error(needed > 0
+          ? `Not enough credits — ${needed.toLocaleString()} more needed for AI Culling.`
+          : "Not enough credits to run AI Culling.");
         return;
       }
       toast.error("Failed to start AI culling. Please try again.");
@@ -3360,6 +3380,13 @@ export default function GalleryEditorPage() {
             />
           )}
       </AnimatePresence>
+
+      {/* In-flow credit top-up (opened by the 402 handler above) */}
+      <BuyCreditsModal
+        isOpen={!!buyCreditsPrompt}
+        onClose={() => setBuyCreditsPrompt(null)}
+        neededCredits={buyCreditsPrompt?.needed || undefined}
+      />
 
       {/* Gallery Settings Modal */}
       <AnimatePresence>

@@ -9,6 +9,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { fetchCaptureTime } from "../_shared/exif-date.ts";
+import { checkCreditThresholds } from "../_shared/credit-alerts.ts";
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
@@ -183,6 +184,109 @@ serve(async (req: Request) => {
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // ── Credit billing for the pipeline's metered steps (culling + faces) ──
+    // Reserve-once, charge-on-settle: the FIRST invocation of a run reserves
+    // ceil(todo × menu-rate) credits and persists a marker on the gallery
+    // (galleries.pipeline_billing) so chained invocations don't re-reserve.
+    // At settle time (finalize / hard error) we charge for the images that
+    // were ACTUALLY newly processed and release the leftover — a failed image
+    // is never charged, mirroring the style-edit reserve/debit model. Style
+    // edits themselves are billed separately by image-webhook. Unlimited
+    // (legacy) plans skip billing entirely via an {unlimited} marker.
+    async function settlePipelineBilling(): Promise<void> {
+      try {
+        const { data: g } = await admin
+          .from("galleries").select("user_id, pipeline_billing").eq("id", galleryId).single();
+        const marker = (g as { pipeline_billing?: Record<string, unknown> | null })?.pipeline_billing ?? null;
+        if (!marker) return;
+        const ts = String(marker.ts);
+        const userId = String(marker.user_id ?? (g as { user_id?: string })?.user_id ?? "");
+        const reserved = Number(marker.reserved) || 0;
+
+        // Nothing to settle (unlimited run / bootstrap that never reserved):
+        // just clear the marker.
+        if (marker.unlimited || !userId || reserved <= 0) {
+          await admin.from("galleries").update({ pipeline_billing: null })
+            .eq("id", galleryId).eq("pipeline_billing->>ts", ts);
+          return;
+        }
+
+        // Crash-safe settle order: (1) idempotent charge, (2) claimed release,
+        // (3) clear marker LAST. A crash at any point leaves the marker in
+        // place, and every step is safe to re-run — so a later settle (next
+        // invocation, user re-run, or the cron sweeper) finishes the books
+        // instead of stranding the reservation.
+        const runTag = `run:${ts}`;
+
+        // 1. Charge — skip if this run was already charged (retry path).
+        const { data: chargedRows } = await admin
+          .from("edit_usage_logs").select("edits_spent")
+          .eq("gallery_id", galleryId).like("description", `%${runTag}%`);
+        let charged = (chargedRows || []).reduce(
+          (s: number, r: { edits_spent: number }) => s + (r.edits_spent || 0), 0);
+        if (charged === 0) {
+          const { count: cullNowC } = await admin
+            .from("gallery_images").select("id", { count: "exact", head: true })
+            .eq("gallery_id", galleryId).gt("culling_score", 0);
+          const { count: facesNowC } = await admin
+            .from("image_features").select("image_id", { count: "exact", head: true })
+            .eq("gallery_id", galleryId).eq("faces_done", true);
+          const didCull = Math.max(0, (cullNowC ?? 0) - (Number(marker.base_cull) || 0));
+          const didFaces = Math.max(0, (facesNowC ?? 0) - (Number(marker.base_faces) || 0));
+          let chargeCull = Math.ceil(didCull * (Number(marker.rate_cull) || 0));
+          let chargeFaces = Math.ceil(didFaces * (Number(marker.rate_face) || 0));
+          // Never charge more than was reserved (rounding can overshoot by 1).
+          if (chargeCull > reserved) chargeCull = reserved;
+          if (chargeCull + chargeFaces > reserved) chargeFaces = reserved - chargeCull;
+
+          const rows: Record<string, unknown>[] = [];
+          if (chargeCull > 0) {
+            rows.push({
+              user_id: userId, gallery_id: galleryId, action_type: "ai_culling",
+              edits_spent: chargeCull, description: `AI culling: ${didCull} photos rated & tagged · ${runTag}`,
+            });
+          }
+          if (chargeFaces > 0) {
+            rows.push({
+              user_id: userId, gallery_id: galleryId, action_type: "face_recognition",
+              edits_spent: chargeFaces, description: `Face recognition: ${didFaces} photos · ${runTag}`,
+            });
+          }
+          // The edit_usage_logs trigger debits the pool AND releases the same
+          // amount from edits_reserved.
+          if (rows.length) await admin.from("edit_usage_logs").insert(rows);
+          charged = chargeCull + chargeFaces;
+          // Bulk debits cross alert thresholds too — same choke-point check
+          // as single-edit debits in image-webhook.
+          if (charged > 0) {
+            await checkCreditThresholds(admin, supabaseUrl, supabaseServiceKey, userId, charged);
+          }
+        }
+
+        // 2. Release the leftover — claimed via a one-shot flag on the marker
+        // so racing settlers can't double-release.
+        const leftover = Math.max(0, reserved - charged);
+        if (leftover > 0) {
+          const { data: relClaim } = await admin
+            .from("galleries")
+            .update({ pipeline_billing: { ...marker, released: true } })
+            .eq("id", galleryId)
+            .eq("pipeline_billing->>ts", ts)
+            .is("pipeline_billing->>released", null)
+            .select("id");
+          if (relClaim && relClaim.length > 0) {
+            await admin.rpc("release_credits_simple", { p_user_id: userId, p_amount: leftover });
+          }
+        }
+
+        // 3. Books closed — clear the marker.
+        await admin.from("galleries").update({ pipeline_billing: null })
+          .eq("id", galleryId).eq("pipeline_billing->>ts", ts);
+      } catch (e) {
+        console.error("pipeline billing settle failed:", e);
+      }
+    }
+
     // Whole-gallery grouping: OLD community-detection over CLIP embeddings + hard
     // EXIF time gate, ported into Modal. Writes similarity_group_1/2/3. Falls back
     // to the SQL clusterer if the Modal group endpoint isn't configured.
@@ -283,6 +387,9 @@ serve(async (req: Request) => {
 
     // Finalize a fully-processed gallery: group images, cluster faces, mark ready.
     async function finalize() {
+      // Settle the run's credit books first: charge for what was actually
+      // processed, release the rest of the reservation.
+      await settlePipelineBilling();
       if (doCluster) {
         // Grouping goes through the NEW Modal community-detection engine ONLY.
         // We never fall back to the old SQL clusterer (removed) — if the Modal
@@ -391,6 +498,89 @@ serve(async (req: Request) => {
     if (images.length === 0 && cullTodo.length === 0) {
       await finalize();
       return json({ success: true, done: true });
+    }
+
+    // ── Reserve credits for this run (first invocation only) ──
+    // Reservation covers the WHOLE remaining todo (not just this
+    // invocation's slice); chained invocations see the marker and skip.
+    const facesTodoCount = doFaces ? withUrl.filter((i) => !facesDone.has(i.id)).length : 0;
+    {
+      const { data: gBill } = await admin
+        .from("galleries").select("user_id, pipeline_billing").eq("id", galleryId).single();
+      const ownerId = (gBill as { user_id?: string } | null)?.user_id ?? null;
+      let marker = (gBill as { pipeline_billing?: { ts?: unknown } | null } | null)?.pipeline_billing ?? null;
+      // A user-initiated run over a marker from a DEAD previous run (older
+      // than 30 min — a live chain re-invokes far more often) — close the old
+      // books, then re-reserve for this run. A fresh marker means a run is
+      // live right now: leave its books alone, its reservation covers billing.
+      if (!isInternal && marker) {
+        const markerAge = Date.now() - (Number(marker.ts) || 0);
+        if (markerAge > 30 * 60_000) {
+          await settlePipelineBilling();
+          marker = null;
+        }
+      }
+      if (!marker && ownerId && (cullTodo.length > 0 || facesTodoCount > 0)) {
+        // Atomic bootstrap claim: only the invocation that lands the
+        // placeholder reserves — a double-click / racing chain can't
+        // double-reserve (the loser sees a non-null marker and skips).
+        const bootTs = Date.now();
+        const { data: claim } = await admin
+          .from("galleries")
+          .update({ pipeline_billing: { ts: bootTs, user_id: ownerId, bootstrapping: true } })
+          .eq("id", galleryId)
+          .is("pipeline_billing", null)
+          .select("id");
+        if (claim && claim.length > 0) {
+          // Menu prices — admin-tunable via platform_settings.credit_pricing.
+          let rateCull = 0.2, rateFace = 0.1;
+          try {
+            const { data: cfg } = await admin
+              .from("platform_settings").select("value").eq("key", "credit_pricing").single();
+            if (cfg?.value) {
+              const p = JSON.parse(cfg.value as string);
+              if (typeof p.ai_culling === "number") rateCull = p.ai_culling;
+              if (typeof p.face_recognition === "number") rateFace = p.face_recognition;
+            }
+          } catch { /* defaults */ }
+          const effRateCull = doCulling ? rateCull : 0;
+          const effRateFace = doFaces ? rateFace : 0;
+          const needed = Math.ceil(cullTodo.length * effRateCull + facesTodoCount * effRateFace);
+
+          const { data: sub } = await admin
+            .from("user_subscriptions").select("edits_remaining, edits_reserved")
+            .eq("user_id", ownerId).single();
+          const unlimited = (sub as { edits_remaining?: number } | null)?.edits_remaining === -1;
+
+          if (unlimited || needed === 0) {
+            await admin.from("galleries")
+              .update({ pipeline_billing: { unlimited: true, ts: bootTs, user_id: ownerId } })
+              .eq("id", galleryId);
+          } else {
+            const { data: ok } = await admin
+              .rpc("reserve_credits_simple", { p_user_id: ownerId, p_needed: needed });
+            if (!ok) {
+              const remaining = (sub as { edits_remaining?: number } | null)?.edits_remaining ?? 0;
+              const reservedNow = (sub as { edits_reserved?: number } | null)?.edits_reserved ?? 0;
+              const available = Math.max(0, remaining - reservedNow);
+              await admin.from("galleries").update({
+                pipeline_billing: null,
+                pipeline_status: "error",
+                culling_status: "error",
+                pipeline_error: `insufficient_credits: AI culling needs ${needed} credits but only ${available} are available. Buy credits or upgrade your plan, then run AI Culling again.`,
+              }).eq("id", galleryId);
+              return json({ error: "insufficient_credits", needed, available }, 402);
+            }
+            await admin.from("galleries").update({
+              pipeline_billing: {
+                ts: bootTs, user_id: ownerId, reserved: needed,
+                base_cull: cullDone.size, base_faces: facesDone.size,
+                rate_cull: effRateCull, rate_face: effRateFace,
+              },
+            }).eq("id", galleryId);
+          }
+        }
+      }
     }
 
     const start = Date.now();
@@ -687,6 +877,9 @@ serve(async (req: Request) => {
           culling_status: "error",
           pipeline_error: msg,
         }).eq("id", galleryId);
+        // Close the credit books: charge whatever WAS processed before the
+        // stall, release the rest of the reservation.
+        await settlePipelineBilling();
         return json({ error: "stalled", remaining, clipRemaining, cullRemaining, cullFirstError }, 200);
       }
       const chain = fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {

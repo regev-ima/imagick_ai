@@ -59,6 +59,8 @@ import { getThumbnailUrl } from "@/lib/imageUrls";
 import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
 import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
+import { BuyCreditsModal } from "@/components/billing/BuyCreditsModal";
+import { useCreditPricing, estimateGalleryCredits } from "@/hooks/useCreditPricing";
 
 // ── The "New collection" create flow ────────────────────────────────────────
 // A single live-plan page (the chosen "C3 / Plan-first" design): the plan leads
@@ -189,6 +191,8 @@ export default function CreateGalleryPage() {
   const [driveLinks, setDriveLinks] = useState<string[]>([]);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const creditPricing = useCreditPricing();
 
   const inputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
@@ -244,9 +248,17 @@ export default function CreateGalleryPage() {
     [styleIds, styles],
   );
   const looksCount = styleIds.length;
-  const editsNeeded = photos * looksCount;
+  // Full credit cost of the run — edits AND the metered AI steps (culling,
+  // faces), so the plan the user approves is what the backend will charge.
+  const editsNeeded = estimateGalleryCredits(creditPricing, photos, looksCount, cull, cull && cullFaces);
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
-  const maxImages = isUnlimited || looksCount === 0 ? Infinity : Math.floor(availableEdits / looksCount);
+  const creditsShort = hasInsufficientEdits ? editsNeeded - availableEdits : 0;
+  // Affordability cap uses the FULL per-photo cost (edits + culling + faces),
+  // so the cap always matches what the credits check will actually charge.
+  const perPhotoCost = looksCount * creditPricing.ai_edit +
+    (cull ? creditPricing.ai_culling : 0) +
+    (cull && cullFaces ? creditPricing.face_recognition : 0);
+  const maxImages = isUnlimited || perPhotoCost <= 0 ? Infinity : Math.floor(availableEdits / perPhotoCost);
   const typeLabel = galleryTypes.find((t) => t.value === type)?.label ?? type;
   const remaining = Math.max(0, availableEdits - editsNeeded);
   const usedPct = availableEdits > 0 ? Math.min(100, Math.round((editsNeeded / availableEdits) * 100)) : (editsNeeded > 0 ? 100 : 0);
@@ -569,7 +581,7 @@ export default function CreateGalleryPage() {
               max={MAX_LOOKS}
             />
             {looksCount >= 1 && (
-              <p className="caption mt-3 shrink-0">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = {editsNeeded.toLocaleString()} edits</p>
+              <p className="caption mt-3 shrink-0">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""}{cull ? " + culling" : ""}{cull && cullFaces ? " + faces" : ""} = {editsNeeded.toLocaleString()} credits</p>
             )}
           </div>
           </div>
@@ -594,7 +606,7 @@ export default function CreateGalleryPage() {
                   {looksCount === 0 ? (
                     "Hosting only — no edits used."
                   ) : (
-                    <>{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""} = <span className="font-medium text-foreground">{editsNeeded.toLocaleString()} edits</span> · {remaining.toLocaleString()} left after</>
+                    <>{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""}{cull ? " + culling" : ""}{cull && cullFaces ? " + faces" : ""} = <span className="font-medium text-foreground">{editsNeeded.toLocaleString()} credits</span> · {remaining.toLocaleString()} left after</>
                   )}
                 </p>
               </>
@@ -603,9 +615,12 @@ export default function CreateGalleryPage() {
               <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-[--radius] border border-destructive/40 bg-destructive/[0.06] p-2.5 text-sm">
                 <span className="flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
-                  Not enough edits — max {Number.isFinite(maxImages) ? maxImages.toLocaleString() : "—"} photos with {looksCount} look{looksCount > 1 ? "s" : ""}.
+                  {creditsShort.toLocaleString()} credits short for this plan.
                 </span>
-                <Button size="sm" variant="glow" className="shrink-0" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
+                <span className="flex shrink-0 gap-2">
+                  <Button size="sm" variant="glow" onClick={() => setShowBuyCredits(true)}>Buy credits</Button>
+                  <Button size="sm" variant="outline" onClick={() => navigate("/dashboard/billing")}>Upgrade</Button>
+                </span>
               </div>
             )}
             {!isUnlimited && !hasInsufficientEdits && isFreePlan && availableEdits === 0 && looksCount > 0 && (
@@ -651,6 +666,14 @@ export default function CreateGalleryPage() {
       </div>
 
       {reviewOpen && <SelectedPhotosModal items={items} count={photos} onRemove={removeAt} onClose={() => setReviewOpen(false)} />}
+
+      {/* In-flow top-up — buy exactly what's missing without leaving the plan. */}
+      <BuyCreditsModal
+        isOpen={showBuyCredits}
+        onClose={() => setShowBuyCredits(false)}
+        neededCredits={creditsShort > 0 ? creditsShort : undefined}
+      />
+
 
       <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
         <AlertDialogContent>

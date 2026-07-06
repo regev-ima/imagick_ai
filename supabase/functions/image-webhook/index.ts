@@ -7,6 +7,7 @@ import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { triggerCullingPipeline } from "../_shared/trigger-culling.ts";
 import { captureException } from "../_shared/sentry.ts";
 import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
+import { checkCreditThresholds } from "../_shared/credit-alerts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -213,42 +214,9 @@ serve(async (req: Request) => {
       }
 
       // Check edit thresholds for free users (warning emails)
-      try {
-        const { data: sub } = await supabase
-          .from("user_subscriptions")
-          .select("edits_remaining, plan_id, subscription_plans!inner(slug)")
-          .eq("user_id", userId)
-          .single();
-
-        const planSlug = (sub as any)?.subscription_plans?.slug;
-        const remaining = sub?.edits_remaining;
-
-        if (planSlug === "free" && remaining !== null && remaining !== undefined) {
-          if (remaining === 500 || remaining === 100 || remaining === 0) {
-            const emailType = remaining === 0 ? "edits_exhausted" : `edits_warning_${remaining}`;
-            // Fire-and-forget: send warning email
-            const sendEmailUrl = `${supabaseUrl}/functions/v1/send-email`;
-            fetch(sendEmailUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${supabaseServiceKey}`,
-              },
-              body: JSON.stringify({ type: emailType, userId, remaining }),
-            }).catch(err => console.error("Failed to trigger edit warning email:", err));
-
-            // WhatsApp notification for edits exhausted
-            if (remaining === 0) {
-              const { data: userRecord } = await supabase.auth.admin.getUserById(userId);
-              const userName = userRecord?.user?.user_metadata?.full_name || userRecord?.user?.email?.split("@")[0] || "Unknown";
-              const msg = `⚠️ Free Edits Exhausted\nUser: ${userName} (${userRecord?.user?.email})\nAll 3,000 free edits used up.`;
-              sendWhatsAppNotification(msg).catch((err: any) => console.error("WhatsApp notification failed:", err));
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Failed to check edit thresholds:", err);
-      }
+      // Low-credit alerts at the debit choke point — shared with the pipeline's
+      // bulk culling/faces charges so no debit path can skip a threshold.
+      await checkCreditThresholds(supabase, supabaseUrl, supabaseServiceKey, userId, 1);
     }
 
     // Trigger EXIF extraction asynchronously (fire and forget)

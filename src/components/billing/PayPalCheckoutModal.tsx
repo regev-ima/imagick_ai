@@ -138,12 +138,16 @@ export function PayPalCheckoutModal({
             attempts++;
             const { data: sub } = await supabase
               .from("user_subscriptions")
-              .select("plan_id, subscription_plans!inner(slug)")
+              .select("plan_id, paypal_subscription_id, subscription_plans!inner(price_monthly, price_yearly)")
               .eq("user_id", userId)
               .maybeSingle();
             
-            const currentSlug = (sub as any)?.subscription_plans?.slug;
-            if (currentSlug && currentSlug !== "free") {
+            // Activated = the webhook stamped the PayPal subscription id and
+            // the plan is a paid one. (A slug check breaks for legacy free
+            // users, whose slug is 'free-v1' — it would "succeed" instantly.)
+            const paidPlan = Number((sub as any)?.subscription_plans?.price_monthly ?? 0) > 0 ||
+              Number((sub as any)?.subscription_plans?.price_yearly ?? 0) > 0;
+            if ((sub as any)?.paypal_subscription_id && paidPlan) {
               onSuccess();
               return;
             }

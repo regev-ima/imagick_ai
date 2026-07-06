@@ -103,6 +103,7 @@ Deno.serve(async (req) => {
     // These receive userId in the body and look up user info via admin API.
     const INTERNAL_TYPES = [
       "edits_warning_500", "edits_warning_100", "edits_exhausted",
+      "credits_warning_50", "credits_warning_80",
       "subscription_activated", "subscription_cancelled", "subscription_expired",
       "payment_failed", "addon_purchased", "downgrade_scheduled",
     ];
@@ -128,6 +129,12 @@ Deno.serve(async (req) => {
       switch (type) {
         case "edits_warning_500":
           template = editsWarningTemplate(500, billingUrl);
+          break;
+        // Percentage-based credit warnings (50% / 80% used) — the template
+        // takes the user's ACTUAL remaining balance from the caller.
+        case "credits_warning_50":
+        case "credits_warning_80":
+          template = editsWarningTemplate(Number(remaining) || 0, billingUrl);
           break;
         case "edits_warning_100":
           template = editsWarningTemplate(100, billingUrl);

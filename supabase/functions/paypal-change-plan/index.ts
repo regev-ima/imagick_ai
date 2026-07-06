@@ -66,6 +66,10 @@ serve(async (req: Request) => {
       .select("*")
       .eq("slug", targetPlanSlug)
       .eq("is_active", true)
+      // Only PUBLISHED plan versions are valid switch targets — otherwise a
+      // v2 subscriber could self-serve onto a grandfathered unlimited legacy
+      // row (e.g. 'pro-v1'), defeating the metered migration.
+      .eq("is_published", true)
       .single();
 
     if (!targetPlan) {

@@ -105,7 +105,9 @@ serve(async (req: Request) => {
         .select("plan:subscription_plans(slug)")
         .eq("user_id", user.id)
         .maybeSingle();
-      const planSlug = (sub?.plan as any)?.slug;
+      // Legacy plan versions are named '<tier>-v1' — normalize to the tier
+      // so grandfathered subscribers keep their plan-specific pricing.
+      const planSlug = String((sub?.plan as any)?.slug || "").replace(/-v\d+$/, "");
       if (planSlug && MODEL_PRICE_BY_PLAN[planSlug]) {
         unitPrice = MODEL_PRICE_BY_PLAN[planSlug];
       }
