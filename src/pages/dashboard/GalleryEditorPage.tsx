@@ -68,6 +68,8 @@ import { GroupingView } from "@/components/gallery/GroupingView";
 import { FaceGallery } from "@/components/gallery/FaceGallery";
 import { FaceClusterImages } from "@/components/gallery/FaceClusterImages";
 import { useFaceSearch } from "@/hooks/useFaceSearch";
+import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
+import { resolveStyleCover } from "@/hooks/useStyleCovers";
 import { GalleryRightSidebar } from "@/components/gallery/GalleryRightSidebar";
 import { DownloadGalleryModal } from "@/components/gallery/DownloadGalleryModal";
 import { DockFilmstrip } from "@/components/gallery/DockFilmstrip";
@@ -488,14 +490,18 @@ export default function GalleryEditorPage() {
       
       const { data, error } = await supabase
         .from("styles")
-        .select("id, name, style_id_external, after_image_urls")
+        .select("id, name, style_id_external, after_image_urls, thumbnail_url")
         .in("id", gallery.selected_style_ids);
-      
+
       if (error) throw error;
       return data || [];
     },
     enabled: !!id && !!gallery && (gallery.selected_style_ids?.length ?? 0) > 0
   });
+
+  // Showcase demo covers, so the style picker in the sidebar shows the same
+  // "edited by this style" preview as the create/add-images flows.
+  const { data: showcaseCovers } = useShowcaseCovers();
 
   // Fetch image_edits for this gallery to know which images have edits for which styles
   // Paginated to support >1000 edits (Supabase default limit)
@@ -2734,7 +2740,7 @@ export default function GalleryEditorPage() {
             id: s.id,
             name: s.name,
             apiId: s.style_id_external || "1",
-            coverUrl: s.after_image_urls?.[0] || undefined,
+            coverUrl: resolveStyleCover(s, showcaseCovers),
           }))}
           selectedStyle={selectedViewStyle}
           onStyleChange={setSelectedViewStyle}
@@ -2779,6 +2785,7 @@ export default function GalleryEditorPage() {
               id: s.id,
               name: s.name,
               apiId: s.style_id_external || "1",
+              coverUrl: resolveStyleCover(s, showcaseCovers),
             }))}
             selectedStyle={selectedViewStyle}
             onStyleChange={(id) => { setSelectedViewStyle(id); setShowMobileSidebar(false); }}

@@ -56,6 +56,7 @@ import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { useOnboardingQuestionnaire } from "@/hooks/useOnboardingQuestionnaire";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
 import { getThumbnailUrl } from "@/lib/imageUrls";
+import { useStyleCovers } from "@/hooks/useStyleCovers";
 import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
 import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
@@ -727,6 +728,9 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
   const atMax = selectedIds.length >= max;
   const hosting = chosen && selectedIds.length === 0;
   const bestId = styles[0]?.id;
+  // Same demo-cover source as the Add-Images flow: prefer a real showcase edit,
+  // then the style's own after/thumbnail images.
+  const { coverFor } = useStyleCovers();
   // The photographer's own trained AI models, kept distinct from the public
   // Aura models so it's clear which engine edits their photos.
   const isMine = (s: StyleRow) => ownerId != null && s.user_id === ownerId && s.status === "ready";
@@ -740,7 +744,7 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
           <div className="aura-microlabel flex items-center gap-1.5 text-primary"><Sparkle size={10} /> Your AI models</div>
           <div className="grid grid-cols-3 gap-2">
             {mine.map((s) => (
-              <LookTile key={s.id} style={s} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+              <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
             ))}
           </div>
         </div>
@@ -751,7 +755,7 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
           {mine.length > 0 && <div className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={10} /> Aura looks</div>}
           <div className="grid grid-cols-3 gap-2">
             {aura.map((s) => (
-              <LookTile key={s.id} style={s} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+              <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
             ))}
           </div>
         </div>
@@ -787,15 +791,15 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
 // One AI-model tile — a compact, visual card so many looks fit at a glance.
 // The cover fills the tile with the name overlaid; no-cover models get a royal-
 // blue aura tile with the sparkle so they still read as AI engines.
-function LookTile({ style: s, on, locked, mine = false, recommended = false, onClick }: {
+function LookTile({ style: s, cover, on, locked, mine = false, recommended = false, onClick }: {
   style: StyleRow;
+  cover?: string;
   on: boolean;
   locked: boolean;
   mine?: boolean;
   recommended?: boolean;
   onClick: () => void;
 }) {
-  const cover = s.thumbnail_url || s.after_image_urls?.[0];
   return (
     <button
       type="button"

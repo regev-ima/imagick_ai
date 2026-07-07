@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { getThumbnailUrl } from "@/lib/imageUrls";
 import type { FilterOptions } from "@/components/gallery/filter-types";
 
 /** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
@@ -553,7 +554,7 @@ function StylesPanel({
                 isSelected ? "ring-primary" : "ring-border/50"
               )}>
                 <img
-                  src={style.coverUrl}
+                  src={getThumbnailUrl(style.coverUrl)}
                   alt={style.name}
                   className="w-full h-full object-cover"
                 />
