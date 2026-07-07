@@ -37,6 +37,7 @@ import { UploadSourceSelector, type UploadSource } from "./UploadSourceSelector"
 import { GoogleDriveInput, type DriveFolderInfo } from "./GoogleDriveInput";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
+import { resolveStyleCover } from "@/hooks/useStyleCovers";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
 import { BuyCreditsModal } from "@/components/billing/BuyCreditsModal";
@@ -940,7 +941,7 @@ export function AddImagesModal({
                           <LookTile
                             key={s.id}
                             name={s.name}
-                            cover={showcaseCovers[s.id] || s.thumbnail_url || s.after_image_urls?.[0]}
+                            cover={resolveStyleCover(s, showcaseCovers)}
                             on={selectedStyles.includes(s.id)}
                             locked={stylesCount >= MAX_LOOKS && !selectedStyles.includes(s.id)}
                             mine
@@ -960,7 +961,7 @@ export function AddImagesModal({
                           <LookTile
                             key={s.id}
                             name={s.name}
-                            cover={showcaseCovers[s.id] || s.thumbnail_url || s.after_image_urls?.[0]}
+                            cover={resolveStyleCover(s, showcaseCovers)}
                             on={selectedStyles.includes(s.id)}
                             locked={stylesCount >= MAX_LOOKS && !selectedStyles.includes(s.id)}
                             recommended={s.id === bestId}
