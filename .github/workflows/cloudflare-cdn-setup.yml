@@ -105,7 +105,18 @@ jobs:
               "action": "set_cache_settings",
               "action_parameters": {
                   "cache": True,
-                  "edge_ttl": {"mode": "override_origin", "default": 604800},      # 7 days
+                  # Cache 2xx for 7 days, but NEVER cache errors: thumbnails are
+                  # generated asynchronously, so an early request 404s — caching
+                  # that 404 would keep serving "not found" long after the image
+                  # exists. -1 = no-store for 4xx/5xx.
+                  "edge_ttl": {
+                      "mode": "override_origin",
+                      "default": 604800,  # 7 days (2xx / 3xx)
+                      "status_code_ttl": [
+                          {"status_code_range": {"from": 200, "to": 299}, "value": 604800},
+                          {"status_code_range": {"from": 400, "to": 599}, "value": -1},
+                      ],
+                  },
                   "browser_ttl": {"mode": "override_origin", "default": 31536000}, # 1 year
               },
               "enabled": True,
@@ -123,6 +134,16 @@ jobs:
               "enabled": True,
           })
           print("Cloudflare rules configured.")
+
+          # ── Purge: evict any already-cached 404s (negative-cached before this
+          # fix). Needs the token's Cache Purge permission; skip gracefully if not.
+          st, res = cf("POST", f"/zones/{ZONE}/purge_cache", {"purge_everything": True})
+          if res.get("success"):
+              print("Cache purged (stale 404s evicted).")
+          else:
+              print("Cache purge SKIPPED:", st, json.dumps(res.get("errors")))
+              print("  (add the token's 'Zone -> Cache Purge -> Purge' permission, or")
+              print("   purge from the dashboard: Caching -> Configuration -> Purge Everything.)")
 
           # ── 4) Verify against a real object (path/UUIDs kept out of the log) ──
           def sb_query(sql):
