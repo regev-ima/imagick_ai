@@ -11,6 +11,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { fetchCaptureTime } from "../_shared/exif-date.ts";
 import { settlePipelineBilling } from "../_shared/pipeline-billing.ts";
 import { alertAdminsPipeline } from "../_shared/pipeline-alerts.ts";
+import { timeoutSignal } from "../_shared/timeout-signal.ts";
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
@@ -580,7 +581,7 @@ serve(async (req: Request) => {
           const res = await fetch(modalUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),
+            signal: timeoutSignal(MODAL_TIMEOUT_MS),
             body: JSON.stringify({
               token: modalToken,
               faces: doFaces, // skip ArcFace on Modal when faces are off
@@ -640,7 +641,7 @@ serve(async (req: Request) => {
         res = await fetch(scoreVisionUrl!, {
           method: "POST",
           headers: scoreVisionHeaders,
-          signal: AbortSignal.timeout(VLM_TIMEOUT_MS),
+          signal: timeoutSignal(VLM_TIMEOUT_MS),
           body: JSON.stringify({
             mode: "culling", image, labels,
             tags: doTags ? tagsList : [], // VLM tagging (blue chips) — from the fixed list
@@ -847,7 +848,7 @@ serve(async (req: Request) => {
             const res = await fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {
               method: "POST",
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-              signal: AbortSignal.timeout(15_000),
+              signal: timeoutSignal(15_000),
               body: JSON.stringify({ galleryId, stall: nextStall, options }),
             });
             // Any HTTP status < 500 means the next link executed (it responds

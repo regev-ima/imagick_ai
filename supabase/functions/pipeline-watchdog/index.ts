@@ -27,6 +27,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { settlePipelineBilling } from "../_shared/pipeline-billing.ts";
 import { alertAdminsPipeline } from "../_shared/pipeline-alerts.ts";
 import { captureException } from "../_shared/sentry.ts";
+import { timeoutSignal } from "../_shared/timeout-signal.ts";
 
 // A live chain re-invokes at least every ~2 minutes (110s budget + overhead).
 // 6 minutes of silence = the chain is dead, not slow.
@@ -108,7 +109,7 @@ serve(async (req: Request) => {
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
               // Links respond only after finishing their work — a timeout here
               // means "delivered and working", not failure.
-              signal: AbortSignal.timeout(10_000),
+              signal: timeoutSignal(10_000),
               body: JSON.stringify({ galleryId: g.id, options }),
             });
           } catch (e) {
@@ -162,7 +163,7 @@ serve(async (req: Request) => {
         const res = await fetch(svUrl, {
           method: "POST",
           headers,
-          signal: AbortSignal.timeout(15_000),
+          signal: timeoutSignal(15_000),
           body: JSON.stringify({ mode: "health" }),
         });
         const health = await res.json().catch(() => null) as { ok?: boolean; remaining_usd?: number | null } | null;
