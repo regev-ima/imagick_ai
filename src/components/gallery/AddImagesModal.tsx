@@ -103,11 +103,13 @@ function SelectMark({ on }: { on: boolean }) {
 
 // One AI-model tile — mirrors the create-collection LookTile so the two flows
 // feel identical: cover fills the tile, name overlaid, sparkle for no-cover.
-function LookTile({ name, cover, on, locked, mine = false, recommended = false, onClick }: {
+function LookTile({ name, cover, on, locked, unavailable = false, mine = false, recommended = false, onClick }: {
   name: string;
   cover?: string;
   on: boolean;
   locked: boolean;
+  /** No trained model attached — the look can't actually edit photos yet. */
+  unavailable?: boolean;
   mine?: boolean;
   recommended?: boolean;
   onClick: () => void;
@@ -116,14 +118,14 @@ function LookTile({ name, cover, on, locked, mine = false, recommended = false, 
     <button
       type="button"
       onClick={onClick}
-      disabled={locked}
-      title={name}
+      disabled={locked || unavailable}
+      title={unavailable ? `${name} — coming soon (no trained model yet)` : name}
       className={cn(
         "group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[--radius] border text-left transition-all",
         on
           ? "border-primary ring-1 ring-inset ring-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.10)]"
           : "border-border hover:border-primary/50",
-        locked && "cursor-not-allowed opacity-45 hover:border-border",
+        (locked || unavailable) && "cursor-not-allowed opacity-45 hover:border-border",
       )}
     >
       {cover ? (
@@ -141,8 +143,11 @@ function LookTile({ name, cover, on, locked, mine = false, recommended = false, 
         </span>
       </span>
       <span className="absolute right-1.5 top-1.5"><SelectMark on={on} /></span>
-      {recommended && !on && (
+      {recommended && !on && !unavailable && (
         <span className="absolute left-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-primary-foreground shadow">Pick</span>
+      )}
+      {unavailable && (
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-muted-foreground shadow">Soon</span>
       )}
     </button>
   );
@@ -416,7 +421,10 @@ export function AddImagesModal({
   // as the create-collection look grid so the two flows read identically.
   const mine = styles.filter((s: any) => user?.id != null && s.user_id === user.id && s.status === "ready");
   const aura = styles.filter((s: any) => !(user?.id != null && s.user_id === user.id));
-  const bestId = styles[0]?.id;
+  // Only looks with a trained model attached can actually edit (matches the
+  // create-collection grid — model-less presets show as "coming soon").
+  const deployable = (s: any) => !!s.style_id_external;
+  const bestId = styles.find(deployable)?.id;
   const hosting = styleTouched && selectedStyles.length === 0;
 
   // Reset when modal opens
@@ -944,6 +952,7 @@ export function AddImagesModal({
                             cover={resolveStyleCover(s, showcaseCovers)}
                             on={selectedStyles.includes(s.id)}
                             locked={stylesCount >= MAX_LOOKS && !selectedStyles.includes(s.id)}
+                            unavailable={!deployable(s)}
                             mine
                             recommended={s.id === bestId}
                             onClick={() => toggleStyle(s.id)}
@@ -964,6 +973,7 @@ export function AddImagesModal({
                             cover={resolveStyleCover(s, showcaseCovers)}
                             on={selectedStyles.includes(s.id)}
                             locked={stylesCount >= MAX_LOOKS && !selectedStyles.includes(s.id)}
+                            unavailable={!deployable(s)}
                             recommended={s.id === bestId}
                             onClick={() => toggleStyle(s.id)}
                           />
