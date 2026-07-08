@@ -612,13 +612,15 @@ export default function GalleryEditorPage() {
       cullingStartedAt: gallery.culling_started_at,
       cullingCompletedAt: gallery.culling_completed_at,
       cullingStatus: gallery.culling_status ?? null,
-      pipelineError: g.pipeline_error ?? null,
+      // Technical diagnostic is ADMIN-ONLY — customers get the generic
+      // "stopped, run again" subtitle instead of internals.
+      pipelineError: canViewAnalytics ? (g.pipeline_error ?? null) : null,
       facesStartedAt: g.face_search_started_at ?? null,
       facesCompletedAt: g.face_search_completed_at ?? null,
       sourceType: (gallery.source_drive_links && gallery.source_drive_links.length > 0 ? "google" : "upload") as "google" | "upload",
       totalImages: gallery.total_images || 0,
     };
-  }, [gallery]);
+  }, [gallery, canViewAnalytics]);
 
   // Apply filters and sorting to images
   const filteredImages = useMemo(() => {
@@ -1544,17 +1546,23 @@ export default function GalleryEditorPage() {
           : "Not enough credits to run AI Culling.");
         return;
       }
-      // Surface the server's actual diagnostic when it sent one — a generic
-      // "try again" hides exactly the information that explains the failure.
+      // Surface the server's actual diagnostic — but ONLY to admins.
+      // Customers get a friendly retry message; the technical detail
+      // (endpoints, secrets, HTML dumps) reaches admins via WhatsApp/Sentry
+      // and, for admin viewers, this toast + the banner.
       let serverMsg: string | null = null;
-      const ctx2 = (err as { context?: unknown })?.context;
-      if (ctx2 instanceof Response) {
-        try {
-          const body = await ctx2.clone().json();
-          if (typeof body?.error === "string" && body.error) serverMsg = body.error;
-        } catch { /* body wasn't JSON */ }
+      if (canViewAnalytics) {
+        const ctx2 = (err as { context?: unknown })?.context;
+        if (ctx2 instanceof Response) {
+          try {
+            const body = await ctx2.clone().json();
+            if (typeof body?.error === "string" && body.error) serverMsg = body.error;
+          } catch { /* body wasn't JSON */ }
+        }
       }
-      toast.error(serverMsg ? `AI Culling failed: ${serverMsg}` : "Failed to start AI culling. Please try again.");
+      toast.error(serverMsg
+        ? `AI Culling failed: ${serverMsg}`
+        : "AI Culling couldn't start — the team has been notified. Please try again.");
       // The gallery row may now carry culling_status='error' + pipeline_error —
       // refetch so the failure banner/timeline show immediately.
       queryClient.invalidateQueries({ queryKey: ["gallery", id] });
@@ -2380,7 +2388,7 @@ export default function GalleryEditorPage() {
             imageCount={images.length}
             isStuck={isCullingStuck}
             hasCullingData={hasCullingData}
-            errorText={(gallery as any)?.pipeline_error ?? null}
+            errorText={canViewAnalytics ? ((gallery as any)?.pipeline_error ?? null) : null}
             onRetry={() => { if (cullingInFlight) return; setCullingRequiredNote(!hasCullingData); setShowAICullingModal(true); }}
             onReopenProgress={
               cullingProgressMinimized ? () => setCullingProgressMinimized(false) : undefined
