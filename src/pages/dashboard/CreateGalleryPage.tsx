@@ -268,28 +268,55 @@ export default function CreateGalleryPage() {
   const complete = name.trim().length > 0 && photos > 0 && !!type && styleTouched && !hasInsufficientEdits;
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  const ingest = (list: FileList | File[] | null) => {
+  // A picked/dropped batch either REPLACES the current selection or ADDS to it.
+  // "Add more" (and any drop while photos already exist) appends, so a
+  // photographer can pull frames from several folders into one collection
+  // instead of the picker wiping the previous folder each time.
+  const ingest = (list: FileList | File[] | null, opts?: { append?: boolean }) => {
     if (!list) return;
     const imgs = Array.from(list).filter(isImageFile);
     if (imgs.length === 0) return;
-    objectUrls.current.forEach((u) => URL.revokeObjectURL(u));
-    objectUrls.current = [];
-    let made = 0;
-    const next: SelImg[] = imgs.map((f) => {
-      let url: string | null = null;
-      if (isPreviewable(f) && made < PREVIEW_CAP) {
-        url = URL.createObjectURL(f);
-        objectUrls.current.push(url);
-        made++;
+    const append = opts?.append ?? false;
+
+    setItems((prev) => {
+      const base = append ? prev : [];
+      if (!append) {
+        // Replacing — drop the old previews we own before rebuilding.
+        objectUrls.current.forEach((u) => URL.revokeObjectURL(u));
+        objectUrls.current = [];
       }
-      return { file: f, url };
+      // Dedup by identity so re-adding the same folder can't double-count.
+      const seen = new Set(base.map((it) => `${it.file.name}|${it.file.size}|${it.file.lastModified}`));
+      let made = objectUrls.current.length;
+      const added: SelImg[] = [];
+      for (const f of imgs) {
+        const key = `${f.name}|${f.size}|${f.lastModified}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        let url: string | null = null;
+        if (isPreviewable(f) && made < PREVIEW_CAP) {
+          url = URL.createObjectURL(f);
+          objectUrls.current.push(url);
+          made++;
+        }
+        added.push({ file: f, url });
+      }
+      return [...base, ...added];
     });
-    setItems(next);
+
     if (!name.trim()) {
       const mid = imgs.map((f) => f.lastModified).filter(Boolean).sort((a, b) => a - b)[Math.floor(imgs.length / 2)];
       const d = mid ? new Date(mid) : new Date();
       setName(`Shoot · ${d.toLocaleString("en-US", { month: "long", year: "numeric" })}`);
     }
+  };
+
+  // The hidden <input> is reused for both "change" and "add more"; a ref carries
+  // which mode the next change event should use.
+  const pickAppendRef = useRef(false);
+  const openPicker = (append: boolean) => {
+    pickAppendRef.current = append;
+    inputRef.current?.click();
   };
 
   const removeAt = (index: number) => {
@@ -373,18 +400,31 @@ export default function CreateGalleryPage() {
 
   return (
     <div className="min-h-full bg-background lg:h-full lg:overflow-hidden">
-      <input ref={inputRef} type="file" multiple accept={IMAGE_ACCEPT} className="hidden" onChange={(e) => ingest(e.target.files)} />
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={IMAGE_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          ingest(e.target.files, { append: pickAppendRef.current });
+          // Clear so re-picking the SAME folder still fires onChange.
+          e.target.value = "";
+        }}
+      />
 
       <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-5 lg:h-full lg:min-h-0 lg:px-8">
-        {/* Header + live plan — one compact bar so the two working columns get
-            the height. Title is the editable name; summary pills sit alongside. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Button variant="ghost" size="icon" className="shrink-0" onClick={handleLeave} aria-label="Back to collections">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <span className="aura-microlabel flex items-center gap-1.5 text-accent"><SparklesIcon className="h-3 w-3" /> New collection · live plan</span>
-            <div className="group relative mt-0.5">
+        {/* Header + live plan — a header microlabel on its own line, then ONE
+            aligned row: back · editable name · summary pills. Keeping the name
+            field and pills on the same centered row makes the top bar read as
+            symmetric (the microlabel used to push the name below the pills). */}
+        <div>
+          <span className="aura-microlabel flex items-center gap-1.5 text-accent"><SparklesIcon className="h-3 w-3" /> New collection · live plan</span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={handleLeave} aria-label="Back to collections">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="group relative min-w-0 flex-1">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -395,15 +435,15 @@ export default function CreateGalleryPage() {
               />
               <Pencil className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 transition-colors group-hover:text-foreground/70" />
             </div>
-          </div>
-          <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
-            <Pill><Images className="h-3 w-3" /> {photos ? `${photos.toLocaleString()} photos` : "no photos yet"}</Pill>
-            <Pill>{typeLabel}</Pill>
-            <Pill>{looksLabel}</Pill>
-            <Pill>{cull ? "Culling on" : "No culling"}</Pill>
-            <Pill accent={!hasInsufficientEdits} danger={hasInsufficientEdits}>
-              <Sparkle size={11} /> {isUnlimited ? `${editsNeeded.toLocaleString()} edits` : `${editsNeeded.toLocaleString()} / ${availableEdits.toLocaleString()} edits`}
-            </Pill>
+            <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
+              <Pill><Images className="h-3 w-3" /> {photos ? `${photos.toLocaleString()} photos` : "no photos yet"}</Pill>
+              <Pill>{typeLabel}</Pill>
+              <Pill>{looksLabel}</Pill>
+              <Pill>{cull ? "Culling on" : "No culling"}</Pill>
+              <Pill accent={!hasInsufficientEdits} danger={hasInsufficientEdits}>
+                <Sparkle size={11} /> {isUnlimited ? `${editsNeeded.toLocaleString()} edits` : `${editsNeeded.toLocaleString()} / ${availableEdits.toLocaleString()} edits`}
+              </Pill>
+            </div>
           </div>
         </div>
 
@@ -434,7 +474,9 @@ export default function CreateGalleryPage() {
               <div className="mt-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Images className="h-3.5 w-3.5" /> {photos.toLocaleString()} photos selected
-                  <button type="button" onClick={() => inputRef.current?.click()} className="text-accent hover:underline">change</button>
+                  <button type="button" onClick={() => openPicker(true)} className="text-accent hover:underline">add more</button>
+                  <span className="text-muted-foreground/40">·</span>
+                  <button type="button" onClick={() => openPicker(false)} className="text-accent hover:underline">replace</button>
                   <span className="text-muted-foreground/40">·</span>
                   <button type="button" onClick={() => setReviewOpen(true)} className="text-accent hover:underline">review &amp; remove</button>
                 </div>
@@ -461,9 +503,9 @@ export default function CreateGalleryPage() {
             ) : (
               <button
                 type="button"
-                onClick={() => inputRef.current?.click()}
+                onClick={() => openPicker(false)}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); void filesFromDataTransfer(e.dataTransfer).then(ingest); }}
+                onDrop={(e) => { e.preventDefault(); void filesFromDataTransfer(e.dataTransfer).then((f) => ingest(f, { append: false })); }}
                 className="mt-3 flex min-h-[160px] w-full flex-1 flex-col items-center justify-center gap-2 rounded-[--radius] border-2 border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.03]"
               >
                 <UploadCloud className="h-6 w-6" /> Select or drag your photos (or a whole folder)
