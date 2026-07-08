@@ -118,3 +118,6 @@ verify_jwt = false
 
 [functions.sentry-telegram-relay]
 verify_jwt = false
+
+[functions.pipeline-watchdog]
+verify_jwt = false

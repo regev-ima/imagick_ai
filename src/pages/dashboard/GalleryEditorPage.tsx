@@ -611,6 +611,7 @@ export default function GalleryEditorPage() {
       compressionTotalCount: g.compression_total_count ?? 0,
       cullingStartedAt: gallery.culling_started_at,
       cullingCompletedAt: gallery.culling_completed_at,
+      cullingStatus: gallery.culling_status ?? null,
       facesStartedAt: g.face_search_started_at ?? null,
       facesCompletedAt: g.face_search_completed_at ?? null,
       sourceType: (gallery.source_drive_links && gallery.source_drive_links.length > 0 ? "google" : "upload") as "google" | "upload",
@@ -1294,12 +1295,27 @@ export default function GalleryEditorPage() {
   //     rather than flashing an instant, false "stuck — 0s elapsed".
   const isCullingStuck = useMemo(() => {
     if (gallery?.culling_status !== "processing") return false;
+    // Server heartbeat (stamped by every pipeline chain link) is the
+    // authoritative liveness signal — it catches a dead run even when partial
+    // data exists (the old elapsed-time heuristic couldn't). 8 minutes of
+    // silence = dead; the server-side watchdog acts first (~6 min: auto-resume
+    // → error+refund), so this is mostly the client-side mirror of its verdict.
+    const beat = (gallery as any)?.pipeline_heartbeat;
+    if (beat) {
+      const beatMs = new Date(beat).getTime();
+      const startMs = gallery?.culling_started_at ? new Date(gallery.culling_started_at).getTime() : 0;
+      // A heartbeat older than this run's start belongs to a PREVIOUS run —
+      // judge by the start time instead (the run is booting).
+      const ref = Math.max(beatMs, startMs);
+      return cullingNow - ref > 8 * 60_000;
+    }
+    // Legacy fallback (runs from before the heartbeat column existed).
     if (hasCullingData) return false;
     const startedAt = gallery?.culling_started_at;
     if (!startedAt) return false;
     const elapsed = cullingNow - new Date(startedAt).getTime();
     return elapsed > stuckThresholdMs(images.length);
-  }, [gallery?.culling_status, gallery?.culling_started_at, images.length, hasCullingData, cullingNow]);
+  }, [gallery, gallery?.culling_status, gallery?.culling_started_at, images.length, hasCullingData, cullingNow]);
 
   // Culling was opted-in at creation (ai_culling_enabled) and the backend
   // auto-starts it the moment upload/processing finishes — so while photos are
@@ -1352,37 +1368,20 @@ export default function GalleryEditorPage() {
   }, [gallery?.culling_status, compressionBarrierActive, images, cullRunCount]);
 
   // Self-healing for inconsistent culling rows:
-  //   1. data present but status still 'processing' → flip to 'ready' so
-  //      the banner clears for everyone who opens the gallery.
-  //   2. status 'processing' but no culling_started_at (legacy / a run
-  //      that pre-dates the timestamp column) → back-fill it to now so
-  //      the run gets a proper countdown and a correct, delayed "stuck"
-  //      window instead of being flagged stuck immediately.
-  // Runs once per render when the inconsistency is detected.
+  //   status 'processing' but no culling_started_at (legacy / a run that
+  //   pre-dates the timestamp column) → back-fill it to now so the run gets a
+  //   proper countdown and a correct, delayed "stuck" window instead of being
+  //   flagged stuck immediately.
+  //
+  // NOTE the old "flip stale 'processing' to 'ready' from the client" healer
+  // is GONE, deliberately: it masked real faults (the run looked finished
+  // while photos were left unscored and the credit reservation stayed open)
+  // and produced contradictory UI (timeline "In progress", button enabled).
+  // Recovery is now owned by the server-side pipeline-watchdog, which
+  // auto-resumes a dead run — or errors it, releases the credits and alerts
+  // the admins. The client just *reports* state truthfully.
   useEffect(() => {
     if (!gallery?.id) return;
-    // Only heal a 'processing' row to 'ready' when it's genuinely stale, not
-    // merely mid-run. process-pipeline writes ratings incrementally per batch
-    // (so hasCullingData flips true after the FIRST batch) and self-chains until
-    // it stamps status='ready' itself. Flipping to 'ready' the moment ANY data
-    // exists would cut the run short — the overlay would vanish and the clock
-    // stop after a few seconds even though most photos are still unscored. So we
-    // only step in as a recovery net once the full "stuck" window has elapsed.
-    if (
-      gallery.culling_status === "processing" &&
-      hasCullingData &&
-      gallery.culling_started_at &&
-      cullingNow - new Date(gallery.culling_started_at).getTime() > stuckThresholdMs(images.length)
-    ) {
-      supabase
-        .from("galleries")
-        .update({ culling_status: "ready" } as any)
-        .eq("id", gallery.id)
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["gallery", id] });
-        });
-      return;
-    }
     // While the compression barrier is legitimately waiting for compression,
     // culling_status is 'processing' but culling_started_at is intentionally
     // null — the barrier stamps it at the REAL culling start (once every image

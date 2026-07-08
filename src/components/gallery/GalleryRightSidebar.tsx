@@ -112,6 +112,9 @@ interface GalleryRightSidebarProps {
     compressionTotalCount: number;
     cullingStartedAt: string | null;
     cullingCompletedAt: string | null;
+    /** galleries.culling_status — lets the timeline show a truthful "Failed"
+     *  instead of an eternal "In progress" when the watchdog errors a run. */
+    cullingStatus?: string | null;
     facesStartedAt: string | null;
     facesCompletedAt: string | null;
     sourceType: "google" | "upload";
@@ -1096,14 +1099,20 @@ function GalleryInfoPanel({
       label: "AI Culling",
       startedAt: data.cullingStartedAt,
       completedAt: data.cullingCompletedAt,
-      status: data.cullingCompletedAt ? "completed" : data.cullingStartedAt ? "active" : "idle",
+      status: data.cullingCompletedAt
+        ? "completed"
+        : data.cullingStatus === "error"
+          ? "error"
+          : data.cullingStartedAt ? "active" : "idle",
       color: "text-primary",
       bgColor: "bg-primary",
       // Make the compression gate explicit: culling is queued but held.
       subtitle:
-        !data.cullingStartedAt && data.cullingCompletedAt === null && data.compressionStartedAt && !data.compressionCompletedAt
-          ? "Waiting for compression…"
-          : null,
+        data.cullingStatus === "error"
+          ? "Stopped — run AI Culling to resume from where it left off"
+          : !data.cullingStartedAt && data.cullingCompletedAt === null && data.compressionStartedAt && !data.compressionCompletedAt
+            ? "Waiting for compression…"
+            : null,
     },
     {
       icon: <ScanFace className="w-3.5 h-3.5" />,
@@ -1196,6 +1205,7 @@ function GalleryInfoPanel({
                     "w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors",
                     stage.status === "completed" && `${stage.bgColor}/20 ${stage.color}`,
                     stage.status === "active" && `${stage.bgColor}/30 ${stage.color} ring-2 ring-offset-1 ring-offset-background ring-current`,
+                    stage.status === "error" && "bg-destructive/15 text-destructive",
                     stage.status === "idle" && "bg-muted/50 text-muted-foreground/40"
                   )}
                 >
@@ -1203,6 +1213,8 @@ function GalleryInfoPanel({
                     <Check className="w-3.5 h-3.5" />
                   ) : stage.status === "active" ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : stage.status === "error" ? (
+                    <AlertTriangle className="w-3.5 h-3.5" />
                   ) : (
                     stage.icon
                   )}
@@ -1236,6 +1248,9 @@ function GalleryInfoPanel({
                   )}
                   {stage.status === "active" && (
                     <span className="text-[10px] text-rating animate-pulse">In progress</span>
+                  )}
+                  {stage.status === "error" && (
+                    <span className="text-[10px] font-medium text-destructive">Failed</span>
                   )}
                 </div>
                 {stage.startedAt && (

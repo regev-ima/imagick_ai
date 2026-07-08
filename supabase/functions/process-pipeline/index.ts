@@ -9,7 +9,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { fetchCaptureTime } from "../_shared/exif-date.ts";
-import { checkCreditThresholds } from "../_shared/credit-alerts.ts";
+import { settlePipelineBilling } from "../_shared/pipeline-billing.ts";
+import { alertAdminsPipeline } from "../_shared/pipeline-alerts.ts";
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 
@@ -18,6 +19,14 @@ const MODAL_BATCH = 12;            // images per Modal HTTP call
 const MODAL_CONCURRENCY = 3;       // Modal calls in flight at once (matches max_containers)
 const CULLING_CONCURRENCY = 8;     // parallel VLM culling calls (score-vision)
 const TIME_BUDGET_MS = 110_000;
+// Hard per-request timeouts on outbound calls. Without these a hung provider
+// (OpenRouter incident, Modal cold-start wedge) parks every worker on a fetch
+// that never resolves — the runtime then kills the whole invocation at its
+// wall-clock limit BEFORE the self-chain dispatches, and the run dies silently
+// with culling_status stuck at 'processing'. A timed-out call is just a failed
+// image (picked up by the next link); a hung call used to kill the run.
+const MODAL_TIMEOUT_MS = 75_000;
+const VLM_TIMEOUT_MS = 45_000;
 
 // Old default photo-shoot labels, used if the caller doesn't pass its own.
 const DEFAULT_LABELS = [
@@ -114,6 +123,13 @@ function faceBox(f: ModalFace, origW: number | null, origH: number | null) {
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Hoisted for the crash handler: an uncaught exception mid-run used to
+  // return 500 and leave the gallery stuck at 'processing' with its credit
+  // reservation open. With this context the catch block can mark the error,
+  // settle the books and page admins instead.
+  // deno-lint-ignore no-explicit-any
+  let crashCtx: { admin: any; galleryId: string; url: string; key: string } | null = null;
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -183,6 +199,7 @@ serve(async (req: Request) => {
     const vlmModel = typeof options?.model === "string" && options.model ? options.model : null;
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
+    crashCtx = { admin, galleryId, url: supabaseUrl, key: supabaseServiceKey };
 
     // ── Credit billing for the pipeline's metered steps (culling + faces) ──
     // Reserve-once, charge-on-settle: the FIRST invocation of a run reserves
@@ -193,99 +210,10 @@ serve(async (req: Request) => {
     // is never charged, mirroring the style-edit reserve/debit model. Style
     // edits themselves are billed separately by image-webhook. Unlimited
     // (legacy) plans skip billing entirely via an {unlimited} marker.
-    async function settlePipelineBilling(): Promise<void> {
-      try {
-        const { data: g } = await admin
-          .from("galleries").select("user_id, pipeline_billing").eq("id", galleryId).single();
-        const marker = (g as { pipeline_billing?: Record<string, unknown> | null })?.pipeline_billing ?? null;
-        if (!marker) return;
-        const ts = String(marker.ts);
-        const userId = String(marker.user_id ?? (g as { user_id?: string })?.user_id ?? "");
-        const reserved = Number(marker.reserved) || 0;
-
-        // Nothing to settle (unlimited run / bootstrap that never reserved):
-        // just clear the marker.
-        if (marker.unlimited || !userId || reserved <= 0) {
-          await admin.from("galleries").update({ pipeline_billing: null })
-            .eq("id", galleryId).eq("pipeline_billing->>ts", ts);
-          return;
-        }
-
-        // Crash-safe settle order: (1) idempotent charge, (2) claimed release,
-        // (3) clear marker LAST. A crash at any point leaves the marker in
-        // place, and every step is safe to re-run — so a later settle (next
-        // invocation, user re-run, or the cron sweeper) finishes the books
-        // instead of stranding the reservation.
-        const runTag = `run:${ts}`;
-
-        // 1. Charge — skip if this run was already charged (retry path).
-        const { data: chargedRows } = await admin
-          .from("edit_usage_logs").select("edits_spent")
-          .eq("gallery_id", galleryId).like("description", `%${runTag}%`);
-        let charged = (chargedRows || []).reduce(
-          (s: number, r: { edits_spent: number }) => s + (r.edits_spent || 0), 0);
-        if (charged === 0) {
-          const { count: cullNowC } = await admin
-            .from("gallery_images").select("id", { count: "exact", head: true })
-            .eq("gallery_id", galleryId).gt("culling_score", 0);
-          const { count: facesNowC } = await admin
-            .from("image_features").select("image_id", { count: "exact", head: true })
-            .eq("gallery_id", galleryId).eq("faces_done", true);
-          const didCull = Math.max(0, (cullNowC ?? 0) - (Number(marker.base_cull) || 0));
-          const didFaces = Math.max(0, (facesNowC ?? 0) - (Number(marker.base_faces) || 0));
-          let chargeCull = Math.ceil(didCull * (Number(marker.rate_cull) || 0));
-          let chargeFaces = Math.ceil(didFaces * (Number(marker.rate_face) || 0));
-          // Never charge more than was reserved (rounding can overshoot by 1).
-          if (chargeCull > reserved) chargeCull = reserved;
-          if (chargeCull + chargeFaces > reserved) chargeFaces = reserved - chargeCull;
-
-          const rows: Record<string, unknown>[] = [];
-          if (chargeCull > 0) {
-            rows.push({
-              user_id: userId, gallery_id: galleryId, action_type: "ai_culling",
-              edits_spent: chargeCull, description: `AI culling: ${didCull} photos rated & tagged · ${runTag}`,
-            });
-          }
-          if (chargeFaces > 0) {
-            rows.push({
-              user_id: userId, gallery_id: galleryId, action_type: "face_recognition",
-              edits_spent: chargeFaces, description: `Face recognition: ${didFaces} photos · ${runTag}`,
-            });
-          }
-          // The edit_usage_logs trigger debits the pool AND releases the same
-          // amount from edits_reserved.
-          if (rows.length) await admin.from("edit_usage_logs").insert(rows);
-          charged = chargeCull + chargeFaces;
-          // Bulk debits cross alert thresholds too — same choke-point check
-          // as single-edit debits in image-webhook.
-          if (charged > 0) {
-            await checkCreditThresholds(admin, supabaseUrl, supabaseServiceKey, userId, charged);
-          }
-        }
-
-        // 2. Release the leftover — claimed via a one-shot flag on the marker
-        // so racing settlers can't double-release.
-        const leftover = Math.max(0, reserved - charged);
-        if (leftover > 0) {
-          const { data: relClaim } = await admin
-            .from("galleries")
-            .update({ pipeline_billing: { ...marker, released: true } })
-            .eq("id", galleryId)
-            .eq("pipeline_billing->>ts", ts)
-            .is("pipeline_billing->>released", null)
-            .select("id");
-          if (relClaim && relClaim.length > 0) {
-            await admin.rpc("release_credits_simple", { p_user_id: userId, p_amount: leftover });
-          }
-        }
-
-        // 3. Books closed — clear the marker.
-        await admin.from("galleries").update({ pipeline_billing: null })
-          .eq("id", galleryId).eq("pipeline_billing->>ts", ts);
-      } catch (e) {
-        console.error("pipeline billing settle failed:", e);
-      }
-    }
+    // Implementation is shared with pipeline-watchdog (_shared/pipeline-billing.ts)
+    // so a dead run's books get closed by the watchdog with identical semantics.
+    const settleBilling = () =>
+      settlePipelineBilling(admin, supabaseUrl, supabaseServiceKey, galleryId);
 
     // Whole-gallery grouping: OLD community-detection over CLIP embeddings + hard
     // EXIF time gate, ported into Modal. Writes similarity_group_1/2/3. Falls back
@@ -389,7 +317,7 @@ serve(async (req: Request) => {
     async function finalize() {
       // Settle the run's credit books first: charge for what was actually
       // processed, release the rest of the reservation.
-      await settlePipelineBilling();
+      await settleBilling();
       if (doCluster) {
         // Grouping goes through the NEW Modal community-detection engine ONLY.
         // We never fall back to the old SQL clusterer (removed) — if the Modal
@@ -436,7 +364,22 @@ serve(async (req: Request) => {
       // Mirror the legacy culling_* fields the gallery UI watches. Stamp the start
       // time only on a fresh user-initiated run (not internal self-chains).
       culling_status: "processing",
-      ...(isInternal ? {} : { pipeline_timing: null, culling_started_at: new Date().toISOString() }),
+      // Heartbeat on EVERY link of the chain — the watchdog treats a gallery
+      // that is 'processing' with a stale heartbeat as a dead run (live chains
+      // re-invoke at least every ~2 minutes).
+      pipeline_heartbeat: new Date().toISOString(),
+      // Persist the run's options on every link so the watchdog can resume a
+      // dead run with the exact same configuration. Runs arriving through the
+      // compression barrier (add-images flow) are INTERNAL calls — persisting
+      // only on user-initiated runs would leave those without options and a
+      // watchdog resume would silently drop e.g. faces=true.
+      pipeline_options: options ?? {},
+      ...(isInternal ? {} : {
+        pipeline_timing: null,
+        culling_started_at: new Date().toISOString(),
+        // Fresh user run → reset the watchdog's resume-attempt counter.
+        pipeline_watchdog: null,
+      }),
     }).eq("id", galleryId);
 
     // Culling was requested but there's no endpoint to call it — fail loudly with
@@ -516,7 +459,7 @@ serve(async (req: Request) => {
       if (!isInternal && marker) {
         const markerAge = Date.now() - (Number(marker.ts) || 0);
         if (markerAge > 30 * 60_000) {
-          await settlePipelineBilling();
+          await settleBilling();
           marker = null;
         }
       }
@@ -637,6 +580,7 @@ serve(async (req: Request) => {
           const res = await fetch(modalUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),
             body: JSON.stringify({
               token: modalToken,
               faces: doFaces, // skip ArcFace on Modal when faces are off
@@ -696,6 +640,7 @@ serve(async (req: Request) => {
         res = await fetch(scoreVisionUrl!, {
           method: "POST",
           headers: scoreVisionHeaders,
+          signal: AbortSignal.timeout(VLM_TIMEOUT_MS),
           body: JSON.stringify({
             mode: "culling", image, labels,
             tags: doTags ? tagsList : [], // VLM tagging (blue chips) — from the fixed list
@@ -879,15 +824,65 @@ serve(async (req: Request) => {
         }).eq("id", galleryId);
         // Close the credit books: charge whatever WAS processed before the
         // stall, release the rest of the reservation.
-        await settlePipelineBilling();
+        await settleBilling();
+        // A stall is a live production fault (provider outage / out of
+        // credits / broken endpoint) — page the admins with the evidence.
+        await alertAdminsPipeline("Culling run stalled (3× no progress)", {
+          gallery: galleryId,
+          remaining, clipRemaining, cullRemaining,
+          first_error: cullFirstError,
+        });
         return json({ error: "stalled", remaining, clipRemaining, cullRemaining, cullFirstError }, 200);
       }
-      const chain = fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-        body: JSON.stringify({ galleryId, stall: nextStall, options }),
-      }).catch((e) => console.error("self-chain failed", e));
-      EdgeRuntime.waitUntil(chain);
+      // Self-chain the next link. This dispatch used to be a single
+      // fire-and-forget fetch — one transient failure (cold start, network
+      // blip) silently killed the whole run, leaving culling_status stuck at
+      // 'processing' forever. Now: retry with backoff, and if every attempt
+      // fails, mark the gallery errored + settle the books + page admins so
+      // the run NEVER dies without a trace. (The watchdog would eventually
+      // catch it too — this is the faster, in-band recovery.)
+      const dispatchChain = async () => {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const res = await fetch(`${supabaseUrl}/functions/v1/process-pipeline`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
+              signal: AbortSignal.timeout(15_000),
+              body: JSON.stringify({ galleryId, stall: nextStall, options }),
+            });
+            // Any HTTP status < 500 means the next link executed (it responds
+            // after doing its work). ≥500 is a gateway-level rejection —
+            // retrying is safe because the function never started.
+            if (res.status < 500) return;
+            console.error(`self-chain got ${res.status} (attempt ${attempt})`);
+          } catch (e) {
+            // CRITICAL asymmetry: a TIMEOUT means the request most likely
+            // REACHED the function and it's mid-work (links take up to ~2 min
+            // to respond) — retrying would spawn a DUPLICATE chain doing the
+            // same images twice (double VLM spend). Assume alive; the fresh
+            // heartbeat proves it and the watchdog covers the rare false
+            // positive. Only genuine connection failures (refused/DNS/reset)
+            // are safe to retry — nothing started on the other side.
+            if (e instanceof DOMException && e.name === "TimeoutError") {
+              console.warn("self-chain dispatch timed out awaiting response — assuming the link is alive");
+              return;
+            }
+            console.error(`self-chain dispatch failed (attempt ${attempt}):`, e);
+          }
+          await new Promise((r) => setTimeout(r, attempt * 2000));
+        }
+        console.error("self-chain dispatch exhausted retries — failing the run loudly");
+        await admin.from("galleries").update({
+          pipeline_status: "error",
+          culling_status: "error",
+          pipeline_error: "עיבוד נעצר: שרשור ההמשך נכשל שלוש פעמים (תקלת תשתית זמנית). הרץ סינון שוב — הריצה תמשיך מאיפה שעצרה.",
+        }).eq("id", galleryId);
+        await settleBilling();
+        await alertAdminsPipeline("Culling self-chain dispatch failed 3×", {
+          gallery: galleryId, remaining,
+        });
+      };
+      EdgeRuntime.waitUntil(dispatchChain());
       return json({ success: true, processed, cullProcessed, remaining, chained: true });
     }
 
@@ -896,6 +891,24 @@ serve(async (req: Request) => {
     return json({ success: true, processed, cullProcessed, done: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
+    // Never die silently: close the run's state + books so the UI shows an
+    // actionable error instead of an eternal spinner, and credits aren't
+    // stranded in the reservation until the cron sweeper.
+    if (crashCtx) {
+      try {
+        await crashCtx.admin.from("galleries").update({
+          pipeline_status: "error",
+          culling_status: "error",
+          pipeline_error: `עיבוד קרס: ${message}. הרץ סינון שוב — הריצה תמשיך מאיפה שעצרה.`,
+        }).eq("id", crashCtx.galleryId);
+        await settlePipelineBilling(crashCtx.admin, crashCtx.url, crashCtx.key, crashCtx.galleryId);
+        await alertAdminsPipeline("Pipeline invocation crashed", {
+          gallery: crashCtx.galleryId, error: message,
+        });
+      } catch (e) {
+        console.error("crash cleanup failed:", e);
+      }
+    }
     return json({ error: message }, 500);
   }
 });
