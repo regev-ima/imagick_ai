@@ -71,6 +71,10 @@ export async function triggerCullingPipeline(
           thresholds: [0.5, 0.7, 0.9],
           timeThreshold: adminTime,
           ...(adminModel ? { model: adminModel } : {}),
+          // Production VLM endpoint as a fallback candidate — server-triggered
+          // runs have no browser origin to offer, so without this a broken
+          // SCORE_VISION_URL secret had nothing to fall back to.
+          scoreVisionUrl: `${(Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "")}/api/score-vision`,
         },
       }),
     });

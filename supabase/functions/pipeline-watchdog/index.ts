@@ -155,8 +155,11 @@ serve(async (req: Request) => {
     // The OpenRouter key lives only in the Vercel /api project; score-vision's
     // health mode reports the remaining balance without spending tokens.
     try {
-      const svUrl = Deno.env.get("SCORE_VISION_URL");
-      if (svUrl) {
+      // Same candidate order as process-pipeline: the secret, then the
+      // production default — so the probe reflects what runs actually use.
+      const studioBase = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
+      const svUrl = Deno.env.get("SCORE_VISION_URL") || `${studioBase}/api/score-vision`;
+      {
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         const bypass = Deno.env.get("SCORE_VISION_BYPASS_TOKEN");
         if (bypass) headers["x-vercel-protection-bypass"] = bypass;
@@ -178,7 +181,10 @@ serve(async (req: Request) => {
         } catch { /* default */ }
 
         const remaining = typeof health?.remaining_usd === "number" ? health.remaining_usd : null;
-        const unhealthy = !res.ok || health?.ok === false;
+        // health === null means the endpoint answered with something that
+        // isn't JSON (e.g. a protected deployment serving an HTML page with
+        // status 200) — that's an outage, not a pass.
+        const unhealthy = !res.ok || !health || health.ok === false;
         const low = remaining !== null && remaining < lowUsd;
 
         if (unhealthy || low) {
@@ -193,11 +199,14 @@ serve(async (req: Request) => {
               value: JSON.stringify({ last_provider_alert: now }),
             }, { onConflict: "key" });
             await alertAdminsPipeline(
-              unhealthy ? "OpenRouter health check FAILED" : "OpenRouter balance LOW",
+              unhealthy ? "score-vision / OpenRouter health check FAILED" : "OpenRouter balance LOW",
               {
+                probed_url: svUrl,
                 remaining_usd: remaining,
                 threshold_usd: lowUsd,
-                note: "culling runs will start failing when the balance hits 0 — top up at openrouter.ai",
+                note: unhealthy
+                  ? "the endpoint did not answer with API JSON — if SCORE_VISION_URL points at a protected/stale deployment, update the secret to <production>/api/score-vision"
+                  : "culling runs will start failing when the balance hits 0 — top up at openrouter.ai",
               },
             );
             stats.lowBalanceAlert = true;
