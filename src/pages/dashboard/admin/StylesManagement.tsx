@@ -13,7 +13,8 @@ import {
   MoreHorizontal,
   Plus,
   Power,
-  PowerOff
+  PowerOff,
+  ExternalLink
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -56,34 +57,40 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import ShowcaseManager from "./ShowcaseManager";
+import { StyleDetailsSheet, type StyleFull, type AdminUserLite } from "./StyleDetailsSheet";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminLoading } from "@/components/admin/AdminLoading";
 
-interface Style {
-   id: string;
-   name: string;
-   description: string | null;
-   status: string;
-   visibility: string;
-   is_preset: boolean;
-   is_active: boolean;
-   thumbnail_url: string | null;
-   created_at: string;
-   user_id: string;
-   /** The editing engine's model id — a style without one CANNOT edit photos
-    *  (the pickers show it as "coming soon"). */
-   style_id_external: string | null;
- }
+// The admin table + details drawer both work off the full styles Row.
+type Style = StyleFull;
 
 export default function StylesManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [deleteStyleId, setDeleteStyleId] = useState<string | null>(null);
-  // "Link engine model" mini-dialog: which style + the id being typed.
-  const [linkStyle, setLinkStyle] = useState<Style | null>(null);
-  const [linkModelId, setLinkModelId] = useState("");
+  // Full-details drawer.
+  const [detailStyle, setDetailStyle] = useState<Style | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Accounts, for resolving owner/allowed emails and the sharing picker.
+  const { data: users = [] } = useQuery<AdminUserLite[]>({
+    queryKey: ["admin-users-lite"],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return [];
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-list-users`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.users || []).map((u: any) => ({ id: u.id, email: u.email, full_name: u.full_name }));
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: styles, isLoading } = useQuery({
     queryKey: ["admin-styles", searchQuery, visibilityFilter],
@@ -107,7 +114,7 @@ export default function StylesManagement() {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as Style[];
+      return data as unknown as Style[];
     },
   });
 
@@ -115,7 +122,7 @@ export default function StylesManagement() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Style> }) => {
       const { error } = await supabase
         .from("styles")
-        .update(updates)
+        .update(updates as never)
         .eq("id", id);
       if (error) throw error;
     },
@@ -242,6 +249,7 @@ export default function StylesManagement() {
                   <TableHeader>
                      <TableRow className="hover:bg-transparent">
                        <TableHead className="aura-microlabel">Style</TableHead>
+                       <TableHead className="aura-microlabel">Engine ID</TableHead>
                        <TableHead className="aura-microlabel">Status</TableHead>
                        <TableHead className="aura-microlabel">Visibility</TableHead>
                        <TableHead className="aura-microlabel">Active</TableHead>
@@ -251,7 +259,7 @@ export default function StylesManagement() {
                   </TableHeader>
                   <TableBody>
                     {styles?.map((style) => (
-                      <TableRow key={style.id}>
+                      <TableRow key={style.id} className="cursor-pointer" onClick={() => setDetailStyle(style)}>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="h-12 w-12 overflow-hidden rounded-[--radius] bg-muted plate-keyline">
@@ -282,6 +290,15 @@ export default function StylesManagement() {
                             </div>
                           </div>
                         </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          {style.style_id_external ? (
+                            <span className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
+                              {style.style_id_external}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">—</span>
+                          )}
+                        </TableCell>
                         <TableCell>{getStatusBadge(style.status)}</TableCell>
                          <TableCell>{getVisibilityBadge(style.visibility, style.is_preset)}</TableCell>
                          <TableCell>
@@ -294,7 +311,7 @@ export default function StylesManagement() {
                          <TableCell className="folio text-muted-foreground">
                            {format(new Date(style.created_at), "MMM d, yyyy")}
                          </TableCell>
-                         <TableCell className="text-right">
+                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                            <DropdownMenu>
                              <DropdownMenuTrigger asChild>
                                <Button variant="ghost" size="icon" aria-label="Style actions">
@@ -302,15 +319,13 @@ export default function StylesManagement() {
                                </Button>
                              </DropdownMenuTrigger>
                              <DropdownMenuContent align="end">
-                               <DropdownMenuItem onClick={() => navigate(`/dashboard/styles/${style.id}`)}>
+                               <DropdownMenuItem onClick={() => setDetailStyle(style)}>
                                  <Eye className="w-4 h-4 mr-2" />
-                                 View Details
+                                 Full details &amp; controls
                                </DropdownMenuItem>
-                               <DropdownMenuItem
-                                 onClick={() => { setLinkStyle(style); setLinkModelId(style.style_id_external || ""); }}
-                               >
-                                 <Sparkles className="w-4 h-4 mr-2" />
-                                 {style.style_id_external ? `Engine model: ${style.style_id_external}` : "Link engine model…"}
+                               <DropdownMenuItem onClick={() => navigate(`/dashboard/styles/${style.id}`)}>
+                                 <ExternalLink className="w-4 h-4 mr-2" />
+                                 Open style page
                                </DropdownMenuItem>
                                <DropdownMenuSeparator />
                                <DropdownMenuItem
@@ -384,41 +399,14 @@ export default function StylesManagement() {
         </TabsContent>
       </Tabs>
 
-      {/* Link engine model — a look edits photos only when a trained model id
-          is attached; this is where the admin wires presets to real models. */}
-      <AlertDialog open={!!linkStyle} onOpenChange={(open) => !open && setLinkStyle(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Link engine model — {linkStyle?.name}</AlertDialogTitle>
-            <AlertDialogDescription>
-              The editing engine's model id (style_id_external). Without it this look
-              can't edit photos and appears as "coming soon" in the pickers. Leave
-              empty and save to unlink.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Input
-            value={linkModelId}
-            onChange={(e) => setLinkModelId(e.target.value)}
-            placeholder="e.g. 42 or model-abc123"
-            autoFocus
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (!linkStyle) return;
-                updateStyleMutation.mutate({
-                  id: linkStyle.id,
-                  updates: { style_id_external: linkModelId.trim() || null } as Partial<Style>,
-                });
-                setLinkStyle(null);
-              }}
-            >
-              Save
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Full details & controls — engine id, training data, timings, errors,
+          allowed accounts, public toggle. Everything for one style. */}
+      <StyleDetailsSheet
+        style={detailStyle}
+        users={users}
+        open={!!detailStyle}
+        onOpenChange={(o) => !o && setDetailStyle(null)}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteStyleId} onOpenChange={() => setDeleteStyleId(null)}>
