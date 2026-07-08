@@ -131,6 +131,71 @@ serve(async (req: Request) => {
       );
     }
 
+    // ── Fetch styles & resolve each to its ENGINE key — uniqueness is mandatory ──
+    // This must happen BEFORE fetching images: the "images missing edits"
+    // query, the reservation, the chain and the remaining-count must all speak
+    // in terms of styles that can actually be dispatched.
+    //
+    // The editing engine identifies a look by style_id_external; the webhook
+    // maps results back through that key and the edited file's storage path is
+    // keyed by it too. A style with NO trained model used to fall back to the
+    // shared legacy key "1" — selecting several model-less looks collapsed
+    // them onto ONE key: the engine edited once, the result was attributed to
+    // whichever style won the map, the other looks silently never happened,
+    // and worse — the missing-edits counter kept seeing them as "todo" and
+    // chained invocations forever. Now: first claim per key wins (keeps the
+    // legacy single-"1" fallback working), the rest are REJECTED loudly and
+    // excluded from dispatch, billing, gallery merge and chaining.
+    const { data: styles, error: stylesError } = await supabase
+      .from("styles")
+      .select("id, name, style_id_external")
+      .in("id", styleIds);
+
+    if (stylesError || !styles || styles.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No styles found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const usableStyles: typeof styles = [];
+    const rejectedStyles: { id: string; name: string; reason: string }[] = [];
+    {
+      const claimedKeys = new Set<string>();
+      for (const s of styles) {
+        const key = s.style_id_external || "1";
+        if (claimedKeys.has(key)) {
+          rejectedStyles.push({
+            id: s.id,
+            name: s.name,
+            reason: s.style_id_external
+              ? `duplicate engine key ${key}`
+              : "no trained model attached (style_id_external is empty) — the look cannot be applied",
+          });
+          continue;
+        }
+        claimedKeys.add(key);
+        usableStyles.push(s);
+      }
+    }
+    if (rejectedStyles.length > 0) {
+      console.error(
+        `process-images: ${rejectedStyles.length} style(s) rejected for gallery ${galleryId}:`,
+        rejectedStyles.map((r) => `${r.name} (${r.reason})`).join("; "),
+      );
+    }
+    if (usableStyles.length === 0) {
+      return new Response(
+        JSON.stringify({
+          error: "no_deployable_styles",
+          message: "None of the selected styles has a trained model attached — nothing can be edited.",
+          rejectedStyles,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const usableStyleIds = usableStyles.map((s) => s.id);
+
     // ── Fetch images to process ──
     let images: { id: string; original_url: string; filename: string; processing_attempts: number }[] | null = null;
     let imagesError: unknown = null;
@@ -170,14 +235,16 @@ serve(async (req: Request) => {
         const processingImages = processingData || [];
         console.log(`Found ${processingImages.length} processing images`);
 
-        // Step 2: If we have room, also fetch "ready" images missing edits for requested styles
+        // Step 2: If we have room, also fetch "ready" images missing edits for
+        // the DISPATCHABLE styles only — counting rejected styles here would
+        // re-fetch forever (their edits can never arrive).
         const remaining = CHUNK_LIMIT - processingImages.length;
-        if (remaining > 0 && styleIds.length > 0) {
-          console.log(`Fetching up to ${remaining} ready images missing edits for ${styleIds.length} styles`);
+        if (remaining > 0 && usableStyleIds.length > 0) {
+          console.log(`Fetching up to ${remaining} ready images missing edits for ${usableStyleIds.length} styles`);
           const { data: readyData, error: readyError } = await supabaseAdmin
             .rpc("get_images_missing_edits", {
               p_gallery_id: galleryId,
-              p_style_ids: styleIds,
+              p_style_ids: usableStyleIds,
               p_limit: remaining,
             });
 
@@ -208,19 +275,6 @@ serve(async (req: Request) => {
 
     console.log(`Fetched ${images.length} images to process`);
 
-    // Fetch styles
-    const { data: styles, error: stylesError } = await supabase
-      .from("styles")
-      .select("id, name, style_id_external")
-      .in("id", styleIds);
-
-    if (stylesError || !styles || styles.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No styles found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     const { appendWebhookSecret } = await import("../_shared/imagick-webhook-auth.ts");
     const webhookUrl = appendWebhookSecret(`${supabaseUrl}/functions/v1/image-webhook`);
 
@@ -230,7 +284,7 @@ serve(async (req: Request) => {
       .from("image_edits")
       .select("image_id, style_id")
       .in("image_id", fetchedImageIds)
-      .in("style_id", styleIds);
+      .in("style_id", usableStyleIds);
 
     const existingCombos = new Set<string>();
     for (const edit of existingEdits || []) {
@@ -254,7 +308,9 @@ serve(async (req: Request) => {
         .single();
 
       if (userSub && userSub.edits_remaining !== -1) {
-        const needed = (images.length * styles.length) - existingCombos.size;
+        // Reserve only for combos that will actually be dispatched — rejected
+        // (model-less/colliding) styles must not hold the user's credits.
+        const needed = (images.length * usableStyles.length) - existingCombos.size;
 
         if (needed > 0) {
           // Atomic reserve — fails if insufficient available edits
@@ -304,13 +360,19 @@ serve(async (req: Request) => {
     const processTasks: Array<{ imageId: string; exec: () => Promise<ProcessImageResult[]> }> = [];
     const results: ProcessImageResult[] = [];
 
+    // Surface each rejected style once in the results, so callers can tell
+    // the photographer exactly which looks were not applied and why.
+    for (const r of rejectedStyles) {
+      results.push({ imageId: "", styleId: r.id, success: false, error: r.reason });
+    }
+
     for (const image of images) {
-      const stylesToProcess = styles.filter(
+      const stylesToProcess = usableStyles.filter(
         (style) => !existingCombos.has(`${image.id}:${style.id}`),
       );
 
       // Record skipped combos
-      for (const style of styles.filter(s => existingCombos.has(`${image.id}:${s.id}`))) {
+      for (const style of usableStyles.filter(s => existingCombos.has(`${image.id}:${s.id}`))) {
         results.push({ imageId: image.id, styleId: style.id, success: true, skipped: true });
       }
 
@@ -457,8 +519,11 @@ serve(async (req: Request) => {
       .eq("id", galleryId)
       .maybeSingle();
 
+    // Merge only styles that actually got dispatched — a rejected (model-less)
+    // style on the gallery would render an empty look tab and re-enter the
+    // todo-count forever.
     const existingStyleIds: string[] = currentGallery?.selected_style_ids || [];
-    const mergedStyleIds = [...new Set([...existingStyleIds, ...styleIds])];
+    const mergedStyleIds = [...new Set([...existingStyleIds, ...usableStyleIds])];
 
     await supabaseAdmin
       .from("galleries")
@@ -474,13 +539,15 @@ serve(async (req: Request) => {
       .in("status", ["processing", "uploading"])
       .lt("processing_attempts", MAX_ATTEMPTS);
 
-    // Also count ready images that still need edits for the requested styles
+    // Also count ready images that still need edits — for DISPATCHABLE styles
+    // only. Counting a rejected style here would keep this >0 forever and
+    // chain invocations in an infinite loop (its edits can never arrive).
     let remainingReady = 0;
-    if (styleIds.length > 0 && !imageIds) {
+    if (usableStyleIds.length > 0 && !imageIds) {
       const { data: readyCount } = await supabaseAdmin
         .rpc("count_images_missing_edits", {
           p_gallery_id: galleryId,
-          p_style_ids: styleIds,
+          p_style_ids: usableStyleIds,
         });
       remainingReady = Number(readyCount) || 0;
     }
@@ -498,7 +565,7 @@ serve(async (req: Request) => {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${supabaseServiceKey}`,
         },
-        body: JSON.stringify({ galleryId, styleIds, userId }),
+        body: JSON.stringify({ galleryId, styleIds: usableStyleIds, userId }),
       }).catch((err) => console.error("Self-chain failed:", err));
       EdgeRuntime.waitUntil(chainPromise);
       chained = true;
@@ -512,7 +579,8 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processing ${images.length} images with ${styles.length} styles`,
+        message: `Processing ${images.length} images with ${usableStyles.length} styles`,
+        ...(rejectedStyles.length > 0 ? { rejectedStyles } : {}),
         requestBatchSize: parsedRequestBatchSize,
         chained,
         remainingProcessing: remaining,

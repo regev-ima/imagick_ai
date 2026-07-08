@@ -70,12 +70,18 @@ interface Style {
    thumbnail_url: string | null;
    created_at: string;
    user_id: string;
+   /** The editing engine's model id — a style without one CANNOT edit photos
+    *  (the pickers show it as "coming soon"). */
+   style_id_external: string | null;
  }
 
 export default function StylesManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [deleteStyleId, setDeleteStyleId] = useState<string | null>(null);
+  // "Link engine model" mini-dialog: which style + the id being typed.
+  const [linkStyle, setLinkStyle] = useState<Style | null>(null);
+  const [linkModelId, setLinkModelId] = useState("");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -262,7 +268,14 @@ export default function StylesManagement() {
                               )}
                             </div>
                             <div>
-                              <p className="font-medium">{style.name}</p>
+                              <p className="flex items-center gap-2 font-medium">
+                                {style.name}
+                                {!style.style_id_external && (
+                                  <Badge variant="outline" className="border-rating/40 text-[10px] text-rating" title="No engine model linked — this look can't edit photos and shows as 'coming soon' in pickers">
+                                    No model
+                                  </Badge>
+                                )}
+                              </p>
                               <p className="max-w-xs truncate text-sm text-muted-foreground">
                                 {style.description || "No description"}
                               </p>
@@ -292,6 +305,12 @@ export default function StylesManagement() {
                                <DropdownMenuItem onClick={() => navigate(`/dashboard/styles/${style.id}`)}>
                                  <Eye className="w-4 h-4 mr-2" />
                                  View Details
+                               </DropdownMenuItem>
+                               <DropdownMenuItem
+                                 onClick={() => { setLinkStyle(style); setLinkModelId(style.style_id_external || ""); }}
+                               >
+                                 <Sparkles className="w-4 h-4 mr-2" />
+                                 {style.style_id_external ? `Engine model: ${style.style_id_external}` : "Link engine model…"}
                                </DropdownMenuItem>
                                <DropdownMenuSeparator />
                                <DropdownMenuItem
@@ -364,6 +383,42 @@ export default function StylesManagement() {
           <ShowcaseManager />
         </TabsContent>
       </Tabs>
+
+      {/* Link engine model — a look edits photos only when a trained model id
+          is attached; this is where the admin wires presets to real models. */}
+      <AlertDialog open={!!linkStyle} onOpenChange={(open) => !open && setLinkStyle(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Link engine model — {linkStyle?.name}</AlertDialogTitle>
+            <AlertDialogDescription>
+              The editing engine's model id (style_id_external). Without it this look
+              can't edit photos and appears as "coming soon" in the pickers. Leave
+              empty and save to unlink.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={linkModelId}
+            onChange={(e) => setLinkModelId(e.target.value)}
+            placeholder="e.g. 42 or model-abc123"
+            autoFocus
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!linkStyle) return;
+                updateStyleMutation.mutate({
+                  id: linkStyle.id,
+                  updates: { style_id_external: linkModelId.trim() || null } as Partial<Style>,
+                });
+                setLinkStyle(null);
+              }}
+            >
+              Save
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteStyleId} onOpenChange={() => setDeleteStyleId(null)}>

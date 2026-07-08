@@ -769,7 +769,12 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
 }) {
   const atMax = selectedIds.length >= max;
   const hosting = chosen && selectedIds.length === 0;
-  const bestId = styles[0]?.id;
+  // A look is only real if a trained model is attached (style_id_external) —
+  // the editing engine has nothing to apply otherwise. Model-less presets used
+  // to be selectable and silently produced no edits (or a mislabeled default),
+  // so they're offered as "coming soon" instead.
+  const deployable = (s: StyleRow) => !!(s as any).style_id_external;
+  const bestId = styles.find(deployable)?.id;
   // Same demo-cover source as the Add-Images flow: prefer a real showcase edit,
   // then the style's own after/thumbnail images.
   const { coverFor } = useStyleCovers();
@@ -786,7 +791,7 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
           <div className="aura-microlabel flex items-center gap-1.5 text-primary"><Sparkle size={10} /> Your AI models</div>
           <div className="grid grid-cols-3 gap-2">
             {mine.map((s) => (
-              <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+              <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} unavailable={!deployable(s)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
             ))}
           </div>
         </div>
@@ -797,7 +802,7 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
           {mine.length > 0 && <div className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={10} /> Aura looks</div>}
           <div className="grid grid-cols-3 gap-2">
             {aura.map((s) => (
-              <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+              <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} locked={atMax && !selectedIds.includes(s.id)} unavailable={!deployable(s)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
             ))}
           </div>
         </div>
@@ -833,11 +838,13 @@ function LookGrid({ styles, selectedIds, chosen, ownerId, onToggle, onHosting, m
 // One AI-model tile — a compact, visual card so many looks fit at a glance.
 // The cover fills the tile with the name overlaid; no-cover models get a royal-
 // blue aura tile with the sparkle so they still read as AI engines.
-function LookTile({ style: s, cover, on, locked, mine = false, recommended = false, onClick }: {
+function LookTile({ style: s, cover, on, locked, unavailable = false, mine = false, recommended = false, onClick }: {
   style: StyleRow;
   cover?: string;
   on: boolean;
   locked: boolean;
+  /** No trained model attached — the look can't actually edit photos yet. */
+  unavailable?: boolean;
   mine?: boolean;
   recommended?: boolean;
   onClick: () => void;
@@ -846,14 +853,14 @@ function LookTile({ style: s, cover, on, locked, mine = false, recommended = fal
     <button
       type="button"
       onClick={onClick}
-      disabled={locked}
-      title={s.name}
+      disabled={locked || unavailable}
+      title={unavailable ? `${s.name} — coming soon (no trained model yet)` : s.name}
       className={cn(
         "group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[--radius] border text-left transition-all",
         on
           ? "border-primary ring-1 ring-inset ring-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.10)]"
           : "border-border hover:border-primary/50",
-        locked && "cursor-not-allowed opacity-45 hover:border-border",
+        (locked || unavailable) && "cursor-not-allowed opacity-45 hover:border-border",
       )}
     >
       {cover ? (
@@ -872,8 +879,11 @@ function LookTile({ style: s, cover, on, locked, mine = false, recommended = fal
         </span>
       </span>
       <span className="absolute right-1.5 top-1.5"><SelectMark on={on} /></span>
-      {recommended && !on && (
+      {recommended && !on && !unavailable && (
         <span className="absolute left-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-primary-foreground shadow">Pick</span>
+      )}
+      {unavailable && (
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-muted-foreground shadow">Soon</span>
       )}
     </button>
   );

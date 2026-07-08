@@ -291,7 +291,7 @@ export function GalleryRightSidebar({
                 onToggleLikedFilter={onToggleLikedFilter}
               />
             )}
-            {canViewAnalytics && galleryTimingData && (
+            {galleryTimingData && (
               <>
                 <Separator />
                 <GalleryInfoPanel data={galleryTimingData} processingStats={processingStats} />
@@ -373,8 +373,9 @@ export function GalleryRightSidebar({
             </SidebarSection>
           )}
 
-          {/* ── INFO (admin only) ── */}
-          {canViewAnalytics && galleryTimingData && (
+          {/* ── INFO — pipeline timeline, visible to every gallery owner so a
+                 stuck/failed step (and its reason) is never admin-only ── */}
+          {galleryTimingData && (
             <SidebarSection
               title="Info"
               id="info"
