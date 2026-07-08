@@ -222,6 +222,22 @@ export default async function handler(req: any, res: any) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { image, model } = body || {};
+
+    // Health probe for the pipeline watchdog: report the OpenRouter key's
+    // remaining balance WITHOUT spending tokens (the key lives only here).
+    // Lets the watchdog alert admins before culling starts failing at $0.
+    if (body?.mode === "health") {
+      const r = await fetch("https://openrouter.ai/api/v1/credits", {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      const d = await r.json().catch(() => null);
+      const total = d?.data?.total_credits;
+      const usage = d?.data?.total_usage;
+      const remaining = typeof total === "number" && typeof usage === "number" ? total - usage : null;
+      res.status(200).json({ ok: r.ok, remaining_usd: remaining });
+      return;
+    }
+
     if (!image || typeof image !== "string") {
       res.status(400).json({ error: "bad_request", message: "missing image (data URL or https URL)" });
       return;
