@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { estimateCullingMs, formatDuration } from "@/lib/cullingEta";
 
@@ -31,6 +31,13 @@ interface CullingStatusBannerProps {
   /** When provided AND the run is healthy (not stuck), the banner turns
    *  into a button that reopens the minimized "AI is working" overlay. */
   onReopenProgress?: () => void;
+  /** The REAL failure diagnostic (galleries.pipeline_error). When status is
+   *  'error' this renders a destructive banner stating exactly why the run
+   *  stopped — the answer to "why did culling fail?" used to live only in
+   *  the DB. */
+  errorText?: string | null;
+  /** Re-run affordance for the error banner (opens the AI Culling modal). */
+  onRetry?: () => void;
   className?: string;
 }
 
@@ -55,15 +62,63 @@ export function CullingStatusBanner({
   isStuck = false,
   hasCullingData = false,
   onReopenProgress,
+  errorText,
+  onRetry,
   className,
 }: CullingStatusBannerProps) {
   // Tick once a minute so the elapsed-time text stays current.
   const [now, setNow] = useState(() => Date.now());
+  // Error banner is dismissible for the current visit; a new run (status →
+  // processing) resets it so a future failure shows again.
+  const [errorDismissed, setErrorDismissed] = useState(false);
+  useEffect(() => {
+    if (status !== "error") setErrorDismissed(false);
+  }, [status]);
   useEffect(() => {
     if (status !== "processing") return;
     const interval = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(interval);
   }, [status]);
+
+  // ── Failure state: say exactly WHY, right where the user is looking ──
+  if (status === "error" && errorText && !errorDismissed) {
+    return (
+      <div
+        className={cn(
+          "flex items-start gap-3 border-b border-destructive/30 bg-destructive/10 px-4 py-2.5",
+          className,
+        )}
+        role="alert"
+      >
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">
+            <span className="aura-microlabel text-destructive">AI Culling stopped</span>
+          </p>
+          <p dir="auto" className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            {errorText}
+          </p>
+        </div>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="flex shrink-0 items-center gap-1.5 rounded-sm border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <RefreshCw className="h-3 w-3" /> Run again
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setErrorDismissed(true)}
+          aria-label="Dismiss"
+          className="shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
 
   if (status !== "processing") return null;
   // The data has already landed but the webhook didn't flip the

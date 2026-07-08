@@ -115,6 +115,8 @@ interface GalleryRightSidebarProps {
     /** galleries.culling_status — lets the timeline show a truthful "Failed"
      *  instead of an eternal "In progress" when the watchdog errors a run. */
     cullingStatus?: string | null;
+    /** galleries.pipeline_error — the actual failure diagnostic. */
+    pipelineError?: string | null;
     facesStartedAt: string | null;
     facesCompletedAt: string | null;
     sourceType: "google" | "upload";
@@ -1107,9 +1109,13 @@ function GalleryInfoPanel({
       color: "text-primary",
       bgColor: "bg-primary",
       // Make the compression gate explicit: culling is queued but held.
+      // On failure prefer the REAL diagnostic (pipeline_error) over the
+      // generic hint — "why did it fail" should be answerable from here.
       subtitle:
         data.cullingStatus === "error"
-          ? "Stopped — run AI Culling to resume from where it left off"
+          ? (data.pipelineError
+              ? `${data.pipelineError.slice(0, 200)}${data.pipelineError.length > 200 ? "…" : ""}`
+              : "Stopped — run AI Culling to resume from where it left off")
           : !data.cullingStartedAt && data.cullingCompletedAt === null && data.compressionStartedAt && !data.compressionCompletedAt
             ? "Waiting for compression…"
             : null,
@@ -1260,7 +1266,9 @@ function GalleryInfoPanel({
                   </p>
                 )}
                 {stage.subtitle && (
-                  <p className="text-[10px] text-rating/90 tabular-nums mt-0.5">{stage.subtitle}</p>
+                  <p dir="auto" className={cn("mt-0.5 text-[10px] tabular-nums", stage.status === "error" ? "text-destructive/90" : "text-rating/90")}>
+                    {stage.subtitle}
+                  </p>
                 )}
               </div>
             </div>
