@@ -171,11 +171,28 @@ serve(async (req: Request) => {
     const doTags = options?.tags !== false;
     // Culling = the OLD VLM rating/label pass (score-vision `mode:"culling"`), which
     // writes the old gallery_images columns. On by default; needs a score-vision URL.
-    // Source of truth = the Edge Function secret SCORE_VISION_URL (a stable PUBLIC
-    // endpoint). The frontend-provided value is only a FALLBACK — a browser preview
-    // URL is often auth-protected and returns HTML/401 to server-to-server calls.
-    const scoreVisionUrl = Deno.env.get("SCORE_VISION_URL") ||
-      (typeof options?.scoreVisionUrl === "string" ? options.scoreVisionUrl : null);
+    //
+    // Endpoint CANDIDATES, tried in order with automatic fallback:
+    //   1. the SCORE_VISION_URL edge secret,
+    //   2. the caller-provided options.scoreVisionUrl,
+    //   3. the production default (STUDIO_URL)/api/score-vision.
+    // A live incident showed why one URL isn't enough: the secret pointed at a
+    // protected/stale Vercel deployment that served an HTML page with status
+    // 200 — every VLM call "succeeded" with unparseable HTML and every culling
+    // run died with 0 progress. When a candidate answers with NON-JSON (a web
+    // page instead of the API) or is unreachable, we switch to the next one
+    // for the rest of the run instead of failing the whole gallery.
+    const studioBase = (Deno.env.get("STUDIO_URL") || "https://app.imagick.ai").replace(/\/+$/, "");
+    const svCandidates: string[] = [];
+    for (const cand of [
+      Deno.env.get("SCORE_VISION_URL"),
+      typeof options?.scoreVisionUrl === "string" ? options.scoreVisionUrl : null,
+      `${studioBase}/api/score-vision`,
+    ]) {
+      if (cand && !svCandidates.includes(cand)) svCandidates.push(cand);
+    }
+    let svIndex = 0;
+    const scoreVisionUrl = svCandidates[0] ?? null;
     // Optional Vercel "Protection Bypass for Automation" token, so we can reach a
     // PROTECTED preview /api/score-vision server-to-server without opening it to the
     // public. Sent as a request header only — NEVER logged or stored.
@@ -636,32 +653,50 @@ serve(async (req: Request) => {
     const bypassInfo = `protection_bypass_configured=${!!scoreVisionBypass}`;
 
     const callScoreVision = async (image: string): Promise<{ data?: Record<string, unknown>; error?: string }> => {
-      let res: Response;
-      try {
-        res = await fetch(scoreVisionUrl!, {
-          method: "POST",
-          headers: scoreVisionHeaders,
-          signal: timeoutSignal(VLM_TIMEOUT_MS),
-          body: JSON.stringify({
-            mode: "culling", image, labels,
-            tags: doTags ? tagsList : [], // VLM tagging (blue chips) — from the fixed list
-            extras: true,                 // eyes / expression / keeper / hero / technical flags
-            ...(vlmModel ? { model: vlmModel } : {}), // per-test model choice
-          }),
-        });
-      } catch (e) {
-        return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)} (${bypassInfo})` };
-      }
-      const ct = res.headers.get("content-type") || "";
-      const text = await res.text();
-      if (!res.ok) return { error: `status=${res.status} ct=${ct || "?"} ${bypassInfo} body=${text.slice(0, 300)}` };
-      if (!ct.includes("application/json")) {
-        return { error: `non-json response ct=${ct || "?"} status=${res.status} ${bypassInfo} body=${text.slice(0, 300)}` };
-      }
-      try {
-        return { data: JSON.parse(text) as Record<string, unknown> };
-      } catch {
-        return { error: `json parse failed ct=${ct} ${bypassInfo} body=${text.slice(0, 300)}` };
+      // Endpoint-level resilience: an unreachable candidate or one answering
+      // with a WEB PAGE (protected/stale deployment → HTML, any status) is a
+      // broken ENDPOINT, not a broken image — advance to the next candidate
+      // (sticky for the whole invocation; chains rediscover in one call) and
+      // retry this image. A JSON error body is the real API talking (rate
+      // limit, provider error) — that stays on the current endpoint.
+      for (;;) {
+        const url = svCandidates[svIndex];
+        let endpointBroken: string | null = null;
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: scoreVisionHeaders,
+            signal: timeoutSignal(VLM_TIMEOUT_MS),
+            body: JSON.stringify({
+              mode: "culling", image, labels,
+              tags: doTags ? tagsList : [], // VLM tagging (blue chips) — from the fixed list
+              extras: true,                 // eyes / expression / keeper / hero / technical flags
+              ...(vlmModel ? { model: vlmModel } : {}), // per-test model choice
+            }),
+          });
+          const ct = res.headers.get("content-type") || "";
+          const text = await res.text();
+          if (!ct.includes("application/json")) {
+            endpointBroken = `non-json response (a web page, not the API) ct=${ct || "?"} status=${res.status} ${bypassInfo} url=${url} body=${text.slice(0, 200)}`;
+          } else if (!res.ok) {
+            return { error: `status=${res.status} ct=${ct || "?"} ${bypassInfo} body=${text.slice(0, 300)}` };
+          } else {
+            try {
+              return { data: JSON.parse(text) as Record<string, unknown> };
+            } catch {
+              return { error: `json parse failed ct=${ct} ${bypassInfo} body=${text.slice(0, 300)}` };
+            }
+          }
+        } catch (e) {
+          endpointBroken = `fetch failed: ${e instanceof Error ? e.message : String(e)} (${bypassInfo}) url=${url}`;
+        }
+        // Endpoint is broken — fall back if another candidate remains.
+        if (svIndex + 1 < svCandidates.length) {
+          console.error(`score-vision endpoint broken, falling back to next candidate: ${endpointBroken}`);
+          svIndex++;
+          continue;
+        }
+        return { error: endpointBroken! };
       }
     };
 
@@ -810,8 +845,11 @@ serve(async (req: Request) => {
         // Point the finger at the step that actually failed to progress.
         let msg: string;
         if (doCulling && cullRemaining > 0 && cullProcessed === 0) {
+          const misconfigured = /non-json|a web page/.test(cullFirstError ?? "");
           msg = "עיבוד נעצר: culling לא התקדם (0 הצלחות) אחרי 3 ניסיונות. " +
-            "בדוק שה-SCORE_VISION_URL הוא endpoint ציבורי שמחזיר JSON. " +
+            (misconfigured
+              ? `ה-endpoint של הסינון מחזיר דף אינטרנט במקום JSON — ה-secret SCORE_VISION_URL מצביע כנראה על deployment מוגן/ישן. עדכן אותו ל-${studioBase}/api/score-vision. `
+              : "בדוק שה-SCORE_VISION_URL הוא endpoint ציבורי שמחזיר JSON. ") +
             `שגיאה ראשונה: ${cullFirstError ?? "לא ידועה"}`;
         } else if (clipRemaining > 0 && processed === 0) {
           msg = "עיבוד נעצר: CLIP/Modal לא התקדם אחרי 3 ניסיונות (ייתכן ש-Modal ללא משאבי GPU פנויים).";
