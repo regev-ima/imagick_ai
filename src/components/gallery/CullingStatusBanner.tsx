@@ -31,10 +31,11 @@ interface CullingStatusBannerProps {
   /** When provided AND the run is healthy (not stuck), the banner turns
    *  into a button that reopens the minimized "AI is working" overlay. */
   onReopenProgress?: () => void;
-  /** The REAL failure diagnostic (galleries.pipeline_error). When status is
-   *  'error' this renders a destructive banner stating exactly why the run
-   *  stopped — the answer to "why did culling fail?" used to live only in
-   *  the DB. */
+  /** ADMIN-ONLY technical diagnostic (galleries.pipeline_error). The error
+   *  banner itself renders for everyone when status is 'error' with a
+   *  friendly message; pass this ONLY for admins — customers must see that
+   *  something failed, never the internals (endpoints, secrets, HTML dumps).
+   *  The full diagnostic reaches admins via WhatsApp/Sentry regardless. */
   errorText?: string | null;
   /** Re-run affordance for the error banner (opens the AI Culling modal). */
   onRetry?: () => void;
@@ -80,8 +81,11 @@ export function CullingStatusBanner({
     return () => clearInterval(interval);
   }, [status]);
 
-  // ── Failure state: say exactly WHY, right where the user is looking ──
-  if (status === "error" && errorText && !errorDismissed) {
+  // ── Failure state ──
+  // Everyone sees THAT it failed + how to recover; only admins also see WHY
+  // (the technical diagnostic) — customers must never be handed endpoint
+  // URLs, secret names or HTML dumps.
+  if (status === "error" && !errorDismissed) {
     return (
       <div
         className={cn(
@@ -95,9 +99,16 @@ export function CullingStatusBanner({
           <p className="text-sm font-medium text-foreground">
             <span className="aura-microlabel text-destructive">AI Culling stopped</span>
           </p>
-          <p dir="auto" className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            {errorText}
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            Something went wrong on our side and the team has been notified.
+            Credits for unprocessed photos were released — run AI Culling again
+            to resume from where it left off.
           </p>
+          {errorText && (
+            <p dir="auto" className="mt-1 rounded-sm bg-background/50 px-2 py-1 font-mono text-[10px] leading-relaxed text-muted-foreground/80">
+              {errorText}
+            </p>
+          )}
         </div>
         {onRetry && (
           <button
