@@ -8,6 +8,7 @@ import { Seo } from "@/components/marketing/Seo";
 import { Reveal, Kicker } from "@/components/marketing/Reveal";
 import { Sparkle } from "@/components/marketing/Sparkle";
 import { BLOG_POSTS, blogCategories, type BlogPost } from "@/components/marketing/blog";
+import { SmartImage } from "@/components/marketing/img";
 import { SITE } from "@/components/marketing/data";
 
 const PAGE = 12;
@@ -16,14 +17,30 @@ const fmtDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
 
 /** Consistent cover block — falls back to a branded plate when a post has no image. */
-function Cover({ post, className = "" }: { post: BlogPost; className?: string }) {
+function Cover({
+  post,
+  sizes = "(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw",
+  widths = [320, 480, 640],
+  eager,
+  priority,
+  className = "",
+}: {
+  post: BlogPost;
+  sizes?: string;
+  widths?: number[];
+  eager?: boolean;
+  priority?: boolean;
+  className?: string;
+}) {
   if (post.cover) {
     return (
-      <img
+      <SmartImage
         src={post.cover}
         alt={post.coverAlt || post.title}
-        loading="lazy"
-        decoding="async"
+        sizes={sizes}
+        widths={widths}
+        eager={eager}
+        priority={priority}
         className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${className}`}
       />
     );
@@ -212,7 +229,13 @@ export default function BlogIndexPage() {
                 className="group grid overflow-hidden rounded-xl border border-border bg-card/60 transition-colors duration-200 hover:border-primary/40 md:grid-cols-2"
               >
                 <div className="aspect-[16/10] overflow-hidden border-b border-border md:aspect-auto md:border-b-0 md:border-r">
-                  <Cover post={featured} />
+                  <Cover
+                    post={featured}
+                    sizes="(min-width: 768px) 50vw, 92vw"
+                    widths={[480, 720, 960, 1200]}
+                    eager
+                    priority
+                  />
                 </div>
                 <div className="flex flex-col justify-center p-6 sm:p-8">
                   <div className="flex items-center gap-3 caption">

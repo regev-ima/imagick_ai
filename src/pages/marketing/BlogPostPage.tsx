@@ -8,6 +8,7 @@ import { Seo } from "@/components/marketing/Seo";
 import { Sparkle } from "@/components/marketing/Sparkle";
 import { AppCta } from "@/components/marketing/AppCta";
 import { getPost, BLOG_POSTS } from "@/components/marketing/blog";
+import { SmartImage } from "@/components/marketing/img";
 import blogContent from "@/components/marketing/blog-content.json";
 import { SITE } from "@/components/marketing/data";
 
@@ -207,14 +208,16 @@ export default function BlogPostPage() {
             )}
 
             {post.cover && (
-              <img
+              <SmartImage
                 src={post.cover}
                 alt={post.coverAlt}
                 width={1200}
                 height={675}
+                widths={[640, 800, 1200, 1600]}
+                sizes="(min-width: 1024px) 760px, 92vw"
                 className="mt-7 aspect-[16/9] w-full rounded-xl border border-border object-cover"
-                loading="eager"
-                decoding="async"
+                eager
+                priority
               />
             )}
 
