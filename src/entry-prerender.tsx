@@ -9,7 +9,8 @@ import UseCasePage from "./pages/marketing/UseCasePage";
 import BlogIndexPage from "./pages/marketing/BlogIndexPage";
 import BlogPostPage from "./pages/marketing/BlogPostPage";
 import { SITE, FAQS, PLANS } from "./components/marketing/data";
-import { USE_CASES, BLOG_POSTS } from "./components/marketing/content";
+import { USE_CASES } from "./components/marketing/content";
+import { BLOG_POSTS } from "./components/marketing/blog";
 
 export type PrerenderRoute = {
   url: string;
@@ -95,31 +96,33 @@ export const ROUTES: PrerenderRoute[] = [
     jsonLd: [breadcrumb([["Home", SITE.url], [u.niche, `${SITE.url}/for/${u.slug}`]])],
   })),
   ...BLOG_POSTS.map((p) => ({
-    url: `/blog/${p.slug}`,
-    out: `blog/${p.slug}/index.html`,
-    title: `${p.title} | Imagick.ai`,
-    description: p.description,
+    url: p.url, // preserved verbatim (e.g. "/blog/<slug>")
+    out: `${p.url.replace(/^\//, "")}/index.html`,
+    title: p.metaTitle,
+    description: p.metaDescription,
     jsonLd: [
       {
         "@context": "https://schema.org",
         "@type": "BlogPosting",
         headline: p.title,
-        description: p.description,
+        description: p.metaDescription,
+        ...(p.cover ? { image: [p.cover] } : {}),
         datePublished: p.date,
-        dateModified: p.date,
-        author: { "@type": "Organization", name: SITE.name },
+        dateModified: p.modified,
+        author: { "@type": "Organization", name: p.author || SITE.name },
         publisher: {
           "@type": "Organization",
           name: SITE.name,
           logo: { "@type": "ImageObject", url: `${SITE.url}/favicon.png` },
         },
-        mainEntityOfPage: `${SITE.url}/blog/${p.slug}`,
-        url: `${SITE.url}/blog/${p.slug}`,
+        ...(p.keywords?.length ? { keywords: p.keywords.join(", ") } : {}),
+        mainEntityOfPage: `${SITE.url}${p.url}`,
+        url: `${SITE.url}${p.url}`,
       },
       breadcrumb([
         ["Home", SITE.url],
         ["Blog", `${SITE.url}/blog`],
-        [p.title, `${SITE.url}/blog/${p.slug}`],
+        [p.title, `${SITE.url}${p.url}`],
       ]),
     ],
   })),

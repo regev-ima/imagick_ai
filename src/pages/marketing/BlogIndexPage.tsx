@@ -5,7 +5,7 @@ import { MarketingNav } from "@/components/marketing/MarketingNav";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { Seo } from "@/components/marketing/Seo";
 import { Reveal, Kicker } from "@/components/marketing/Reveal";
-import { BLOG_POSTS } from "@/components/marketing/content";
+import { BLOG_POSTS } from "@/components/marketing/blog";
 import { SITE } from "@/components/marketing/data";
 
 const fmtDate = (iso: string) =>
@@ -78,7 +78,7 @@ export default function BlogIndexPage() {
                   )}
                   <div className="flex flex-1 flex-col p-6">
                   <div className="flex items-center gap-3 caption">
-                    <span className="rounded-full bg-primary/12 px-2 py-0.5 !text-primary">{p.tag}</span>
+                    <span className="rounded-full bg-primary/12 px-2 py-0.5 !text-primary">{p.category}</span>
                     <span className="inline-flex items-center gap-1">
                       <Clock className="h-3 w-3" /> {p.readMins} min
                     </span>
