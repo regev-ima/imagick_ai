@@ -3,52 +3,65 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// After a fresh deploy, lazy-imported chunks renamed by Vite are no longer
-// at the URLs the open tab's index.html references. The next route change
-// throws "Failed to fetch dynamically imported module". Vite emits the
-// `vite:preloadError` event for exactly this case — recover with a hard
-// reload so the browser picks up the new index.html (and the new hashes).
-// sessionStorage guard prevents an infinite loop if the new bundle is also
-// broken for some reason.
-const RELOAD_FLAG = "imagick.chunk-reload-attempted";
-window.addEventListener("vite:preloadError", (event) => {
-  if (sessionStorage.getItem(RELOAD_FLAG) === "1") return;
-  sessionStorage.setItem(RELOAD_FLAG, "1");
-  event.preventDefault();
+// After a fresh deploy, lazy-imported chunks renamed by Vite are no longer at
+// the URLs the open tab's index.html references. The next route change fails
+// to import its chunk ("Failed to fetch dynamically imported module"). We
+// recover with a hard reload so the browser picks up the new index.html (and
+// the new hashes). This must survive MANY deploys in a row (an old tab left
+// open across several releases), so instead of a one-shot flag we throttle by
+// time and cap the total attempts — enough to self-heal on every deploy, but
+// never an infinite loop if a build is genuinely broken.
+const RELOAD_TS = "imagick.chunk-reload-ts";
+const RELOAD_COUNT = "imagick.chunk-reload-count";
+const RELOAD_MIN_INTERVAL = 8000; // never auto-reload twice within 8s
+const RELOAD_MAX = 3; // …or more than 3 times before showing the fallback
+
+const STALE_CHUNK_RE =
+  /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|dynamically imported module/i;
+
+function isStaleChunkError(error: unknown): boolean {
+  const msg = String((error as { message?: string } | null | undefined)?.message ?? error ?? "");
+  return STALE_CHUNK_RE.test(msg);
+}
+
+function recoverFromStaleChunk(): boolean {
+  const now = Date.now();
+  const last = Number(sessionStorage.getItem(RELOAD_TS) || 0);
+  const count = Number(sessionStorage.getItem(RELOAD_COUNT) || 0);
+  if (now - last < RELOAD_MIN_INTERVAL) return false; // just reloaded — avoid a loop
+  if (count >= RELOAD_MAX) return false; // give up and let the fallback show
+  sessionStorage.setItem(RELOAD_TS, String(now));
+  sessionStorage.setItem(RELOAD_COUNT, String(count + 1));
   window.location.reload();
+  return true;
+}
+
+window.addEventListener("vite:preloadError", (event) => {
+  event.preventDefault();
+  recoverFromStaleChunk();
 });
 // Same recovery for promise rejections that aren't routed through the Vite
 // event (older browsers or hand-rolled dynamic imports).
 window.addEventListener("unhandledrejection", (event) => {
-  const msg = String(event.reason?.message || event.reason || "");
-  if (/Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg)) {
-    if (sessionStorage.getItem(RELOAD_FLAG) === "1") return;
-    sessionStorage.setItem(RELOAD_FLAG, "1");
+  if (isStaleChunkError(event.reason)) {
     event.preventDefault();
-    window.location.reload();
+    recoverFromStaleChunk();
   }
 });
-// Clear the guard once the app actually mounts successfully so a future
-// deploy can recover the same way.
+// Once the app has been stable for a while, forget the attempt count so a
+// future deploy recovers cleanly from scratch.
 window.addEventListener("load", () => {
-  setTimeout(() => sessionStorage.removeItem(RELOAD_FLAG), 5000);
+  setTimeout(() => sessionStorage.removeItem(RELOAD_COUNT), 15000);
 });
-
-function isStaleChunkError(error: unknown): boolean {
-  const msg = String((error as { message?: string } | null | undefined)?.message ?? error ?? "");
-  return /Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg);
-}
 
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary
     fallback={({ error, resetError }) => {
       // Belt-and-suspenders: if the lazy() chunk failure slipped past the
       // global vite:preloadError listener, the ErrorBoundary still catches
-      // it here. Trigger a single hard reload so the user lands on the
-      // new bundle without ever seeing the fallback.
-      if (isStaleChunkError(error) && sessionStorage.getItem(RELOAD_FLAG) !== "1") {
-        sessionStorage.setItem(RELOAD_FLAG, "1");
-        window.location.reload();
+      // it here. Reload (throttled/capped) so the user lands on the new
+      // bundle without ever seeing the fallback.
+      if (isStaleChunkError(error) && recoverFromStaleChunk()) {
         return null;
       }
       return (
