@@ -34,3 +34,6 @@ supabase/.temp/
 playwright-report/
 test-results/
 __pycache__/
+
+# Claude Code agent worktrees (transient, per-session tooling state)
+.claude/worktrees/
