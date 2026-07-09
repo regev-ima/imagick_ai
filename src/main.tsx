@@ -17,7 +17,7 @@ const RELOAD_MIN_INTERVAL = 8000; // never auto-reload twice within 8s
 const RELOAD_MAX = 3; // …or more than 3 times before showing the fallback
 
 const STALE_CHUNK_RE =
-  /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|dynamically imported module/i;
+  /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|dynamically imported module|Failed to load module script|Expected a JavaScript module script/i;
 
 function isStaleChunkError(error: unknown): boolean {
   const msg = String((error as { message?: string } | null | undefined)?.message ?? error ?? "");

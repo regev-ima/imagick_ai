@@ -16,7 +16,7 @@
     { "source": "/unsubscribe", "has": [{ "type": "host", "value": "imagick.ai" }], "destination": "https://app.imagick.ai/unsubscribe", "permanent": false }
   ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
