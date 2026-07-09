@@ -1,16 +1,14 @@
-import { useState, useCallback, useMemo, useRef, useEffect, type CSSProperties } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
-  ArrowRight,
   Check,
   Upload,
   X,
-  Sparkles,
-  FileText,
   Loader2,
   CloudIcon,
+  Pencil,
+  Zap,
   Heart,
   User as UserIcon,
   Baby,
@@ -27,9 +25,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Orb } from "@/components/aura/Orb";
 import { cn } from "@/lib/utils";
 import {
@@ -61,6 +56,7 @@ interface UploadProgress {
   /** Set of file IDs that failed */
   failedIds: Set<string>;
 }
+
 const galleryTypes: { value: string; label: string; icon: LucideIcon }[] = [
   { value: "wedding", label: "Wedding", icon: Heart },
   { value: "portrait", label: "Portrait", icon: UserIcon },
@@ -76,43 +72,13 @@ const galleryTypes: { value: string; label: string; icon: LucideIcon }[] = [
   { value: "sports", label: "Sports", icon: Trophy },
 ];
 
-// LIGHTROOM motion — calm, responsive fades/slides.
-const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
-
-// Floating particles config (generated once) — brand royal-blue dust
-const PARTICLES = Array.from({ length: 10 }, (_, i) => ({
-  id: i,
-  size: Math.random() > 0.5 ? "w-1 h-1" : "w-2 h-2",
-  color: Math.random() > 0.5 ? "bg-primary/20" : "bg-accent/20",
-  top: `${Math.random() * 90 + 5}%`,
-  left: `${Math.random() * 90 + 5}%`,
-  duration: 4 + Math.random() * 4,
-  yOffset: 20 + Math.random() * 20,
-  xOffset: 10 + Math.random() * 10,
-  delay: Math.random() * 3,
-}));
-
-// Gradient orbs config — royal-blue AI bloom
-const ORBS = [
-  { color: "bg-primary", size: "w-48 h-48 lg:w-72 lg:h-72", top: "10%", left: "15%", duration: 18 },
-  { color: "bg-accent", size: "w-56 h-56 lg:w-64 lg:h-64", top: "60%", left: "70%", duration: 15 },
-  { color: "bg-primary", size: "w-48 h-48", top: "40%", left: "45%", duration: 20 },
-];
-
 /**
- * The AI mark — a 4-point sparkle (the logo star). Royal blue by default.
- * Tinted via currentColor so it inherits text-primary / text-accent.
+ * The AI mark — a 4-point sparkle (the logo star). Royal blue by default,
+ * tinted via currentColor so it inherits text-primary / text-accent.
  */
 function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      className={className}
-      aria-hidden
-      style={{ display: "block" }}
-    >
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
       <path
         d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
         fill="currentColor"
@@ -121,46 +87,17 @@ function Sparkle({ size = 16, className }: { size?: number; className?: string }
   );
 }
 
-// Sparkle burst component for step completion & micro-interactions
-function SparkleBurst({ active }: { active: boolean }) {
-  if (!active) return null;
-  const sparks = Array.from({ length: 6 }, (_, i) => {
-    const angle = (i / 6) * Math.PI * 2;
-    const dist = 14 + Math.random() * 10;
-    return { id: i, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist };
-  });
+/** Live-summary chip for the header row (mirrors the New Collection pattern). */
+function Pill({ children, accent = false }: { children: React.ReactNode; accent?: boolean }) {
   return (
-    <>
-      {sparks.map((s) => (
-        <motion.div
-          key={s.id}
-          className="absolute w-1 h-1 rounded-full bg-accent"
-          style={{ top: "50%", left: "50%" }}
-          initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-          animate={{ x: s.x, y: s.y, opacity: 0, scale: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        />
-      ))}
-    </>
-  );
-}
-
-// Button hover sparkle effect
-function ButtonSparkles({ active }: { active: boolean }) {
-  if (!active) return null;
-  return (
-    <>
-      {[0, 1, 2, 3].map((i) => (
-        <motion.div
-          key={i}
-          className="absolute w-1 h-1 rounded-full bg-accent-foreground/80"
-          style={{ bottom: 0, left: `${20 + i * 20}%` }}
-          initial={{ y: 0, opacity: 0.8, scale: 1 }}
-          animate={{ y: -20 - Math.random() * 15, opacity: 0, scale: 0 }}
-          transition={{ duration: 0.6, delay: i * 0.08, repeat: Infinity, repeatDelay: 0.5 }}
-        />
-      ))}
-    </>
+    <span className={cn(
+      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
+      accent
+        ? "border-primary/40 bg-primary/10 text-primary"
+        : "border-border bg-surface-2 text-muted-foreground",
+    )}>
+      {children}
+    </span>
   );
 }
 
@@ -177,30 +114,24 @@ const isPreviewable = (f: File) => f.type.startsWith("image/") && !/heic|heif/i.
 export default function CreateStylePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  // Respect the OS "reduce motion" setting — gates all ambient/looping motion.
-  const prefersReducedMotion = useReducedMotion();
   const [isCreating, setIsCreating] = useState(false);
-  const [sparkleTarget, setSparkleTarget] = useState<string | null>(null);
-  const [shimmerZone, setShimmerZone] = useState<"before" | "after" | null>(null);
-  const [hoveringCreate, setHoveringCreate] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
-  // Step 1: Details + Model Types
+  // Details
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [selectedModelTypes, setSelectedModelTypes] = useState<string[]>([]);
 
-  // Step 2: Upload source
+  // Upload source
   const [uploadSource, setUploadSource] = useState<UploadSource>("local");
 
-  // Step 2: Images - Local
+  // Images — Local
   const [beforeFiles, setBeforeFiles] = useState<LocalFile[]>([]);
   const [afterFiles, setAfterFiles] = useState<LocalFile[]>([]);
   const [isDraggingBefore, setIsDraggingBefore] = useState(false);
   const [isDraggingAfter, setIsDraggingAfter] = useState(false);
 
-  // Step 2: Images - Google Drive
+  // Images — Google Drive
   const [beforeFolderInfo, setBeforeFolderInfo] = useState<DriveFolderInfo | null>(null);
   const [beforeDriveLinks, setBeforeDriveLinks] = useState<string[]>([]);
   const [afterFolderInfo, setAfterFolderInfo] = useState<DriveFolderInfo | null>(null);
@@ -222,8 +153,6 @@ export default function CreateStylePage() {
   }, [uploadProgress]);
 
   const toggleModelType = (value: string) => {
-    setSparkleTarget(value);
-    setTimeout(() => setSparkleTarget(null), 500);
     setSelectedModelTypes((prev) => {
       if (prev.includes(value)) return prev.filter((v) => v !== value);
       if (prev.length >= 5) {
@@ -257,10 +186,6 @@ export default function CreateStylePage() {
     if (type === "before") setIsDraggingBefore(false);
     else setIsDraggingAfter(false);
     const files = Array.from(e.dataTransfer.files).filter((f) => acceptsFile(f, type));
-    if (files.length > 0) {
-      setShimmerZone(type);
-      setTimeout(() => setShimmerZone(null), 600);
-    }
     addFiles(files, type);
   }, []);
 
@@ -287,9 +212,8 @@ export default function CreateStylePage() {
     });
   };
 
-  // Apply an upload-progress event (from the shared uploadStyleFiles helper)
-  // to local state — same active/done/failed + per-side counter bookkeeping
-  // the inline uploader used to do directly.
+  // Apply an upload-progress event (from the shared uploadStyleFiles helper) to
+  // local state — active/done/failed + per-side counter bookkeeping.
   const applyUploadProgress = (subDir: "before" | "after") => (event: UploadStyleFileEvent) => {
     setUploadProgress((prev) => {
       if (!prev) return prev;
@@ -323,7 +247,7 @@ export default function CreateStylePage() {
         .from("styles")
         .insert({
           name: name.trim(),
-          description: description.trim() || null,
+          description: null,
           category: selectedModelTypes[0] || null,
           associated_tags: selectedModelTypes,
           user_id: user.id,
@@ -380,7 +304,6 @@ export default function CreateStylePage() {
 
         toast.success("Style created! Import from Google Drive has started.");
       } else {
-        // Initialize upload progress
         setUploadProgress({
           before: { uploaded: 0, total: beforeFiles.length },
           after: { uploaded: 0, total: afterFiles.length },
@@ -441,6 +364,11 @@ export default function CreateStylePage() {
     }
   };
 
+  // ── Derived summary (drives the header pills + footer) ───────────────────────
+  const beforeCount = uploadSource === "local" ? beforeFiles.length : beforeDriveLinks.length;
+  const afterCount = uploadSource === "local" ? afterFiles.length : afterDriveLinks.length;
+  const typeLabel = galleryTypes.find((t) => t.value === selectedModelTypes[0])?.label ?? "any subject";
+
   const hasName = name.trim().length > 0;
   const hasImages =
     uploadSource === "local"
@@ -448,11 +376,16 @@ export default function CreateStylePage() {
       : beforeDriveLinks.length > 0 && afterDriveLinks.length > 0;
   const canCreate = hasName && hasImages;
 
+  // Local before/after should be matched pairs — surface a non-blocking nudge.
+  const localCountMismatch =
+    uploadSource === "local" &&
+    beforeFiles.length > 0 &&
+    afterFiles.length > 0 &&
+    beforeFiles.length !== afterFiles.length;
+
   // Leaving mid-flow throws away typed details, staged files, and Drive links.
-  // Intercept Cancel / back with a confirm when there's something to lose.
   const hasUnsavedWork =
     name.trim().length > 0 ||
-    description.trim().length > 0 ||
     selectedModelTypes.length > 0 ||
     beforeFiles.length > 0 ||
     afterFiles.length > 0 ||
@@ -461,11 +394,8 @@ export default function CreateStylePage() {
     isCreating;
 
   const handleLeave = () => {
-    if (hasUnsavedWork) {
-      setShowLeaveConfirm(true);
-    } else {
-      navigate("/dashboard/styles");
-    }
+    if (hasUnsavedWork) setShowLeaveConfirm(true);
+    else navigate("/dashboard/styles");
   };
 
   // Warn on tab close / reload only while an upload is actually in flight.
@@ -479,525 +409,291 @@ export default function CreateStylePage() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isCreating]);
 
-  // Local before/after should be matched pairs — surface a non-blocking nudge.
-  const localCountMismatch =
-    uploadSource === "local" &&
-    beforeFiles.length > 0 &&
-    afterFiles.length > 0 &&
-    beforeFiles.length !== afterFiles.length;
+  // ── One reusable local upload column (before / after) ────────────────────────
+  const renderLocalZone = (type: "before" | "after") => {
+    const files = type === "before" ? beforeFiles : afterFiles;
+    const dragging = type === "before" ? isDraggingBefore : isDraggingAfter;
+    const percent = type === "before" ? beforePercent : afterPercent;
+    const side = uploadProgress?.[type];
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="caption flex items-center gap-1.5">
+            <Upload className="h-3 w-3" />
+            {type === "before" ? "Before · originals" : "After · edited"}
+          </span>
+          <span className="aura-chip">{files.length} {files.length === 1 ? "file" : "files"}</span>
+        </div>
+
+        {uploadProgress && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between caption">
+              <span>{side?.uploaded ?? 0}/{side?.total ?? 0}</span>
+              <span className="text-accent">{percent}%</span>
+            </div>
+            <Progress value={percent} className="h-1.5" />
+          </div>
+        )}
+
+        {!isCreating && (
+          <div
+            onDragOver={(e) => handleDragOver(e, type)}
+            onDragLeave={(e) => handleDragLeave(e, type)}
+            onDrop={(e) => handleDrop(e, type)}
+            className={cn(
+              "relative overflow-hidden rounded-[--radius] border-2 border-dashed p-5 text-center transition-colors",
+              dragging ? "border-primary bg-primary/[0.04]" : "border-border hover:border-primary/50 hover:bg-primary/[0.03]",
+            )}
+          >
+            <input
+              type="file"
+              multiple
+              accept={type === "before" ? IMAGE_ACCEPT : "image/*"}
+              onChange={(e) => handleFileSelect(e, type)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              aria-label={`Upload ${type} images`}
+            />
+            <Upload className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Drag &amp; drop or click</p>
+            <p className="caption mt-1">
+              {type === "before" ? "Min 5 · RAW ok" : "Matched by filename"}
+            </p>
+          </div>
+        )}
+
+        {files.length > 0 && (
+          <div className="grid grid-cols-4 gap-1.5">
+            {files.slice(0, 8).map((file) => {
+              const isActive = uploadProgress?.activeIds.has(file.id);
+              const isDone = uploadProgress?.doneIds.has(file.id);
+              const isFailed = uploadProgress?.failedIds.has(file.id);
+              return (
+                <div key={file.id} className="group relative">
+                  {file.preview ? (
+                    <img
+                      src={file.preview}
+                      alt=""
+                      className={cn("aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity", isActive && "opacity-60")}
+                    />
+                  ) : (
+                    <div className={cn("grid aspect-square w-full place-items-center rounded-sm bg-surface-2 plate-keyline transition-opacity", isActive && "opacity-60")}>
+                      <span className="caption">RAW</span>
+                    </div>
+                  )}
+                  {isActive && (
+                    <div className="absolute inset-0 grid place-items-center rounded-sm bg-background/40">
+                      <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                    </div>
+                  )}
+                  {isDone && (
+                    <div className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-primary">
+                      <Check className="h-3 w-3 text-primary-foreground" />
+                    </div>
+                  )}
+                  {isFailed && (
+                    <div className="absolute inset-0 grid place-items-center rounded-sm bg-destructive/20">
+                      <X className="h-5 w-5 text-destructive" />
+                    </div>
+                  )}
+                  {!uploadProgress && (
+                    <button
+                      onClick={() => removeFile(file.id, type)}
+                      aria-label={`Remove ${type} image`}
+                      className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            {files.length > 8 && (
+              <div className="grid aspect-square w-full place-items-center rounded-sm bg-muted font-mono text-sm text-muted-foreground">
+                +{files.length - 8}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-background px-5 py-7 lg:px-10 lg:py-10">
-      {/* === AI Ambient Animations (Background) — royal-blue dust === */}
-      {!prefersReducedMotion && (
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {/* Floating particles */}
-        {PARTICLES.map((p) => (
-          <motion.div
-            key={p.id}
-            className={cn("absolute rounded-full opacity-40", p.size, p.color)}
-            style={{ top: p.top, left: p.left }}
-            animate={{
-              y: [-p.yOffset, p.yOffset, -p.yOffset],
-              x: [-p.xOffset, p.xOffset, -p.xOffset],
-            }}
-            transition={{
-              duration: p.duration,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: p.delay,
-            }}
-          />
-        ))}
-        {/* Gradient orbs */}
-        {ORBS.map((orb, i) => (
-          <motion.div
-            key={i}
-            className={cn("absolute rounded-full blur-[100px] opacity-[0.06]", orb.size, orb.color)}
-            style={{ top: orb.top, left: orb.left }}
-            animate={{
-              x: [0, 60, -40, 0],
-              y: [0, -50, 30, 0],
-            }}
-            transition={{
-              duration: orb.duration,
-              repeat: Infinity,
-              repeatType: "mirror",
-              ease: "easeInOut",
-            }}
-          />
-        ))}
-      </div>
-      )}
-
-      <div className="relative mx-auto w-full max-w-[1100px]">
-        {/* ════ MASTHEAD — single page, inspired by the collection planner ══ */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleLeave} aria-label="Back to styles">
-            <ArrowLeft className="w-5 h-5" />
+    <div className="min-h-full bg-background px-4 py-6 lg:px-8 lg:py-8">
+      <div className="mx-auto w-full max-w-2xl">
+        {/* ════ HEADER — plan-first: microlabel · back + inline name + live pills ══ */}
+        <span className="aura-microlabel flex items-center gap-1.5 text-accent">
+          <Sparkle size={11} /> Train a style · new look
+        </span>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Button variant="ghost" size="icon" className="shrink-0" onClick={handleLeave} aria-label="Back to styles">
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <span className="aura-microlabel flex items-center gap-1.5 text-accent">
-              <Sparkle size={11} /> Train an AI style
-            </span>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Train New <span className="text-accent">AI Style</span>
-            </h1>
+          <div className="group relative min-w-0 flex-1">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isCreating}
+              className="w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset ring-border/60 transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 hover:ring-border focus:bg-surface-2 focus:ring-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
+              placeholder="Untitled look"
+              aria-label="Style name"
+            />
+            <Pencil className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 transition-colors group-hover:text-foreground/70" />
+          </div>
+          <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
+            <Pill><Upload className="h-3 w-3" /> {beforeCount} before</Pill>
+            <Pill><Upload className="h-3 w-3" /> {afterCount} after</Pill>
+            <Pill>{typeLabel}</Pill>
+            <Pill accent={canCreate}>
+              <Sparkle size={11} /> {canCreate ? "Ready to train" : "Add 5+ pairs"}
+            </Pill>
           </div>
         </div>
 
-        {/* ════ SINGLE PANEL — Details + Training pairs stacked ══════════ */}
-        <div className="relative mt-6 glass-card overflow-hidden rounded-[--radius]">
-          {/* ── Section 1 · Details ── */}
-          <div className="p-6 lg:p-8">
-            <div className="space-y-6">
-                  {/* Hero Section */}
-                  <div className="mb-6 flex items-center gap-4">
-                    <Orb className="h-10 w-10 shrink-0" />
-                    <div>
-                      <h2 className="text-2xl font-semibold tracking-tight lg:text-3xl">
-                        Teach AI <span className="text-accent">Your Unique Eye</span>
-                      </h2>
-                      <p className="mt-1 font-sans text-sm text-muted-foreground">
-                        Your editing style, replicated across hundreds of photos in minutes.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Compact Form: Name + Description on same row */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <Label htmlFor="name" className="mb-2 flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        Style Name *
-                      </Label>
-                      <Input
-                        id="name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g., Warm Wedding, Moody Portrait"
-                        className="bg-input border-border"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="description" className="mb-2 block">
-                        Description
-                      </Label>
-                      <Textarea
-                        id="description"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Describe the look and feel..."
-                        className="min-h-[68px] bg-input border-border"
-                        rows={2}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Model Type - compact grid */}
-                  <div>
-                    <Label className="mb-3 flex items-center gap-2">Model Type</Label>
-                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                      {galleryTypes.map((type) => {
-                        const Icon = type.icon;
-                        const isSelected = selectedModelTypes.includes(type.value);
-                        return (
-                          <button
-                            key={type.value}
-                            type="button"
-                            onClick={() => toggleModelType(type.value)}
-                            aria-pressed={isSelected}
-                            aria-label={type.label}
-                            className={cn(
-                              "relative flex flex-col items-center gap-1 rounded-[--radius] border p-2 text-center transition-all",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
-                              isSelected
-                                ? "border-primary bg-primary/10"
-                                : "border-border bg-card hover:border-primary/50",
-                            )}
-                          >
-                            <Icon
-                              className={cn(
-                                "h-4 w-4",
-                                isSelected ? "text-accent" : "text-muted-foreground",
-                              )}
-                            />
-                            <span className={cn(
-                              "text-xs font-medium",
-                              isSelected ? "text-accent" : "text-muted-foreground",
-                            )}>
-                              {type.label}
-                            </span>
-                            {isSelected && (
-                              <Check className="absolute right-1 top-1 h-3 w-3 text-accent" />
-                            )}
-                            {/* Sparkle micro-interaction on select */}
-                            <SparkleBurst active={sparkleTarget === type.value && !prefersReducedMotion} />
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selectedModelTypes.length > 0 && (
-                      <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                        {selectedModelTypes.length}/5 selected
-                      </p>
+        {/* ════ WORK — single calm column of panels ═══════════════════════════ */}
+        <div className={cn("mt-6 space-y-4", isCreating && "pointer-events-none select-none opacity-60")}>
+          {/* ── Look details — model type ── */}
+          <div className="glass-card rounded-[--radius] p-5">
+            <div className="caption mb-1.5 flex items-center gap-1.5 text-accent">
+              <Sparkle size={11} /> What is this look for?
+            </div>
+            <p className="mb-3.5 text-xs text-muted-foreground">
+              Pick up to 5 subjects — seeds where this style is suggested. Optional.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {galleryTypes.map((t) => {
+                const Icon = t.icon;
+                const on = selectedModelTypes.includes(t.value);
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => toggleModelType(t.value)}
+                    aria-pressed={on}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+                      on
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-surface-2 text-muted-foreground hover:border-primary/50 hover:text-foreground",
                     )}
-                  </div>
+                  >
+                    <Icon className={cn("h-4 w-4", on ? "text-accent" : "text-muted-foreground")} strokeWidth={1.75} />
+                    {t.label}
+                    {on && <Check className="h-3.5 w-3.5 text-accent" />}
+                  </button>
+                );
+              })}
             </div>
+            {selectedModelTypes.length > 0 && (
+              <p className="caption mt-3">{selectedModelTypes.length}/5 selected</p>
+            )}
           </div>
 
-          {/* ── divider between the two former steps ── */}
-          <hr className="aura-hairline" />
-
-          {/* ── Section 2 · Training pairs ── */}
-          <div className="p-6 lg:p-8">
-            <div className="space-y-6">
-                  <div>
-                    <h2 className="mb-1 text-xl font-semibold tracking-tight">Training Images</h2>
-                    <p className="font-sans text-sm text-muted-foreground">
-                      Upload matching before and after images to train your AI style
-                    </p>
-                  </div>
-
-                  <UploadSourceSelector value={uploadSource} onChange={setUploadSource} />
-
-                  {uploadSource === "local" ? (
-                    <div className="grid gap-6 lg:grid-cols-2">
-                      {/* Before Images - Local */}
-                      <div className="space-y-4">
-                        <Label className="flex items-center gap-2">
-                          <Upload className="w-4 h-4" />
-                          Before Images (Original) - {beforeFiles.length} files
-                        </Label>
-
-                        {/* Upload progress bar for Before */}
-                        {uploadProgress && (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between font-mono text-[11px]">
-                              <span className="text-muted-foreground">
-                                Uploading: {uploadProgress.before.uploaded}/{uploadProgress.before.total}
-                              </span>
-                              <span className="font-semibold text-accent">{beforePercent}%</span>
-                            </div>
-                            <Progress value={beforePercent} className="h-2" />
-                          </div>
-                        )}
-
-                        {!isCreating && (
-                          <div
-                            onDragOver={(e) => handleDragOver(e, "before")}
-                            onDragLeave={(e) => handleDragLeave(e, "before")}
-                            onDrop={(e) => handleDrop(e, "before")}
-                            className={cn(
-                              "relative overflow-hidden rounded-[--radius] border-2 border-dashed p-6 text-center transition-all",
-                              isDraggingBefore
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-primary/50",
-                            )}
-                          >
-                            {/* Shimmer on file drop */}
-                            {shimmerZone === "before" && (
-                              <motion.div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
-                                initial={{ x: "-100%" }}
-                                animate={{ x: "100%" }}
-                                transition={{ duration: 0.6, ease: "easeInOut" }}
-                              />
-                            )}
-                            <input
-                              type="file"
-                              multiple
-                              accept={IMAGE_ACCEPT}
-                              onChange={(e) => handleFileSelect(e, "before")}
-                              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                            />
-                            <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-                            <p className="font-sans text-sm text-muted-foreground">Drag & drop or click to upload</p>
-                            <p className="mt-1 font-mono text-[11px] text-muted-foreground">Minimum 5 unedited images · RAW supported</p>
-                          </div>
-                        )}
-
-                        {beforeFiles.length > 0 && (
-                          <div className="grid grid-cols-4 gap-2">
-                            {beforeFiles.slice(0, 8).map((file) => {
-                              const isActive = uploadProgress?.activeIds.has(file.id);
-                              const isDone = uploadProgress?.doneIds.has(file.id);
-                              const isFailed = uploadProgress?.failedIds.has(file.id);
-                              return (
-                                <div key={file.id} className="group relative">
-                                  {file.preview ? (
-                                    <img
-                                      src={file.preview}
-                                      alt="Before"
-                                      className={cn(
-                                        "aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity",
-                                        isActive && "opacity-60",
-                                      )}
-                                    />
-                                  ) : (
-                                    <div
-                                      className={cn(
-                                        "grid aspect-square w-full place-items-center rounded-sm bg-surface-2 plate-keyline transition-opacity",
-                                        isActive && "opacity-60",
-                                      )}
-                                    >
-                                      <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
-                                    </div>
-                                  )}
-                                  {/* Upload status overlay */}
-                                  {isActive && (
-                                    <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-background/40">
-                                      <Loader2 className="h-5 w-5 animate-spin text-accent" />
-                                    </div>
-                                  )}
-                                  {isDone && (
-                                    <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary">
-                                      <Check className="h-3 w-3 text-primary-foreground" />
-                                    </div>
-                                  )}
-                                  {isFailed && (
-                                    <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-destructive/20">
-                                      <X className="h-5 w-5 text-destructive" />
-                                    </div>
-                                  )}
-                                  {!uploadProgress && (
-                                    <button
-                                      onClick={() => removeFile(file.id, "before")}
-                                      aria-label="Remove before image"
-                                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            {beforeFiles.length > 8 && (
-                              <div className="flex aspect-square w-full items-center justify-center rounded-sm bg-muted font-mono text-sm text-muted-foreground">
-                                +{beforeFiles.length - 8}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* After Images - Local */}
-                      <div className="space-y-4">
-                        <Label className="flex items-center gap-2">
-                          <Upload className="w-4 h-4" />
-                          After Images (Edited) - {afterFiles.length} files
-                        </Label>
-
-                        {/* Upload progress bar for After */}
-                        {uploadProgress && (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between font-mono text-[11px]">
-                              <span className="text-muted-foreground">
-                                Uploading: {uploadProgress.after.uploaded}/{uploadProgress.after.total}
-                              </span>
-                              <span className="font-semibold text-accent">{afterPercent}%</span>
-                            </div>
-                            <Progress value={afterPercent} className="h-2" />
-                          </div>
-                        )}
-
-                        {!isCreating && (
-                          <div
-                            onDragOver={(e) => handleDragOver(e, "after")}
-                            onDragLeave={(e) => handleDragLeave(e, "after")}
-                            onDrop={(e) => handleDrop(e, "after")}
-                            className={cn(
-                              "relative overflow-hidden rounded-[--radius] border-2 border-dashed p-6 text-center transition-all",
-                              isDraggingAfter
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-primary/50",
-                            )}
-                          >
-                            {/* Shimmer on file drop */}
-                            {shimmerZone === "after" && (
-                              <motion.div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
-                                initial={{ x: "-100%" }}
-                                animate={{ x: "100%" }}
-                                transition={{ duration: 0.6, ease: "easeInOut" }}
-                              />
-                            )}
-                            <input
-                              type="file"
-                              multiple
-                              accept="image/*"
-                              onChange={(e) => handleFileSelect(e, "after")}
-                              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                            />
-                            <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-                            <p className="font-sans text-sm text-muted-foreground">Drag & drop or click to upload</p>
-                            <p className="mt-1 font-mono text-[11px] text-muted-foreground">Matching edited images</p>
-                          </div>
-                        )}
-
-                        {afterFiles.length > 0 && (
-                          <div className="grid grid-cols-4 gap-2">
-                            {afterFiles.slice(0, 8).map((file) => {
-                              const isActive = uploadProgress?.activeIds.has(file.id);
-                              const isDone = uploadProgress?.doneIds.has(file.id);
-                              const isFailed = uploadProgress?.failedIds.has(file.id);
-                              return (
-                                <div key={file.id} className="group relative">
-                                  <img
-                                    src={file.preview ?? undefined}
-                                    alt="After"
-                                    className={cn(
-                                      "aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity",
-                                      isActive && "opacity-60",
-                                    )}
-                                  />
-                                  {isActive && (
-                                    <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-background/40">
-                                      <Loader2 className="h-5 w-5 animate-spin text-accent" />
-                                    </div>
-                                  )}
-                                  {isDone && (
-                                    <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary">
-                                      <Check className="h-3 w-3 text-primary-foreground" />
-                                    </div>
-                                  )}
-                                  {isFailed && (
-                                    <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-destructive/20">
-                                      <X className="h-5 w-5 text-destructive" />
-                                    </div>
-                                  )}
-                                  {!uploadProgress && (
-                                    <button
-                                      onClick={() => removeFile(file.id, "after")}
-                                      aria-label="Remove after image"
-                                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            {afterFiles.length > 8 && (
-                              <div className="flex aspect-square w-full items-center justify-center rounded-sm bg-muted font-mono text-sm text-muted-foreground">
-                                +{afterFiles.length - 8}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Google Drive mode */
-                    <div className="grid gap-6 lg:grid-cols-2">
-                      <div className="space-y-3">
-                        <Label className="flex items-center gap-2">
-                          <CloudIcon className="w-4 h-4" />
-                          Before Images (Original)
-                        </Label>
-                        <GoogleDriveInput
-                          folderInfo={beforeFolderInfo}
-                          onUpdate={(info, links) => {
-                            setBeforeFolderInfo(info);
-                            setBeforeDriveLinks(links);
-                          }}
-                        />
-                      </div>
-
-                      <div className="space-y-3">
-                        <Label className="flex items-center gap-2">
-                          <CloudIcon className="w-4 h-4" />
-                          After Images (Edited)
-                        </Label>
-                        <GoogleDriveInput
-                          folderInfo={afterFolderInfo}
-                          onUpdate={(info, links) => {
-                            setAfterFolderInfo(info);
-                            setAfterDriveLinks(links);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {localCountMismatch && (
-                    <div
-                      role="alert"
-                      className="flex items-start gap-3 rounded-[--radius] border border-amber-500/30 bg-amber-500/10 p-4"
-                    >
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                      <p className="font-sans text-sm leading-snug text-muted-foreground">
-                        <span className="font-medium text-amber-500">
-                          Counts don't match — {beforeFiles.length} before vs {afterFiles.length} after.
-                        </span>{" "}
-                        Training works best with the same number of matched before/after pairs.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-3 rounded-[--radius] border border-primary/25 bg-primary/[0.06] p-4">
-                    <Sparkle size={14} className="mt-0.5 shrink-0 text-accent" />
-                    <p className="font-sans text-sm leading-snug text-muted-foreground">
-                      <span className="font-medium text-foreground">Tip: </span>
-                      For best results, use images with consistent editing style. The AI will learn your unique look from these examples.
-                      {uploadSource === "local" ? " Minimum 5 pairs required." : " Each folder should contain at least 5 images."}
-                    </p>
-                  </div>
+          {/* ── Training pairs ── */}
+          <div className="glass-card rounded-[--radius] p-5">
+            <div className="mb-3.5">
+              <div className="caption flex items-center gap-1.5"><Upload className="h-3 w-3" /> Training pairs · minimum 5</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Upload matching before/after images — the AI learns your edit from each pair.
+              </p>
             </div>
+
+            <UploadSourceSelector value={uploadSource} onChange={setUploadSource} />
+
+            {uploadSource === "local" ? (
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                {renderLocalZone("before")}
+                {renderLocalZone("after")}
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2.5">
+                  <span className="caption flex items-center gap-1.5"><CloudIcon className="h-3 w-3" /> Before · originals</span>
+                  <GoogleDriveInput
+                    folderInfo={beforeFolderInfo}
+                    onUpdate={(info, links) => { setBeforeFolderInfo(info); setBeforeDriveLinks(links); }}
+                  />
+                </div>
+                <div className="space-y-2.5">
+                  <span className="caption flex items-center gap-1.5"><CloudIcon className="h-3 w-3" /> After · edited</span>
+                  <GoogleDriveInput
+                    folderInfo={afterFolderInfo}
+                    onUpdate={(info, links) => { setAfterFolderInfo(info); setAfterDriveLinks(links); }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {localCountMismatch && (
+              <div role="alert" className="mt-4 flex items-start gap-2.5 rounded-[--radius] border border-rating/30 bg-rating/[0.08] p-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rating" />
+                <p className="text-xs leading-snug text-muted-foreground">
+                  <span className="font-medium text-rating">Counts don't match — {beforeFiles.length} before vs {afterFiles.length} after.</span>{" "}
+                  Training works best with an equal number of matched pairs.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ════ FOOTER — training plan + glow CTA ═════════════════════════════ */}
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-between">
+          <div className="glass-card min-w-0 flex-1 rounded-[--radius] px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-sm font-semibold">
+                <Sparkle size={12} className="text-accent" /> Training plan
+              </span>
+              <span className="font-mono text-sm font-semibold folio">{beforeCount} · {afterCount}</span>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {canCreate
+                ? `${typeLabel} look · ${beforeCount} before + ${afterCount} after · typically 30–60 min to train.`
+                : "Add a name and at least 5 before and 5 after images to start."}
+            </p>
           </div>
 
-          {/* ════ ACTION BAR — single create, no wizard ══════════════════ */}
-          <div className="flex items-center justify-end gap-3 border-t border-border bg-background/40 px-6 py-4">
-            <Button variant="outline" onClick={handleLeave}>
-              Cancel
-            </Button>
+          <div className="sm:flex sm:w-[300px] sm:shrink-0 sm:flex-col sm:justify-center">
             <Button
               variant="glow"
-              onClick={() => setShowConfirmDialog(true)}
+              size="lg"
               disabled={!canCreate || isCreating}
-              className="relative gap-2 overflow-hidden"
-              onMouseEnter={() => setHoveringCreate(true)}
-              onMouseLeave={() => setHoveringCreate(false)}
+              className="w-full gap-2"
+              onClick={() => setShowConfirmDialog(true)}
             >
-              {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkle size={14} className="text-accent-foreground" />}
-              {isCreating ? "Uploading..." : "Create Style"}
-              <ButtonSparkles active={hoveringCreate && !isCreating && !prefersReducedMotion} />
+              {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+              {isCreating ? "Uploading…" : "Create & start training"}
             </Button>
+            <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
+              {canCreate ? "Trains a real AI model on your pairs" : "Finish the steps above to continue"}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* ════ CONFIRMATION DIALOG — peak AI moment ═════════════════════ */}
+      {/* ════ CONFIRMATION DIALOG ═══════════════════════════════════════════ */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <div className="mb-2 flex items-center gap-3">
               <Orb className="h-9 w-9 shrink-0" />
-              <AlertDialogTitle className="flex items-center gap-2">
-                Ready to train your style?
-              </AlertDialogTitle>
+              <AlertDialogTitle>Ready to train your style?</AlertDialogTitle>
             </div>
             <AlertDialogDescription>
-              This will upload your images and start training the AI model.
-              Training typically takes 30-60 minutes.
+              This uploads your images and starts training the AI model. Training typically takes 30–60 minutes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowConfirmDialog(false);
-                handleCreate();
-              }}
-            >
+            <AlertDialogAction onClick={() => { setShowConfirmDialog(false); handleCreate(); }}>
               <Sparkle size={14} className="mr-2 text-accent-foreground" />
-              Confirm & Train
+              Confirm &amp; train
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ════ LEAVE GUARD — protect typed details + staged uploads ══════ */}
+      {/* ════ LEAVE GUARD ═══════════════════════════════════════════════════ */}
       <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1007,14 +703,12 @@ export default function CreateStylePage() {
             <AlertDialogDescription>
               {isCreating
                 ? "Your images are still uploading. Leaving now may interrupt the upload and training won't start."
-                : "Your style details and uploaded images haven't been saved yet. Leaving will discard them."}
+                : "Your style details and staged images haven't been saved yet. Leaving will discard them."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Stay</AlertDialogCancel>
-            <AlertDialogAction onClick={() => navigate("/dashboard/styles")}>
-              Leave
-            </AlertDialogAction>
+            <AlertDialogAction onClick={() => navigate("/dashboard/styles")}>Leave</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
