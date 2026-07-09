@@ -50,6 +50,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { getThumbnailUrl, getPreviewUrl } from "@/lib/imageUrls";
 import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
+import { formatDuration } from "@/lib/cullingEta";
 
 type StyleStatus = "importing" | "training" | "ready" | "error";
 
@@ -473,11 +474,21 @@ export default function StyleDetailsPage() {
                   {style.training_start_date && style.training_completion_date && (() => {
                     const startMs = new Date(style.training_start_date).getTime();
                     const endMs = new Date(style.training_completion_date).getTime();
-                    const durationMin = Math.round((endMs - startMs) / 60000);
+                    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
                     return (
                       <span className="aura-chip">
-                        ⏱ {durationMin < 1 ? "<1" : durationMin} min
+                        ⏱ {formatDuration(endMs - startMs)}
                         · {new Date(style.training_completion_date).toLocaleDateString()}
+                      </span>
+                    );
+                  })()}
+                  {style.import_start_date && style.import_completion_date && (() => {
+                    const startMs = new Date(style.import_start_date).getTime();
+                    const endMs = new Date(style.import_completion_date).getTime();
+                    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
+                    return (
+                      <span className="aura-chip">
+                        ⬆ Upload took {formatDuration(endMs - startMs)}
                       </span>
                     );
                   })()}

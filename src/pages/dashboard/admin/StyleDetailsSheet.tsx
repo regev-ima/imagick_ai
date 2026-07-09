@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sheet,
@@ -23,9 +23,21 @@ import {
 import { Copy, Check, ExternalLink, X, Plus, AlertTriangle, ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getThumbnailUrl } from "@/lib/imageUrls";
+import { breakdownFiles, type FileBreakdown, type StyleFileKind } from "@/lib/styleFiles";
+import { formatDuration } from "@/lib/cullingEta";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { StyleTrainingGalleryDialog } from "@/components/admin/StyleTrainingGalleryDialog";
+
+const KIND_LABELS: Record<StyleFileKind, string> = {
+  raw: "RAW",
+  jpeg: "JPG",
+  png: "PNG",
+  heic: "HEIC",
+  tiff: "TIFF",
+  webp: "WEBP",
+  other: "Other",
+};
 
 /** Every column the admin might want — mirrors the styles Row. */
 export interface StyleFull {
@@ -148,6 +160,63 @@ function LinkList({ urls }: { urls: string[] | null | undefined }) {
   );
 }
 
+/** Chips of file-type counts (RAW 24 / JPG 96 / ...) plus an expandable full filename list. */
+function FileTypeBreakdown({ breakdown }: { breakdown: FileBreakdown }) {
+  const [expanded, setExpanded] = useState(false);
+  if (breakdown.total === 0) return <span className="text-muted-foreground/50">none</span>;
+  const kinds = (Object.keys(breakdown.byKind) as StyleFileKind[]).filter((k) => breakdown.byKind[k] > 0);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {kinds.map((k) => (
+          <Badge key={k} variant="outline" className="text-[10px]">
+            {KIND_LABELS[k]} {breakdown.byKind[k]}
+          </Badge>
+        ))}
+        <button
+          type="button"
+          className="text-[10px] text-primary hover:underline"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "Hide files" : "Show all files"}
+        </button>
+      </div>
+      {expanded && (
+        <div className="max-h-48 overflow-y-auto font-mono text-xs">
+          {breakdown.files.map((f, i) => (
+            <div key={i} className="truncate" title={f.filename}>
+              {f.filename} — {KIND_LABELS[f.kind]}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Computes `${prefix}<formatted duration>`, guarding against missing/invalid/negative diffs. Returns null when there's nothing sane to show. */
+function durationLabel(startIso: string | null, endIso: string | null, prefix: string): string | null {
+  if (!startIso || !endIso) return null;
+  const startMs = new Date(startIso).getTime();
+  const endMs = new Date(endIso).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
+  const diffMs = endMs - startMs;
+  if (!Number.isFinite(diffMs) || diffMs < 0) return null;
+  return `${prefix}${formatDuration(diffMs)}`;
+}
+
+/** Live-ticking "Training running — Xh Ym" that recomputes every second while training is in flight. */
+function LiveTrainingDuration({ startIso }: { startIso: string }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const startMs = new Date(startIso).getTime();
+  const elapsedMs = Number.isFinite(startMs) ? Math.max(0, Date.now() - startMs) : 0;
+  return <span>Training running — {formatDuration(elapsedMs)}</span>;
+}
+
 export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const [modelId, setModelId] = useState("");
@@ -177,6 +246,10 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
   });
 
   if (!style) return null;
+
+  const beforeBreakdown = breakdownFiles(style.before_image_urls);
+  const afterBreakdown = breakdownFiles(style.after_image_urls);
+  const bothFileListsEmpty = beforeBreakdown.total === 0 && afterBreakdown.total === 0;
 
   const allowed = style.allowed_user_ids ?? [];
   const isPublic = style.visibility === "public";
@@ -347,12 +420,30 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
               <Field label="Imported">{style.total_images_imported ?? 0}{style.total_images_to_import ? ` / ${style.total_images_to_import}` : ""}</Field>
               <Field label="Sessions">{style.training_sessions_count ?? 0}</Field>
             </div>
+            {bothFileListsEmpty ? (
+              <Field label="File count">
+                {style.total_images_imported ?? 0} files imported <span className="text-muted-foreground/50">(before/after breakdown unavailable)</span>
+              </Field>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Before files">Before: {beforeBreakdown.total} files</Field>
+                <Field label="After files">After: {afterBreakdown.total} files</Field>
+              </div>
+            )}
             <Field label={`Before images (${style.before_image_urls?.length ?? 0})`}>
               <ImageStrip urls={style.before_image_urls} />
             </Field>
             <Field label={`After images (${style.after_image_urls?.length ?? 0})`}>
               <ImageStrip urls={style.after_image_urls} />
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Before file types">
+                <FileTypeBreakdown breakdown={beforeBreakdown} />
+              </Field>
+              <Field label="After file types">
+                <FileTypeBreakdown breakdown={afterBreakdown} />
+              </Field>
+            </div>
             {(style.google_before_urls?.length || style.google_after_urls?.length) ? (
               <>
                 <Field label={`Google Drive — before (${style.google_before_urls?.length ?? 0})`}>
@@ -390,6 +481,22 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
               <Field label="Import completed">{fmt(style.import_completion_date)}</Field>
               <Field label="Training started">{fmt(style.training_start_date)}</Field>
               <Field label="Training completed">{fmt(style.training_completion_date)}</Field>
+              <Field label="Upload duration">
+                {durationLabel(style.import_start_date, style.import_completion_date, "Upload took ") ?? (
+                  <span className="text-muted-foreground/50">—</span>
+                )}
+              </Field>
+              <Field label="Training duration">
+                {!style.training_start_date || !Number.isFinite(new Date(style.training_start_date).getTime()) ? (
+                  <span className="text-muted-foreground/50">—</span>
+                ) : style.training_completion_date ? (
+                  durationLabel(style.training_start_date, style.training_completion_date, "Training took ") ?? (
+                    <span className="text-muted-foreground/50">—</span>
+                  )
+                ) : (
+                  <LiveTrainingDuration startIso={style.training_start_date} />
+                )}
+              </Field>
             </div>
           </section>
 
