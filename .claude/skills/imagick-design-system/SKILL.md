@@ -126,6 +126,73 @@ crisp inline fields (see §6). Match the workspace, not the raw primitive.
 
 ---
 
+## 3b. Layout, containers & spacing (READ before laying out any page)
+
+**Every dashboard page uses the same scaffold** — a full-bleed background wrapper
+with padding, then a centered max-width container:
+```tsx
+<div className="min-h-full bg-background px-4 py-6 lg:px-8">
+  <div className="mx-auto w-full max-w-6xl"> … </div>
+</div>
+```
+
+### Container max-widths — pick by page type. THIS IS FIXED; do not improvise.
+| Page type | Container | Call-sites |
+|---|---|---|
+| **Create / workspace flow** | **`max-w-6xl`** (1152px) | `CreateGalleryPage`, `CreateStylePage` — the two "create" screens MUST match |
+| List / detail / admin | `max-w-[1320px]` | `StylesPage`, `DashboardHome`, `BillingPage`, `StyleDetailsPage` content, all `admin/*` pages |
+| Media grid (galleries) | `max-w-[1600px]` | `GalleriesPage` |
+| Settings / narrow form | `max-w-[1100px]` | `SettingsPage` |
+| Centered empty / not-found card | `max-w-md` | "Style not found" card |
+| Modal (standard) | `sm:max-w-md` / `sm:max-w-lg` | most dialogs |
+| Modal (near-fullscreen viewer) | `sm:max-w-[95vw] h-[92vh]` | training-gallery / lightbox dialog |
+
+> **Sibling screens share a width.** A create flow is `max-w-6xl` — never pick
+> `max-w-2xl`/`3xl` for one just because it has fewer fields. Keep the page frame
+> identical to its sibling and let the internal columns/cards breathe. Widening the
+> *container* while narrowing the *content* to a sub-column is fine ONLY if the
+> sibling does the same; otherwise fill the container.
+
+### Page padding rhythm
+`px-4 py-5`/`py-6` on mobile → `lg:px-8` on desktop. A **fixed-height workspace**
+(e.g. CreateGalleryPage) adds `lg:h-full lg:overflow-hidden` and scrolls its columns
+internally (`flex min-h-0 flex-col` + inner `overflow-y-auto`); a **normal page**
+uses `min-h-full` and lets the body scroll.
+
+### Spacing scale (the Tailwind steps actually used — stay on them)
+- Stacked cards / sections: `space-y-4` (dense) … `space-y-6` (roomy) … `space-y-8` (hero).
+- Card padding: `p-5` (`glass-card rounded-[--radius] p-5`); compact cards `px-4 py-3`.
+- Inline gaps: `gap-1.5` (chips/pills, icon+label), `gap-2` (chip rows, button icon),
+  `gap-3` (form rows; header row uses `gap-x-3 gap-y-2`).
+- Label → control `mb-2`/`mb-2.5`; help text under a title `mt-1`; grids `gap-4`.
+
+### Responsive breakpoints (mobile-first)
+`sm:` (640px) collapses two-up grids to one column. `lg:` (1024px) is the desktop
+workspace threshold — columns appear, padding grows (`lg:px-8`), fixed-height kicks in
+(`lg:h-full`). Two-column workspace grid: `lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]`.
+
+### Z-index scale — only 10 / 20 / 30 / 50
+`z-10` in-card overlays & the lightbox layer · `z-20` labels over media · `z-50`
+modals, dialogs, fixed action bars. Don't invent values between.
+
+### States (encode state in form, not just text)
+- **Loading**: inline `Loader2` (`h-4 w-4 animate-spin text-primary`); `<Orb>` for a
+  hero/AI load; `AdminLoading` for admin tables; `.thumbnail-shimmer` for image tiles.
+- **Empty**: centered `glass-card` with a muted icon in a `rounded-[--radius] border
+  bg-muted` tile, a `text-lg font-semibold tracking-tight` line, a muted explainer
+  (`AdminEmptyState`, or StyleDetailsPage's "No examples yet").
+- **Error**: inline box `rounded-[--radius] border border-destructive/30 bg-destructive/10`
+  + `AlertTriangle`. A NON-blocking warning uses `--rating` (amber) instead of destructive.
+- **Focus**: always `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`
+  (buttons add `ring-offset-2 ring-offset-background`).
+- **Busy / locked**: freeze a form mid-submit with `pointer-events-none select-none opacity-60`.
+
+### Toasts
+`sonner` — `import { toast } from "sonner"`; `toast.success/error(...)`, past-tense
+("Training started"), specific and blameless.
+
+---
+
 ## 4. Typography
 
 Two families, loaded via Google Fonts in `src/index.css`:
@@ -361,12 +428,15 @@ graphite tile with a mono `RAW` label instead of a broken `<img>`.
 | Calm workspaces; ambient motion only on hero/celebration | particles/orbs on dense screens |
 | Style through tokens (works in light+dark) | hard-coded hex values |
 | lucide icons + the `Sparkle` SVG | emoji icons |
+| Match the sibling screen's container width (create = `max-w-6xl`) — see §3b | picking `max-w-2xl`/`3xl` because a screen "feels smaller" |
+| Z-index only 10/20/30/50; page scaffold `min-h-full bg-background px-4 py-6 lg:px-8` | arbitrary z-index; ad-hoc page shells |
 
 ---
 
 ## 12. Cheat sheet (paste-ready)
 
 ```
+Page shell:   <div className="min-h-full bg-background px-4 py-6 lg:px-8"><div className="mx-auto w-full max-w-6xl"> … (create=6xl · list/admin=[1320px] · galleries=[1600px] · settings=[1100px]; see §3b)
 Panel:        <div className="glass-card rounded-[--radius] p-5"> … </div>
 Section label:<div className="caption mb-2.5">Photos</div>
 AI eyebrow:   <span className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={11}/> Label</span>

@@ -521,7 +521,7 @@ export default function CreateStylePage() {
 
   return (
     <div className="min-h-full bg-background px-4 py-6 lg:px-8 lg:py-8">
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="mx-auto w-full max-w-6xl">
         {/* ════ HEADER — plan-first: microlabel · back + inline name + live pills ══ */}
         <span className="aura-microlabel flex items-center gap-1.5 text-accent">
           <Sparkle size={11} /> Train a style · new look
