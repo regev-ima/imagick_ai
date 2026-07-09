@@ -17,6 +17,7 @@ import {
   Pencil,
   Trash2,
   RefreshCw,
+  GitBranch,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -207,6 +208,38 @@ export default function StyleDetailsPage() {
           filename: img?.filename || "",
         };
       }).sort((a, b) => a.filename.localeCompare(b.filename, undefined, { numeric: true }));
+    },
+    enabled: !!styleId,
+  });
+
+  // Lineage: the parent this style was retrained from (name only, for the badge).
+  const { data: parentStyle } = useQuery({
+    queryKey: ["style-parent", style?.father_style_id],
+    queryFn: async () => {
+      if (!style?.father_style_id) return null;
+      const { data, error } = await supabase
+        .from("styles")
+        .select("id,name")
+        .eq("id", style.father_style_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!style?.father_style_id,
+  });
+
+  // Lineage: styles retrained FROM this one.
+  const { data: childStyles = [] } = useQuery({
+    queryKey: ["style-children", styleId],
+    queryFn: async () => {
+      if (!styleId) return [];
+      const { data, error } = await supabase
+        .from("styles")
+        .select("id,name,status,created_at")
+        .eq("father_style_id", styleId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
     enabled: !!styleId,
   });
@@ -445,6 +478,16 @@ export default function StyleDetailsPage() {
                 {style.name}
               </h1>
 
+              {style.father_style_id && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/dashboard/styles/${style.father_style_id}`)}
+                  className="mt-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-accent"
+                >
+                  <GitBranch className="w-3.5 h-3.5" /> Retrained from {parentStyle?.name ?? "…"}
+                </button>
+              )}
+
               {style.description && (
                 <p className="mt-4 max-w-2xl font-sans text-lg leading-relaxed text-muted-foreground">
                   {style.description}
@@ -680,6 +723,42 @@ export default function StyleDetailsPage() {
                   {tag}
                 </span>
               ))}
+            </motion.div>
+          )}
+
+          {/* Lineage — styles retrained from this one */}
+          {childStyles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.22, duration: 0.5, ease: EASE }}
+              className="mt-8"
+            >
+              <div className="glass-card overflow-hidden rounded-[--radius]">
+                <PanelHeader
+                  icon={<GitBranch className="h-3.5 w-3.5" />}
+                  label={`Retrained into (${childStyles.length})`}
+                />
+                <div className="divide-y divide-border">
+                  {childStyles.map((child) => {
+                    const childStatus = statusConfig[child.status as StyleStatus] || statusConfig.ready;
+                    return (
+                      <button
+                        key={child.id}
+                        type="button"
+                        onClick={() => navigate(`/dashboard/styles/${child.id}`)}
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                      >
+                        <span className="truncate text-sm font-medium">{child.name}</span>
+                        <span className="caption flex shrink-0 items-center gap-1.5" style={{ color: `hsl(${childStatus.token})` }}>
+                          <span className="aura-led" style={{ "--led": childStatus.token } as CSSProperties} />
+                          {childStatus.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </motion.div>
           )}
 

@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Check, ExternalLink, X, Plus, AlertTriangle, ImageIcon } from "lucide-react";
+import { Copy, Check, ExternalLink, X, Plus, AlertTriangle, ImageIcon, GitBranch } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { breakdownFiles, type FileBreakdown, type StyleFileKind } from "@/lib/styleFiles";
@@ -28,6 +28,7 @@ import { formatDuration } from "@/lib/cullingEta";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { StyleTrainingGalleryDialog } from "@/components/admin/StyleTrainingGalleryDialog";
+import { RetrainStyleDialog } from "@/components/admin/RetrainStyleDialog";
 
 const KIND_LABELS: Record<StyleFileKind, string> = {
   raw: "RAW",
@@ -75,6 +76,7 @@ export interface StyleFull {
   import_completion_date: string | null;
   training_start_date: string | null;
   training_completion_date: string | null;
+  father_style_id: string | null;
 }
 
 export interface AdminUserLite {
@@ -88,6 +90,7 @@ interface Props {
   users: AdminUserLite[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenParent?: (parentId: string) => void;
 }
 
 function CopyButton({ value }: { value: string }) {
@@ -217,17 +220,60 @@ function LiveTrainingDuration({ startIso }: { startIso: string }) {
   return <span>Training running — {formatDuration(elapsedMs)}</span>;
 }
 
-export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
+export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenParent }: Props) {
   const queryClient = useQueryClient();
   const [modelId, setModelId] = useState("");
   const [addUserId, setAddUserId] = useState("");
   const [remark, setRemark] = useState("");
   const [trainingGalleryOpen, setTrainingGalleryOpen] = useState(false);
+  const [retrainOpen, setRetrainOpen] = useState(false);
+  const [children, setChildren] = useState<{ id: string; name: string; status: string; created_at: string }[]>([]);
+  const [parentName, setParentName] = useState<string | null>(null);
 
   const emailOf = useMemo(() => {
     const map = new Map(users.map((u) => [u.id, u.email]));
     return (id: string) => map.get(id) || id;
   }, [users]);
+
+  // Lineage: the parent this style was retrained from (name only, for the badge).
+  useEffect(() => {
+    if (!style?.father_style_id) {
+      setParentName(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("styles")
+      .select("id,name")
+      .eq("id", style.father_style_id)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled) setParentName(data?.name ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [style?.father_style_id]);
+
+  // Lineage: styles retrained FROM this one.
+  useEffect(() => {
+    if (!style?.id) {
+      setChildren([]);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("styles")
+      .select("id,name,status,created_at")
+      .eq("father_style_id", style.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (!cancelled) setChildren(data ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [style?.id]);
 
   const patch = useMutation({
     mutationFn: async (updates: Record<string, unknown>) => {
@@ -545,11 +591,66 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
             </div>
           </section>
 
+          <Separator />
+
+          {/* ── Lineage & retrain ── */}
+          <section className="space-y-3">
+            <div className="aura-microlabel text-primary">Lineage &amp; retrain</div>
+
+            {style.father_style_id && (
+              <button
+                type="button"
+                onClick={() => onOpenParent?.(style.father_style_id as string)}
+                className="inline-flex items-center gap-1.5 rounded-[--radius] border border-border bg-surface-2/40 px-2.5 py-1.5 text-xs text-primary transition-colors hover:border-primary/50 hover:underline"
+              >
+                <GitBranch className="h-3.5 w-3.5 shrink-0" />
+                Retrained from {parentName ?? "…"}
+              </button>
+            )}
+
+            {children.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="aura-microlabel text-muted-foreground">
+                  Retrained children ({children.length})
+                </div>
+                {children.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => onOpenParent?.(c.id)}
+                    className="flex w-full items-center justify-between gap-2 rounded-[--radius] border border-border bg-surface-2/40 px-2.5 py-1.5 text-left transition-colors hover:border-primary/50"
+                  >
+                    <span className="truncate text-xs">{c.name}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] capitalize">{c.status}</Badge>
+                      <span className="font-mono text-[10px] text-muted-foreground">{fmt(c.created_at)}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {!style.father_style_id && children.length === 0 && (
+              <p className="text-xs text-muted-foreground/60">No retrain history yet.</p>
+            )}
+
+            <Button variant="glow" onClick={() => setRetrainOpen(true)}>Retrain…</Button>
+          </section>
+
           <div className="h-4" />
         </div>
 
         <StyleTrainingGalleryDialog style={style} open={trainingGalleryOpen} onOpenChange={setTrainingGalleryOpen} />
       </SheetContent>
+      <RetrainStyleDialog
+        parent={style}
+        open={retrainOpen}
+        onOpenChange={setRetrainOpen}
+        onCreated={(newId) => {
+          setRetrainOpen(false);
+          onOpenParent?.(newId);
+        }}
+      />
     </Sheet>
   );
 }
