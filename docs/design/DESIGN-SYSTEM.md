@@ -35,6 +35,17 @@ Keep neutrals (`--background`, `--card`, `--surface-*`, `--border`,
 `--muted*`), the radius scale, the type ramp and every component recipe fixed —
 those define the *system*; the hue is just a variable.
 
+> **One language across the whole product.** The app (platform) and the
+> marketing site share this exact token file (`src/index.css`). There is not a
+> "site design" and an "app design" — there is one LIGHTROOM language. Don't
+> invent a new look for a new page; reuse the recipes below.
+>
+> **The only legitimate hardcoded colours** are third‑party *service* brand
+> colours in `ServiceLogo.tsx` (Google, Meta, LinkedIn, TikTok, Pinterest, GA,
+> …) on the tracking/tags admin — those must be each vendor's real hex to be
+> recognisable, and are **not** part of our palette. Nothing else in a
+> component may hardcode a colour.
+
 ---
 
 ## 1. Colour tokens
