@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { StyleTrainingGalleryDialog } from "@/components/admin/StyleTrainingGalleryDialog";
 
 /** Every column the admin might want — mirrors the styles Row. */
 export interface StyleFull {
@@ -152,6 +153,7 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
   const [modelId, setModelId] = useState("");
   const [addUserId, setAddUserId] = useState("");
   const [remark, setRemark] = useState("");
+  const [trainingGalleryOpen, setTrainingGalleryOpen] = useState(false);
 
   const emailOf = useMemo(() => {
     const map = new Map(users.map((u) => [u.id, u.email]));
@@ -334,7 +336,12 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
 
           {/* ── Training data ── */}
           <section className="space-y-3">
-            <div className="aura-microlabel text-primary">Training data</div>
+            <div className="flex items-center justify-between">
+              <div className="aura-microlabel text-primary">Training data</div>
+              <Button size="sm" variant="outline" onClick={() => setTrainingGalleryOpen(true)}>
+                <ImageIcon className="mr-1.5 h-3.5 w-3.5" /> Open training gallery
+              </Button>
+            </div>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Method">{style.upload_method || <span className="text-muted-foreground/50">—</span>}</Field>
               <Field label="Imported">{style.total_images_imported ?? 0}{style.total_images_to_import ? ` / ${style.total_images_to_import}` : ""}</Field>
@@ -433,6 +440,8 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange }: Props) {
 
           <div className="h-4" />
         </div>
+
+        <StyleTrainingGalleryDialog style={style} open={trainingGalleryOpen} onOpenChange={setTrainingGalleryOpen} />
       </SheetContent>
     </Sheet>
   );
