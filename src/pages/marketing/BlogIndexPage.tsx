@@ -63,7 +63,7 @@ export default function BlogIndexPage() {
               <Reveal key={p.slug} delay={(i % 2) * 0.08}>
                 <Link
                   to={`/blog/${p.slug}`}
-                  className="group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card/60 transition-colors hover:border-primary/40"
+                  className="group flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card/60 transition-colors duration-200 hover:border-primary/40"
                 >
                   {p.cover && (
                     <div className="aspect-[16/9] overflow-hidden border-b border-border">

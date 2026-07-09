@@ -155,7 +155,7 @@ export default function BlogPostPage() {
                 <Link
                   key={r.slug}
                   to={r.url}
-                  className="group rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-primary/40"
+                  className="group rounded-xl border border-border bg-card/60 p-4 transition-colors duration-200 hover:border-primary/40"
                 >
                   <div className="caption text-muted-foreground">{fmtDate(r.date)}</div>
                   <div className="mt-1.5 text-sm font-medium leading-snug text-foreground group-hover:text-primary">
