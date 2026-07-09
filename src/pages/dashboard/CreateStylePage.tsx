@@ -49,6 +49,7 @@ import { UploadSourceSelector, type UploadSource } from "@/components/gallery/Up
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 import { Progress } from "@/components/ui/progress";
 import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
+import { uploadStyleFiles, type UploadStyleFileEvent } from "@/lib/uploadStyleFiles";
 
 interface UploadProgress {
   before: { uploaded: number; total: number };
@@ -286,107 +287,25 @@ export default function CreateStylePage() {
     });
   };
 
-  // Upload local files to B2 for a style
-  const uploadStyleFiles = async (
-    styleId: string,
-    userId: string,
-    localFiles: LocalFile[],
-    subDir: "before" | "after"
-  ): Promise<string[]> => {
-    const files = localFiles.map((f) => f.file);
-    const fileIds = localFiles.map((f) => f.id);
-    const prefix = `styles/${userId}/${styleId}/${subDir}/`;
-    // Training pairs before/after by ORIGINAL filename (stem) — same as the Google
-    // Drive path, which keeps Drive names (use_uuid4:false for styles). So NEVER
-    // UUID-rename here; keep the photographer's names and only neutralize path
-    // separators / whitespace, applied identically to before and after so a RAW
-    // "IMG_1234.CR2" still pairs with the edited "IMG_1234.jpg".
-    const fileNames = files.map((f) => f.name.replace(/[/\\]/g, "_").replace(/\s+/g, "_"));
-
-    const { data, error } = await supabase.functions.invoke("image-upload", {
-      body: { bucket: "imagick", prefix, names: fileNames },
+  // Apply an upload-progress event (from the shared uploadStyleFiles helper)
+  // to local state — same active/done/failed + per-side counter bookkeeping
+  // the inline uploader used to do directly.
+  const applyUploadProgress = (subDir: "before" | "after") => (event: UploadStyleFileEvent) => {
+    setUploadProgress((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, activeIds: new Set(prev.activeIds), doneIds: new Set(prev.doneIds), failedIds: new Set(prev.failedIds) };
+      if (event.type === "active") {
+        next.activeIds.add(event.fileId);
+      } else if (event.type === "done") {
+        next.activeIds.delete(event.fileId);
+        next.doneIds.add(event.fileId);
+        next[subDir] = { ...next[subDir], uploaded: next[subDir].uploaded + 1 };
+      } else if (event.type === "failed") {
+        next.activeIds.delete(event.fileId);
+        next.failedIds.add(event.fileId);
+      }
+      return next;
     });
-
-    if (error || !data?.urls) {
-      throw new Error("Failed to get upload URLs");
-    }
-
-    const urls = data.urls?.signedUrls || data.urls;
-    if (!Array.isArray(urls) || urls.length === 0) {
-      throw new Error("Invalid signed URLs");
-    }
-
-    const B2_PROXY_URL = "https://cloudflare-b2-proxy.rx8rq49b5c.workers.dev";
-    const CONCURRENCY = 6;
-    const MAX_RETRIES = 3;
-
-    const uploadOne = async (file: File, signedUrl: string, fileId: string): Promise<string> => {
-      // Mark as active
-      setUploadProgress((prev) => {
-        if (!prev) return prev;
-        const next = { ...prev, activeIds: new Set(prev.activeIds), doneIds: new Set(prev.doneIds) };
-        next.activeIds.add(fileId);
-        return next;
-      });
-
-      const buffer = await file.arrayBuffer();
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-          const response = await fetch(B2_PROXY_URL, {
-            method: "PUT",
-            headers: {
-              signedurl: signedUrl,
-              "Content-Type": file.type || "image/jpeg",
-            },
-            body: buffer,
-          });
-          if (response.ok) {
-            // Mark as done
-            setUploadProgress((prev) => {
-              if (!prev) return prev;
-              const next = { ...prev, activeIds: new Set(prev.activeIds), doneIds: new Set(prev.doneIds) };
-              next.activeIds.delete(fileId);
-              next.doneIds.add(fileId);
-              next[subDir] = { ...next[subDir], uploaded: next[subDir].uploaded + 1 };
-              return next;
-            });
-            return signedUrl.split("?")[0];
-          }
-          if (attempt < MAX_RETRIES - 1) {
-            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-            continue;
-          }
-          throw new Error(`Failed to upload ${file.name}`);
-        } catch (err) {
-          if (attempt >= MAX_RETRIES - 1) {
-            // Mark as failed
-            setUploadProgress((prev) => {
-              if (!prev) return prev;
-              const next = { ...prev, activeIds: new Set(prev.activeIds), failedIds: new Set(prev.failedIds) };
-              next.activeIds.delete(fileId);
-              next.failedIds.add(fileId);
-              return next;
-            });
-            throw err;
-          }
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        }
-      }
-      throw new Error(`Failed to upload ${file.name}`);
-    };
-
-    const results: string[] = new Array(files.length);
-    let idx = 0;
-
-    const worker = async () => {
-      while (idx < files.length) {
-        const i = idx++;
-        results[i] = await uploadOne(files[i], urls[i], fileIds[i]);
-      }
-    };
-
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()));
-    return results;
   };
 
   const handleCreate = async () => {
@@ -474,8 +393,8 @@ export default function CreateStylePage() {
         const afterDir = `styles/${user.id}/${styleId}/after/`;
 
         const [beforeUrls, afterUrls] = await Promise.all([
-          uploadStyleFiles(styleId, user.id, beforeFiles, "before"),
-          uploadStyleFiles(styleId, user.id, afterFiles, "after"),
+          uploadStyleFiles(beforeFiles, user.id, styleId, "before", applyUploadProgress("before")),
+          uploadStyleFiles(afterFiles, user.id, styleId, "after", applyUploadProgress("after")),
         ]);
 
         await supabase
