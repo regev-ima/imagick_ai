@@ -121,3 +121,6 @@ verify_jwt = false
 
 [functions.pipeline-watchdog]
 verify_jwt = false
+
+[functions.style-source-edit]
+verify_jwt = false

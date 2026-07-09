@@ -4,6 +4,7 @@ import { styleReadyTemplate } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { captureException } from "../_shared/sentry.ts";
 import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
+import { autoProcessStyleSource } from "../_shared/style-source.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -290,6 +291,22 @@ Deno.serve(async (req) => {
           await autoProcessShowcase(supabase, callbackStyleId);
         } catch (showcaseErr) {
           console.error("Error in auto-process showcase:", showcaseErr);
+          // Non-fatal — don't fail the webhook
+        }
+
+        // === Auto-edit the style's own SOURCE collection (req 2) ===
+        // Materializes the style's BEFORE set as a hidden gallery and runs
+        // the freshly trained model over it, so the three-way compare
+        // (source · photographer's edit · model's edit) has data to show.
+        try {
+          await autoProcessStyleSource(
+            supabase,
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+            callbackStyleId,
+          );
+        } catch (sourceErr) {
+          console.error("Error in auto-process style source:", sourceErr);
           // Non-fatal — don't fail the webhook
         }
       }
