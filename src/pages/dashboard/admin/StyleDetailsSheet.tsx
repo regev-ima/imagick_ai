@@ -77,6 +77,7 @@ export interface StyleFull {
   training_start_date: string | null;
   training_completion_date: string | null;
   father_style_id: string | null;
+  source_gallery_id: string | null;
 }
 
 export interface AdminUserLite {

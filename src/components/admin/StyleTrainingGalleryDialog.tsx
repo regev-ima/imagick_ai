@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, ExternalLink, FileImage, X } from "lucide-react";
 import { parseStyleFile, type StyleFileKind } from "@/lib/styleFiles";
 import type { StyleFull } from "@/pages/dashboard/admin/StyleDetailsSheet";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { TriCompare } from "@/components/admin/TriCompare";
 
 interface Props {
   style: StyleFull | null;
@@ -37,8 +40,10 @@ const KIND_LABEL: Record<StyleFileKind, string> = {
 };
 
 /** Icon + extension badge + filename — the only safe way to represent a RAW
- * (or otherwise unloadable) training file; browsers can't decode CR2/NEF/ARW. */
-function FileCard({ filename, ext, size = "sm" }: { filename: string; ext: string; size?: "sm" | "lg" }) {
+ * (or otherwise unloadable) training file; browsers can't decode CR2/NEF/ARW.
+ * Exported so TriCompare.tsx (the Compare tab) can reuse it for the RAW-safe
+ * source pane instead of reimplementing the same file-card. */
+export function FileCard({ filename, ext, size = "sm" }: { filename: string; ext: string; size?: "sm" | "lg" }) {
   const isLarge = size === "lg";
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-surface-2 p-3 text-center plate-keyline">
@@ -218,6 +223,15 @@ function LightboxLayer({
 export function StyleTrainingGalleryDialog({ style, open, onOpenChange }: Props) {
   const [tab, setTab] = useState<GridTab | "compare">("before");
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
+  // Compare tab: "Generate model edits" in-flight state + a way to force
+  // TriCompare to refetch once it resolves (see handleGenerateEdits below).
+  const [generating, setGenerating] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+  // The `style` prop is a snapshot passed down from the admin table/sheet —
+  // it won't pick up a freshly-created source_gallery_id on its own after a
+  // successful generate call, so track the fresh value locally and merge it
+  // into what TriCompare sees.
+  const [sourceGalleryIdOverride, setSourceGalleryIdOverride] = useState<string | null>(null);
 
   const beforeUrls = useMemo(
     () => (style?.before_image_urls ?? []).filter((u): u is string => !!u),
@@ -233,12 +247,52 @@ export function StyleTrainingGalleryDialog({ style, open, onOpenChange }: Props)
     if (!open) {
       setLightbox(null);
       setTab("before");
+      setGenerating(false);
     }
   }, [open]);
+
+  // Reset the override/refetch counter whenever a different style is shown.
+  useEffect(() => {
+    setSourceGalleryIdOverride(null);
+    setRefreshToken(0);
+  }, [style?.id]);
 
   if (!style) return null;
 
   const lightboxUrls = lightbox?.tab === "after" ? afterUrls : beforeUrls;
+
+  const compareStyle: StyleFull = sourceGalleryIdOverride
+    ? { ...style, source_gallery_id: sourceGalleryIdOverride }
+    : style;
+
+  async function handleGenerateEdits() {
+    if (!style) return;
+    setGenerating(true);
+    try {
+      const { error } = await supabase.functions.invoke("style-source-edit", {
+        body: { styleId: style.id },
+      });
+      if (error) throw error;
+
+      // Pick up a freshly-created source_gallery_id (legacy styles that had
+      // none yet) so TriCompare's query key changes and it actually fetches.
+      const { data: refreshed } = await supabase
+        .from("styles")
+        .select("source_gallery_id")
+        .eq("id", style.id)
+        .maybeSingle();
+      if (refreshed?.source_gallery_id) {
+        setSourceGalleryIdOverride(refreshed.source_gallery_id as string);
+      }
+      setRefreshToken((n) => n + 1);
+      toast.success("Model edits generated");
+    } catch (err) {
+      console.error("Generate model edits failed:", err);
+      toast.error("Failed to generate model edits");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -275,16 +329,14 @@ export function StyleTrainingGalleryDialog({ style, open, onOpenChange }: Props)
           <TabsContent value="after" className="mt-0 min-h-0 flex-1 overflow-y-auto p-6">
             <Grid urls={afterUrls} onOpen={(index) => setLightbox({ tab: "after", index })} />
           </TabsContent>
-          {/* Placeholder — the three-way compare (source · photographer's edit ·
-              model's edit) lands in a follow-up task; the tab is wired now so
-              there's an obvious slot to fill in. */}
-          <TabsContent value="compare" className="mt-0 min-h-0 flex-1 overflow-y-auto p-6">
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-              <span className="aura-microlabel text-muted-foreground">Three-way compare</span>
-              <p className="max-w-sm font-sans text-sm text-muted-foreground">
-                Source photo · photographer's edit · model's edit — coming soon.
-              </p>
-            </div>
+          {/* Three-way compare: source photo · photographer's edit · model's edit. */}
+          <TabsContent value="compare" className="mt-0 min-h-0 flex-1 overflow-hidden p-6">
+            <TriCompare
+              style={compareStyle}
+              onGenerateEdits={handleGenerateEdits}
+              generating={generating}
+              refreshToken={refreshToken}
+            />
           </TabsContent>
         </Tabs>
 
