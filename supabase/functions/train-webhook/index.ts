@@ -47,6 +47,69 @@ Deno.serve(async (req) => {
         });
       }
 
+      // === Harvest this batch's file_mappings into before/after_image_urls ===
+      // Drive-imported styles historically left before_image_urls/after_image_urls
+      // completely empty (only local uploads populate them in CreateStylePage).
+      // body.file_mappings carries { original_name, new_name }[] for the files
+      // that just landed in THIS folder's B2 output dir (see gd-transfer-webhook's
+      // identical FileMapping shape). Parse it defensively — a malformed shape
+      // must never break the transfer-counter/training-kickoff logic below.
+      try {
+        const fileMappings = Array.isArray(body.file_mappings) ? body.file_mappings : [];
+        console.log(
+          `file_mappings shape for style ${styleId} (${transferType}): count=${fileMappings.length} sample=${JSON.stringify(fileMappings.slice(0, 3))}`
+        );
+
+        if (
+          fileMappings.length > 0 &&
+          (transferType === "style-before" || transferType === "style-after")
+        ) {
+          const subDir = transferType === "style-before" ? "before" : "after";
+          const outputDir = `styles/${userId}/${styleId}/${subDir}/`;
+          const newUrls = fileMappings
+            .map((m: any) => (m && typeof m.new_name === "string" ? m.new_name : null))
+            .filter((n: string | null): n is string => !!n)
+            .map((newName: string) => `https://s3.us-east-005.backblazeb2.com/imagick/${outputDir}${newName}`);
+
+          if (newUrls.length > 0) {
+            const column = transferType === "style-before" ? "before_image_urls" : "after_image_urls";
+            const otherColumn = column === "before_image_urls" ? "after_image_urls" : "before_image_urls";
+
+            const { data: currentStyle, error: fetchStyleErr } = await supabase
+              .from("styles")
+              .select("before_image_urls, after_image_urls")
+              .eq("id", styleId)
+              .single();
+
+            if (fetchStyleErr || !currentStyle) {
+              console.error("Failed to fetch style before harvesting file_mappings:", fetchStyleErr);
+            } else {
+              const existingUrls: string[] = (currentStyle as any)[column] || [];
+              const merged = Array.from(new Set([...existingUrls, ...newUrls]));
+              const otherUrls: string[] = (currentStyle as any)[otherColumn] || [];
+
+              const { error: harvestUpdateErr } = await supabase
+                .from("styles")
+                .update({
+                  [column]: merged,
+                  total_images_imported: merged.length + otherUrls.length,
+                })
+                .eq("id", styleId);
+
+              if (harvestUpdateErr) {
+                console.error("Failed to persist harvested file_mappings URLs:", harvestUpdateErr);
+              } else {
+                console.log(
+                  `Harvested ${newUrls.length} ${transferType} URL(s) for style ${styleId}; ${column} now has ${merged.length} total.`
+                );
+              }
+            }
+          }
+        }
+      } catch (harvestErr) {
+        console.error("Non-fatal: failed to harvest file_mappings into image URL arrays:", harvestErr);
+      }
+
       console.log(`GD transfer (${transferType}) complete for style ${styleId}. Incrementing counter...`);
 
       // Atomically increment the completed counter

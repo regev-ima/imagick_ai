@@ -392,6 +392,14 @@ export default function CreateStylePage() {
         const beforeDir = `styles/${user.id}/${styleId}/before/`;
         const afterDir = `styles/${user.id}/${styleId}/after/`;
 
+        await supabase
+          .from("styles")
+          .update({
+            import_start_date: new Date().toISOString(),
+            total_images_to_import: beforeFiles.length + afterFiles.length,
+          })
+          .eq("id", styleId);
+
         const [beforeUrls, afterUrls] = await Promise.all([
           uploadStyleFiles(beforeFiles, user.id, styleId, "before", applyUploadProgress("before")),
           uploadStyleFiles(afterFiles, user.id, styleId, "after", applyUploadProgress("after")),
@@ -402,6 +410,8 @@ export default function CreateStylePage() {
           .update({
             before_image_urls: beforeUrls,
             after_image_urls: afterUrls,
+            import_completion_date: new Date().toISOString(),
+            total_images_imported: beforeUrls.length + afterUrls.length,
           })
           .eq("id", styleId);
 
