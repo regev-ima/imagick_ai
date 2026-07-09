@@ -30,11 +30,20 @@ export function useStorageBreakdown() {
     queryFn: async () => {
       if (!effectiveUserId) return null;
 
-      // Fetch galleries with image counts
+      // Fetch galleries with image counts. Excludes hidden
+      // `__style_source__` system galleries (galleries.is_system) — their
+      // gallery_images rows never carry file_size_bytes (see
+      // ensureStyleSourceGallery in supabase/functions/_shared/style-source.ts),
+      // so the `recalculate_user_storage` DB trigger already treats them as
+      // zero bytes against the user's real `storage_used_mb`/quota. Including
+      // them here would misrepresent the proportional per-gallery split (and
+      // leak an internal gallery name into the user's storage UI) without
+      // actually reflecting any billed storage.
       const { data: galleries, error: gError } = await supabase
         .from("galleries")
         .select("id, name, status, total_images, created_at, updated_at")
         .eq("user_id", effectiveUserId)
+        .eq("is_system" as never, false as never)
         .order("total_images", { ascending: false });
 
       if (gError) {

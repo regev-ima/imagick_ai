@@ -183,7 +183,12 @@ export default function AdminDashboard() {
     queryKey: ["admin-stats"],
     queryFn: async () => {
       const [galleriesResult, stylesResult, kpiResult] = await Promise.all([
-        supabase.from("galleries").select("id", { count: "exact", head: true }),
+        // Real-user galleries only — exclude hidden `__style_source__` system
+        // galleries so this KPI reflects actual user activity.
+        supabase
+          .from("galleries")
+          .select("id", { count: "exact", head: true })
+          .eq("is_system" as never, false as never),
         supabase.from("styles").select("id", { count: "exact", head: true }),
         supabase.rpc("get_admin_kpi_overview"),
       ]);

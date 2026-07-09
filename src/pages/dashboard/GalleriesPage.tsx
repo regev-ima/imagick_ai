@@ -123,6 +123,9 @@ export default function GalleriesPage() {
         .from("galleries")
         .select("*")
         .eq("user_id", effectiveUserId)
+        // Hidden `__style_source__` galleries materialize a style's training
+        // material — never real user collections, must never appear here.
+        .eq("is_system" as never, false as never)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;

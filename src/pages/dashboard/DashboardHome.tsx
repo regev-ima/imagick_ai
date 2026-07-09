@@ -156,7 +156,9 @@ export default function DashboardHome() {
       const { data, error } = await supabase
         .from("galleries")
         .select("id, total_images")
-        .eq("user_id", effectiveUserId);
+        .eq("user_id", effectiveUserId)
+        // Exclude hidden `__style_source__` system galleries from the user's totals.
+        .eq("is_system" as never, false as never);
       if (error) throw error;
       return {
         count: data.length,
@@ -174,6 +176,9 @@ export default function DashboardHome() {
         .from("galleries")
         .select("*")
         .eq("user_id", effectiveUserId)
+        // Hidden system galleries (style training source) never belong in
+        // "recent collections" widgets.
+        .eq("is_system" as never, false as never)
         .order("created_at", { ascending: false })
         .limit(8);
       if (error) throw error;

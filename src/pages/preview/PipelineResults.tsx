@@ -88,8 +88,12 @@ export default function PipelineResults() {
     queryKey: ["pipeline-galleries"],
     queryFn: async (): Promise<GalleryRow[]> => {
       // Only id/name so the picker works even before the pipeline migration runs.
+      // Excludes hidden `__style_source__` system galleries — not a real
+      // gallery to run the pipeline preview against.
       const { data, error } = await supabase
-        .from("galleries").select("id, name").order("created_at", { ascending: false });
+        .from("galleries").select("id, name")
+        .eq("is_system" as never, false as never)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as GalleryRow[]) ?? [];
     },
