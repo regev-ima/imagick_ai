@@ -42,6 +42,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { StyleStatusCard } from "@/components/styles/StyleStatusCard";
 import { BeforeAfterSlider } from "@/components/styles/BeforeAfterSlider";
+import { StyleTrainingGalleryDialog } from "@/components/admin/StyleTrainingGalleryDialog";
+import type { StyleFull } from "@/pages/dashboard/admin/StyleDetailsSheet";
 import { useImportProgress } from "@/hooks/useImportProgress";
 import { Button } from "@/components/ui/button";
 import { Orb } from "@/components/aura/Orb";
@@ -158,6 +160,7 @@ export default function StyleDetailsPage() {
   const [renameName, setRenameName] = useState("");
   const [renameDescription, setRenameDescription] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [trainingGalleryOpen, setTrainingGalleryOpen] = useState(false);
 
   const { data: style, isLoading } = useQuery({
     queryKey: ["style", styleId],
@@ -556,6 +559,21 @@ export default function StyleDetailsPage() {
                     </Button>
                   )}
 
+                  {/* Before · After · Compare — the same training-gallery view
+                      the admin has, for the style's owner. Shows when the style
+                      carries training photos. */}
+                  {isOwner && ((style.before_image_urls?.length ?? 0) > 0 || (style.after_image_urls?.length ?? 0) > 0) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTrainingGalleryOpen(true)}
+                      className="gap-1.5"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      Before · After · Compare
+                    </Button>
+                  )}
+
                   {style.status === "ready" && (
                     <Button
                       variant="glow"
@@ -760,6 +778,17 @@ export default function StyleDetailsPage() {
                 </div>
               </div>
             </motion.div>
+          )}
+
+          {/* Training gallery — the owner's read-only Before · After · Compare
+              (the same view the admin uses for this style). */}
+          {isOwner && (
+            <StyleTrainingGalleryDialog
+              style={style as unknown as StyleFull}
+              open={trainingGalleryOpen}
+              onOpenChange={setTrainingGalleryOpen}
+              readOnly
+            />
           )}
 
           {/* Lightbox */}

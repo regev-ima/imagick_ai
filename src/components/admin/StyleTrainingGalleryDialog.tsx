@@ -20,6 +20,9 @@ interface Props {
   style: StyleFull | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Viewer mode for the style owner (non-admin) — hides the "Generate model
+   * edits" action in the Compare tab. */
+  readOnly?: boolean;
 }
 
 type GridTab = "before" | "after";
@@ -220,7 +223,7 @@ function LightboxLayer({
   );
 }
 
-export function StyleTrainingGalleryDialog({ style, open, onOpenChange }: Props) {
+export function StyleTrainingGalleryDialog({ style, open, onOpenChange, readOnly }: Props) {
   const [tab, setTab] = useState<GridTab | "compare">("before");
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   // Compare tab: "Generate model edits" in-flight state + a way to force
@@ -340,9 +343,10 @@ export function StyleTrainingGalleryDialog({ style, open, onOpenChange }: Props)
           <TabsContent value="compare" className="mt-0 min-h-0 flex-1 overflow-hidden p-6">
             <TriCompare
               style={compareStyle}
-              onGenerateEdits={handleGenerateEdits}
+              onGenerateEdits={readOnly ? undefined : handleGenerateEdits}
               generating={generating}
               refreshToken={refreshToken}
+              readOnly={readOnly}
             />
           </TabsContent>
         </Tabs>
