@@ -58,6 +58,20 @@ export default defineConfig(({ isSsrBuild }) => ({
           ? undefined
           : (id: string) => {
               if (id.includes("node_modules")) {
+                // Keep the ENTIRE React runtime in one dedicated chunk. If
+                // react-dom/scheduler get co-located into the radix chunk (as
+                // Rollup would otherwise do) while framer-motion lives in its
+                // own chunk, the vendor chunks can form a circular import and
+                // read a React export before it initialises — which surfaces
+                // in production as "n is not a function" during commit. A
+                // single react-vendor chunk that everything depends on removes
+                // that ordering hazard.
+                if (
+                  /[\\/]node_modules[\\/](react-router-dom|react-router|react-dom|react|scheduler|use-sync-external-store|react-is)[\\/]/.test(
+                    id,
+                  )
+                )
+                  return "react-vendor";
                 if (id.includes("face-api.js")) return "face-api";
                 if (id.includes("recharts")) return "recharts";
                 if (id.includes("framer-motion")) return "framer-motion";
