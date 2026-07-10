@@ -301,7 +301,12 @@ export function StyleTrainingGalleryDialog({ style, open, onOpenChange }: Props)
           // While the lightbox is open, Esc backs out of it — not the whole dialog.
           if (lightbox) e.preventDefault();
         }}
-        className="relative flex h-[92vh] w-full max-w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[95vw]"
+        // Pin to a fixed inset box instead of translate-centering. The shared
+        // DialogContent centers via `top-1/2 -translate-y-1/2`, but on a full-
+        // height panel the enter animation can drop that transform, leaving the
+        // top stuck at 50% so the dialog renders in the bottom half. Explicit
+        // top/right/bottom/left insets (no transform dependency) can't do that.
+        className="relative flex flex-col gap-0 overflow-hidden p-0 left-[2.5vw] right-[2.5vw] top-[3vh] bottom-[3vh] h-auto max-h-none w-auto max-w-none translate-x-0 translate-y-0"
       >
         <DialogHeader className="shrink-0 space-y-1 border-b border-border px-6 py-4 text-left">
           <DialogTitle className="text-lg font-semibold tracking-tight text-foreground">{style.name}</DialogTitle>
