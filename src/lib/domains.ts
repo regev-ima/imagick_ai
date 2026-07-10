@@ -59,7 +59,8 @@ export function isMarketingPath(pathname: string): boolean {
     pathname === "/" ||
     MARKETING_PAGES.includes(pathname) ||
     pathname.startsWith("/blog") ||
-    pathname.startsWith("/for/")
+    pathname.startsWith("/for/") ||
+    pathname.startsWith("/legal/")
   );
 }
 

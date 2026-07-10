@@ -16,6 +16,8 @@ import ComparePage from "./pages/marketing/ComparePage";
 import ContactPage from "./pages/marketing/ContactPage";
 import EnterprisePage from "./pages/marketing/EnterprisePage";
 import TryDemoPage from "./pages/marketing/TryDemoPage";
+import PrivacyPage from "./pages/legal/PrivacyPage";
+import TermsPage from "./pages/legal/TermsPage";
 import { SITE, FAQS, PLANS } from "./components/marketing/data";
 import { USE_CASES } from "./components/marketing/content";
 import { BLOG_POSTS } from "./components/marketing/blog";
@@ -152,6 +154,22 @@ export const ROUTES: PrerenderRoute[] = [
     description: p.description,
     jsonLd: [breadcrumb([["Home", SITE.url], [p.title.split(" — ")[0], `${SITE.url}${p.url}`]])],
   })),
+  {
+    url: "/legal/privacy",
+    out: "legal/privacy/index.html",
+    title: "Privacy Policy — Imagick.ai",
+    description:
+      "How Imagick.ai collects, uses and protects your data. We never use your photos to train AI models without your explicit consent.",
+    jsonLd: [breadcrumb([["Home", SITE.url], ["Privacy Policy", `${SITE.url}/legal/privacy`]])],
+  },
+  {
+    url: "/legal/terms",
+    out: "legal/terms/index.html",
+    title: "Terms of Service — Imagick.ai",
+    description:
+      "The terms for using Imagick.ai — your account, your content, acceptable use, billing and cancellation.",
+    jsonLd: [breadcrumb([["Home", SITE.url], ["Terms of Service", `${SITE.url}/legal/terms`]])],
+  },
   ...USE_CASES.map((u) => ({
     url: `/for/${u.slug}`,
     out: `for/${u.slug}/index.html`,
@@ -212,6 +230,8 @@ export function render(url: string): string {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/enterprise" element={<EnterprisePage />} />
             <Route path="/try-demo" element={<TryDemoPage />} />
+            <Route path="/legal/privacy" element={<PrivacyPage />} />
+            <Route path="/legal/terms" element={<TermsPage />} />
           </Routes>
         </StaticRouter>
       </ThemeProvider>

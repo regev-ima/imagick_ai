@@ -2,7 +2,12 @@ import LegalPageLayout from "./LegalPageLayout";
 
 export default function TermsPage() {
   return (
-    <LegalPageLayout title="Terms of Service" lastUpdated="May 2026">
+    <LegalPageLayout
+      title="Terms of Service"
+      lastUpdated="May 2026"
+      path="/legal/terms"
+      description="The terms for using Imagick.ai — your account, your content, acceptable use, billing and cancellation."
+    >
       <section>
         <h2 className="aura-microlabel mb-3 text-foreground/80">01 · The service</h2>
         <p>

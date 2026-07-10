@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Home, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBrandLogo } from "@/hooks/useBrandLogo";
+import { getSiteMode } from "@/lib/domains";
 
 const EASE = [0.22, 0.61, 0.36, 1] as const;
 
@@ -29,6 +30,11 @@ function Sparkle({ size = 16, className = "" }: { size?: number; className?: str
 const NotFound = () => {
   const location = useLocation();
   const { logo: imagickLogo } = useBrandLogo();
+
+  // On the marketing site (or preview), a 404 should lead back to the public
+  // home — never into the app dashboard/login.
+  const inApp = getSiteMode() === "app" || location.pathname.startsWith("/dashboard");
+  const home = inApp ? { to: "/dashboard", label: "Back to dashboard" } : { to: "/", label: "Back to home" };
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);
@@ -76,9 +82,9 @@ const NotFound = () => {
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button asChild className="w-full gap-2 sm:w-auto">
-              <Link to="/dashboard">
+              <Link to={home.to}>
                 <Home className="w-4 h-4" />
-                Back to dashboard
+                {home.label}
               </Link>
             </Button>
             <Button

@@ -2,7 +2,12 @@ import LegalPageLayout from "./LegalPageLayout";
 
 export default function PrivacyPage() {
   return (
-    <LegalPageLayout title="Privacy Policy" lastUpdated="May 2026">
+    <LegalPageLayout
+      title="Privacy Policy"
+      lastUpdated="May 2026"
+      path="/legal/privacy"
+      description="How Imagick.ai collects, uses and protects your data. We never use your photos to train AI models without your explicit consent."
+    >
       <section>
         <h2 className="aura-microlabel mb-3 text-foreground/80">Who we are</h2>
         <p>
