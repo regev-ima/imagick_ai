@@ -19,7 +19,9 @@ export default function UseCasePage() {
   const { slug } = useParams();
   const useCase = getUseCase(slug);
 
-  useEffect(() => window.scrollTo(0, 0), [slug]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [slug]);
 
   if (!useCase) return <Navigate to="/" replace />;
 

@@ -90,7 +90,9 @@ export default function BlogIndexPage() {
   const [cat, setCat] = useState<string | null>(null);
   const [limit, setLimit] = useState(PAGE);
 
-  useEffect(() => window.scrollTo(0, 0), []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const cats = useMemo(() => blogCategories(), []);
 
@@ -107,7 +109,9 @@ export default function BlogIndexPage() {
   }, [q, cat]);
 
   // Reset the visible window whenever the filter/search changes.
-  useEffect(() => setLimit(PAGE), [q, cat]);
+  useEffect(() => {
+    setLimit(PAGE);
+  }, [q, cat]);
 
   const isBrowsing = !q.trim() && !cat;
   const featured = isBrowsing ? filtered[0] : undefined;

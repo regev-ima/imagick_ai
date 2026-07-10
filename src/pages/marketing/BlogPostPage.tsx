@@ -127,7 +127,9 @@ export default function BlogPostPage() {
   const { slug } = useParams();
   const post = getPost(slug);
 
-  useEffect(() => window.scrollTo(0, 0), [slug]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [slug]);
 
   const html = post ? (blogContent as Record<string, string>)[post.slug] ?? "" : "";
   const [first, second] = useMemo(() => splitForCta(html), [html]);

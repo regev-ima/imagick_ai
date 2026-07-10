@@ -41,7 +41,9 @@ function CellValue({ value, highlight }: { value: Cell; highlight: boolean }) {
 }
 
 export default function PricingPage() {
-  useEffect(() => window.scrollTo(0, 0), []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const jsonLd = [
     {
