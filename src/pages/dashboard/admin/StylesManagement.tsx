@@ -406,6 +406,10 @@ export default function StylesManagement() {
         users={users}
         open={!!detailStyle}
         onOpenChange={(o) => !o && setDetailStyle(null)}
+        onOpenParent={(id) => {
+          const p = styles?.find((s) => s.id === id);
+          if (p) setDetailStyle(p);
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

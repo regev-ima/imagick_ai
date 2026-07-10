@@ -302,12 +302,16 @@ serve(async (req: Request) => {
     // ── 5. Archive inactive galleries ─────────────────────────────────────
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Find galleries from expired/free users that haven't been updated in 30 days
+    // Find galleries from expired/free users that haven't been updated in 30 days.
+    // Excludes hidden `__style_source__` system galleries (galleries.is_system) —
+    // sweeping those into archival is meaningless churn, they have no
+    // upload/processing lifecycle for "archived" to mean anything.
     const { data: inactiveGalleries } = await supabase
       .from("galleries")
       .select("id, user_id, name")
       .lt("updated_at", thirtyDaysAgo)
       .neq("status", "archived")
+      .eq("is_system", false)
       .limit(100);
 
     for (const gallery of inactiveGalleries || []) {

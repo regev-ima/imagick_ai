@@ -83,6 +83,9 @@ export function AuraCommand() {
         .from("galleries")
         .select("id, name, status, total_images, hero_image_url")
         .eq("user_id", effectiveUserId)
+        // A user should never see the hidden `__style_source__` system
+        // gallery as a searchable/navigable result.
+        .eq("is_system" as never, false as never)
         .order("updated_at", { ascending: false })
         .limit(30);
       if (error) throw error;

@@ -16,6 +16,8 @@ import {
  import { Button } from "@/components/ui/button";
  import { Input } from "@/components/ui/input";
  import { Badge } from "@/components/ui/badge";
+ import { Switch } from "@/components/ui/switch";
+ import { Label } from "@/components/ui/label";
  import {
    Table,
    TableBody,
@@ -61,6 +63,10 @@ interface Gallery {
   ai_culling_enabled: boolean;
   categories: string[] | null;
   source_drive_links: string[] | null;
+  // Hidden `__style_source__` galleries created per-style by
+  // ensureStyleSourceGallery (supabase/functions/_shared/style-source.ts).
+  // Not in the generated types snapshot yet — see galleries.is_system.
+  is_system?: boolean;
 }
  
 export default function GalleriesManagement() {
@@ -68,24 +74,33 @@ export default function GalleriesManagement() {
   const [deleteGalleryId, setDeleteGalleryId] = useState<string | null>(null);
   const [showcaseDeleteOpen, setShowcaseDeleteOpen] = useState(false);
   const [cloningId, setCloningId] = useState<string | null>(null);
+  // Hidden `__style_source__` galleries are real rows (needed for the
+  // admin's style-source debugging), but must never silently blend into the
+  // default view of "all galleries" — default-exclude, with an explicit
+  // toggle + badge when shown.
+  const [showSystem, setShowSystem] = useState(false);
   const queryClient = useQueryClient();
    const navigate = useNavigate();
- 
+
    const { data: galleries, isLoading } = useQuery({
-     queryKey: ["admin-galleries", searchQuery],
+     queryKey: ["admin-galleries", searchQuery, showSystem],
      queryFn: async () => {
        let query = supabase
          .from("galleries")
          .select("*")
          .order("created_at", { ascending: false });
- 
+
+       if (!showSystem) {
+         query = query.eq("is_system" as never, false as never);
+       }
+
        if (searchQuery) {
          query = query.ilike("name", `%${searchQuery}%`);
        }
- 
+
        const { data, error } = await query;
        if (error) throw error;
-       return data as Gallery[];
+       return data as unknown as Gallery[];
      },
    });
  
@@ -197,14 +212,22 @@ export default function GalleriesManagement() {
 
        <div className="glass-card overflow-hidden rounded-[--radius]">
          <div className="border-b border-border bg-background/40 p-3">
-           <div className="flex max-w-md items-center gap-2 rounded-[--radius] border border-border bg-background px-3">
-             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-             <Input
-               placeholder="Search galleries..."
-               value={searchQuery}
-               onChange={(e) => setSearchQuery(e.target.value)}
-               className="flex-1 border-0 bg-transparent px-0 focus-visible:ring-0"
-             />
+           <div className="flex flex-wrap items-center justify-between gap-3">
+             <div className="flex max-w-md flex-1 items-center gap-2 rounded-[--radius] border border-border bg-background px-3">
+               <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+               <Input
+                 placeholder="Search galleries..."
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 className="flex-1 border-0 bg-transparent px-0 focus-visible:ring-0"
+               />
+             </div>
+             <div className="flex items-center gap-2">
+               <Switch id="show-system-galleries" checked={showSystem} onCheckedChange={setShowSystem} />
+               <Label htmlFor="show-system-galleries" className="aura-microlabel cursor-pointer text-muted-foreground">
+                 Show system galleries
+               </Label>
+             </div>
            </div>
          </div>
          <div>
@@ -234,7 +257,14 @@ export default function GalleriesManagement() {
                    <TableRow key={gallery.id}>
                      <TableCell>
                        <div>
-                         <p className="font-medium">{gallery.name}</p>
+                         <div className="flex items-center gap-1.5">
+                           <p className="font-medium">{gallery.name}</p>
+                           {gallery.is_system && (
+                             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                               System
+                             </Badge>
+                           )}
+                         </div>
                          <p className="max-w-xs truncate text-sm text-muted-foreground">
                            {gallery.description || "No description"}
                          </p>
