@@ -52,6 +52,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { useOnboardingQuestionnaire } from "@/hooks/useOnboardingQuestionnaire";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
@@ -175,6 +176,9 @@ export default function CreateGalleryPage() {
   const { answers: onboardingAnswers, allQuestions: onboardingQuestions } = useOnboardingQuestionnaire();
 
   const [name, setName] = useState("");
+  // Set true when Create is pressed with an empty name — highlights the field.
+  const [nameError, setNameError] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [type, setType] = useState("wedding");
   const [typeTouched, setTypeTouched] = useState(false);
   const [items, setItems] = useState<SelImg[]>([]);
@@ -372,6 +376,29 @@ export default function CreateGalleryPage() {
     });
   };
 
+  // Validate on click so a missing required field gives clear feedback instead
+  // of a silently dead button.
+  const attemptCreate = () => {
+    if (busy) return;
+    const missing: string[] = [];
+    if (name.trim().length === 0) missing.push("a collection name");
+    if (photos === 0) missing.push(uploadSource === "drive" ? "a Drive folder" : "photos");
+    if (!styleTouched) missing.push("a look (or “No editing”)");
+    if (missing.length > 0) {
+      toast.error(`Add ${missing.join(", ")} to continue.`);
+      if (name.trim().length === 0) {
+        setNameError(true);
+        nameInputRef.current?.focus();
+      }
+      return;
+    }
+    if (hasInsufficientEdits) {
+      toast.error(`You're ${creditsShort.toLocaleString()} credits short — buy credits or pick “No editing”.`);
+      return;
+    }
+    handleCreate();
+  };
+
   // Leave guard — don't silently drop staged photos / an in-flight upload.
   const hasUnsavedWork = photos > 0 || busy;
   const handleLeave = () => {
@@ -426,12 +453,19 @@ export default function CreateGalleryPage() {
             </Button>
             <div className="group relative min-w-0 flex-1">
               <input
+                ref={nameInputRef}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); if (nameError) setNameError(false); }}
                 disabled={busy}
-                className="w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset ring-border/60 transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 hover:ring-border focus:bg-surface-2 focus:ring-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="Untitled shoot"
                 aria-label="Collection name"
+                aria-invalid={nameError}
+                className={cn(
+                  "w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 focus:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60",
+                  nameError
+                    ? "ring-destructive/70 focus:ring-destructive placeholder:text-destructive/50"
+                    : "ring-border/60 hover:ring-border focus:ring-primary/60",
+                )}
+                placeholder={nameError ? "Name your collection to continue…" : "Untitled shoot"}
               />
               <Pencil className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 transition-colors group-hover:text-foreground/70" />
             </div>
@@ -694,7 +728,7 @@ export default function CreateGalleryPage() {
             </div>
           ) : (
             <div>
-              <Button variant="glow" size="lg" disabled={!complete} className="w-full gap-2" onClick={handleCreate}>
+              <Button variant="glow" size="lg" aria-disabled={!complete} className={cn("w-full gap-2", !complete && "opacity-60")} onClick={attemptCreate}>
                 <Zap className="h-4 w-4" /> Create &amp; start editing
               </Button>
               <p className="mt-2 text-center text-[11px] text-muted-foreground/70">

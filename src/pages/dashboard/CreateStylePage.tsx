@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -145,17 +145,14 @@ export default function CreateStylePage() {
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
-  const beforePercent = useMemo(() => {
-    if (!uploadProgress) return 0;
-    const { uploaded, total } = uploadProgress.before;
-    return total > 0 ? Math.round((uploaded / total) * 100) : 0;
-  }, [uploadProgress]);
-
-  const afterPercent = useMemo(() => {
-    if (!uploadProgress) return 0;
-    const { uploaded, total } = uploadProgress.after;
-    return total > 0 ? Math.round((uploaded / total) * 100) : 0;
-  }, [uploadProgress]);
+  // Combined upload progress (before + after) — drives the single "uploading"
+  // window in the footer, mirroring the New Collection create flow.
+  const totalUploaded = uploadProgress ? uploadProgress.before.uploaded + uploadProgress.after.uploaded : 0;
+  const totalToUpload = uploadProgress ? uploadProgress.before.total + uploadProgress.after.total : 0;
+  const uploadPct = totalToUpload > 0 ? Math.round((totalUploaded / totalToUpload) * 100) : (uploadProgress ? 0 : 100);
+  const activeUploadName = uploadProgress
+    ? [...beforeFiles, ...afterFiles].find((f) => uploadProgress.activeIds.has(f.id))?.file.name
+    : undefined;
 
   const toggleModelType = (value: string) => {
     setSelectedModelTypes((prev) => {
@@ -447,8 +444,6 @@ export default function CreateStylePage() {
   const renderLocalZone = (type: "before" | "after") => {
     const files = type === "before" ? beforeFiles : afterFiles;
     const dragging = type === "before" ? isDraggingBefore : isDraggingAfter;
-    const percent = type === "before" ? beforePercent : afterPercent;
-    const side = uploadProgress?.[type];
 
     const hasFiles = files.length > 0;
     const accept = type === "before" ? IMAGE_ACCEPT : "image/*";
@@ -463,16 +458,6 @@ export default function CreateStylePage() {
           </span>
           <span className="aura-chip">{files.length} {files.length === 1 ? "file" : "files"}</span>
         </div>
-
-        {uploadProgress && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between caption">
-              <span>{side?.uploaded ?? 0}/{side?.total ?? 0}</span>
-              <span className="text-accent">{percent}%</span>
-            </div>
-            <Progress value={percent} className="h-1.5" />
-          </div>
-        )}
 
         {hasFiles ? (
           <div
@@ -709,20 +694,37 @@ export default function CreateStylePage() {
           </div>
 
           <div className="sm:flex sm:w-[300px] sm:shrink-0 sm:flex-col sm:justify-center">
-            <Button
-              variant="glow"
-              size="lg"
-              disabled={isCreating}
-              aria-disabled={!canCreate}
-              className={cn("w-full gap-2", !canCreate && "opacity-60")}
-              onClick={attemptCreate}
-            >
-              {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-              {isCreating ? "Uploading…" : "Create & start training"}
-            </Button>
-            <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
-              {canCreate ? "Trains a real AI model on your pairs" : "Finish the steps above to continue"}
-            </p>
+            {isCreating ? (
+              <div className="space-y-2.5 rounded-[--radius] border border-border bg-card p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 text-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    {uploadProgress ? "Uploading your images…" : "Creating style…"}
+                  </span>
+                  <span className="font-mono text-primary">{uploadProgress ? `${totalUploaded}/${totalToUpload}` : ""}</span>
+                </div>
+                <Progress value={uploadPct} className="h-1.5" />
+                {activeUploadName && (
+                  <p className="truncate text-xs text-muted-foreground">Receiving {activeUploadName} · {uploadPct}%</p>
+                )}
+              </div>
+            ) : (
+              <>
+                <Button
+                  variant="glow"
+                  size="lg"
+                  aria-disabled={!canCreate}
+                  className={cn("w-full gap-2", !canCreate && "opacity-60")}
+                  onClick={attemptCreate}
+                >
+                  <Zap className="h-4 w-4" />
+                  Create &amp; start training
+                </Button>
+                <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
+                  {canCreate ? "Trains a real AI model on your pairs" : "Finish the steps above to continue"}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
