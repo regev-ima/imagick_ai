@@ -117,6 +117,8 @@ export default function CreateStylePage() {
   const [isCreating, setIsCreating] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  // Which side's full review/manage modal is open (null = closed).
+  const [reviewSide, setReviewSide] = useState<"before" | "after" | null>(null);
 
   // Details
   const [name, setName] = useState("");
@@ -410,6 +412,11 @@ export default function CreateStylePage() {
   }, [isCreating]);
 
   // ── One reusable local upload column (before / after) ────────────────────────
+  // Bounded so it NEVER grows the page (same pattern as the New Collection
+  // "Photos" card): empty = a dropzone; filled = a compact preview strip
+  // (first PREVIEW_CAP thumbnails + a "+N" tile) whose click opens the review /
+  // manage modal. All images live in the modal, so any count stays on-screen.
+  const PREVIEW_CAP = 11;
   const renderLocalZone = (type: "before" | "after") => {
     const files = type === "before" ? beforeFiles : afterFiles;
     const dragging = type === "before" ? isDraggingBefore : isDraggingAfter;
@@ -418,10 +425,11 @@ export default function CreateStylePage() {
 
     const hasFiles = files.length > 0;
     const accept = type === "before" ? IMAGE_ACCEPT : "image/*";
+    const extra = files.length - PREVIEW_CAP;
 
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
-        <div className="flex shrink-0 items-center justify-between">
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
           <span className="caption flex items-center gap-1.5">
             <Upload className="h-3 w-3" />
             {type === "before" ? "Before · originals" : "After · edited"}
@@ -430,7 +438,7 @@ export default function CreateStylePage() {
         </div>
 
         {uploadProgress && (
-          <div className="shrink-0 space-y-1.5">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between caption">
               <span>{side?.uploaded ?? 0}/{side?.total ?? 0}</span>
               <span className="text-accent">{percent}%</span>
@@ -439,93 +447,107 @@ export default function CreateStylePage() {
           </div>
         )}
 
-        {/* Combined dropzone + thumbnails — one fixed-height box (flex-1) that
-            NEVER grows the page: empty = a fill prompt; filled = a small
-            internally-scrolling grid so any number of images stays contained. */}
-        <div
-          onDragOver={(e) => !isCreating && handleDragOver(e, type)}
-          onDragLeave={(e) => !isCreating && handleDragLeave(e, type)}
-          onDrop={(e) => !isCreating && handleDrop(e, type)}
-          className={cn(
-            "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[--radius] border-2 border-dashed transition-colors",
-            dragging ? "border-primary bg-primary/[0.04]" : "border-border",
-            !hasFiles && !isCreating && "hover:border-primary/50 hover:bg-primary/[0.03]",
-          )}
-        >
-          {hasFiles ? (
-            <>
-              {!isCreating && (
-                <label className="caption flex shrink-0 cursor-pointer items-center justify-center gap-1.5 border-b border-border/60 py-1.5 transition-colors hover:text-foreground">
+        {hasFiles ? (
+          <div
+            onDragOver={(e) => !isCreating && handleDragOver(e, type)}
+            onDragLeave={(e) => !isCreating && handleDragLeave(e, type)}
+            onDrop={(e) => !isCreating && handleDrop(e, type)}
+            className={cn(
+              "rounded-[--radius] border p-2.5 transition-colors",
+              dragging ? "border-primary bg-primary/[0.04]" : "border-border",
+            )}
+          >
+            {!isCreating && (
+              <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
+                <label className="cursor-pointer text-accent hover:underline">
                   <input type="file" multiple accept={accept} onChange={(e) => handleFileSelect(e, type)} className="hidden" aria-label={`Add ${type} images`} />
-                  <Upload className="h-3 w-3" /> Add more
+                  add more
                 </label>
-              )}
-              <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(46px,1fr))] gap-1 overflow-y-auto p-1.5">
-                {files.map((file) => {
-                  const isActive = uploadProgress?.activeIds.has(file.id);
-                  const isDone = uploadProgress?.doneIds.has(file.id);
-                  const isFailed = uploadProgress?.failedIds.has(file.id);
-                  return (
-                    <div key={file.id} className="group relative aspect-square">
-                      {file.preview ? (
-                        <img src={file.preview} alt="" loading="lazy" className={cn("h-full w-full rounded-sm object-cover plate-keyline transition-opacity", isActive && "opacity-60")} />
-                      ) : (
-                        <div className={cn("grid h-full w-full place-items-center rounded-sm bg-surface-2 plate-keyline transition-opacity", isActive && "opacity-60")}>
-                          <span className="font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
-                        </div>
-                      )}
-                      {isActive && (
-                        <div className="absolute inset-0 grid place-items-center rounded-sm bg-background/40">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
-                        </div>
-                      )}
-                      {isDone && (
-                        <div className="absolute bottom-0.5 right-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-primary">
-                          <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                        </div>
-                      )}
-                      {isFailed && (
-                        <div className="absolute inset-0 grid place-items-center rounded-sm bg-destructive/20">
-                          <X className="h-3.5 w-3.5 text-destructive" />
-                        </div>
-                      )}
-                      {!uploadProgress && (
-                        <button
-                          onClick={() => removeFile(file.id, type)}
-                          aria-label={`Remove ${type} image`}
-                          className="absolute right-0 top-0 grid h-4 w-4 place-items-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          <X className="h-2.5 w-2.5" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+                <span className="text-muted-foreground/40">·</span>
+                <button type="button" onClick={() => setReviewSide(type)} className="text-accent hover:underline">review &amp; manage</button>
               </div>
-            </>
-          ) : (
-            <label className={cn("flex min-h-[120px] flex-1 flex-col items-center justify-center p-5 text-center", isCreating ? "cursor-default" : "cursor-pointer")}>
-              {!isCreating && (
-                <input type="file" multiple accept={accept} onChange={(e) => handleFileSelect(e, type)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label={`Upload ${type} images`} />
+            )}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(52px,1fr))] gap-1.5">
+              {files.slice(0, PREVIEW_CAP).map((file) => {
+                const isActive = uploadProgress?.activeIds.has(file.id);
+                const isDone = uploadProgress?.doneIds.has(file.id);
+                const isFailed = uploadProgress?.failedIds.has(file.id);
+                return (
+                  <button
+                    type="button"
+                    key={file.id}
+                    onClick={() => setReviewSide(type)}
+                    aria-label="Review images"
+                    className="relative aspect-square overflow-hidden rounded-sm plate-keyline transition-opacity hover:opacity-90"
+                  >
+                    {file.preview ? (
+                      <img src={file.preview} alt="" loading="lazy" className={cn("h-full w-full object-cover", isActive && "opacity-60")} />
+                    ) : (
+                      <div className={cn("grid h-full w-full place-items-center bg-surface-2", isActive && "opacity-60")}>
+                        <span className="font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
+                      </div>
+                    )}
+                    {isActive && (
+                      <div className="absolute inset-0 grid place-items-center bg-background/40">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                      </div>
+                    )}
+                    {isDone && (
+                      <div className="absolute bottom-0.5 right-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-primary">
+                        <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                      </div>
+                    )}
+                    {isFailed && (
+                      <div className="absolute inset-0 grid place-items-center bg-destructive/20">
+                        <X className="h-3.5 w-3.5 text-destructive" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+              {extra > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setReviewSide(type)}
+                  aria-label={`See all ${files.length} ${type} images`}
+                  className="grid aspect-square place-items-center rounded-sm border border-border bg-surface-2 font-mono text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                >
+                  +{extra}
+                </button>
               )}
-              <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Drag &amp; drop or click</p>
-              <p className="caption mt-1">{type === "before" ? "Min 5 · RAW ok" : "Matched by filename"}</p>
-            </label>
-          )}
-        </div>
+            </div>
+          </div>
+        ) : (
+          <label
+            onDragOver={(e) => !isCreating && handleDragOver(e, type)}
+            onDragLeave={(e) => !isCreating && handleDragLeave(e, type)}
+            onDrop={(e) => !isCreating && handleDrop(e, type)}
+            className={cn(
+              "relative flex min-h-[150px] flex-col items-center justify-center rounded-[--radius] border-2 border-dashed p-5 text-center transition-colors",
+              dragging ? "border-primary bg-primary/[0.04]" : "border-border",
+              !isCreating ? "cursor-pointer hover:border-primary/50 hover:bg-primary/[0.03]" : "cursor-default",
+            )}
+          >
+            {!isCreating && (
+              <input type="file" multiple accept={accept} onChange={(e) => handleFileSelect(e, type)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label={`Upload ${type} images`} />
+            )}
+            <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Drag &amp; drop or click</p>
+            <p className="caption mt-1">{type === "before" ? "Min 5 · RAW ok" : "Matched by filename"}</p>
+          </label>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="min-h-full bg-background lg:h-full lg:overflow-hidden">
-      <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-6 lg:h-full lg:min-h-0 lg:px-8">
+    <div className="min-h-full bg-background px-4 py-6 lg:px-8 lg:py-8">
+      <div className="mx-auto w-full max-w-6xl">
         {/* ════ HEADER — plan-first: microlabel · back + inline name + live pills ══ */}
-        <span className="aura-microlabel flex shrink-0 items-center gap-1.5 text-accent">
+        <span className="aura-microlabel flex items-center gap-1.5 text-accent">
           <Sparkle size={11} /> Train a style · new look
         </span>
-        <div className="mt-1.5 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-2">
           <Button variant="ghost" size="icon" className="shrink-0" onClick={handleLeave} aria-label="Back to styles">
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -551,9 +573,9 @@ export default function CreateStylePage() {
         </div>
 
         {/* ════ WORK — single calm column of panels ═══════════════════════════ */}
-        <div className={cn("mt-6 flex min-h-0 flex-1 flex-col gap-4", isCreating && "pointer-events-none select-none opacity-60")}>
+        <div className={cn("mt-6 space-y-4", isCreating && "pointer-events-none select-none opacity-60")}>
           {/* ── Look details — model type ── */}
-          <div className="glass-card shrink-0 rounded-[--radius] p-5">
+          <div className="glass-card rounded-[--radius] p-5">
             <div className="caption mb-1.5 flex items-center gap-1.5 text-accent">
               <Sparkle size={11} /> What is this look for?
             </div>
@@ -589,34 +611,32 @@ export default function CreateStylePage() {
             )}
           </div>
 
-          {/* ── Training pairs — grows to fill the workspace ── */}
-          <div className="glass-card flex min-h-0 flex-1 flex-col rounded-[--radius] p-5">
-            <div className="mb-3.5 shrink-0">
+          {/* ── Training pairs ── */}
+          <div className="glass-card rounded-[--radius] p-5">
+            <div className="mb-3.5">
               <div className="caption flex items-center gap-1.5"><Upload className="h-3 w-3" /> Training pairs · minimum 5</div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Upload matching before/after images — the AI learns your edit from each pair.
               </p>
             </div>
 
-            <div className="shrink-0">
-              <UploadSourceSelector value={uploadSource} onChange={setUploadSource} />
-            </div>
+            <UploadSourceSelector value={uploadSource} onChange={setUploadSource} />
 
             {uploadSource === "local" ? (
-              <div className="mt-4 flex min-h-0 flex-1 flex-col gap-5 sm:flex-row">
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
                 {renderLocalZone("before")}
                 {renderLocalZone("after")}
               </div>
             ) : (
-              <div className="mt-4 flex min-h-0 flex-1 flex-col gap-5 sm:flex-row">
-                <div className="flex-1 space-y-2.5">
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2.5">
                   <span className="caption flex items-center gap-1.5"><CloudIcon className="h-3 w-3" /> Before · originals</span>
                   <GoogleDriveInput
                     folderInfo={beforeFolderInfo}
                     onUpdate={(info, links) => { setBeforeFolderInfo(info); setBeforeDriveLinks(links); }}
                   />
                 </div>
-                <div className="flex-1 space-y-2.5">
+                <div className="space-y-2.5">
                   <span className="caption flex items-center gap-1.5"><CloudIcon className="h-3 w-3" /> After · edited</span>
                   <GoogleDriveInput
                     folderInfo={afterFolderInfo}
@@ -627,7 +647,7 @@ export default function CreateStylePage() {
             )}
 
             {localCountMismatch && (
-              <div role="alert" className="mt-4 flex shrink-0 items-start gap-2.5 rounded-[--radius] border border-rating/30 bg-rating/[0.08] p-3">
+              <div role="alert" className="mt-4 flex items-start gap-2.5 rounded-[--radius] border border-rating/30 bg-rating/[0.08] p-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rating" />
                 <p className="text-xs leading-snug text-muted-foreground">
                   <span className="font-medium text-rating">Counts don't match — {beforeFiles.length} before vs {afterFiles.length} after.</span>{" "}
@@ -639,7 +659,7 @@ export default function CreateStylePage() {
         </div>
 
         {/* ════ FOOTER — training plan + glow CTA ═════════════════════════════ */}
-        <div className="mt-5 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-between">
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-between">
           <div className="glass-card min-w-0 flex-1 rounded-[--radius] px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5 text-sm font-semibold">
@@ -713,6 +733,101 @@ export default function CreateStylePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ════ REVIEW / MANAGE MODAL — see & manage every file for one side ═════ */}
+      {reviewSide && (
+        <ReviewFilesModal
+          side={reviewSide}
+          files={reviewSide === "before" ? beforeFiles : afterFiles}
+          accept={reviewSide === "before" ? IMAGE_ACCEPT : "image/*"}
+          canEdit={!isCreating}
+          onAdd={(e) => handleFileSelect(e, reviewSide)}
+          onRemove={(id) => removeFile(id, reviewSide)}
+          onClose={() => setReviewSide(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Full review + manage grid for one side (before / after) — mirrors the New
+ * Collection "review selection" modal. Shows every file, lets the admin drop
+ * mistakes, and add more from any folder. RAW files render as a tile.
+ */
+function ReviewFilesModal({
+  side,
+  files,
+  accept,
+  canEdit,
+  onAdd,
+  onRemove,
+  onClose,
+}: {
+  side: "before" | "after";
+  files: LocalFile[];
+  accept: string;
+  canEdit: boolean;
+  onAdd: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemove: (id: string) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="glass-card flex max-h-[90vh] w-full max-w-5xl flex-col rounded-[--radius] p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-1 flex items-start justify-between gap-3">
+          <div>
+            <span className="aura-microlabel text-accent">Review selection</span>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {side === "before" ? "Before · originals" : "After · edited"} — {files.length.toLocaleString()} {files.length === 1 ? "file" : "files"}
+            </h2>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close"><X className="h-5 w-5" /></Button>
+        </div>
+        <p className="caption mb-3">Hover a file and tap ✕ to drop it. RAW files show as a tile.</p>
+
+        <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5 overflow-y-auto pr-1">
+          {files.map((file) => (
+            <div key={file.id} className="group relative aspect-square overflow-hidden rounded-[5px] bg-surface-2">
+              {file.preview ? (
+                <img src={file.preview} alt="" loading="lazy" className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center text-center font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</div>
+              )}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(file.id)}
+                  aria-label="Remove file"
+                  className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-all hover:bg-destructive group-hover:opacity-100 focus-visible:opacity-100"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          {canEdit ? (
+            <Button asChild variant="outline" size="sm">
+              <label className="cursor-pointer">
+                <input type="file" multiple accept={accept} onChange={onAdd} className="hidden" aria-label={`Add ${side} images`} />
+                <Upload className="mr-1.5 h-4 w-4" /> Add more
+              </label>
+            </Button>
+          ) : (
+            <span className="caption">Scroll for more</span>
+          )}
+          <Button variant="glow" onClick={onClose}>Done · {files.length.toLocaleString()}</Button>
+        </div>
+      </div>
     </div>
   );
 }
