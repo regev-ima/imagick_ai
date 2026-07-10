@@ -662,11 +662,16 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
 
           <div className="h-4" />
         </div>
+
+        {/* Nested INSIDE SheetContent on purpose: Radix DismissableLayer builds
+            its layer stack from the React tree, so a stacked modal must be a
+            descendant of the layer it sits on top of. As a sibling of
+            SheetContent it registered as a peer layer and the Sheet's own
+            focus/pointer settling read as an outside-interaction, dismissing it
+            the instant it opened. Its own portal (position: fixed) still renders
+            it full-screen regardless of where it lives in the tree. */}
+        <StyleTrainingGalleryDialog style={style} open={trainingGalleryOpen} onOpenChange={setTrainingGalleryOpen} />
       </SheetContent>
-      {/* Rendered as a sibling of SheetContent (not inside it) so this Dialog
-          escapes the Sheet's focus-trap/scroll-lock — nesting a modal inside
-          another modal's content mis-stacks it and blocks scrolling. */}
-      <StyleTrainingGalleryDialog style={style} open={trainingGalleryOpen} onOpenChange={setTrainingGalleryOpen} />
       <RetrainStyleDialog
         parent={style}
         open={retrainOpen}
