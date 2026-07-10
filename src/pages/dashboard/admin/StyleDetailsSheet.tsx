@@ -174,7 +174,7 @@ function FileTypeBreakdown({ breakdown }: { breakdown: FileBreakdown }) {
       <div className="flex flex-wrap items-center gap-1.5">
         {kinds.map((k) => (
           <Badge key={k} variant="outline" className="text-[10px]">
-            {KIND_LABELS[k]} {breakdown.byKind[k]}
+            {KIND_LABELS[k]}
           </Badge>
         ))}
         <button
@@ -297,6 +297,10 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
   const beforeBreakdown = breakdownFiles(style.before_image_urls);
   const afterBreakdown = breakdownFiles(style.after_image_urls);
   const bothFileListsEmpty = beforeBreakdown.total === 0 && afterBreakdown.total === 0;
+  // Training happens on before↔after PAIRS, so the meaningful "imported"
+  // number is the pair count (211) — not before+after summed (422, which the
+  // stored total_images_imported double-counts).
+  const pairCount = Math.min(beforeBreakdown.total, afterBreakdown.total);
 
   const allowed = style.allowed_user_ids ?? [];
   const isPublic = style.visibility === "public";
@@ -464,7 +468,11 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
             </div>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Method">{style.upload_method || <span className="text-muted-foreground/50">—</span>}</Field>
-              <Field label="Imported">{style.total_images_imported ?? 0}{style.total_images_to_import ? ` / ${style.total_images_to_import}` : ""}</Field>
+              <Field label="Imported">
+                {bothFileListsEmpty
+                  ? <>{style.total_images_imported ?? 0} files</>
+                  : <>{pairCount} {pairCount === 1 ? "pair" : "pairs"}</>}
+              </Field>
               <Field label="Sessions">{style.training_sessions_count ?? 0}</Field>
             </div>
             {bothFileListsEmpty ? (
@@ -528,20 +536,34 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
               <Field label="Import completed">{fmt(style.import_completion_date)}</Field>
               <Field label="Training started">{fmt(style.training_start_date)}</Field>
               <Field label="Training completed">{fmt(style.training_completion_date)}</Field>
+              {/* Upload/import phase only. */}
               <Field label="Upload duration">
-                {durationLabel(style.import_start_date, style.import_completion_date, "Upload took ") ?? (
+                {durationLabel(style.import_start_date, style.import_completion_date, "") ?? (
                   <span className="text-muted-foreground/50">—</span>
                 )}
               </Field>
+              {/* Isolated training time (live-ticks while still running). */}
               <Field label="Training duration">
                 {!style.training_start_date || !Number.isFinite(new Date(style.training_start_date).getTime()) ? (
                   <span className="text-muted-foreground/50">—</span>
                 ) : style.training_completion_date ? (
-                  durationLabel(style.training_start_date, style.training_completion_date, "Training took ") ?? (
+                  durationLabel(style.training_start_date, style.training_completion_date, "") ?? (
                     <span className="text-muted-foreground/50">—</span>
                   )
                 ) : (
                   <LiveTrainingDuration startIso={style.training_start_date} />
+                )}
+              </Field>
+              {/* Whole lifecycle: record created → model ready (final approval). */}
+              <Field label="Total (upload → approval)">
+                {durationLabel(style.created_at, style.training_completion_date, "") ?? (
+                  <span className="text-muted-foreground/50">—</span>
+                )}
+              </Field>
+              {/* Full processing span: import began → training finished. */}
+              <Field label="Import → training end">
+                {durationLabel(style.import_start_date, style.training_completion_date, "") ?? (
+                  <span className="text-muted-foreground/50">—</span>
                 )}
               </Field>
             </div>
@@ -640,9 +662,11 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
 
           <div className="h-4" />
         </div>
-
-        <StyleTrainingGalleryDialog style={style} open={trainingGalleryOpen} onOpenChange={setTrainingGalleryOpen} />
       </SheetContent>
+      {/* Rendered as a sibling of SheetContent (not inside it) so this Dialog
+          escapes the Sheet's focus-trap/scroll-lock — nesting a modal inside
+          another modal's content mis-stacks it and blocks scrolling. */}
+      <StyleTrainingGalleryDialog style={style} open={trainingGalleryOpen} onOpenChange={setTrainingGalleryOpen} />
       <RetrainStyleDialog
         parent={style}
         open={retrainOpen}
