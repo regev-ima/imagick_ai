@@ -49,6 +49,9 @@ interface Props {
    * when style.source_gallery_id didn't change (re-processing new images
    * into an already-existing source gallery). */
   refreshToken?: number;
+  /** Viewer mode for the style owner — hides the admin-only "Generate model
+   * edits" action; the before/after comparison still works. */
+  readOnly?: boolean;
 }
 
 function AvailabilityDots({ row }: { row: CompareRow }) {
@@ -124,7 +127,7 @@ function SlotSelect({ label, value, onChange }: { label: string; value: Slot; on
   );
 }
 
-export function TriCompare({ style, onGenerateEdits, generating, refreshToken }: Props) {
+export function TriCompare({ style, onGenerateEdits, generating, refreshToken, readOnly }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"slider" | "side-by-side">("slider");
   // Default Photographer vs Model — "the money shot" per the plan.
@@ -199,19 +202,23 @@ export function TriCompare({ style, onGenerateEdits, generating, refreshToken }:
               <Sparkles className="h-3.5 w-3.5 text-accent" /> No model edits yet
             </p>
             <p className="mt-0.5 max-w-md text-xs text-muted-foreground">
-              Generate the model's edits on this style's own source photos to unlock the full three-way compare.
+              {readOnly
+                ? "The model's own edits aren't available for this style yet — compare your before and after training photos below."
+                : "Generate the model's edits on this style's own source photos to unlock the full three-way compare."}
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="glow"
-            disabled={generating}
-            onClick={() => onGenerateEdits?.()}
-            className="shrink-0 gap-1.5"
-          >
-            {generating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Generate model edits
-          </Button>
+          {!readOnly && (
+            <Button
+              size="sm"
+              variant="glow"
+              disabled={generating}
+              onClick={() => onGenerateEdits?.()}
+              className="shrink-0 gap-1.5"
+            >
+              {generating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Generate model edits
+            </Button>
+          )}
         </div>
       )}
 
