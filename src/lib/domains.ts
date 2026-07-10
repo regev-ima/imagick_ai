@@ -40,11 +40,24 @@ export function isAppPath(pathname: string): boolean {
   );
 }
 
+/** Marketing pages served on imagick.ai (keep in sync with vercel.json). */
+export const MARKETING_PAGES = [
+  "/pricing",
+  "/about",
+  "/ai-styles",
+  "/ai-workflow",
+  "/case-studies",
+  "/compare",
+  "/contact",
+  "/enterprise",
+  "/try-demo",
+];
+
 /** A path that belongs to the marketing site (rendered on imagick.ai). */
 export function isMarketingPath(pathname: string): boolean {
   return (
     pathname === "/" ||
-    pathname === "/pricing" ||
+    MARKETING_PAGES.includes(pathname) ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/for/")
   );

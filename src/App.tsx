@@ -28,6 +28,14 @@ const PricingPage = lazy(() => import("./pages/PricingPage"));
 const UseCasePage = lazy(() => import("./pages/marketing/UseCasePage"));
 const BlogIndexPage = lazy(() => import("./pages/marketing/BlogIndexPage"));
 const BlogPostPage = lazy(() => import("./pages/marketing/BlogPostPage"));
+const AboutPage = lazy(() => import("./pages/marketing/AboutPage"));
+const AiStylesPage = lazy(() => import("./pages/marketing/AiStylesPage"));
+const AiWorkflowPage = lazy(() => import("./pages/marketing/AiWorkflowPage"));
+const CaseStudiesPage = lazy(() => import("./pages/marketing/CaseStudiesPage"));
+const ComparePage = lazy(() => import("./pages/marketing/ComparePage"));
+const ContactPage = lazy(() => import("./pages/marketing/ContactPage"));
+const EnterprisePage = lazy(() => import("./pages/marketing/EnterprisePage"));
+const TryDemoPage = lazy(() => import("./pages/marketing/TryDemoPage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const DashboardLayout = lazy(() => import("./components/layout/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
@@ -117,6 +125,14 @@ const App = () => (
                 <Route path="/for/:slug" element={<UseCasePage />} />
                 <Route path="/blog" element={<BlogIndexPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/ai-styles" element={<AiStylesPage />} />
+                <Route path="/ai-workflow" element={<AiWorkflowPage />} />
+                <Route path="/case-studies" element={<CaseStudiesPage />} />
+                <Route path="/compare" element={<ComparePage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/enterprise" element={<EnterprisePage />} />
+                <Route path="/try-demo" element={<TryDemoPage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/unsubscribe" element={<UnsubscribePage />} />

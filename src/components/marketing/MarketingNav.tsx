@@ -13,8 +13,8 @@ type NavItem = { label: string; id?: string; to?: string };
 
 const NAV: NavItem[] = [
   { label: "Features", id: "features" },
-  { label: "How it works", id: "how" },
-  { label: "Showcase", id: "showcase" },
+  { label: "How it works", to: "/ai-workflow" },
+  { label: "Demo", to: "/try-demo" },
   { label: "Pricing", to: "/pricing" },
   { label: "Blog", to: "/blog" },
   { label: "FAQ", id: "faq" },

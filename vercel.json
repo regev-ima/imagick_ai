@@ -3,11 +3,16 @@
   "redirects": [
     { "source": "/:path*", "has": [{ "type": "host", "value": "www.imagick.ai" }], "destination": "https://imagick.ai/:path*", "permanent": true },
 
+    { "source": "/privacy-policy", "destination": "/legal/privacy", "permanent": true },
+    { "source": "/terms-of-service", "destination": "/legal/terms", "permanent": true },
+    { "source": "/style-guide", "destination": "/about", "permanent": true },
+
     { "source": "/", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "/dashboard", "permanent": false },
     { "source": "/pricing", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/pricing", "permanent": false },
     { "source": "/blog", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/blog", "permanent": false },
     { "source": "/blog/:path*", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/blog/:path*", "permanent": false },
     { "source": "/for/:path*", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/for/:path*", "permanent": false },
+    { "source": "/:page(about|ai-styles|ai-workflow|case-studies|compare|contact|enterprise|try-demo)", "has": [{ "type": "host", "value": "app.imagick.ai" }], "destination": "https://imagick.ai/:page", "permanent": false },
 
     { "source": "/dashboard", "has": [{ "type": "host", "value": "imagick.ai" }], "destination": "https://app.imagick.ai/dashboard", "permanent": false },
     { "source": "/dashboard/:path*", "has": [{ "type": "host", "value": "imagick.ai" }], "destination": "https://app.imagick.ai/dashboard/:path*", "permanent": false },

@@ -7,9 +7,11 @@ import { USE_CASES } from "./content";
 
 const productLinks = [
   { label: "Features", id: "features" },
-  { label: "How it works", id: "how" },
+  { label: "AI styles", to: "/ai-styles" },
+  { label: "AI workflow", to: "/ai-workflow" },
+  { label: "Compare", to: "/compare" },
+  { label: "Try the demo", to: "/try-demo" },
   { label: "Pricing", to: "/pricing" },
-  { label: "Blog", to: "/blog" },
 ];
 
 const useCaseLinks = USE_CASES.map((u) => ({
@@ -17,10 +19,17 @@ const useCaseLinks = USE_CASES.map((u) => ({
   to: `/for/${u.slug}`,
 }));
 
+const companyLinks = [
+  { label: "About", to: "/about" },
+  { label: "Case studies", to: "/case-studies" },
+  { label: "Blog", to: "/blog" },
+  { label: "Studios & enterprise", to: "/enterprise" },
+  { label: "Contact", to: "/contact" },
+];
+
 const resourceLinks = [
   { label: "Sign in", href: appHref("/auth") },
   { label: "Start free", href: appHref("/auth?mode=signup") },
-  { label: "Contact", href: `mailto:${SITE.email}` },
 ];
 
 const legalLinks = [
@@ -99,12 +108,15 @@ export function MarketingFooter() {
             <div className="flex flex-col gap-3">{useCaseLinks.map(renderLink)}</div>
           </div>
           <div>
-            <div className="aura-microlabel mb-4">Get started</div>
-            <div className="flex flex-col gap-3">{resourceLinks.map(renderLink)}</div>
+            <div className="aura-microlabel mb-4">Company</div>
+            <div className="flex flex-col gap-3">{companyLinks.map(renderLink)}</div>
           </div>
           <div>
-            <div className="aura-microlabel mb-4">Legal</div>
-            <div className="flex flex-col gap-3">{legalLinks.map(renderLink)}</div>
+            <div className="aura-microlabel mb-4">Get started</div>
+            <div className="flex flex-col gap-3">
+              {resourceLinks.map(renderLink)}
+              {legalLinks.map(renderLink)}
+            </div>
           </div>
         </div>
 

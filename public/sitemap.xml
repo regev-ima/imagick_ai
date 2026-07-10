@@ -2,14 +2,19 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://imagick.ai/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://imagick.ai/pricing</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://imagick.ai/try-demo</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://imagick.ai/ai-styles</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://imagick.ai/ai-workflow</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://imagick.ai/compare</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://imagick.ai/case-studies</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://imagick.ai/enterprise</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://imagick.ai/about</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://imagick.ai/contact</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://imagick.ai/for/wedding-photographers</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://imagick.ai/for/portrait-photographers</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://imagick.ai/for/real-estate-photographers</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://imagick.ai/for/event-photographers</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://imagick.ai/blog</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://imagick.ai/blog/cull-wedding-gallery-faster-with-ai</loc><changefreq>yearly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://imagick.ai/blog/ai-photo-editing-vs-presets</loc><changefreq>yearly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://imagick.ai/blog/faster-client-delivery-guide</loc><changefreq>yearly</changefreq><priority>0.6</priority></url>
   <url><loc>https://imagick.ai/auth</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
   <url><loc>https://imagick.ai/legal/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://imagick.ai/legal/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
