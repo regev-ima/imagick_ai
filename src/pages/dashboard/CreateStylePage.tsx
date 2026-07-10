@@ -22,6 +22,8 @@ import {
   MapPin,
   Trophy,
   AlertTriangle,
+  Lock,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,6 +47,7 @@ import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/Goo
 import { Progress } from "@/components/ui/progress";
 import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
 import { uploadStyleFiles, type UploadStyleFileEvent } from "@/lib/uploadStyleFiles";
+import { useStyleQuota } from "@/hooks/useStyleQuota";
 
 interface UploadProgress {
   before: { uploaded: number; total: number };
@@ -122,6 +125,17 @@ export default function CreateStylePage() {
   // Set true when Create is pressed with an empty name — highlights the field.
   const [nameError, setNameError] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Subscription gate — a top-level custom model consumes a plan "slot"
+  // (Free = 0). The DB trigger enforce_style_quota is the hard backstop;
+  // this drives the friendly blocked state below so users never reach a
+  // form they can't submit.
+  const {
+    canCreate: withinQuota,
+    used: modelsUsed,
+    limit: modelLimit,
+    isLoading: quotaLoading,
+  } = useStyleQuota();
 
   // Details
   const [name, setName] = useState("");
@@ -360,7 +374,17 @@ export default function CreateStylePage() {
       navigate(`/dashboard/styles/${styleId}`);
     } catch (error: any) {
       console.error("Create style error:", error);
-      toast.error(error.message || "Failed to create style");
+      // The DB quota trigger raises this if the client gate was bypassed or
+      // the plan changed mid-flow — steer the user to billing instead of
+      // showing a raw Postgres error.
+      if (typeof error?.message === "string" && error.message.includes("style_quota_exceeded")) {
+        toast.error("You've reached your plan's custom model limit.", {
+          description: "Upgrade your plan or remove a model to train a new one.",
+          action: { label: "View plans", onClick: () => navigate("/dashboard/billing") },
+        });
+      } else {
+        toast.error(error.message || "Failed to create style");
+      }
     } finally {
       setIsCreating(false);
     }
@@ -551,6 +575,55 @@ export default function CreateStylePage() {
       </div>
     );
   };
+
+  // ── Subscription gate ────────────────────────────────────────────────────────
+  // Block the whole form (the single choke point every "Train New Style" entry
+  // funnels into) when the plan has no room for another custom model. The DB
+  // trigger still guards inserts, but this keeps users out of a dead-end form.
+  if (!quotaLoading && !withinQuota) {
+    const noneIncluded = modelLimit <= 0;
+    return (
+      <div className="min-h-full bg-background px-4 py-6 lg:px-8 lg:py-8">
+        <div className="mx-auto w-full max-w-6xl">
+          <span className="aura-microlabel flex items-center gap-1.5 text-accent">
+            <Sparkle size={11} /> Train a style · new look
+          </span>
+          <div className="mt-1.5 flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate("/dashboard/styles")} aria-label="Back to styles">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight">Train a new style</h1>
+          </div>
+
+          <div className="mt-8 flex justify-center">
+            <div className="glass-card w-full max-w-lg rounded-[--radius] p-8 text-center">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-[--radius] border border-primary/30 bg-primary/[0.06]">
+                <Lock className="h-6 w-6 text-accent" />
+              </div>
+              <h2 className="mt-5 text-xl font-semibold tracking-tight">
+                {noneIncluded ? "Custom models aren't on your plan" : "You've used all your custom models"}
+              </h2>
+              <p className="mx-auto mt-2.5 max-w-sm font-sans text-sm leading-relaxed text-muted-foreground">
+                {noneIncluded ? (
+                  <>Your plan includes ready-made styles but no custom model training. Upgrade to train your own look from before/after pairs.</>
+                ) : (
+                  <>Your plan includes {modelLimit} custom {modelLimit === 1 ? "model" : "models"} — you're using {modelsUsed}. Upgrade, add an extra-model add-on, or remove a model to train a new one.</>
+                )}
+              </p>
+              <div className="mt-6 flex flex-col items-center gap-2.5 sm:flex-row sm:justify-center">
+                <Button variant="glow" className="gap-2" onClick={() => navigate("/dashboard/billing")}>
+                  <Sparkles className="h-4 w-4" /> View plans
+                </Button>
+                <Button variant="outline" onClick={() => navigate("/dashboard/styles")}>
+                  Back to styles
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-background px-4 py-6 lg:px-8 lg:py-8">

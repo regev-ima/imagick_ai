@@ -21,9 +21,11 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import heroImage1 from "@/assets/hero-gallery-1.jpg";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { getPreviewUrl } from "@/lib/imageUrls";
 import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
+import { useStyleQuota } from "@/hooks/useStyleQuota";
+import { toast } from "sonner";
 
 type StyleStatus = "importing" | "training" | "ready" | "error" | "deleted";
 type StyleVisibility = "private" | "public";
@@ -150,6 +152,26 @@ export default function StylesPage() {
 
   const { data: showcaseCovers = {} } = useShowcaseCovers();
 
+  // Custom-model quota — gates the "Train New Style" entry points so users
+  // see their limit before landing on a form they can't submit.
+  const { canCreate: canCreateStyle, used: modelsUsed, limit: modelLimit, isUnlimited, isLoading: quotaLoading } = useStyleQuota();
+
+  const goCreateStyle = () => {
+    // While the quota is still resolving, let the create page (and the DB
+    // trigger) be the gate rather than blocking on a not-yet-known limit.
+    if (!quotaLoading && !canCreateStyle) {
+      toast.error("You've reached your plan's custom model limit.", {
+        description:
+          modelLimit <= 0
+            ? "Custom model training isn't included on your plan. Upgrade to train your own look."
+            : `You're using ${modelsUsed} of ${modelLimit}. Upgrade or remove a model to train a new one.`,
+        action: { label: "View plans", onClick: () => navigate("/dashboard/billing") },
+      });
+      return;
+    }
+    navigate("/dashboard/styles/new");
+  };
+
   const handleViewStyle = (styleId: string) => {
     navigate(`/dashboard/styles/${styleId}`);
   };
@@ -214,12 +236,17 @@ export default function StylesPage() {
                 Your AI editing models — trained, curated, ready to transform.
               </p>
             </div>
-            <Button variant="glow" className="gap-2" asChild>
-              <Link to="/dashboard/styles/new">
+            <div className="flex flex-col items-start gap-1.5 sm:items-end">
+              <Button variant="glow" className="gap-2" onClick={goCreateStyle}>
                 <Plus className="w-4 h-4" />
                 Train New Style
-              </Link>
-            </Button>
+              </Button>
+              {!quotaLoading && !isUnlimited && (
+                <span className="aura-microlabel text-muted-foreground">
+                  {modelsUsed} / {modelLimit} custom {modelLimit === 1 ? "model" : "models"}
+                </span>
+              )}
+            </div>
           </div>
         </motion.header>
 
@@ -364,11 +391,9 @@ export default function StylesPage() {
                     : "Train your first custom AI style model and start transforming images with your unique aesthetic."}
                 </p>
                 {!searchQuery && (
-                  <Button variant="glow" className="mt-7 gap-2" asChild>
-                    <Link to="/dashboard/styles/new">
-                      <Plus className="w-4 h-4" />
-                      Train New Style
-                    </Link>
+                  <Button variant="glow" className="mt-7 gap-2" onClick={goCreateStyle}>
+                    <Plus className="w-4 h-4" />
+                    Train New Style
                   </Button>
                 )}
               </div>
