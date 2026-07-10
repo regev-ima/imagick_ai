@@ -416,8 +416,11 @@ export default function CreateStylePage() {
     const percent = type === "before" ? beforePercent : afterPercent;
     const side = uploadProgress?.[type];
 
+    const hasFiles = files.length > 0;
+    const accept = type === "before" ? IMAGE_ACCEPT : "image/*";
+
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
         <div className="flex shrink-0 items-center justify-between">
           <span className="caption flex items-center gap-1.5">
             <Upload className="h-3 w-3" />
@@ -436,85 +439,81 @@ export default function CreateStylePage() {
           </div>
         )}
 
-        {!isCreating && (
-          <div
-            onDragOver={(e) => handleDragOver(e, type)}
-            onDragLeave={(e) => handleDragLeave(e, type)}
-            onDrop={(e) => handleDrop(e, type)}
-            className={cn(
-              "relative flex min-h-[150px] flex-1 flex-col items-center justify-center overflow-hidden rounded-[--radius] border-2 border-dashed p-5 text-center transition-colors",
-              dragging ? "border-primary bg-primary/[0.04]" : "border-border hover:border-primary/50 hover:bg-primary/[0.03]",
-            )}
-          >
-            <input
-              type="file"
-              multiple
-              accept={type === "before" ? IMAGE_ACCEPT : "image/*"}
-              onChange={(e) => handleFileSelect(e, type)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              aria-label={`Upload ${type} images`}
-            />
-            <Upload className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Drag &amp; drop or click</p>
-            <p className="caption mt-1">
-              {type === "before" ? "Min 5 · RAW ok" : "Matched by filename"}
-            </p>
-          </div>
-        )}
-
-        {files.length > 0 && (
-          <div className="grid shrink-0 grid-cols-4 gap-1.5">
-            {files.slice(0, 8).map((file) => {
-              const isActive = uploadProgress?.activeIds.has(file.id);
-              const isDone = uploadProgress?.doneIds.has(file.id);
-              const isFailed = uploadProgress?.failedIds.has(file.id);
-              return (
-                <div key={file.id} className="group relative">
-                  {file.preview ? (
-                    <img
-                      src={file.preview}
-                      alt=""
-                      className={cn("aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity", isActive && "opacity-60")}
-                    />
-                  ) : (
-                    <div className={cn("grid aspect-square w-full place-items-center rounded-sm bg-surface-2 plate-keyline transition-opacity", isActive && "opacity-60")}>
-                      <span className="caption">RAW</span>
+        {/* Combined dropzone + thumbnails — one fixed-height box (flex-1) that
+            NEVER grows the page: empty = a fill prompt; filled = a small
+            internally-scrolling grid so any number of images stays contained. */}
+        <div
+          onDragOver={(e) => !isCreating && handleDragOver(e, type)}
+          onDragLeave={(e) => !isCreating && handleDragLeave(e, type)}
+          onDrop={(e) => !isCreating && handleDrop(e, type)}
+          className={cn(
+            "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[--radius] border-2 border-dashed transition-colors",
+            dragging ? "border-primary bg-primary/[0.04]" : "border-border",
+            !hasFiles && !isCreating && "hover:border-primary/50 hover:bg-primary/[0.03]",
+          )}
+        >
+          {hasFiles ? (
+            <>
+              {!isCreating && (
+                <label className="caption flex shrink-0 cursor-pointer items-center justify-center gap-1.5 border-b border-border/60 py-1.5 transition-colors hover:text-foreground">
+                  <input type="file" multiple accept={accept} onChange={(e) => handleFileSelect(e, type)} className="hidden" aria-label={`Add ${type} images`} />
+                  <Upload className="h-3 w-3" /> Add more
+                </label>
+              )}
+              <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(46px,1fr))] gap-1 overflow-y-auto p-1.5">
+                {files.map((file) => {
+                  const isActive = uploadProgress?.activeIds.has(file.id);
+                  const isDone = uploadProgress?.doneIds.has(file.id);
+                  const isFailed = uploadProgress?.failedIds.has(file.id);
+                  return (
+                    <div key={file.id} className="group relative aspect-square">
+                      {file.preview ? (
+                        <img src={file.preview} alt="" loading="lazy" className={cn("h-full w-full rounded-sm object-cover plate-keyline transition-opacity", isActive && "opacity-60")} />
+                      ) : (
+                        <div className={cn("grid h-full w-full place-items-center rounded-sm bg-surface-2 plate-keyline transition-opacity", isActive && "opacity-60")}>
+                          <span className="font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
+                        </div>
+                      )}
+                      {isActive && (
+                        <div className="absolute inset-0 grid place-items-center rounded-sm bg-background/40">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                        </div>
+                      )}
+                      {isDone && (
+                        <div className="absolute bottom-0.5 right-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-primary">
+                          <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                        </div>
+                      )}
+                      {isFailed && (
+                        <div className="absolute inset-0 grid place-items-center rounded-sm bg-destructive/20">
+                          <X className="h-3.5 w-3.5 text-destructive" />
+                        </div>
+                      )}
+                      {!uploadProgress && (
+                        <button
+                          onClick={() => removeFile(file.id, type)}
+                          aria-label={`Remove ${type} image`}
+                          className="absolute right-0 top-0 grid h-4 w-4 place-items-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      )}
                     </div>
-                  )}
-                  {isActive && (
-                    <div className="absolute inset-0 grid place-items-center rounded-sm bg-background/40">
-                      <Loader2 className="h-4 w-4 animate-spin text-accent" />
-                    </div>
-                  )}
-                  {isDone && (
-                    <div className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-primary">
-                      <Check className="h-3 w-3 text-primary-foreground" />
-                    </div>
-                  )}
-                  {isFailed && (
-                    <div className="absolute inset-0 grid place-items-center rounded-sm bg-destructive/20">
-                      <X className="h-5 w-5 text-destructive" />
-                    </div>
-                  )}
-                  {!uploadProgress && (
-                    <button
-                      onClick={() => removeFile(file.id, type)}
-                      aria-label={`Remove ${type} image`}
-                      className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-            {files.length > 8 && (
-              <div className="grid aspect-square w-full place-items-center rounded-sm bg-muted font-mono text-sm text-muted-foreground">
-                +{files.length - 8}
+                  );
+                })}
               </div>
-            )}
-          </div>
-        )}
+            </>
+          ) : (
+            <label className={cn("flex min-h-[120px] flex-1 flex-col items-center justify-center p-5 text-center", isCreating ? "cursor-default" : "cursor-pointer")}>
+              {!isCreating && (
+                <input type="file" multiple accept={accept} onChange={(e) => handleFileSelect(e, type)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label={`Upload ${type} images`} />
+              )}
+              <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Drag &amp; drop or click</p>
+              <p className="caption mt-1">{type === "before" ? "Min 5 · RAW ok" : "Matched by filename"}</p>
+            </label>
+          )}
+        </div>
       </div>
     );
   };
