@@ -417,8 +417,8 @@ export default function CreateStylePage() {
     const side = uploadProgress?.[type];
 
     return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex shrink-0 items-center justify-between">
           <span className="caption flex items-center gap-1.5">
             <Upload className="h-3 w-3" />
             {type === "before" ? "Before · originals" : "After · edited"}
@@ -427,7 +427,7 @@ export default function CreateStylePage() {
         </div>
 
         {uploadProgress && (
-          <div className="space-y-1.5">
+          <div className="shrink-0 space-y-1.5">
             <div className="flex items-center justify-between caption">
               <span>{side?.uploaded ?? 0}/{side?.total ?? 0}</span>
               <span className="text-accent">{percent}%</span>
@@ -442,7 +442,7 @@ export default function CreateStylePage() {
             onDragLeave={(e) => handleDragLeave(e, type)}
             onDrop={(e) => handleDrop(e, type)}
             className={cn(
-              "relative overflow-hidden rounded-[--radius] border-2 border-dashed p-5 text-center transition-colors",
+              "relative flex min-h-[150px] flex-1 flex-col items-center justify-center overflow-hidden rounded-[--radius] border-2 border-dashed p-5 text-center transition-colors",
               dragging ? "border-primary bg-primary/[0.04]" : "border-border hover:border-primary/50 hover:bg-primary/[0.03]",
             )}
           >
@@ -463,7 +463,7 @@ export default function CreateStylePage() {
         )}
 
         {files.length > 0 && (
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid shrink-0 grid-cols-4 gap-1.5">
             {files.slice(0, 8).map((file) => {
               const isActive = uploadProgress?.activeIds.has(file.id);
               const isDone = uploadProgress?.doneIds.has(file.id);
@@ -520,13 +520,13 @@ export default function CreateStylePage() {
   };
 
   return (
-    <div className="min-h-full bg-background px-4 py-6 lg:px-8 lg:py-8">
-      <div className="mx-auto w-full max-w-6xl">
+    <div className="min-h-full bg-background lg:h-full lg:overflow-hidden">
+      <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-6 lg:h-full lg:min-h-0 lg:px-8">
         {/* ════ HEADER — plan-first: microlabel · back + inline name + live pills ══ */}
-        <span className="aura-microlabel flex items-center gap-1.5 text-accent">
+        <span className="aura-microlabel flex shrink-0 items-center gap-1.5 text-accent">
           <Sparkle size={11} /> Train a style · new look
         </span>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="mt-1.5 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
           <Button variant="ghost" size="icon" className="shrink-0" onClick={handleLeave} aria-label="Back to styles">
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -552,9 +552,9 @@ export default function CreateStylePage() {
         </div>
 
         {/* ════ WORK — single calm column of panels ═══════════════════════════ */}
-        <div className={cn("mt-6 space-y-4", isCreating && "pointer-events-none select-none opacity-60")}>
+        <div className={cn("mt-6 flex min-h-0 flex-1 flex-col gap-4", isCreating && "pointer-events-none select-none opacity-60")}>
           {/* ── Look details — model type ── */}
-          <div className="glass-card rounded-[--radius] p-5">
+          <div className="glass-card shrink-0 rounded-[--radius] p-5">
             <div className="caption mb-1.5 flex items-center gap-1.5 text-accent">
               <Sparkle size={11} /> What is this look for?
             </div>
@@ -590,32 +590,34 @@ export default function CreateStylePage() {
             )}
           </div>
 
-          {/* ── Training pairs ── */}
-          <div className="glass-card rounded-[--radius] p-5">
-            <div className="mb-3.5">
+          {/* ── Training pairs — grows to fill the workspace ── */}
+          <div className="glass-card flex min-h-0 flex-1 flex-col rounded-[--radius] p-5">
+            <div className="mb-3.5 shrink-0">
               <div className="caption flex items-center gap-1.5"><Upload className="h-3 w-3" /> Training pairs · minimum 5</div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Upload matching before/after images — the AI learns your edit from each pair.
               </p>
             </div>
 
-            <UploadSourceSelector value={uploadSource} onChange={setUploadSource} />
+            <div className="shrink-0">
+              <UploadSourceSelector value={uploadSource} onChange={setUploadSource} />
+            </div>
 
             {uploadSource === "local" ? (
-              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+              <div className="mt-4 flex min-h-0 flex-1 flex-col gap-5 sm:flex-row">
                 {renderLocalZone("before")}
                 {renderLocalZone("after")}
               </div>
             ) : (
-              <div className="mt-4 grid gap-5 sm:grid-cols-2">
-                <div className="space-y-2.5">
+              <div className="mt-4 flex min-h-0 flex-1 flex-col gap-5 sm:flex-row">
+                <div className="flex-1 space-y-2.5">
                   <span className="caption flex items-center gap-1.5"><CloudIcon className="h-3 w-3" /> Before · originals</span>
                   <GoogleDriveInput
                     folderInfo={beforeFolderInfo}
                     onUpdate={(info, links) => { setBeforeFolderInfo(info); setBeforeDriveLinks(links); }}
                   />
                 </div>
-                <div className="space-y-2.5">
+                <div className="flex-1 space-y-2.5">
                   <span className="caption flex items-center gap-1.5"><CloudIcon className="h-3 w-3" /> After · edited</span>
                   <GoogleDriveInput
                     folderInfo={afterFolderInfo}
@@ -626,7 +628,7 @@ export default function CreateStylePage() {
             )}
 
             {localCountMismatch && (
-              <div role="alert" className="mt-4 flex items-start gap-2.5 rounded-[--radius] border border-rating/30 bg-rating/[0.08] p-3">
+              <div role="alert" className="mt-4 flex shrink-0 items-start gap-2.5 rounded-[--radius] border border-rating/30 bg-rating/[0.08] p-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rating" />
                 <p className="text-xs leading-snug text-muted-foreground">
                   <span className="font-medium text-rating">Counts don't match — {beforeFiles.length} before vs {afterFiles.length} after.</span>{" "}
@@ -638,7 +640,7 @@ export default function CreateStylePage() {
         </div>
 
         {/* ════ FOOTER — training plan + glow CTA ═════════════════════════════ */}
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-between">
+        <div className="mt-5 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-between">
           <div className="glass-card min-w-0 flex-1 rounded-[--radius] px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5 text-sm font-semibold">
