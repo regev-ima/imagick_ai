@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -119,6 +119,9 @@ export default function CreateStylePage() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   // Which side's full review/manage modal is open (null = closed).
   const [reviewSide, setReviewSide] = useState<"before" | "after" | null>(null);
+  // Set true when Create is pressed with an empty name — highlights the field.
+  const [nameError, setNameError] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Details
   const [name, setName] = useState("");
@@ -400,6 +403,30 @@ export default function CreateStylePage() {
     else navigate("/dashboard/styles");
   };
 
+  // Validate on click so a missing required field gives clear feedback instead
+  // of a silently dead button.
+  const attemptCreate = () => {
+    if (isCreating) return;
+    const missing: string[] = [];
+    if (!hasName) missing.push("a style name");
+    if (uploadSource === "local") {
+      if (beforeFiles.length < 5) missing.push("at least 5 before images");
+      if (afterFiles.length < 5) missing.push("at least 5 after images");
+    } else {
+      if (beforeDriveLinks.length === 0) missing.push("a Before Drive folder");
+      if (afterDriveLinks.length === 0) missing.push("an After Drive folder");
+    }
+    if (missing.length > 0) {
+      toast.error(`Add ${missing.join(", ")} to start training.`);
+      if (!hasName) {
+        setNameError(true);
+        nameInputRef.current?.focus();
+      }
+      return;
+    }
+    setShowConfirmDialog(true);
+  };
+
   // Warn on tab close / reload only while an upload is actually in flight.
   useEffect(() => {
     if (!isCreating) return;
@@ -553,12 +580,19 @@ export default function CreateStylePage() {
           </Button>
           <div className="group relative min-w-0 flex-1">
             <input
+              ref={nameInputRef}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); if (nameError) setNameError(false); }}
               disabled={isCreating}
-              className="w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset ring-border/60 transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 hover:ring-border focus:bg-surface-2 focus:ring-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
-              placeholder="Untitled look"
               aria-label="Style name"
+              aria-invalid={nameError}
+              className={cn(
+                "w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 focus:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60",
+                nameError
+                  ? "ring-destructive/70 focus:ring-destructive placeholder:text-destructive/50"
+                  : "ring-border/60 hover:ring-border focus:ring-primary/60",
+              )}
+              placeholder={nameError ? "Name your look to continue…" : "Untitled look"}
             />
             <Pencil className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 transition-colors group-hover:text-foreground/70" />
           </div>
@@ -678,9 +712,10 @@ export default function CreateStylePage() {
             <Button
               variant="glow"
               size="lg"
-              disabled={!canCreate || isCreating}
-              className="w-full gap-2"
-              onClick={() => setShowConfirmDialog(true)}
+              disabled={isCreating}
+              aria-disabled={!canCreate}
+              className={cn("w-full gap-2", !canCreate && "opacity-60")}
+              onClick={attemptCreate}
             >
               {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
               {isCreating ? "Uploading…" : "Create & start training"}
