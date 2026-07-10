@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Star,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -317,6 +318,22 @@ export default function ShowcaseManager() {
   };
 
 
+  // Pick which edited image represents the style (its card/preview cover).
+  // Writes thumbnail_url, which resolveStyleCover now prioritises so the choice
+  // sticks across every picker and the public style library.
+  const handleSetCover = useCallback(async (styleId: string, afterUrl: string) => {
+    const { error } = await supabase.from("styles").update({ thumbnail_url: afterUrl } as never).eq("id", styleId);
+    if (error) {
+      console.error("Set cover error:", error);
+      toast.error("Failed to set cover image");
+      return;
+    }
+    toast.success("Cover image updated");
+    queryClient.invalidateQueries({ queryKey: ["preset-styles-showcase"] });
+    queryClient.invalidateQueries({ queryKey: ["showcase-covers"] });
+    queryClient.invalidateQueries({ queryKey: ["styles"] });
+  }, [queryClient]);
+
   const handleDeleteEditPair = useCallback(async (styleId: string, imageId: string) => {
     setHiddenMap((prev) => {
       const list = prev[styleId] || [];
@@ -497,8 +514,20 @@ export default function ShowcaseManager() {
                                     <span className="absolute bottom-1 left-1 text-[10px] font-medium bg-black/60 text-white px-1.5 py-0.5 rounded">After</span>
                                   </div>
                                 </div>
-                                {/* Hide/Delete buttons */}
+                                {/* Set-as-cover / Hide / Delete buttons */}
                                 <div className="absolute top-1.5 right-1.5 flex gap-1">
+                                  <button
+                                    onClick={() => handleSetCover(style.id, edit.edited_url)}
+                                    className={cn(
+                                      "p-1.5 rounded-md backdrop-blur-sm transition-colors",
+                                      style.thumbnail_url === edit.edited_url
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-background/60 text-foreground hover:bg-background/80"
+                                    )}
+                                    title={style.thumbnail_url === edit.edited_url ? "Cover image" : "Set as cover"}
+                                  >
+                                    <Star className={cn("w-3.5 h-3.5", style.thumbnail_url === edit.edited_url && "fill-current")} />
+                                  </button>
                                   <button
                                     onClick={() => toggleHidden(style.id, edit.image_id)}
                                     className={cn(

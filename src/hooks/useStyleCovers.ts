@@ -12,10 +12,12 @@ export interface StyleCoverInput {
  * Resolve the single best "edited-by-this-style" preview URL.
  *
  * Priority:
- *   1. showcase edit — a real result the style produced on the shared sample
+ *   1. thumbnail_url — an explicitly chosen cover (the admin picked which
+ *      image represents the style in the Showcase Manager); wins so the choice
+ *      actually sticks.
+ *   2. showcase edit — a real result the style produced on the shared sample
  *      gallery (auto-generated for every style when training completes).
- *   2. after_image_urls[0] — curated result images on the style row.
- *   3. thumbnail_url — a manually set cover.
+ *   3. after_image_urls[0] — curated result images on the style row.
  *
  * Returns undefined when the style has no demo anywhere (caller shows a
  * placeholder). Keeping this in one place means every style picker/card shows
@@ -27,9 +29,9 @@ export function resolveStyleCover(
   showcaseCovers?: Record<string, string>,
 ): string | undefined {
   return (
+    style.thumbnail_url ||
     showcaseCovers?.[style.id] ||
     style.after_image_urls?.[0] ||
-    style.thumbnail_url ||
     undefined
   );
 }
