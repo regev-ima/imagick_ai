@@ -6,6 +6,8 @@ interface BeforeAfterSliderProps {
   beforeSrc: string;
   afterSrc: string;
   className?: string;
+  /** Max height of the slider box (any CSS length). Defaults to 50vh. */
+  maxHeight?: string;
 }
 
 function SliderImageFallback({ className }: { className?: string }) {
@@ -16,7 +18,7 @@ function SliderImageFallback({ className }: { className?: string }) {
   );
 }
 
-export function BeforeAfterSlider({ beforeSrc, afterSrc, className }: BeforeAfterSliderProps) {
+export function BeforeAfterSlider({ beforeSrc, afterSrc, className, maxHeight = "50vh" }: BeforeAfterSliderProps) {
   const [position, setPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const [beforeError, setBeforeError] = useState(false);
@@ -58,7 +60,7 @@ export function BeforeAfterSlider({ beforeSrc, afterSrc, className }: BeforeAfte
         "relative rounded-2xl overflow-hidden select-none cursor-col-resize border border-border bg-black/20 mx-auto",
         className
       )}
-      style={{ aspectRatio: naturalAspect ? String(naturalAspect) : "3/2", maxHeight: "50vh", touchAction: "none" }}
+      style={{ aspectRatio: naturalAspect ? String(naturalAspect) : "3/2", maxHeight, touchAction: "none" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
