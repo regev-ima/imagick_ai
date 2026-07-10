@@ -15,6 +15,7 @@ import {
 import { Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FileCard } from "@/components/admin/StyleTrainingGalleryDialog";
+import { getThumbnailUrl } from "@/lib/imageUrls";
 import type { StyleFull } from "@/pages/dashboard/admin/StyleDetailsSheet";
 
 /**
@@ -223,20 +224,33 @@ export function TriCompare({ style, onGenerateEdits, generating, refreshToken }:
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 gap-4">
-          {/* Left: scrollable pair list */}
-          <div className="flex w-64 shrink-0 flex-col gap-1 overflow-y-auto rounded-[--radius] border border-border bg-surface-2/20 p-2">
+          {/* Left: compact preview panel — thumbnail · name · availability */}
+          <div className="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto rounded-[--radius] border border-border bg-surface-2/20 p-2">
             {rows.map((row, i) => (
               <button
                 key={row.stem}
                 type="button"
                 onClick={() => setSelectedIndex(i)}
                 className={cn(
-                  "flex w-full items-center justify-between gap-2 rounded-[--radius] border px-2.5 py-2 text-left transition-colors",
+                  "flex w-full items-center gap-2.5 rounded-[--radius] border px-2 py-1.5 text-left transition-colors",
                   i === clampedIndex
                     ? "border-primary/60 bg-primary/5"
                     : "border-transparent hover:border-border hover:bg-surface-2/40",
                 )}
               >
+                <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[--radius] border border-border bg-surface-2">
+                  {row.source ? (
+                    <img
+                      src={getThumbnailUrl(row.source)}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+                    />
+                  ) : (
+                    <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
+                  )}
+                </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground" title={row.stem}>
                   {row.stem}
                 </span>
@@ -245,9 +259,21 @@ export function TriCompare({ style, onGenerateEdits, generating, refreshToken }:
             ))}
           </div>
 
-          {/* Right: viewer */}
+          {/* Right: viewer — controls sit in one right-aligned toolbar above a
+              large image so the comparison gets almost all the vertical space. */}
           <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
+              {modelEditsLoading && (
+                <span className="mr-auto flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Loading model edits…
+                </span>
+              )}
+              {viewMode === "slider" && (
+                <>
+                  <SlotSelect label="Before" value={beforeSlot} onChange={setBeforeSlot} />
+                  <SlotSelect label="After" value={afterSlot} onChange={setAfterSlot} />
+                </>
+              )}
               <ToggleGroup
                 type="single"
                 variant="outline"
@@ -258,11 +284,6 @@ export function TriCompare({ style, onGenerateEdits, generating, refreshToken }:
                 <ToggleGroupItem value="slider" className="text-xs">Slider</ToggleGroupItem>
                 <ToggleGroupItem value="side-by-side" className="text-xs">Side-by-side</ToggleGroupItem>
               </ToggleGroup>
-              {modelEditsLoading && (
-                <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Loading model edits…
-                </span>
-              )}
             </div>
 
             {viewMode === "side-by-side" ? (
@@ -272,27 +293,20 @@ export function TriCompare({ style, onGenerateEdits, generating, refreshToken }:
                 <ImagePane label="Model's edit" url={activeRow?.modelEdit} />
               </div>
             ) : (
-              <div className="flex min-h-0 flex-1 flex-col gap-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <SlotSelect label="Before" value={beforeSlot} onChange={setBeforeSlot} />
-                  <SlotSelect label="After" value={afterSlot} onChange={setAfterSlot} />
-                </div>
-                <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto">
-                  {beforeUrl && afterUrl ? (
-                    <div className="w-full max-w-4xl">
-                      <BeforeAfterSlider
-                        key={`${clampedIndex}-${beforeSlot}-${afterSlot}`}
-                        beforeSrc={beforeUrl}
-                        afterSrc={afterUrl}
-                        className="max-h-[55vh]"
-                      />
-                    </div>
-                  ) : (
-                    <p className="max-w-sm text-center text-sm text-muted-foreground">
-                      {SLOT_LABEL[beforeSlot]} vs {SLOT_LABEL[afterSlot]} — one or both aren't available for this photo.
-                    </p>
-                  )}
-                </div>
+              <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+                {beforeUrl && afterUrl ? (
+                  <BeforeAfterSlider
+                    key={`${clampedIndex}-${beforeSlot}-${afterSlot}`}
+                    beforeSrc={beforeUrl}
+                    afterSrc={afterUrl}
+                    maxHeight="100%"
+                    className="h-full max-w-full"
+                  />
+                ) : (
+                  <p className="max-w-sm text-center text-sm text-muted-foreground">
+                    {SLOT_LABEL[beforeSlot]} vs {SLOT_LABEL[afterSlot]} — one or both aren't available for this photo.
+                  </p>
+                )}
               </div>
             )}
           </div>
