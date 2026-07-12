@@ -52,16 +52,20 @@ export async function uploadStyleFiles(
   const uploadOne = async (file: File, signedUrl: string, fileId: string): Promise<string> => {
     onProgress?.({ type: "active", fileId });
 
-    const buffer = await file.arrayBuffer();
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
+        // Stream the File directly (Blob body) rather than reading the whole
+        // file into an ArrayBuffer first — with many concurrent uploads of
+        // large RAW/JPEGs, buffering every file into JS memory was a big source
+        // of memory pressure, and it delayed the first PUT. fetch sets
+        // Content-Length from the Blob and a File is re-readable across retries.
         const response = await fetch(B2_PROXY_URL, {
           method: "PUT",
           headers: {
             signedurl: signedUrl,
             "Content-Type": file.type || "image/jpeg",
           },
-          body: buffer,
+          body: file,
         });
         if (response.ok) {
           onProgress?.({ type: "done", fileId });
