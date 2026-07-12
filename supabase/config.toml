@@ -51,6 +51,9 @@ verify_jwt = false
 [functions.admin-list-users]
 verify_jwt = false
 
+[functions.admin-manage-user]
+verify_jwt = false
+
 [functions.notify-whatsapp]
 verify_jwt = false
 

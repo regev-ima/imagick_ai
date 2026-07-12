@@ -33,6 +33,7 @@ import {
   Upload,
   Timer,
   Layers,
+  Settings2,
   type LucideIcon,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -41,11 +42,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { ManageUserPanel } from "./ManageUserPanel";
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-user-detail", userId],
     enabled: !!userId,
     queryFn: async () => {
@@ -121,6 +123,7 @@ export default function UserDetailPage() {
               <TabsTrigger value="styles" className="gap-1.5"><Sparkles className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Styles</span></TabsTrigger>
               <TabsTrigger value="sessions" className="gap-1.5"><Monitor className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sessions</span></TabsTrigger>
               <TabsTrigger value="onboarding" className="gap-1.5"><ClipboardList className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Onboarding</span></TabsTrigger>
+              <TabsTrigger value="manage" className="gap-1.5"><Settings2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Manage</span></TabsTrigger>
             </TabsList>
           </div>
 
@@ -567,6 +570,18 @@ export default function UserDetailPage() {
                 </div>
               );
             })()}
+          </TabsContent>
+
+          {/* === MANAGE === */}
+          <TabsContent value="manage">
+            <ManageUserPanel
+              userId={userId!}
+              email={data.user.email}
+              fullName={data.user.full_name || ""}
+              role={data.user.role || ""}
+              suspended={data.subscription?.status === "suspended"}
+              onChanged={() => refetch()}
+            />
           </TabsContent>
         </Tabs>
       )}
