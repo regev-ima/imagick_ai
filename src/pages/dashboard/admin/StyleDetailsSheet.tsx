@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Sheet,
@@ -23,6 +23,7 @@ import {
 import { Copy, Check, ExternalLink, X, Plus, AlertTriangle, ImageIcon, GitBranch, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getThumbnailUrl } from "@/lib/imageUrls";
+import { cn } from "@/lib/utils";
 import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 import { breakdownFiles, type FileBreakdown, type StyleFileKind } from "@/lib/styleFiles";
 import { formatDuration } from "@/lib/cullingEta";
@@ -328,6 +329,127 @@ function StyleDemoPreview({ styleId, onOpenGallery }: { styleId: string; onOpenG
   );
 }
 
+/**
+ * Live upload monitor — while a client is still uploading a style's source
+ * photos, the DB only knows the *target* (total_images_to_import, stamped at
+ * the start) and the final count (stamped at the end); it has no mid-upload
+ * progress, because the browser uploads straight to B2. So we count the actual
+ * objects that have landed in the style's before/ + after/ prefixes (the same
+ * count-files the pipeline uses) every few seconds. That gives a truthful
+ * "X of Y uploaded · N%", and — by watching whether the count is still moving —
+ * a real "still uploading" vs "looks stuck" signal.
+ */
+function StyleUploadMonitor({ style }: { style: StyleFull }) {
+  // The sheet's `style` prop is a snapshot frozen at open time, so read the
+  // live status/target straight from the row (cheap, only while uploading).
+  const { data: live } = useQuery({
+    queryKey: ["style-upload-live", style.id],
+    initialData: {
+      status: style.status,
+      total_images_to_import: style.total_images_to_import,
+    },
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("styles")
+        .select("status, total_images_to_import")
+        .eq("id", style.id)
+        .single();
+      if (error) throw error;
+      return data as { status: string; total_images_to_import: number | null };
+    },
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === "uploading" || s === "importing" ? 5000 : false;
+    },
+  });
+
+  // Covers both direct browser upload ("uploading") and Google-Drive import
+  // ("importing") — both land in the same before/ + after/ prefixes.
+  const uploading = live?.status === "uploading" || live?.status === "importing";
+  const target = live?.total_images_to_import ?? style.total_images_to_import ?? 0;
+
+  // Count the objects actually in storage right now (before + after). Mirrors
+  // the working useImportProgress call: no bucket arg, guard on data.success.
+  const { data: counts, isError } = useQuery({
+    queryKey: ["style-upload-count", style.id],
+    enabled: uploading,
+    refetchInterval: uploading ? 5000 : false,
+    queryFn: async () => {
+      const countFolder = async (sub: "before" | "after") => {
+        const { data, error } = await supabase.functions.invoke("count-files", {
+          body: { folder: `styles/${style.user_id}/${style.id}/${sub}/` },
+        });
+        if (error || !data?.success) throw new Error("count-files failed");
+        return Number(data?.fileCount ?? 0);
+      };
+      const [before, after] = await Promise.all([countFolder("before"), countFolder("after")]);
+      return { before, after, total: before + after, at: Date.now() };
+    },
+  });
+
+  // Stall detection: remember when the landed count last moved; if it hasn't
+  // budged for a while (and we're short of the target), the upload looks stuck.
+  const STALL_MS = 45_000;
+  const progressRef = useRef<{ lastTotal: number; lastChangedAt: number }>({ lastTotal: -1, lastChangedAt: 0 });
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    if (!counts) return;
+    const r = progressRef.current;
+    if (counts.total !== r.lastTotal) {
+      r.lastTotal = counts.total;
+      r.lastChangedAt = counts.at;
+      setStalled(false);
+    } else if (target > 0 && counts.total < target && counts.at - r.lastChangedAt > STALL_MS) {
+      setStalled(true);
+    }
+  }, [counts, target]);
+
+  if (!uploading) return null;
+
+  const landed = counts?.total ?? 0;
+  const pct = target > 0 ? Math.min(100, Math.round((landed / target) * 100)) : 0;
+  const complete = target > 0 && landed >= target;
+
+  return (
+    <section className="aura-ai-border glass-card space-y-3 rounded-[--radius] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="aura-microlabel text-primary">Live upload</div>
+        {target > 0 && (
+          <span className="folio text-sm tabular-nums text-foreground">{landed} / {target} · {pct}%</span>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            complete
+              ? "bg-secondary"
+              : stalled
+                ? "bg-rating"
+                : "bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] animate-gradient-x",
+          )}
+          style={{ width: `${target > 0 ? pct : (landed > 0 ? 100 : 6)}%` }}
+        />
+      </div>
+
+      {/* Status line */}
+      <div className="flex items-center gap-2 text-xs">
+        {isError ? (
+          <><AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rating" /><span className="text-muted-foreground">Couldn't read the upload folder — retrying…</span></>
+        ) : complete ? (
+          <><Check className="h-3.5 w-3.5 shrink-0 text-secondary" /><span className="text-foreground">All photos uploaded — finalizing &amp; starting training.</span></>
+        ) : stalled ? (
+          <><AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rating" /><span className="text-foreground">No new photos in {Math.round(STALL_MS / 1000)}s — the upload may be paused or stuck.</span></>
+        ) : (
+          <><Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" /><span className="text-muted-foreground">Uploading… {counts ? `${counts.before} before · ${counts.after} after` : "counting files…"}</span></>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenParent }: Props) {
   const queryClient = useQueryClient();
   const [modelId, setModelId] = useState("");
@@ -430,6 +552,9 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
         </SheetHeader>
 
         <div className="mt-5 space-y-6">
+          {/* ── Live upload monitor (only while a client is still uploading) ── */}
+          <StyleUploadMonitor style={style} />
+
           {/* ── Identity ── */}
           <section className="space-y-3">
             <div className="aura-microlabel text-primary">Identity</div>
