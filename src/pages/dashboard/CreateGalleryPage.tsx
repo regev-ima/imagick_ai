@@ -56,7 +56,7 @@ import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { useOnboardingQuestionnaire } from "@/hooks/useOnboardingQuestionnaire";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
 import { LookGrid } from "@/components/gallery/LookGrid";
-import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
+import { IMAGE_ACCEPT, isImageFile, canPreviewInBrowser } from "@/lib/imageFileTypes";
 import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 import { BuyCreditsModal } from "@/components/billing/BuyCreditsModal";
@@ -111,8 +111,10 @@ type StyleRow = ReturnType<typeof useCreateGalleryFlow>["styles"][number];
 // browser can't render, or beyond the preview cap).
 interface SelImg { file: File; url: string | null }
 
-// RAW/HEIC can't render as <img>; only build previews from web-renderable ones.
-const isPreviewable = (f: File) => f.type.startsWith("image/") && !/heic|heif/i.test(f.type);
+// RAW/HEIC/TIFF can't render as <img> — only build object-URL previews from
+// files the browser can actually decode (canPreviewInBrowser). RAW frequently
+// arrives with an image/* MIME (image/tiff, image/x-canon-cr2, …), so a naive
+// type.startsWith("image/") check would pass and then show a BROKEN image.
 
 const curatedTags = (type: string, lang: LanguageCode) => getCullingLabels(type || "wedding", lang);
 
@@ -241,10 +243,6 @@ export default function CreateGalleryPage() {
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const photos = uploadSource === "drive" ? (driveFolderInfo?.totalImageCount || 0) : items.length;
-  const previews = useMemo(
-    () => items.map((it) => it.url).filter((u): u is string => !!u),
-    [items],
-  );
   const rankedStyles = useMemo(() => rankStyles(styles, type), [styles, type]);
   const selectedStyles = useMemo(
     () => styleIds.map((id) => styles.find((s) => s.id === id)).filter((s): s is StyleRow => !!s),
@@ -296,7 +294,7 @@ export default function CreateGalleryPage() {
         if (seen.has(key)) continue;
         seen.add(key);
         let url: string | null = null;
-        if (isPreviewable(f) && made < PREVIEW_CAP) {
+        if (canPreviewInBrowser(f) && made < PREVIEW_CAP) {
           url = URL.createObjectURL(f);
           objectUrls.current.push(url);
           made++;
@@ -512,21 +510,32 @@ export default function CreateGalleryPage() {
                   <span className="text-muted-foreground/40">·</span>
                   <button type="button" onClick={() => setReviewOpen(true)} className="text-accent hover:underline">review &amp; remove</button>
                 </div>
-                {previews.length > 0 && (
+                {items.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {previews.slice(0, 6).map((src, i) => (
-                      <button key={i} type="button" onClick={() => setReviewOpen(true)} className="overflow-hidden rounded-md ring-1 ring-border transition hover:ring-primary/60" aria-label="Review selected photos">
-                        <img src={src} alt="" className="h-12 w-12 object-cover" />
+                    {items.slice(0, 6).map((it, i) => (
+                      <button key={i} type="button" onClick={() => setReviewOpen(true)} className="relative block h-12 w-12 overflow-hidden rounded-md ring-1 ring-border transition hover:ring-primary/60" aria-label="Review selected photos">
+                        {/* RAW/TIFF/HEIC placeholder sits behind; a decodable
+                            preview covers it, and onError reveals it again if a
+                            frame turns out to be unrenderable. */}
+                        <span className="absolute inset-0 grid place-items-center bg-surface-2 text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
+                        {it.url && (
+                          <img
+                            src={it.url}
+                            alt=""
+                            className="absolute inset-0 h-12 w-12 object-cover"
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
+                          />
+                        )}
                       </button>
                     ))}
-                    {photos > Math.min(6, previews.length) && (
+                    {photos > 6 && (
                       <button
                         type="button"
                         onClick={() => setReviewOpen(true)}
                         className="grid h-12 w-12 place-items-center rounded-md border border-border bg-surface-2 text-xs font-semibold text-foreground/80 transition hover:border-primary/50 hover:text-foreground"
                         aria-label="See all selected photos"
                       >
-                        +{(photos - Math.min(6, previews.length)).toLocaleString()}
+                        +{(photos - 6).toLocaleString()}
                       </button>
                     )}
                   </div>
@@ -883,10 +892,17 @@ function SelectedPhotosModal({ items, count, onRemove, onClose }: {
         <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5 overflow-y-auto pr-1">
           {items.map((it, i) => (
             <div key={`${it.file.name}-${it.file.size}-${it.file.lastModified}`} className="group relative aspect-square overflow-hidden rounded-[5px] bg-surface-2">
-              {it.url ? (
-                <img src={it.url} alt="" loading="lazy" className="h-full w-full object-cover" />
-              ) : (
-                <div className="grid h-full w-full place-items-center text-center text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</div>
+              {/* RAW placeholder behind; a decodable preview covers it, and
+                  onError reveals it again if a frame won't render. */}
+              <div className="absolute inset-0 grid place-items-center text-center text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</div>
+              {it.url && (
+                <img
+                  src={it.url}
+                  alt=""
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
               )}
               <button
                 type="button"
