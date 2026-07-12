@@ -15,8 +15,20 @@ import {
 import { Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FileCard } from "@/components/admin/StyleTrainingGalleryDialog";
-import { getThumbnailUrl } from "@/lib/imageUrls";
+import { getCdnResizedUrl, toCdnUrl } from "@/lib/imageUrls";
 import type { StyleFull } from "@/pages/dashboard/admin/StyleDetailsSheet";
+
+/**
+ * Resolve a lightweight display url. Training files have no pre-generated
+ * derivatives, so we lean on Cloudflare on-the-fly resizing (probed by the
+ * parent dialog) and fall back to the edge-cached original when it's off or
+ * the source is RAW (browsers/Cloudflare can't decode CR2/NEF/...).
+ */
+function displayUrl(url: string | undefined, resize: boolean | null, width: number): string | undefined {
+  if (!url) return url;
+  if (parseStyleFile(url).kind === "raw") return url;
+  return resize ? getCdnResizedUrl(url, { width, quality: 80, fit: "scale-down" }) : toCdnUrl(url);
+}
 
 /**
  * Three-way compare (source photo · photographer's edit · model's edit) —
@@ -52,6 +64,9 @@ interface Props {
   /** Viewer mode for the style owner — hides the admin-only "Generate model
    * edits" action; the before/after comparison still works. */
   readOnly?: boolean;
+  /** Cloudflare image-resizing availability, probed once by the parent dialog.
+   * null = still probing. Drives lightweight thumbnails/previews. */
+  resize?: boolean | null;
 }
 
 function AvailabilityDots({ row }: { row: CompareRow }) {
@@ -74,12 +89,25 @@ function AvailabilityDots({ row }: { row: CompareRow }) {
 /** One labeled pane in the side-by-side viewer. RAW is only possible on the
  * source side (before-set files can be RAW) — photographer/model urls are
  * always raster, so they only need the plain onError fallback. */
-function ImagePane({ label, url, allowRawCard }: { label: string; url?: string; allowRawCard?: boolean }) {
+function ImagePane({
+  label,
+  url,
+  allowRawCard,
+  resize,
+}: {
+  label: string;
+  url?: string;
+  allowRawCard?: boolean;
+  resize?: boolean | null;
+}) {
   const parsed = useMemo(() => (url ? parseStyleFile(url) : null), [url]);
-  const [errored, setErrored] = useState(false);
-  useEffect(() => setErrored(false), [url]);
+  // 0 = resized/edge-cached preview, 1 = raw stored url, 2+ = "Failed to load".
+  const [stage, setStage] = useState(0);
+  useEffect(() => setStage(0), [url]);
 
-  const showFileCard = !!(allowRawCard && parsed?.kind === "raw");
+  const isRaw = parsed?.kind === "raw";
+  const showFileCard = !!(allowRawCard && isRaw);
+  const src = stage === 0 ? displayUrl(url, resize ?? null, 1400) : url;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5">
@@ -89,16 +117,17 @@ function ImagePane({ label, url, allowRawCard }: { label: string; url?: string; 
           <span className="px-3 text-center text-xs text-muted-foreground/50">Not available</span>
         ) : showFileCard && parsed ? (
           <FileCard filename={parsed.filename} ext={parsed.ext} size="lg" />
-        ) : errored ? (
+        ) : stage >= 2 ? (
           <div className="flex flex-col items-center gap-1.5 text-muted-foreground/50">
             <ImageIcon className="h-8 w-8" />
             <span className="text-[10px]">Failed to load</span>
           </div>
         ) : (
           <img
-            src={url}
+            src={src}
             alt={label}
-            onError={() => setErrored(true)}
+            decoding="async"
+            onError={() => setStage((s) => s + 1)}
             className="max-h-full max-w-full object-contain"
           />
         )}
@@ -127,7 +156,7 @@ function SlotSelect({ label, value, onChange }: { label: string; value: Slot; on
   );
 }
 
-export function TriCompare({ style, onGenerateEdits, generating, refreshToken, readOnly }: Props) {
+export function TriCompare({ style, onGenerateEdits, generating, refreshToken, readOnly, resize }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"slider" | "side-by-side">("slider");
   // Default Photographer vs Model — "the money shot" per the plan.
@@ -248,9 +277,10 @@ export function TriCompare({ style, onGenerateEdits, generating, refreshToken, r
                 <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[--radius] border border-border bg-surface-2">
                   {row.source ? (
                     <img
-                      src={getThumbnailUrl(row.source)}
+                      src={displayUrl(row.source, resize ?? null, 96)}
                       alt=""
                       loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
                     />
@@ -295,17 +325,17 @@ export function TriCompare({ style, onGenerateEdits, generating, refreshToken, r
 
             {viewMode === "side-by-side" ? (
               <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
-                <ImagePane label="Source" url={activeRow?.source} allowRawCard />
-                <ImagePane label="Photographer's edit" url={activeRow?.photographerEdit} />
-                <ImagePane label="Model's edit" url={activeRow?.modelEdit} />
+                <ImagePane label="Source" url={activeRow?.source} allowRawCard resize={resize} />
+                <ImagePane label="Photographer's edit" url={activeRow?.photographerEdit} resize={resize} />
+                <ImagePane label="Model's edit" url={activeRow?.modelEdit} resize={resize} />
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
                 {beforeUrl && afterUrl ? (
                   <BeforeAfterSlider
                     key={`${clampedIndex}-${beforeSlot}-${afterSlot}`}
-                    beforeSrc={beforeUrl}
-                    afterSrc={afterUrl}
+                    beforeSrc={displayUrl(beforeUrl, resize ?? null, 1400) ?? beforeUrl}
+                    afterSrc={displayUrl(afterUrl, resize ?? null, 1400) ?? afterUrl}
                     maxHeight="100%"
                     className="h-full max-w-full"
                   />

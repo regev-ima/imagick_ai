@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, ExternalLink, FileImage, X } from "lucide-react";
 import { parseStyleFile, type StyleFileKind } from "@/lib/styleFiles";
+import { getCdnResizedUrl, toCdnUrl } from "@/lib/imageUrls";
 import type { StyleFull } from "@/pages/dashboard/admin/StyleDetailsSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,6 +31,46 @@ type GridTab = "before" | "after";
 interface LightboxState {
   tab: GridTab;
   index: number;
+}
+
+// Cloudflare Image Resizing availability, probed once per session.
+// null = not yet probed; true/false = resolved. Cached at module scope so the
+// probe runs only once no matter how many times the dialog reopens.
+let cdnResizeSupport: boolean | null = null;
+
+/**
+ * Probe whether Cloudflare on-the-fly image resizing is enabled by loading a
+ * tiny variant of a real sample image. Training files have NO pre-generated
+ * thumbnails (compression runs for gallery uploads only), so a fast grid
+ * depends on this. If resizing is off, callers fall back to the edge-cached
+ * original via toCdnUrl — still better than the raw S3 host the DB stores.
+ */
+function useCdnResizeSupport(sampleUrl: string | undefined): boolean | null {
+  const [supported, setSupported] = useState<boolean | null>(cdnResizeSupport);
+  useEffect(() => {
+    if (cdnResizeSupport !== null) {
+      setSupported(cdnResizeSupport);
+      return;
+    }
+    if (!sampleUrl) return;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      cdnResizeSupport = true;
+      setSupported(true);
+    };
+    img.onerror = () => {
+      if (cancelled) return;
+      cdnResizeSupport = false;
+      setSupported(false);
+    };
+    img.src = getCdnResizedUrl(sampleUrl, { width: 32, quality: 40 });
+    return () => {
+      cancelled = true;
+    };
+  }, [sampleUrl]);
+  return supported;
 }
 
 const KIND_LABEL: Record<StyleFileKind, string> = {
@@ -67,10 +108,37 @@ export function FileCard({ filename, ext, size = "sm" }: { filename: string; ext
   );
 }
 
-function GridCell({ url, index, onOpen }: { url: string; index: number; onOpen: (index: number) => void }) {
+function GridCell({
+  url,
+  index,
+  onOpen,
+  resize,
+}: {
+  url: string;
+  index: number;
+  onOpen: (index: number) => void;
+  resize: boolean | null;
+}) {
   const parsed = useMemo(() => parseStyleFile(url), [url]);
-  const [errored, setErrored] = useState(false);
-  const showFileCard = parsed.kind === "raw" || errored;
+  const isImage = parsed.kind !== "raw";
+  // Fallback ladder for the <img> src: 0 = resized thumb / edge-cached CDN,
+  // 1 = edge-cached original, 2 = raw stored url, 3+ = FileCard placeholder.
+  const [stage, setStage] = useState(0);
+  useEffect(() => setStage(0), [url, resize]);
+
+  // Wait for the one-shot resize probe before painting so we never pull a
+  // full-res original just to swap it for a thumbnail a moment later.
+  const probing = isImage && resize === null;
+  const showFileCard = !isImage || stage >= 3;
+
+  const src = useMemo(() => {
+    if (!isImage) return url;
+    if (stage === 0) {
+      return resize ? getCdnResizedUrl(url, { width: 400, quality: 72, fit: "cover" }) : toCdnUrl(url);
+    }
+    if (stage === 1) return toCdnUrl(url);
+    return url;
+  }, [url, isImage, stage, resize]);
 
   return (
     <button
@@ -81,12 +149,15 @@ function GridCell({ url, index, onOpen }: { url: string; index: number; onOpen: 
       <div className="relative aspect-square w-full overflow-hidden bg-muted">
         {showFileCard ? (
           <FileCard filename={parsed.filename} ext={parsed.ext} />
+        ) : probing ? (
+          <div className="h-full w-full animate-pulse bg-muted" />
         ) : (
           <img
-            src={url}
+            src={src}
             alt={parsed.filename}
             loading="lazy"
-            onError={() => setErrored(true)}
+            decoding="async"
+            onError={() => setStage((s) => s + 1)}
             className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
           />
         )}
@@ -101,7 +172,15 @@ function GridCell({ url, index, onOpen }: { url: string; index: number; onOpen: 
   );
 }
 
-function Grid({ urls, onOpen }: { urls: string[]; onOpen: (index: number) => void }) {
+function Grid({
+  urls,
+  onOpen,
+  resize,
+}: {
+  urls: string[];
+  onOpen: (index: number) => void;
+  resize: boolean | null;
+}) {
   if (urls.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
@@ -112,7 +191,7 @@ function Grid({ urls, onOpen }: { urls: string[]; onOpen: (index: number) => voi
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
       {urls.map((url, i) => (
-        <GridCell key={`${i}-${url}`} url={url} index={i} onOpen={onOpen} />
+        <GridCell key={`${i}-${url}`} url={url} index={i} onOpen={onOpen} resize={resize} />
       ))}
     </div>
   );
@@ -124,17 +203,29 @@ function LightboxLayer({
   index,
   onNavigate,
   onClose,
+  resize,
 }: {
   urls: string[];
   index: number;
   onNavigate: (index: number) => void;
   onClose: () => void;
+  resize: boolean | null;
 }) {
   const url = urls[index];
   const parsed = useMemo(() => (url ? parseStyleFile(url) : null), [url]);
-  const [errored, setErrored] = useState(false);
+  // 0 = resized large / edge-cached, 1 = raw stored url, 2+ = FileCard.
+  const [stage, setStage] = useState(0);
 
-  useEffect(() => setErrored(false), [url]);
+  useEffect(() => setStage(0), [url]);
+
+  const isImage = parsed ? parsed.kind !== "raw" : false;
+  const displaySrc = useMemo(() => {
+    if (!url || !isImage) return url;
+    if (stage === 0) {
+      return resize ? getCdnResizedUrl(url, { width: 1600, quality: 82, fit: "scale-down" }) : toCdnUrl(url);
+    }
+    return url;
+  }, [url, isImage, stage, resize]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -154,7 +245,7 @@ function LightboxLayer({
   }, [index, urls.length, onNavigate, onClose]);
 
   if (!url || !parsed) return null;
-  const showFileCard = parsed.kind === "raw" || errored;
+  const showFileCard = parsed.kind === "raw" || stage >= 2;
 
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-background/98 backdrop-blur-xl">
@@ -187,9 +278,10 @@ function LightboxLayer({
           </div>
         ) : (
           <img
-            src={url}
+            src={displaySrc}
             alt={parsed.filename}
-            onError={() => setErrored(true)}
+            decoding="async"
+            onError={() => setStage((s) => s + 1)}
             className="max-h-full max-w-full object-contain"
           />
         )}
@@ -244,6 +336,14 @@ export function StyleTrainingGalleryDialog({ style, open, onOpenChange, readOnly
     () => (style?.after_image_urls ?? []).filter((u): u is string => !!u),
     [style],
   );
+
+  // Probe Cloudflare image-resizing once using a real (decodable) sample, so
+  // the grids can serve lightweight thumbnails instead of full-res originals.
+  const sampleUrl = useMemo(
+    () => [...beforeUrls, ...afterUrls].find((u) => parseStyleFile(u).kind !== "raw"),
+    [beforeUrls, afterUrls],
+  );
+  const resizeSupported = useCdnResizeSupport(sampleUrl);
 
   // Reset transient state whenever the dialog closes so the next open starts clean.
   useEffect(() => {
@@ -334,10 +434,10 @@ export function StyleTrainingGalleryDialog({ style, open, onOpenChange, readOnly
           </div>
 
           <TabsContent value="before" className="mt-0 min-h-0 flex-1 overflow-y-auto p-6">
-            <Grid urls={beforeUrls} onOpen={(index) => setLightbox({ tab: "before", index })} />
+            <Grid urls={beforeUrls} onOpen={(index) => setLightbox({ tab: "before", index })} resize={resizeSupported} />
           </TabsContent>
           <TabsContent value="after" className="mt-0 min-h-0 flex-1 overflow-y-auto p-6">
-            <Grid urls={afterUrls} onOpen={(index) => setLightbox({ tab: "after", index })} />
+            <Grid urls={afterUrls} onOpen={(index) => setLightbox({ tab: "after", index })} resize={resizeSupported} />
           </TabsContent>
           {/* Three-way compare: source photo · photographer's edit · model's edit. */}
           <TabsContent value="compare" className="mt-0 min-h-0 flex-1 overflow-hidden p-6">
@@ -357,6 +457,7 @@ export function StyleTrainingGalleryDialog({ style, open, onOpenChange, readOnly
             index={lightbox.index}
             onNavigate={(index) => setLightbox((prev) => (prev ? { ...prev, index } : prev))}
             onClose={() => setLightbox(null)}
+            resize={resizeSupported}
           />
         )}
       </DialogContent>

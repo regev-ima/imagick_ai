@@ -6,6 +6,8 @@ import {
   getEditedUrl,
   getEditedThumbnailUrl,
   getEditedPreviewUrl,
+  toCdnUrl,
+  getCdnResizedUrl,
 } from "./imageUrls";
 
 // Stored URLs (in the DB) use the S3 host; the browser is served from the CDN.
@@ -40,6 +42,45 @@ describe("parseB2Url", () => {
 
   it("returns null for empty input", () => {
     expect(parseB2Url("")).toBeNull();
+  });
+});
+
+describe("toCdnUrl", () => {
+  const styleOriginal = `${B2}/styles/u1/s1/before/MY_0777.JPG`;
+
+  it("routes a raw S3 style url through the CDN host, key unchanged", () => {
+    expect(toCdnUrl(styleOriginal)).toBe(`${CDN}/styles/u1/s1/before/MY_0777.JPG`);
+  });
+
+  it("is a no-op key-wise for a url already on the CDN host", () => {
+    const cdnUrl = `${CDN}/styles/u1/s1/before/MY_0777.JPG`;
+    expect(toCdnUrl(cdnUrl)).toBe(cdnUrl);
+  });
+
+  it("returns the input unchanged when it can't be parsed", () => {
+    expect(toCdnUrl("")).toBe("");
+  });
+});
+
+describe("getCdnResizedUrl", () => {
+  const styleOriginal = `${B2}/styles/u1/s1/before/MY_0777.JPG`;
+
+  it("builds a Cloudflare cdn-cgi/image resize url with defaults", () => {
+    expect(getCdnResizedUrl(styleOriginal)).toBe(
+      `${CDN}/cdn-cgi/image/width=400,quality=72,format=auto,fit=cover/styles/u1/s1/before/MY_0777.JPG`,
+    );
+  });
+
+  it("honours explicit width/quality/fit options", () => {
+    expect(getCdnResizedUrl(styleOriginal, { width: 1600, quality: 82, fit: "scale-down" })).toBe(
+      `${CDN}/cdn-cgi/image/width=1600,quality=82,format=auto,fit=scale-down/styles/u1/s1/before/MY_0777.JPG`,
+    );
+  });
+
+  it("works on a filename with no basePath", () => {
+    expect(getCdnResizedUrl(`${B2}/photo.JPG`, { width: 200 })).toBe(
+      `${CDN}/cdn-cgi/image/width=200,quality=72,format=auto,fit=cover/photo.JPG`,
+    );
   });
 });
 
