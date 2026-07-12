@@ -71,37 +71,45 @@ export function LookGrid({
   const aura = styles.filter((s) => !(ownerId != null && s.user_id === ownerId));
 
   return (
-    <div className="max-h-[44vh] space-y-3 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">
-      {mine.length > 0 && (
-        <div className="space-y-2">
-          <div className="aura-microlabel flex items-center gap-1.5 text-primary"><Sparkle size={10} /> Your AI models</div>
-          <div className="grid grid-cols-3 gap-2">
-            {mine.map((s) => (
-              <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} used={usedSet.has(s.id)} locked={atMax && !selectedIds.includes(s.id)} engineTaken={engineTaken(s)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
-            ))}
+    // A flex column so the styles scroll on their own and the opt-out stays put.
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Styles — the ONLY region that scrolls. Bounded on small screens so a
+          long model list can't stretch the whole panel; on desktop it fills the
+          card and scrolls internally instead. */}
+      <div className="max-h-[42vh] min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 lg:max-h-none">
+        {mine.length > 0 && (
+          <div className="space-y-2">
+            <div className="aura-microlabel flex items-center gap-1.5 text-primary"><Sparkle size={10} /> Your AI models</div>
+            <div className="grid grid-cols-3 gap-2">
+              {mine.map((s) => (
+                <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} used={usedSet.has(s.id)} locked={atMax && !selectedIds.includes(s.id)} engineTaken={engineTaken(s)} mine recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {aura.length > 0 && (
-        <div className="space-y-2">
-          {mine.length > 0 && <div className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={10} /> Aura looks</div>}
-          <div className="grid grid-cols-3 gap-2">
-            {aura.map((s) => (
-              <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} used={usedSet.has(s.id)} locked={atMax && !selectedIds.includes(s.id)} engineTaken={engineTaken(s)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
-            ))}
+        {aura.length > 0 && (
+          <div className="space-y-2">
+            {mine.length > 0 && <div className="aura-microlabel flex items-center gap-1.5 text-accent"><Sparkle size={10} /> Aura looks</div>}
+            <div className="grid grid-cols-3 gap-2">
+              {aura.map((s) => (
+                <LookTile key={s.id} style={s} cover={coverFor(s)} on={selectedIds.includes(s.id)} used={usedSet.has(s.id)} locked={atMax && !selectedIds.includes(s.id)} engineTaken={engineTaken(s)} recommended={s.id === bestId} onClick={() => onToggle(s.id)} />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {styles.length === 0 && (
-        <p className="caption">No AI models available yet — host &amp; share as-is below, or train your own look later.</p>
-      )}
+        {styles.length === 0 && (
+          <p className="caption">No AI models available yet — host &amp; share as-is below, or train your own look later.</p>
+        )}
+      </div>
 
-      {/* Opt-out — dashed + separated so it never competes with the AI models. */}
+      {/* Opt-out — pinned OUTSIDE the scroll area so "No editing" is always in
+          view without scrolling past every look. Dashed + separated so it never
+          competes with the AI models. */}
       {onHosting && (
-        <div className="pt-0.5">
-          <div className="aura-hairline mb-2" />
+        <div className="shrink-0 pt-2.5">
+          <div className="aura-hairline mb-2.5" />
           <button
             type="button"
             onClick={onHosting}

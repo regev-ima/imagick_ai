@@ -39,3 +39,25 @@ export function isImageFile(file: File): boolean {
   if (file.type.startsWith("image/")) return true;
   return EXT_RE.test(file.name);
 }
+
+// ── Preview-ability ──────────────────────────────────────────────────────
+// A file can be a perfectly valid upload (isImageFile) yet impossible to show
+// in an <img>: RAW, TIFF and HEIC. RAW in particular often arrives with an
+// image/* MIME (image/tiff, image/x-canon-cr2, …), so a naive
+// `type.startsWith("image/")` check passes and then renders a BROKEN image.
+// Callers should render a placeholder tile for these instead.
+const NON_RENDERABLE_EXT = [...RAW_EXTENSIONS, "tif", "tiff"]; // RAW_EXTENSIONS already includes heic/heif
+const NON_RENDERABLE_EXT_RE = new RegExp(`\\.(${NON_RENDERABLE_EXT.join("|")})$`, "i");
+const RENDERABLE_MIME_RE = /^image\/(jpeg|pjpeg|png|gif|webp|bmp|avif|svg\+xml)$/i;
+const RENDERABLE_EXT_RE = /\.(jpe?g|jfif|png|gif|webp|bmp|avif)$/i;
+
+/**
+ * True only when a browser can decode the file directly in an `<img>`. RAW,
+ * TIFF and HEIC are valid uploads but NOT previewable — show a placeholder.
+ */
+export function canPreviewInBrowser(file: File): boolean {
+  if (NON_RENDERABLE_EXT_RE.test(file.name)) return false;
+  const type = (file.type || "").toLowerCase();
+  if (/^image\/(tiff|heic|heif)$/.test(type) || /^image\/(x-|vnd\.)/.test(type)) return false;
+  return RENDERABLE_MIME_RE.test(type) || RENDERABLE_EXT_RE.test(file.name);
+}
