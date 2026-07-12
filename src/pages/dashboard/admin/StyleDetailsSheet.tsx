@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Sheet,
   SheetContent,
@@ -20,9 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Check, ExternalLink, X, Plus, AlertTriangle, ImageIcon, GitBranch } from "lucide-react";
+import { Copy, Check, ExternalLink, X, Plus, AlertTriangle, ImageIcon, GitBranch, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getThumbnailUrl } from "@/lib/imageUrls";
+import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 import { breakdownFiles, type FileBreakdown, type StyleFileKind } from "@/lib/styleFiles";
 import { formatDuration } from "@/lib/cullingEta";
 import { toast } from "sonner";
@@ -219,6 +220,129 @@ function LiveTrainingDuration({ startIso }: { startIso: string }) {
   const startMs = new Date(startIso).getTime();
   const elapsedMs = Number.isFinite(startMs) ? Math.max(0, Date.now() - startMs) : 0;
   return <span>Training running — {formatDuration(elapsedMs)}</span>;
+}
+
+/**
+ * Demo preview — runs THIS style over the shared, reusable demo gallery
+ * (SHOWCASE_GALLERY_ID) so a style with no training photos still gets a
+ * before/after showcase. The demo photos are uploaded once (Showcase Manager)
+ * and reused for every style; the resulting image_edits already power the
+ * customer style page and card covers, so this needs no per-style upload.
+ */
+function StyleDemoPreview({ styleId }: { styleId: string }) {
+  const queryClient = useQueryClient();
+  const [running, setRunning] = useState(false);
+
+  const { data: demoImages = [] } = useQuery({
+    queryKey: ["demo-gallery-images"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("gallery_images")
+        .select("id, original_url, thumbnail_url, filename")
+        .eq("gallery_id", SHOWCASE_GALLERY_ID)
+        .neq("status", "deleted")
+        .order("sort_order");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: demoEdits = [] } = useQuery({
+    queryKey: ["style-demo-edits", styleId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("image_edits")
+        .select("image_id, edited_url")
+        .eq("style_id", styleId)
+        .eq("gallery_id", SHOWCASE_GALLERY_ID);
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: running ? 4000 : false,
+  });
+
+  const total = demoImages.length;
+  const done = demoEdits.length;
+
+  const editedByImage = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of demoEdits) if (e.image_id && e.edited_url) m.set(e.image_id, e.edited_url);
+    return m;
+  }, [demoEdits]);
+
+  // Stop the spinner once every demo photo has an edit; refresh covers so the
+  // style's card thumbnail picks up the freshly generated demo.
+  useEffect(() => {
+    if (running && total > 0 && done >= total) {
+      setRunning(false);
+      toast.success("Demo edits ready");
+      queryClient.invalidateQueries({ queryKey: ["showcase-covers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-styles"] });
+    }
+  }, [running, done, total, queryClient]);
+
+  const runDemo = async () => {
+    if (total === 0) {
+      toast.error("No demo photos yet — add them once in the Showcase Manager.");
+      return;
+    }
+    setRunning(true);
+    try {
+      const { error } = await supabase.functions.invoke("process-images", {
+        body: { galleryId: SHOWCASE_GALLERY_ID, imageIds: demoImages.map((i) => i.id), styleIds: [styleId] },
+      });
+      if (error) throw error;
+      toast.success(`Editing ${total} demo photo${total === 1 ? "" : "s"} with this style…`);
+    } catch (err) {
+      console.error("Edit with demo failed:", err);
+      toast.error("Failed to start demo edit");
+      setRunning(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="aura-microlabel text-primary">Demo preview</div>
+          <p className="mt-0.5 text-xs text-muted-foreground">Runs this style on the shared demo photos — no re-upload.</p>
+        </div>
+        <Button size="sm" variant="glow" disabled={running || total === 0} onClick={runDemo}>
+          {running ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+          Edit with this demo
+        </Button>
+      </div>
+
+      {total === 0 ? (
+        <p className="text-xs text-muted-foreground/60">
+          No demo photos yet. Add them once in the Showcase Manager and they're reusable for every style.
+        </p>
+      ) : (
+        <>
+          <div className="aura-microlabel text-muted-foreground">{done} / {total} demo photos edited</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {demoImages.map((img) => {
+              const after = editedByImage.get(img.id);
+              return (
+                <div key={img.id} className="overflow-hidden rounded-[--radius] border border-border">
+                  <div className="grid grid-cols-2">
+                    <img src={getThumbnailUrl(img.original_url)} alt="before" className="aspect-square w-full object-cover" loading="lazy" />
+                    {after ? (
+                      <img src={getThumbnailUrl(after)} alt="after" className="aspect-square w-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="grid aspect-square w-full place-items-center bg-surface-2 text-muted-foreground/50">
+                        {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="text-[9px]">pending</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </section>
+  );
 }
 
 export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenParent }: Props) {
@@ -523,6 +647,11 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
               </Field>
             )}
           </section>
+
+          <Separator />
+
+          {/* ── Demo preview — run this style on the shared demo gallery ── */}
+          <StyleDemoPreview styleId={style.id} />
 
           <Separator />
 
