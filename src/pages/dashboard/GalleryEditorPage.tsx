@@ -199,20 +199,23 @@ export default function GalleryEditorPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Fetch gallery data with ownership verification
+  // Fetch gallery data with ownership verification.
+  // Admins may open ANY gallery (incl. other accounts' and the shared
+  // __showcase__ / system galleries) — the RLS admin-read policies allow the
+  // reads, so the explicit owner filter must not re-block them here.
   // Refetch every 5 seconds when processing, culling, or transferring
   const { data: gallery, isLoading: galleryLoading } = useQuery({
-    queryKey: ["gallery", id, effectiveUserId],
+    queryKey: ["gallery", id, effectiveUserId, canViewAnalytics],
     queryFn: async () => {
       if (!effectiveUserId) return null;
-      
-      const { data, error } = await supabase
+
+      let q = supabase
         .from("galleries")
         .select("*")
-        .eq("id", id)
-        .eq("user_id", effectiveUserId)
-        .maybeSingle();
-      
+        .eq("id", id);
+      if (!canViewAnalytics) q = q.eq("user_id", effectiveUserId);
+      const { data, error } = await q.maybeSingle();
+
       if (error) throw error;
       return data;
     },
@@ -1902,6 +1905,11 @@ export default function GalleryEditorPage() {
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
         <Images className="w-16 h-16 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Gallery not found</h2>
+        <p className="max-w-md text-center text-sm text-muted-foreground">
+          {canViewAnalytics
+            ? "This gallery doesn't exist (it may have been deleted)."
+            : "This gallery doesn't exist, was deleted, or belongs to another account."}
+        </p>
         <Button asChild>
           <Link to="/dashboard/galleries">Back to Collections</Link>
         </Button>
