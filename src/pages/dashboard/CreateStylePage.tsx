@@ -107,8 +107,76 @@ function Pill({ children, accent = false }: { children: React.ReactNode; accent?
 interface LocalFile {
   id: string;
   file: File;
-  /** Object URL for an <img> preview, or null for RAW/HEIC the browser can't render. */
-  preview: string | null;
+}
+
+// ── Lazy thumbnails ────────────────────────────────────────────────────────
+// Selecting thousands of training photos used to freeze the tab: addFiles
+// eagerly created an object URL for EVERY file and the browser decoded them all.
+// Instead, a tile now builds its object URL only when it scrolls near the
+// viewport (and revokes it on unmount), so memory stays flat no matter how many
+// files are queued. One shared IntersectionObserver drives every tile, so even
+// a review modal with thousands of tiles registers a single observer.
+const thumbCallbacks = new WeakMap<Element, () => void>();
+let thumbObserver: IntersectionObserver | null = null;
+function getThumbObserver(): IntersectionObserver {
+  if (!thumbObserver) {
+    thumbObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) thumbCallbacks.get(entry.target)?.();
+        }
+      },
+      { rootMargin: "300px" },
+    );
+  }
+  return thumbObserver;
+}
+
+function LazyThumb({ file, dim = false }: { file: File; dim?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const previewable = canPreviewInBrowser(file);
+
+  useEffect(() => {
+    if (!previewable) return;
+    const el = ref.current;
+    if (!el) return;
+    let created: string | null = null;
+    const observer = getThumbObserver();
+    const reveal = () => {
+      if (created) return;
+      created = URL.createObjectURL(file);
+      setUrl(created);
+      observer.unobserve(el);
+      thumbCallbacks.delete(el);
+    };
+    thumbCallbacks.set(el, reveal);
+    observer.observe(el);
+    return () => {
+      observer.unobserve(el);
+      thumbCallbacks.delete(el);
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [file, previewable]);
+
+  return (
+    <div ref={ref} className={cn("absolute inset-0 bg-surface-2", dim && "opacity-60")}>
+      {!previewable && (
+        <div className="absolute inset-0 grid place-items-center text-center">
+          <span className="font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
+        </div>
+      )}
+      {url && (
+        <img
+          src={url}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
+        />
+      )}
+    </div>
+  );
 }
 
 export default function CreateStylePage() {
@@ -207,14 +275,11 @@ export default function CreateStylePage() {
   };
 
   const addFiles = (files: File[], type: "before" | "after") => {
-    // RAW/HEIC/TIFF can't render in an <img>; only build object-URL previews
-    // for files the browser can actually decode (canPreviewInBrowser). RAW
-    // often arrives with an image/* MIME (image/tiff, image/x-canon-cr2, …),
-    // so a naive type.startsWith("image/") check would show a BROKEN image.
+    // No object URLs here — LazyThumb builds them per-tile on scroll, so queuing
+    // thousands of files stays instant and light (see the note above LazyThumb).
     const newFiles: LocalFile[] = files.map((file) => ({
       id: Math.random().toString(36).substr(2, 9),
       file,
-      preview: canPreviewInBrowser(file) ? URL.createObjectURL(file) : null,
     }));
     if (type === "before") setBeforeFiles((prev) => [...prev, ...newFiles]);
     else setAfterFiles((prev) => [...prev, ...newFiles]);
@@ -222,11 +287,7 @@ export default function CreateStylePage() {
 
   const removeFile = (id: string, type: "before" | "after") => {
     const setter = type === "before" ? setBeforeFiles : setAfterFiles;
-    setter((prev) => {
-      const file = prev.find((f) => f.id === id);
-      if (file?.preview) URL.revokeObjectURL(file.preview);
-      return prev.filter((f) => f.id !== id);
-    });
+    setter((prev) => prev.filter((f) => f.id !== id));
   };
 
   // Apply an upload-progress event (from the shared uploadStyleFiles helper) to
@@ -517,20 +578,7 @@ export default function CreateStylePage() {
                     aria-label="Review images"
                     className="relative aspect-square overflow-hidden rounded-sm plate-keyline transition-opacity hover:opacity-90"
                   >
-                    {/* RAW placeholder sits behind; a decodable preview covers
-                        it, and onError reveals it again if a frame won't render. */}
-                    <div className={cn("absolute inset-0 grid place-items-center bg-surface-2", isActive && "opacity-60")}>
-                      <span className="font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
-                    </div>
-                    {file.preview && (
-                      <img
-                        src={file.preview}
-                        alt=""
-                        loading="lazy"
-                        className={cn("absolute inset-0 h-full w-full object-cover", isActive && "opacity-60")}
-                        onError={(e) => { e.currentTarget.style.display = "none"; }}
-                      />
-                    )}
+                    <LazyThumb file={file.file} dim={isActive} />
                     {isActive && (
                       <div className="absolute inset-0 grid place-items-center bg-background/40">
                         <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
@@ -914,18 +962,7 @@ function ReviewFilesModal({
         <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5 overflow-y-auto pr-1">
           {files.map((file) => (
             <div key={file.id} className="group relative aspect-square overflow-hidden rounded-[5px] bg-surface-2">
-              {/* RAW placeholder behind; a decodable preview covers it, and
-                  onError reveals it again if a frame won't render. */}
-              <div className="absolute inset-0 grid place-items-center text-center font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</div>
-              {file.preview && (
-                <img
-                  src={file.preview}
-                  alt=""
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  onError={(e) => { e.currentTarget.style.display = "none"; }}
-                />
-              )}
+              <LazyThumb file={file.file} />
               {canEdit && (
                 <button
                   type="button"
