@@ -83,6 +83,17 @@ serve(async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Is the (non-internal) caller an admin? Admins operate galleries they
+    // don't own — chiefly the shared __showcase__ gallery, which belongs to
+    // one account but every admin manages it. Without this the owner filter
+    // below 404s ("Gallery not found or access denied") and the Showcase
+    // Manager's "Process" buttons all fail.
+    let isAdminCaller = false;
+    if (token !== supabaseServiceKey) {
+      const { data: adm } = await supabaseAdmin.rpc("is_admin", { _user_id: userId });
+      isAdminCaller = !!adm;
+    }
+
     // Get Imagick API credentials
     const username = Deno.env.get("IMAGICK_API_USERNAME");
     const password = Deno.env.get("IMAGICK_API_PASSWORD");
@@ -116,19 +127,31 @@ serve(async (req: Request) => {
       );
     }
 
-    // Verify user owns the gallery
-    const { data: gallery, error: galleryError } = await supabase
+    // Verify access to the gallery. Owner (or internal service call) always;
+    // admins may operate any gallery (e.g. the shared showcase). Use the admin
+    // client so RLS never hides a foreign gallery from a legitimate admin.
+    let galleryQuery = supabaseAdmin
       .from("galleries")
       .select("id, name, user_id")
-      .eq("id", galleryId)
-      .eq("user_id", userId)
-      .single();
+      .eq("id", galleryId);
+    if (token !== supabaseServiceKey && !isAdminCaller) {
+      galleryQuery = galleryQuery.eq("user_id", userId);
+    }
+    const { data: gallery, error: galleryError } = await galleryQuery.single();
 
     if (galleryError || !gallery) {
       return new Response(
         JSON.stringify({ error: "Gallery not found or access denied" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // When an admin drives a gallery they don't own (the showcase), attribute
+    // the edits + any credit reservation to the gallery's OWNER — never to the
+    // admin. The showcase owner is a system/unlimited account, so this also
+    // means showcase processing is never charged to a person.
+    if (isAdminCaller && gallery.user_id && gallery.user_id !== userId) {
+      userId = gallery.user_id;
     }
 
     // ── Fetch styles & resolve each to its ENGINE key — uniqueness is mandatory ──

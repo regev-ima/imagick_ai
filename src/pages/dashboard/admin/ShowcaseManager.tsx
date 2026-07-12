@@ -191,6 +191,21 @@ export default function ShowcaseManager() {
     }
   }, [isProcessing, overallProgress.allComplete]);
 
+  // Pull the real server error out of a supabase.functions.invoke failure so
+  // the toast says WHY (e.g. "no_deployable_styles", access errors) instead of
+  // a blind "failed".
+  const processErrorMessage = async (err: unknown): Promise<string> => {
+    const ctx = (err as { context?: unknown })?.context;
+    if (ctx instanceof Response) {
+      try {
+        const body = await ctx.clone().json();
+        if (typeof body?.message === "string" && body.message) return body.message;
+        if (typeof body?.error === "string" && body.error) return `Processing failed: ${body.error}`;
+      } catch { /* not JSON */ }
+    }
+    return "Failed to start processing";
+  };
+
   // Images this style still needs an edit for. This is THE smart filter — the
   // engine only ever receives photos it hasn't edited in this style, so no
   // photo is ever re-edited (the backend also dedups per (image,style), a
@@ -219,8 +234,8 @@ export default function ShowcaseManager() {
       if (error) throw error;
       toast.success(`Sent ${imageIds.length} new image(s) to editing for this style`);
       queryClient.invalidateQueries({ queryKey: ["showcase-edits"] });
-    } catch {
-      toast.error("Failed to start processing");
+    } catch (err) {
+      toast.error(await processErrorMessage(err));
       setProcessingStyleIds((prev) => { const n = new Set(prev); n.delete(styleId); return n; });
     }
   };
@@ -259,8 +274,8 @@ export default function ShowcaseManager() {
       const totalPairs = Object.values(perStyleSent).reduce((a, b) => a + b, 0);
       toast.success(`Sent ${totalPairs} new image×style edit(s) across ${styleIds.filter((s) => perStyleSent[s] > 0).length} style(s)`);
       queryClient.invalidateQueries({ queryKey: ["showcase-edits"] });
-    } catch {
-      toast.error("Failed to start processing");
+    } catch (err) {
+      toast.error(await processErrorMessage(err));
       setProcessingStyleIds((prev) => { const n = new Set(prev); styleIds.forEach((s) => n.delete(s)); return n; });
     }
   };
