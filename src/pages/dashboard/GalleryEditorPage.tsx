@@ -559,12 +559,29 @@ export default function GalleryEditorPage() {
     if (allDone) setPendingReEdit(null);
   }, [pendingReEdit, imageIdsByStyle]);
 
-  // Looks currently being generated (re-edit in flight) — the VIEW sidebar
-  // spins their ring and shows "processing…" until every edit has landed.
-  const processingViewStyleIds = useMemo(
-    () => new Set(pendingReEdit?.styleIds ?? []),
-    [pendingReEdit],
-  );
+  // Looks currently being generated — the VIEW sidebar spins their ring and
+  // shows "processing…" until every edit has landed. Two signals, unioned:
+  //   1. pendingReEdit — instant feedback the moment the user hits Apply,
+  //      before the backend has flipped any image to "processing".
+  //   2. server-derived — while the gallery is processing, any look that a
+  //      still-processing image is missing its edit for is being generated.
+  //      This one survives a page reload (a 90-photo re-edit runs for a
+  //      while), so the spinner keeps showing after a refresh.
+  const processingViewStyleIds = useMemo(() => {
+    const set = new Set<string>(pendingReEdit?.styleIds ?? []);
+    if (gallery?.status === "processing") {
+      const inFlight = images
+        .filter((i) => i.status === "processing" || i.status === "uploading")
+        .map((i) => i.id);
+      if (inFlight.length > 0) {
+        for (const style of galleryStylesData) {
+          const edited = imageIdsByStyle[style.id];
+          if (inFlight.some((id) => !edited?.has(id))) set.add(style.id);
+        }
+      }
+    }
+    return set;
+  }, [pendingReEdit, gallery?.status, images, galleryStylesData, imageIdsByStyle]);
 
   const styleApiIdMap = useMemo(() => {
     const map: Record<string, string> = {};
