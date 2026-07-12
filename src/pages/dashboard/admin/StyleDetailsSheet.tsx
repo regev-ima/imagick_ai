@@ -229,7 +229,7 @@ function LiveTrainingDuration({ startIso }: { startIso: string }) {
  * and reused for every style; the resulting image_edits already power the
  * customer style page and card covers, so this needs no per-style upload.
  */
-function StyleDemoPreview({ styleId }: { styleId: string }) {
+function StyleDemoPreview({ styleId, onOpenGallery }: { styleId: string; onOpenGallery: () => void }) {
   const queryClient = useQueryClient();
   const [running, setRunning] = useState(false);
 
@@ -263,12 +263,6 @@ function StyleDemoPreview({ styleId }: { styleId: string }) {
 
   const total = demoImages.length;
   const done = demoEdits.length;
-
-  const editedByImage = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const e of demoEdits) if (e.image_id && e.edited_url) m.set(e.image_id, e.edited_url);
-    return m;
-  }, [demoEdits]);
 
   // Stop the spinner once every demo photo has an edit; refresh covers so the
   // style's card thumbnail picks up the freshly generated demo.
@@ -315,31 +309,20 @@ function StyleDemoPreview({ styleId }: { styleId: string }) {
 
       {total === 0 ? (
         <p className="text-xs text-muted-foreground/60">
-          No demo photos yet. Add them once in the Showcase Manager and they're reusable for every style.
+          No demo photos yet. Add them once to the shared demo collection and they're reusable for every style.
         </p>
       ) : (
-        <>
-          <div className="aura-microlabel text-muted-foreground">{done} / {total} demo photos edited</div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {demoImages.map((img) => {
-              const after = editedByImage.get(img.id);
-              return (
-                <div key={img.id} className="overflow-hidden rounded-[--radius] border border-border">
-                  <div className="grid grid-cols-2">
-                    <img src={getThumbnailUrl(img.original_url)} alt="before" className="aspect-square w-full object-cover" loading="lazy" />
-                    {after ? (
-                      <img src={getThumbnailUrl(after)} alt="after" className="aspect-square w-full object-cover" loading="lazy" />
-                    ) : (
-                      <div className="grid aspect-square w-full place-items-center bg-surface-2 text-muted-foreground/50">
-                        {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="text-[9px]">pending</span>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+        <div className="flex items-center justify-between gap-2">
+          <div className="aura-microlabel text-muted-foreground">
+            {done} / {total} demo photos edited
+            {running && <Loader2 className="ml-1.5 inline h-3 w-3 animate-spin align-[-1px]" />}
           </div>
-        </>
+          {/* The before/after grid + cover/hide/promote controls live in the
+              training gallery's Demo tab — one place for all style images. */}
+          <Button size="sm" variant="outline" onClick={onOpenGallery}>
+            <ImageIcon className="mr-1.5 h-3.5 w-3.5" /> View demos & save previews
+          </Button>
+        </div>
       )}
     </section>
   );
@@ -351,6 +334,9 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
   const [addUserId, setAddUserId] = useState("");
   const [remark, setRemark] = useState("");
   const [trainingGalleryOpen, setTrainingGalleryOpen] = useState(false);
+  // Which tab the training gallery opens on — "demo" when launched from the
+  // Demo preview section, otherwise its default (before / training files).
+  const [galleryInitialTab, setGalleryInitialTab] = useState<"before" | "demo" | undefined>(undefined);
   const [retrainOpen, setRetrainOpen] = useState(false);
   const [children, setChildren] = useState<{ id: string; name: string; status: string; created_at: string }[]>([]);
   const [parentName, setParentName] = useState<string | null>(null);
@@ -586,7 +572,7 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="aura-microlabel text-primary">Training data</div>
-              <Button size="sm" variant="outline" onClick={() => setTrainingGalleryOpen(true)}>
+              <Button size="sm" variant="outline" onClick={() => { setGalleryInitialTab(undefined); setTrainingGalleryOpen(true); }}>
                 <ImageIcon className="mr-1.5 h-3.5 w-3.5" /> Open training gallery
               </Button>
             </div>
@@ -651,7 +637,10 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
           <Separator />
 
           {/* ── Demo preview — run this style on the shared demo gallery ── */}
-          <StyleDemoPreview styleId={style.id} />
+          <StyleDemoPreview
+            styleId={style.id}
+            onOpenGallery={() => { setGalleryInitialTab("demo"); setTrainingGalleryOpen(true); }}
+          />
 
           <Separator />
 
@@ -799,7 +788,7 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
             focus/pointer settling read as an outside-interaction, dismissing it
             the instant it opened. Its own portal (position: fixed) still renders
             it full-screen regardless of where it lives in the tree. */}
-        <StyleTrainingGalleryDialog style={style} open={trainingGalleryOpen} onOpenChange={setTrainingGalleryOpen} />
+        <StyleTrainingGalleryDialog style={style} open={trainingGalleryOpen} onOpenChange={setTrainingGalleryOpen} initialTab={galleryInitialTab} />
       </SheetContent>
       <RetrainStyleDialog
         parent={style}
