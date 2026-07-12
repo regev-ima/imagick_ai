@@ -559,6 +559,13 @@ export default function GalleryEditorPage() {
     if (allDone) setPendingReEdit(null);
   }, [pendingReEdit, imageIdsByStyle]);
 
+  // Looks currently being generated (re-edit in flight) — the VIEW sidebar
+  // spins their ring and shows "processing…" until every edit has landed.
+  const processingViewStyleIds = useMemo(
+    () => new Set(pendingReEdit?.styleIds ?? []),
+    [pendingReEdit],
+  );
+
   const styleApiIdMap = useMemo(() => {
     const map: Record<string, string> = {};
     galleryStylesData.forEach((style) => {
@@ -2801,6 +2808,7 @@ export default function GalleryEditorPage() {
           }))}
           selectedStyle={selectedViewStyle}
           onStyleChange={setSelectedViewStyle}
+          processingStyleIds={processingViewStyleIds}
           hasCullingData={hasCullingData}
           cullingCounts={cullingCounts}
           similarityLevel={sidebarSimilarityLevel}
@@ -2846,6 +2854,7 @@ export default function GalleryEditorPage() {
             }))}
             selectedStyle={selectedViewStyle}
             onStyleChange={(id) => { setSelectedViewStyle(id); setShowMobileSidebar(false); }}
+            processingStyleIds={processingViewStyleIds}
             hasCullingData={hasCullingData}
             cullingCounts={cullingCounts}
             similarityLevel={sidebarSimilarityLevel}

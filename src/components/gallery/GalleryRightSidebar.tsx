@@ -52,6 +52,9 @@ interface GalleryRightSidebarProps {
   availableStyles: Array<{ id: string; name: string; apiId?: string; coverUrl?: string }>;
   selectedStyle: string;
   onStyleChange: (styleId: string) => void;
+  /** Looks whose edits are still being generated — shown with a spinning ring
+   *  and a "processing…" label in the VIEW list. */
+  processingStyleIds?: Set<string>;
 
   // Culling data
   hasCullingData: boolean;
@@ -140,6 +143,7 @@ export function GalleryRightSidebar({
   availableStyles,
   selectedStyle,
   onStyleChange,
+  processingStyleIds,
   hasCullingData,
   cullingCounts,
   similarityLevel,
@@ -267,7 +271,7 @@ export function GalleryRightSidebar({
               )}
             </div>
             <Separator />
-            <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} />
+            <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} processingStyleIds={processingStyleIds} />
             <Separator />
             {filters && onFiltersChange && (
               <UnifiedFilterPanel
@@ -337,7 +341,7 @@ export function GalleryRightSidebar({
             isOpen={openSections.has("styles")}
             onToggle={() => toggleAccordion("styles")}
           >
-            <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} />
+            <StylesPanel allStyles={allStyles} selectedStyle={selectedStyle} onStyleChange={onStyleChange} processingStyleIds={processingStyleIds} />
           </SidebarSection>
 
           {/* ── FILTER ── */}
@@ -530,16 +534,19 @@ function StylesPanel({
   allStyles,
   selectedStyle,
   onStyleChange,
+  processingStyleIds,
 }: {
   allStyles: Array<{ id: string; name: string; apiId?: string; coverUrl?: string }>;
   selectedStyle: string;
   onStyleChange: (id: string) => void;
+  processingStyleIds?: Set<string>;
 }) {
   return (
     <div className="space-y-1">
       {allStyles.map((style, i) => {
         const isSelected = selectedStyle === style.id;
         const isOriginal = style.id === "original";
+        const isProcessing = !!processingStyleIds?.has(style.id);
         const color = isOriginal ? "bg-muted-foreground" : STYLE_COLORS[i % STYLE_COLORS.length];
 
         return (
@@ -553,37 +560,52 @@ function StylesPanel({
             )}
             onClick={() => onStyleChange(style.id)}
           >
-            {/* Thumbnail or color dot */}
-            {style.coverUrl ? (
-              <div className={cn(
-                "w-8 h-8 rounded-full shrink-0 overflow-hidden ring-2 transition-all",
-                isSelected ? "ring-primary" : "ring-border/50"
-              )}>
-                <img
-                  src={getThumbnailUrl(style.coverUrl)}
-                  alt={style.name}
-                  className="w-full h-full object-cover"
+            {/* Avatar — while the look is generating, a primary arc spins
+                around it so the "this look is still cooking" state reads at a
+                glance, matching the "processing…" label on the right. */}
+            <div className="relative w-8 h-8 shrink-0">
+              {isProcessing && (
+                <span
+                  className="absolute -inset-[3px] rounded-full border-2 border-transparent border-t-primary border-r-primary animate-spin"
+                  aria-hidden
                 />
-              </div>
-            ) : (
-              <div
-                className={cn(
-                  "w-8 h-8 rounded-full shrink-0 flex items-center justify-center ring-2 transition-all",
-                  isSelected ? "ring-primary" : "ring-border/50",
-                  isOriginal ? "bg-muted" : `${color}/20`
-                )}
-              >
-                {isOriginal ? (
-                  <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                ) : (
-                  <Sparkle size={14} className={color.replace("bg-", "text-")} />
-                )}
-              </div>
-            )}
+              )}
+              {style.coverUrl ? (
+                <div className={cn(
+                  "w-8 h-8 rounded-full overflow-hidden ring-2 transition-all",
+                  isProcessing ? "ring-primary/40" : isSelected ? "ring-primary" : "ring-border/50"
+                )}>
+                  <img
+                    src={getThumbnailUrl(style.coverUrl)}
+                    alt={style.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center ring-2 transition-all",
+                    isProcessing ? "ring-primary/40" : isSelected ? "ring-primary" : "ring-border/50",
+                    isOriginal ? "bg-muted" : `${color}/20`
+                  )}
+                >
+                  {isOriginal ? (
+                    <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                  ) : (
+                    <Sparkle size={14} className={color.replace("bg-", "text-")} />
+                  )}
+                </div>
+              )}
+            </div>
             <span className="truncate flex-1 font-medium">{style.name}</span>
-            {isSelected && (
+            {isProcessing ? (
+              <span className="shrink-0 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                processing…
+              </span>
+            ) : isSelected ? (
               <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-            )}
+            ) : null}
           </button>
         );
       })}
