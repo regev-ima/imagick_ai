@@ -357,8 +357,12 @@ function StyleDemoTab({ style, readOnly }: { style: StyleFull; readOnly?: boolea
   const queryClient = useQueryClient();
   const [hidden, setHidden] = useState<Set<string>>(() => loadHidden(style.id));
   const [saving, setSaving] = useState(false);
+  // The `style` prop is a snapshot from the admin table and won't pick up a
+  // freshly-saved cover, so track it locally for instant ★ feedback.
+  const [coverUrl, setCoverUrl] = useState<string | null>(style.thumbnail_url);
 
   useEffect(() => setHidden(loadHidden(style.id)), [style.id]);
+  useEffect(() => setCoverUrl(style.thumbnail_url), [style.id, style.thumbnail_url]);
 
   const { data: demoImages = [] } = useQuery({
     queryKey: ["demo-gallery-images"],
@@ -407,11 +411,15 @@ function StyleDemoTab({ style, readOnly }: { style: StyleFull; readOnly?: boolea
   }
 
   async function setCover(afterUrl: string) {
-    const { error } = await supabase.from("styles").update({ thumbnail_url: afterUrl } as never).eq("id", style.id);
+    // Store the REDUCED thumbnail (webp) — the styles table and pickers render
+    // thumbnail_url directly, so a full-res edited url would load slowly.
+    const thumb = getThumbnailUrl(afterUrl);
+    const { error } = await supabase.from("styles").update({ thumbnail_url: thumb } as never).eq("id", style.id);
     if (error) {
       toast.error("Failed to set cover");
       return;
     }
+    setCoverUrl(thumb);
     toast.success("Cover updated");
     queryClient.invalidateQueries({ queryKey: ["admin-styles"] });
     queryClient.invalidateQueries({ queryKey: ["showcase-covers"] });
@@ -440,7 +448,12 @@ function StyleDemoTab({ style, readOnly }: { style: StyleFull; readOnly?: boolea
         before_image_urls: before,
         after_image_urls: after,
       };
-      if (!style.thumbnail_url) updateData.thumbnail_url = after[0];
+      // Pick a reduced-thumbnail cover if none chosen yet.
+      if (!coverUrl) {
+        const thumb = getThumbnailUrl(after[0]);
+        updateData.thumbnail_url = thumb;
+        setCoverUrl(thumb);
+      }
       const { error } = await supabase.from("styles").update(updateData as never).eq("id", style.id);
       if (error) throw error;
       toast.success(`Saved ${after.length} before/after previews to this style`);
@@ -497,15 +510,23 @@ function StyleDemoTab({ style, readOnly }: { style: StyleFull; readOnly?: boolea
         {demoImages.map((img) => {
           const after = editedByImage.get(img.id);
           const isHidden = hidden.has(img.id);
-          const isCover = !!after && style.thumbnail_url === after;
+          // Compare through getThumbnailUrl so a legacy full-res cover still
+          // matches its reduced-thumbnail equivalent.
+          const isCover = !!after && !!coverUrl && getThumbnailUrl(after) === getThumbnailUrl(coverUrl);
           return (
             <div
               key={img.id}
               className={cn(
-                "overflow-hidden rounded-[--radius] border border-border transition-opacity",
+                "relative overflow-hidden rounded-[--radius] border transition-opacity",
+                isCover ? "border-rating ring-2 ring-rating" : "border-border",
                 isHidden && "opacity-40",
               )}
             >
+              {isCover && (
+                <span className="absolute left-1.5 top-9 z-10 rounded-sm bg-rating px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-black">
+                  Cover
+                </span>
+              )}
               <div className="relative grid grid-cols-2">
                 <img
                   src={getThumbnailUrl(img.original_url)}
