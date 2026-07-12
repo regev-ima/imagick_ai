@@ -315,9 +315,7 @@ function StyleSourceStatus({ style }: { style: StyleFull }) {
         <p className="text-xs text-muted-foreground/60">Available once training is complete.</p>
       ) : !galleryId || total === 0 ? (
         <p className="text-xs text-muted-foreground/60">
-          {galleryId
-            ? "No editable source photos (RAW originals can't be run through the engine)."
-            : "Not started yet — click “Edit source” to run the model over the style's source photos."}
+          Not started yet — click “Edit source” to run the model over the style's source photos.
         </p>
       ) : (
         <div className="space-y-1.5">
