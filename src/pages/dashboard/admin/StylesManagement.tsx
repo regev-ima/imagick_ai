@@ -116,6 +116,15 @@ export default function StylesManagement() {
       if (error) throw error;
       return data as unknown as Style[];
     },
+    // Keep the list live while anything is in flight, so an admin watching a
+    // client's upload sees the status move (uploading → training → ready)
+    // without a manual refresh.
+    refetchInterval: (q) =>
+      (q.state.data as Style[] | undefined)?.some(
+        (s) => s.status === "uploading" || s.status === "training" || s.status === "importing",
+      )
+        ? 8000
+        : false,
   });
 
   const updateStyleMutation = useMutation({
