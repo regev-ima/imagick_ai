@@ -23,7 +23,8 @@ import {
   Mountain,
   MapPin,
   Trophy,
-  AlertTriangle,
+  Info,
+  FileImage,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -165,7 +166,53 @@ function ButtonSparkles({ active }: { active: boolean }) {
 interface LocalFile {
   id: string;
   file: File;
+  /** Object URL for browser-renderable images; "" for RAW/unpreviewable files. */
   preview: string;
+}
+
+// Formats browsers cannot decode to a thumbnail (RAW, TIFF, HEIC on most
+// browsers). We skip the object URL for these and show a labelled placeholder
+// instead of a broken-image icon.
+const UNPREVIEWABLE_EXT =
+  /\.(cr2|cr3|nef|arw|dng|raf|orf|rw2|srw|pef|x3f|3fr|erf|kdc|dcr|mos|nrw|iiq|sr2|srf|tif|tiff|heic|heif)$/i;
+
+function canPreview(file: File): boolean {
+  if (UNPREVIEWABLE_EXT.test(file.name)) return false;
+  return (file.type || "").startsWith("image/");
+}
+
+function fileExtLabel(name: string): string {
+  const m = name.match(/\.([a-z0-9]+)$/i);
+  return (m ? m[1] : "raw").toUpperCase();
+}
+
+/** Thumbnail that shows the image, or a tidy labelled tile for RAW/unpreviewable files. */
+function FileThumb({ file, dim }: { file: LocalFile; dim?: boolean }) {
+  const [broken, setBroken] = useState(false);
+  const base = cn(
+    "aspect-square w-full rounded-sm plate-keyline transition-opacity",
+    dim && "opacity-60",
+  );
+  if (file.preview && !broken) {
+    return (
+      <img
+        src={file.preview}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        onError={() => setBroken(true)}
+        className={cn(base, "object-cover")}
+      />
+    );
+  }
+  return (
+    <div className={cn(base, "flex flex-col items-center justify-center gap-1 bg-surface-2")}>
+      <FileImage className="h-5 w-5 text-muted-foreground/70" />
+      <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {fileExtLabel(file.file.name)}
+      </span>
+    </div>
+  );
 }
 
 export default function CreateStylePage() {
@@ -268,7 +315,7 @@ export default function CreateStylePage() {
     const newFiles: LocalFile[] = files.map((file) => ({
       id: Math.random().toString(36).substr(2, 9),
       file,
-      preview: URL.createObjectURL(file),
+      preview: canPreview(file) ? URL.createObjectURL(file) : "",
     }));
     if (type === "before") setBeforeFiles((prev) => [...prev, ...newFiles]);
     else setAfterFiles((prev) => [...prev, ...newFiles]);
@@ -909,14 +956,7 @@ export default function CreateStylePage() {
                               const isFailed = uploadProgress?.failedIds.has(file.id);
                               return (
                                 <div key={file.id} className="group relative">
-                                  <img
-                                    src={file.preview}
-                                    alt="Before"
-                                    className={cn(
-                                      "aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity",
-                                      isActive && "opacity-60",
-                                    )}
-                                  />
+                                  <FileThumb file={file} dim={isActive} />
                                   {/* Upload status overlay */}
                                   {isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-background/40">
@@ -1016,14 +1056,7 @@ export default function CreateStylePage() {
                               const isFailed = uploadProgress?.failedIds.has(file.id);
                               return (
                                 <div key={file.id} className="group relative">
-                                  <img
-                                    src={file.preview}
-                                    alt="After"
-                                    className={cn(
-                                      "aspect-square w-full rounded-sm object-cover plate-keyline transition-opacity",
-                                      isActive && "opacity-60",
-                                    )}
-                                  />
+                                  <FileThumb file={file} dim={isActive} />
                                   {isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-background/40">
                                       <Loader2 className="h-5 w-5 animate-spin text-accent" />
@@ -1094,16 +1127,13 @@ export default function CreateStylePage() {
                   )}
 
                   {localCountMismatch && (
-                    <div
-                      role="alert"
-                      className="flex items-start gap-3 rounded-[--radius] border border-amber-500/30 bg-amber-500/10 p-4"
-                    >
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <div className="flex items-start gap-3 rounded-[--radius] border border-border bg-surface-1 p-4">
+                      <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       <p className="font-sans text-sm leading-snug text-muted-foreground">
-                        <span className="font-medium text-amber-500">
-                          Counts don't match — {beforeFiles.length} before vs {afterFiles.length} after.
-                        </span>{" "}
-                        Training works best with the same number of matched before/after pairs.
+                        <span className="font-medium text-foreground">Tip — matched pairs train best.</span>{" "}
+                        You've added {beforeFiles.length.toLocaleString()} before and{" "}
+                        {afterFiles.length.toLocaleString()} after. An equal number of before/after pairs gives the
+                        cleanest result, but you can keep going.
                       </p>
                     </div>
                   )}
