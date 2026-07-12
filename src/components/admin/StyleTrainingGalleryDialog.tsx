@@ -9,11 +9,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BeforeAfterSlider } from "@/components/styles/BeforeAfterSlider";
 import { ChevronLeft, ChevronRight, Eye, EyeOff, ExternalLink, FileImage, Loader2, Star, X } from "lucide-react";
 import { parseStyleFile, type StyleFileKind } from "@/lib/styleFiles";
-import { getCdnResizedUrl, getThumbnailUrl, toCdnUrl } from "@/lib/imageUrls";
+import { getCdnResizedUrl, getPreviewUrl, getThumbnailUrl, toCdnUrl } from "@/lib/imageUrls";
 import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { StyleFull } from "@/pages/dashboard/admin/StyleDetailsSheet";
@@ -357,11 +359,16 @@ function StyleDemoTab({ style, readOnly }: { style: StyleFull; readOnly?: boolea
   const queryClient = useQueryClient();
   const [hidden, setHidden] = useState<Set<string>>(() => loadHidden(style.id));
   const [saving, setSaving] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<"slider" | "side-by-side">("side-by-side");
   // The `style` prop is a snapshot from the admin table and won't pick up a
   // freshly-saved cover, so track it locally for instant ★ feedback.
   const [coverUrl, setCoverUrl] = useState<string | null>(style.thumbnail_url);
 
-  useEffect(() => setHidden(loadHidden(style.id)), [style.id]);
+  useEffect(() => {
+    setHidden(loadHidden(style.id));
+    setSelectedIndex(0);
+  }, [style.id]);
   useEffect(() => setCoverUrl(style.thumbnail_url), [style.id, style.thumbnail_url]);
 
   const { data: demoImages = [] } = useQuery({
@@ -485,6 +492,13 @@ function StyleDemoTab({ style, readOnly }: { style: StyleFull; readOnly?: boolea
     );
   }
 
+  const coverKey = coverUrl ? getThumbnailUrl(coverUrl) : null;
+  const activeIndex = Math.min(selectedIndex, total - 1);
+  const active = demoImages[activeIndex];
+  const activeAfter = active ? editedByImage.get(active.id) : undefined;
+  const activeHidden = active ? hidden.has(active.id) : false;
+  const activeIsCover = !!activeAfter && !!coverKey && getThumbnailUrl(activeAfter) === coverKey;
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
@@ -506,72 +520,124 @@ function StyleDemoTab({ style, readOnly }: { style: StyleFull; readOnly?: boolea
         )}
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 overflow-y-auto">
-        {demoImages.map((img) => {
-          const after = editedByImage.get(img.id);
-          const isHidden = hidden.has(img.id);
-          // Compare through getThumbnailUrl so a legacy full-res cover still
-          // matches its reduced-thumbnail equivalent.
-          const isCover = !!after && !!coverUrl && getThumbnailUrl(after) === getThumbnailUrl(coverUrl);
-          return (
-            <div
-              key={img.id}
-              className={cn(
-                "relative overflow-hidden rounded-[--radius] border transition-opacity",
-                isCover ? "border-rating ring-2 ring-rating" : "border-border",
-                isHidden && "opacity-40",
-              )}
-            >
-              {isCover && (
-                <span className="absolute left-1.5 top-9 z-10 rounded-sm bg-rating px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-black">
-                  Cover
-                </span>
-              )}
-              <div className="relative grid grid-cols-2">
-                <img
-                  src={getThumbnailUrl(img.original_url)}
-                  alt="before"
-                  loading="lazy"
-                  className="aspect-square w-full object-cover"
-                />
-                {after ? (
-                  <img src={getThumbnailUrl(after)} alt="after" loading="lazy" className="aspect-square w-full object-cover" />
-                ) : (
-                  <div className="grid aspect-square w-full place-items-center bg-surface-2 text-[9px] text-muted-foreground/50">
-                    pending
-                  </div>
+      <div className="flex min-h-0 flex-1 gap-4">
+        {/* Left: every demo photo — thumbnail · name · cover/hidden markers. */}
+        <div className="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto rounded-[--radius] border border-border bg-surface-2/20 p-2">
+          {demoImages.map((img, i) => {
+            const after = editedByImage.get(img.id);
+            const isCover = !!after && !!coverKey && getThumbnailUrl(after) === coverKey;
+            const isHidden = hidden.has(img.id);
+            return (
+              <button
+                key={img.id}
+                type="button"
+                onClick={() => setSelectedIndex(i)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-[--radius] border px-2 py-1.5 text-left transition-colors",
+                  i === activeIndex
+                    ? "border-primary/60 bg-primary/5"
+                    : "border-transparent hover:border-border hover:bg-surface-2/40",
+                  isHidden && "opacity-50",
                 )}
-                <span className="absolute left-1.5 top-1.5 rounded-sm bg-background/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
-                  Before
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[--radius] border border-border bg-surface-2">
+                  <img src={getThumbnailUrl(img.original_url)} alt="" loading="lazy" className="h-full w-full object-cover" />
                 </span>
-                <span className="absolute left-1/2 top-1.5 rounded-sm bg-background/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
-                  After
+                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground" title={img.filename || `#${i + 1}`}>
+                  {img.filename || `#${i + 1}`}
                 </span>
-                {!readOnly && after && (
-                  <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setCover(after)}
-                      title={isCover ? "Cover image" : "Set as cover"}
-                      className="rounded-sm bg-background/80 p-1 text-muted-foreground backdrop-blur-sm transition-colors hover:text-rating"
-                    >
-                      <Star className={cn("h-3.5 w-3.5", isCover && "fill-current text-rating")} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleHidden(img.id)}
-                      title={isHidden ? "Include in previews" : "Hide from previews"}
-                      className="rounded-sm bg-background/80 p-1 text-muted-foreground backdrop-blur-sm transition-colors hover:text-foreground"
-                    >
-                      {isHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                    </button>
-                  </div>
-                )}
-              </div>
+                <span className="flex shrink-0 items-center gap-1">
+                  {isCover && <Star className="h-3 w-3 fill-current text-rating" />}
+                  {isHidden && <EyeOff className="h-3 w-3 text-muted-foreground/50" />}
+                  {!after && <span className="h-1.5 w-1.5 rounded-full ring-1 ring-inset ring-border" title="Not edited yet" />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right: the selected photo large — before/after with cover + hide. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={active?.filename}>
+              {active?.filename || `#${activeIndex + 1}`}
+              {activeAfter ? "" : " · not edited yet"}
+            </span>
+            <div className="flex items-center gap-2">
+              {!readOnly && (
+                <>
+                  <Button
+                    size="sm"
+                    variant={activeIsCover ? "secondary" : "outline"}
+                    disabled={!activeAfter}
+                    onClick={() => activeAfter && setCover(activeAfter)}
+                  >
+                    <Star className={cn("mr-1.5 h-3.5 w-3.5", activeIsCover && "fill-current text-rating")} />
+                    {activeIsCover ? "Cover" : "Set as cover"}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={!active} onClick={() => active && toggleHidden(active.id)}>
+                    {activeHidden ? <Eye className="mr-1.5 h-3.5 w-3.5" /> : <EyeOff className="mr-1.5 h-3.5 w-3.5" />}
+                    {activeHidden ? "Show" : "Hide"}
+                  </Button>
+                </>
+              )}
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                value={viewMode}
+                onValueChange={(v) => v && setViewMode(v as "slider" | "side-by-side")}
+              >
+                <ToggleGroupItem value="side-by-side" className="text-xs">Side-by-side</ToggleGroupItem>
+                <ToggleGroupItem value="slider" className="text-xs">Slider</ToggleGroupItem>
+              </ToggleGroup>
             </div>
-          );
-        })}
+          </div>
+
+          {!active ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Select a photo</div>
+          ) : viewMode === "side-by-side" ? (
+            <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+              <DemoPane label="Before" src={getPreviewUrl(active.original_url)} />
+              {activeAfter ? (
+                <DemoPane label="After" src={getPreviewUrl(activeAfter)} />
+              ) : (
+                <div className="flex min-h-0 flex-1 items-center justify-center rounded-[--radius] border border-border bg-surface-2/40 text-xs text-muted-foreground/50 plate-keyline">
+                  Not edited yet
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+              {activeAfter ? (
+                <BeforeAfterSlider
+                  key={`${active.id}-${activeAfter}`}
+                  beforeSrc={getPreviewUrl(active.original_url)}
+                  afterSrc={getPreviewUrl(activeAfter)}
+                  maxHeight="100%"
+                  className="h-full max-w-full"
+                />
+              ) : (
+                <p className="max-w-sm text-center text-sm text-muted-foreground">
+                  This photo hasn't been edited with this style yet.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/** One labeled, large pane in the demo side-by-side view. */
+function DemoPane({ label, src }: { label: string; src: string }) {
+  return (
+    <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[--radius] border border-border bg-surface-2/40 plate-keyline">
+      <span className="absolute left-1.5 top-1.5 z-10 rounded-sm bg-background/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
+        {label}
+      </span>
+      <img src={src} alt={label} decoding="async" className="max-h-full max-w-full object-contain" />
     </div>
   );
 }
