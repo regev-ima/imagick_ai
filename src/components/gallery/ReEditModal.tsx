@@ -1,43 +1,24 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { X, Check, Lock, Eye, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Orb } from "@/components/aura/Orb";
 import { Card } from "@/components/ui/card";
-
-/** The AI mark — 4-point sparkle (logo star). Inherits currentColor. */
-function Sparkle({ size = 16, className }: { size?: number; className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden style={{ display: "block" }}>
-      <path
-        d="M12 0 C12.9 7.2 16.8 11.1 24 12 C16.8 12.9 12.9 16.8 12 24 C11.1 16.8 7.2 12.9 0 12 C7.2 11.1 11.1 7.2 12 0 Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { LookGrid, Sparkle, type LookStyle } from "@/components/gallery/LookGrid";
 import { toast } from "sonner";
-import { getThumbnailUrl } from "@/lib/imageUrls";
-import heroImage1 from "@/assets/hero-gallery-1.jpg";
 import { useSubscription } from "@/hooks/useSubscription";
-import { useShowcaseCovers } from "@/hooks/useShowcaseCovers";
 
-interface Style {
-  id: string;
-  name: string;
-  thumbnail_url: string | null;
-  category: string | null;
-}
+const MAX_LOOKS = 3;
 
 interface ReEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedImageCount: number;
-  styles: Style[];
+  styles: LookStyle[];
   usedStyleIds: string[];
+  /** Gallery owner id — groups their trained models as "Your AI models". */
+  ownerId?: string | null;
   onConfirm: (styleIds: string[]) => void;
   isProcessing?: boolean;
 }
@@ -48,50 +29,42 @@ export function ReEditModal({
   selectedImageCount,
   styles,
   usedStyleIds = [],
+  ownerId,
   onConfirm,
-  isProcessing: externalIsProcessing = false
+  isProcessing: externalIsProcessing = false,
 }: ReEditModalProps) {
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [touched, setTouched] = useState(false);
   const isProcessing = externalIsProcessing;
   const navigate = useNavigate();
-  const { editsRemaining, availableEdits, editsReserved, isUnlimited, canEdit, isSuspended, isExpired, isFreePlan } = useSubscription();
+  const { availableEdits, editsReserved, isUnlimited, canEdit, isSuspended, isExpired, isFreePlan } = useSubscription();
 
   const editsNeeded = selectedImageCount * selectedStyles.length;
   const hasInsufficientEdits = !isUnlimited && editsNeeded > availableEdits;
 
-  const { data: showcaseCovers = {} } = useShowcaseCovers({ enabled: isOpen });
-
   useEffect(() => {
-    if (isOpen) setSelectedStyles([]);
+    if (isOpen) { setSelectedStyles([]); setTouched(false); }
   }, [isOpen]);
 
+  // Same select/lock rules as the create-collection picker: cap at MAX_LOOKS,
+  // and never let an already-applied look be re-selected (LookGrid disables it,
+  // this is the belt-and-braces guard).
   const toggleStyle = (styleId: string) => {
-    if (usedStyleIds.includes(styleId)) {
-      toast.error("This style was already applied to selected images");
-      return;
-    }
-    setSelectedStyles(prev => {
-      if (prev.includes(styleId)) return prev.filter(id => id !== styleId);
-      if (prev.length >= 3) { toast.error("Maximum 3 styles allowed"); return prev; }
+    setTouched(true);
+    if (usedStyleIds.includes(styleId)) return;
+    setSelectedStyles((prev) => {
+      if (prev.includes(styleId)) return prev.filter((id) => id !== styleId);
+      if (prev.length >= MAX_LOOKS) { toast.error(`Up to ${MAX_LOOKS} looks`); return prev; }
       return [...prev, styleId];
     });
   };
 
-  const handleConfirm = async () => {
-    if (selectedStyles.length === 0) { toast.error("Please select at least one style"); return; }
+  const handleConfirm = () => {
+    if (selectedStyles.length === 0) { toast.error("Pick at least one look"); return; }
     onConfirm(selectedStyles);
   };
 
   if (!isOpen) return null;
-
-  const availableStyles = styles.filter(s => !usedStyleIds.includes(s.id));
-  const usedStyles = styles.filter(s => usedStyleIds.includes(s.id));
-
-  const getStyleCover = (style: Style) => {
-    const cover = showcaseCovers[style.id];
-    if (cover) return getThumbnailUrl(cover);
-    return style.thumbnail_url || heroImage1;
-  };
 
   return (
     <motion.div
@@ -105,7 +78,7 @@ export function ReEditModal({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="w-full max-w-3xl max-h-[85vh] overflow-hidden"
+        className="w-full max-w-2xl max-h-[85vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <Card className="glass-card border-border rounded-[--radius] flex flex-col max-h-[85vh]">
@@ -115,10 +88,10 @@ export function ReEditModal({
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Sparkle size={16} className="text-primary" />
-                  Re-Edit Images
+                  Edit in a new style
                 </h2>
                 <p className="aura-microlabel mt-0.5">
-                  <span className="folio text-foreground">{selectedImageCount}</span> image{selectedImageCount > 1 ? 's' : ''} selected
+                  <span className="folio text-foreground">{selectedImageCount}</span> photo{selectedImageCount !== 1 ? "s" : ""} · re-edits leave your originals and other looks untouched
                 </p>
               </div>
             </div>
@@ -127,7 +100,7 @@ export function ReEditModal({
             </Button>
           </div>
 
-          <div className="flex-1 overflow-hidden p-6">
+          <div className="flex-1 overflow-hidden p-6 flex flex-col min-h-0">
             {/* Blocking banners */}
             {!canEdit && (isSuspended || isExpired) && (
               <div className="p-3 rounded-lg border text-sm bg-destructive/10 border-destructive/30 mb-4">
@@ -145,150 +118,41 @@ export function ReEditModal({
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                     <span>You've used all 3,000 free edits.</span>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="ml-3 flex-shrink-0"
-                    onClick={() => navigate("/dashboard/billing")}
-                  >
+                  <Button size="sm" variant="default" className="ml-3 flex-shrink-0" onClick={() => navigate("/dashboard/billing")}>
                     Upgrade Plan
                   </Button>
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-bold mb-1">Select AI Styles</h3>
-                <p className="text-sm text-muted-foreground">Choose up to 3 styles to apply</p>
+            {/* Same picker as collection creation */}
+            <div className="mb-3.5 flex shrink-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                  <Sparkle size={13} className="text-primary" /> Choose your AI look
+                </div>
+                <p className="caption mt-1">A trained AI model edits every selected photo in this look — pick up to {MAX_LOOKS}.</p>
               </div>
-              <div className={cn(
-                "px-3 py-1.5 rounded-sm font-mono text-sm font-semibold tabular-nums folio border",
-                selectedStyles.length > 0
-                  ? "bg-primary/15 text-primary border-primary/30"
-                  : "surface-2 text-muted-foreground border-border/60"
-              )}>
-                {selectedStyles.length}/3
-              </div>
+              {selectedStyles.length > 0 && <span className="aura-microlabel shrink-0 text-primary">{selectedStyles.length}/{MAX_LOOKS}</span>}
             </div>
 
-            <ScrollArea className="h-[400px] pr-2">
-              {/* Available Styles */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {availableStyles.map((style) => {
-                  const isSelected = selectedStyles.includes(style.id);
-                  return (
-                    <motion.div
-                      key={style.id}
-                      role="checkbox"
-                      aria-checked={isSelected}
-                      aria-label={style.name}
-                      tabIndex={0}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => toggleStyle(style.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          toggleStyle(style.id);
-                        }
-                      }}
-                      className={cn(
-                        "relative rounded-sm overflow-hidden cursor-pointer transition-all h-36 flex flex-col justify-end group",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                        isSelected
-                          ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg shadow-primary/20"
-                          : "ring-1 ring-border/60 hover:ring-primary/40"
-                      )}
-                    >
-                      <img
-                        src={getStyleCover(style)}
-                        alt={style.name}
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                      {/* Eye icon */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(`/dashboard/styles/${style.id}`, "_blank");
-                        }}
-                        className="absolute top-2.5 left-2.5 w-8 h-8 rounded-full bg-background/60 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background/80"
-                      >
-                        <Eye className="w-4 h-4 text-foreground" />
-                      </button>
-
-                      <div className="relative z-10 p-3">
-                        <div className="flex items-center gap-2">
-                          <Sparkle size={14} className="text-primary" />
-                          <span className="font-semibold text-sm text-white truncate">{style.name}</span>
-                        </div>
-                        {style.category && (
-                          <p className="text-xs text-white/60 capitalize mt-0.5 ml-6">{style.category}</p>
-                        )}
-                      </div>
-
-                      {isSelected && (
-                        <div className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                          <Check className="w-4 h-4 text-primary-foreground" />
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
+            {styles.length === 0 ? (
+              <div className="text-center py-8">
+                <Sparkle size={48} className="text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No styles available</p>
+                <p className="text-sm text-muted-foreground">Create a custom style first</p>
               </div>
-
-              {/* Already Used Styles (disabled) */}
-              {usedStyles.length > 0 && (
-                <>
-                  <h4 className="aura-microlabel mt-6 mb-3 flex items-center gap-2">
-                    <Lock className="w-3.5 h-3.5" />
-                    Already Applied
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {usedStyles.map((style) => (
-                      <div
-                        key={style.id}
-                        className="relative rounded-sm overflow-hidden ring-1 ring-border/40 opacity-50 cursor-not-allowed h-36 flex flex-col justify-end"
-                      >
-                        <img
-                          src={getStyleCover(style)}
-                          alt={style.name}
-                          className="absolute inset-0 w-full h-full object-cover grayscale"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                        <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-muted/80 backdrop-blur-sm flex items-center justify-center">
-                          <Lock className="w-3 h-3 text-muted-foreground" />
-                        </div>
-                        <div className="relative z-10 p-3">
-                          <div className="flex items-center gap-2">
-                            <Sparkle size={14} className="text-muted-foreground" />
-                            <span className="font-semibold text-sm text-white/70 truncate">{style.name}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {styles.length === 0 && (
-                <div className="text-center py-8">
-                  <Sparkle size={48} className="text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">No styles available</p>
-                  <p className="text-sm text-muted-foreground">Create a custom style first</p>
-                </div>
-              )}
-
-              {availableStyles.length === 0 && usedStyles.length > 0 && (
-                <div className="text-center py-8">
-                  <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">All styles already applied</p>
-                  <p className="text-sm text-muted-foreground">Create new styles to apply different edits</p>
-                </div>
-              )}
-            </ScrollArea>
+            ) : (
+              <LookGrid
+                styles={styles}
+                selectedIds={selectedStyles}
+                usedIds={usedStyleIds}
+                chosen={touched}
+                ownerId={ownerId}
+                onToggle={toggleStyle}
+                max={MAX_LOOKS}
+              />
+            )}
           </div>
 
           {/* Edit Cost Summary */}
@@ -296,14 +160,14 @@ export function ReEditModal({
             <div className="p-6 border-t border-border/50">
               {isUnlimited ? (
                 <div className="text-sm text-muted-foreground">
-                  {selectedImageCount} image{selectedImageCount !== 1 ? 's' : ''} × {selectedStyles.length} style{selectedStyles.length !== 1 ? 's' : ''} = <span className="font-semibold text-foreground">{editsNeeded} edits</span>
+                  {selectedImageCount} photo{selectedImageCount !== 1 ? "s" : ""} × {selectedStyles.length} look{selectedStyles.length !== 1 ? "s" : ""} = <span className="font-semibold text-foreground">{editsNeeded} edits</span>
                   <span className="ml-2 text-primary font-medium">Unlimited plan</span>
                 </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {selectedImageCount} image{selectedImageCount !== 1 ? 's' : ''} × {selectedStyles.length} style{selectedStyles.length !== 1 ? 's' : ''} = <span className="font-semibold text-foreground">{editsNeeded} edits</span>
+                      {selectedImageCount} photo{selectedImageCount !== 1 ? "s" : ""} × {selectedStyles.length} look{selectedStyles.length !== 1 ? "s" : ""} = <span className="font-semibold text-foreground">{editsNeeded} edits</span>
                     </span>
                     <span className="text-muted-foreground">
                       Available: <span className="font-semibold text-foreground">{availableEdits.toLocaleString()}</span>{editsReserved > 0 && <span className="text-xs ml-1">({editsReserved.toLocaleString()} reserved)</span>}
@@ -315,12 +179,7 @@ export function ReEditModal({
                         <AlertTriangle className="w-4 h-4 shrink-0" />
                         <span>Not enough edits.</span>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="ml-3 flex-shrink-0"
-                        onClick={() => navigate("/dashboard/billing")}
-                      >
+                      <Button size="sm" variant="default" className="ml-3 flex-shrink-0" onClick={() => navigate("/dashboard/billing")}>
                         Upgrade Plan
                       </Button>
                     </div>
@@ -339,7 +198,9 @@ export function ReEditModal({
               disabled={selectedStyles.length === 0 || isProcessing || !canEdit || hasInsufficientEdits}
               onClick={handleConfirm}
             >
-              {isProcessing ? "Sending to AI..." : `Apply ${selectedStyles.length > 0 ? selectedStyles.length : ""} Style${selectedStyles.length !== 1 ? 's' : ''}`}
+              {isProcessing
+                ? "Sending to AI..."
+                : `Apply ${selectedStyles.length > 0 ? selectedStyles.length : ""} look${selectedStyles.length !== 1 ? "s" : ""}`}
             </Button>
           </div>
         </Card>

@@ -477,9 +477,9 @@ export default function GalleryEditorPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("styles")
-        .select("id, name, thumbnail_url, category")
+        .select("id, name, thumbnail_url, category, user_id, status, style_id_external, after_image_urls")
         .order("created_at", { ascending: false });
-      
+
       if (error) throw error;
       return data;
     }
@@ -2158,8 +2158,11 @@ export default function GalleryEditorPage() {
                 </>
               )}
               {gallery.status === "processing" && (() => {
-                // Detect re-edit scenario: all images already ready but gallery is processing
-                const isReEditScenario = pendingReEdit && processingStats.ready === processingStats.total;
+                // A re-edit is in flight whenever we're tracking pending edits.
+                // (The originals stay "ready" in the UI; only the new look's
+                // view shows per-image processing — so key off pendingReEdit,
+                // not the image-status counts.)
+                const isReEditScenario = !!pendingReEdit;
                 if (isReEditScenario) {
                   const expectedCount = pendingReEdit.imageIds.length * pendingReEdit.styleIds.length;
                   let completedCount = 0;
@@ -2239,6 +2242,18 @@ export default function GalleryEditorPage() {
                 <span className="folio text-foreground">{selectedImages.length}</span> selected
               </span>
 
+              {/* Select All — promoted to the main row for one-tap reach. */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={selectAll}
+                disabled={selectedImages.length >= images.length}
+              >
+                <CheckSquare className="w-4 h-4" />
+                Select All
+              </Button>
+
               {/* High-frequency actions — always visible */}
               <Button
                 variant="glow"
@@ -2247,7 +2262,7 @@ export default function GalleryEditorPage() {
                 onClick={() => setShowReEditModal(true)}
               >
                 <Sparkle size={14} className="text-current" />
-                Re-edit
+                Edit in new style
               </Button>
               <Button
                 variant="outline"
@@ -2286,10 +2301,6 @@ export default function GalleryEditorPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center">
-                  <DropdownMenuItem onClick={selectAll}>
-                    <CheckSquare className="w-4 h-4 mr-2" />
-                    Select All
-                  </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={selectedImages.length !== 1}
                     onClick={() => setHeroImage.mutate(selectedImages[0])}
@@ -2546,7 +2557,7 @@ export default function GalleryEditorPage() {
         <>
         {/* AI Processing Banner - shows when processing with no ready images */}
         <AnimatePresence>
-          {gallery?.status === "processing" && processingStats.ready === 0 && images.length > 0 && (
+          {gallery?.status === "processing" && processingStats.ready === 0 && images.length > 0 && !pendingReEdit && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -2668,14 +2679,28 @@ export default function GalleryEditorPage() {
                   isSelected={selectedImages.includes(image.id)}
                   computedWidth={computed?.width}
                   computedHeight={computed?.height}
-                  status={
-                    selectedViewStyle !== "original" &&
-                    pendingReEdit?.styleIds.includes(selectedViewStyle) &&
-                    pendingReEdit?.imageIds.includes(image.id) &&
-                    !imageIdsByStyle[selectedViewStyle]?.has(image.id)
-                      ? "processing"
-                      : image.status
-                  }
+                  status={(() => {
+                    const isReEditImg = pendingReEdit?.imageIds.includes(image.id);
+                    // The NEW look being applied, still awaiting this image's
+                    // edit → show it as processing (only in that look's view).
+                    if (
+                      selectedViewStyle !== "original" &&
+                      pendingReEdit?.styleIds.includes(selectedViewStyle) &&
+                      isReEditImg &&
+                      !imageIdsByStyle[selectedViewStyle]?.has(image.id)
+                    ) {
+                      return "processing";
+                    }
+                    // During a re-edit the backend transiently flips the source
+                    // image to "processing", but its original and already-
+                    // finished looks are still on hand — keep them visible
+                    // instead of flashing every view to a spinner (the "gallery
+                    // reset" bug). Only the pending look's view (above) spins.
+                    if (isReEditImg && image.status === "processing") {
+                      return "ready";
+                    }
+                    return image.status;
+                  })()}
                   onImageClick={handleImageClick}
                   onSelectionToggle={handleSelectionToggle}
                   onOpenLightbox={openLightbox}
@@ -3344,6 +3369,7 @@ export default function GalleryEditorPage() {
             queryClient={queryClient}
             galleryId={id}
             setPendingReEdit={setPendingReEdit}
+            ownerId={gallery?.user_id}
           />
         )}
       </AnimatePresence>
@@ -3459,7 +3485,7 @@ export default function GalleryEditorPage() {
 function ReEditModalWithEdits({
   showReEditModal, setShowReEditModal, selectedImages, setSelectedImages,
   styles, isProcessing, gallery, reEditImages, queryClient, galleryId,
-  setPendingReEdit,
+  setPendingReEdit, ownerId,
 }: {
   showReEditModal: boolean;
   setShowReEditModal: (v: boolean) => void;
@@ -3472,6 +3498,7 @@ function ReEditModalWithEdits({
   queryClient: any;
   galleryId: string | undefined;
   setPendingReEdit: (v: { imageIds: string[]; styleIds: string[] } | null) => void;
+  ownerId?: string | null;
 }) {
   // Query image_edits for selected images to find styles applied to ALL of them
   const { data: usedStyleIds = [] } = useQuery({
@@ -3507,6 +3534,7 @@ function ReEditModalWithEdits({
       selectedImageCount={selectedImages.length}
       styles={styles}
       usedStyleIds={usedStyleIds}
+      ownerId={ownerId}
       isProcessing={isProcessing}
       onConfirm={(styleIds) => {
         if (gallery) {
