@@ -298,13 +298,35 @@ Deno.serve(async (req) => {
         // Materializes the style's BEFORE set as a hidden gallery and runs
         // the freshly trained model over it, so the three-way compare
         // (source · photographer's edit · model's edit) has data to show.
+        // Notify on WhatsApp so the admin knows the post-training status —
+        // especially when a large source set is skipped and needs a manual run.
         try {
-          await autoProcessStyleSource(
+          const srcResult = await autoProcessStyleSource(
             supabase,
             Deno.env.get("SUPABASE_URL")!,
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
             callbackStyleId,
           );
+
+          try {
+            const { data: srcStyle } = await supabase
+              .from("styles")
+              .select("name")
+              .eq("id", callbackStyleId)
+              .maybeSingle();
+            const styleName = srcStyle?.name || callbackStyleId;
+            let msg: string | null = null;
+            if (srcResult.status === "dispatched") {
+              msg = `🎨 Source auto-edit started\nStyle: ${styleName}\nEditing ${srcResult.dispatched}/${srcResult.total} source photos with the new model.`;
+            } else if (srcResult.status === "skipped_too_many") {
+              msg = `⚠️ Source auto-edit skipped\nStyle: ${styleName}\n${srcResult.total} source photos (over the auto limit). Open the style in admin and click "Edit source" to run it.`;
+            } else if (srcResult.status === "error") {
+              msg = `❌ Source auto-edit failed to start\nStyle: ${styleName}\nRun it manually from the admin style panel.`;
+            }
+            if (msg) await sendWhatsAppNotification(msg);
+          } catch (notifyErr) {
+            console.error("Source-edit WhatsApp notify error:", notifyErr);
+          }
         } catch (sourceErr) {
           console.error("Error in auto-process style source:", sourceErr);
           // Non-fatal — don't fail the webhook

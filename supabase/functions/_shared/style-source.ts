@@ -164,22 +164,39 @@ export async function ensureStyleSourceGallery(
   return galleryId;
 }
 
+/** Outcome of a source-edit attempt, so callers can surface a status/notify. */
+export interface SourceEditResult {
+  status:
+    | "dispatched" // process-images was kicked off for `dispatched` images
+    | "already_done" // every source image already has an edit for this style
+    | "skipped_too_many" // over the auto cap and not forced — needs a manual run
+    | "no_editable_source" // source gallery has 0 editable (e.g. all-RAW befores)
+    | "no_gallery" // no trained model / couldn't materialize the gallery
+    | "error"; // process-images dispatch failed
+  dispatched: number;
+  total: number;
+}
+
 /**
  * Ensure the source gallery exists, then dispatch process-images for any of
  * its images that don't yet have an edit from this style. Mirrors
  * `autoProcessShowcase` in train-webhook/index.ts. Non-fatal — logs and
- * returns on any failure, never throws.
+ * returns a result on any failure, never throws.
+ *
+ * Pass `{ force: true }` (manual admin trigger) to bypass the auto-dispatch
+ * size cap so large source sets can still be edited on demand.
  */
 export async function autoProcessStyleSource(
   admin: any,
   supabaseUrl: string,
   serviceKey: string,
   styleId: string,
-): Promise<void> {
+  opts?: { force?: boolean },
+): Promise<SourceEditResult> {
   const galleryId = await ensureStyleSourceGallery(admin, styleId);
   if (!galleryId) {
     console.log(`autoProcessStyleSource: no source gallery for style ${styleId}, skipping`);
-    return;
+    return { status: "no_gallery", dispatched: 0, total: 0 };
   }
 
   const { data: style } = await admin
@@ -190,7 +207,7 @@ export async function autoProcessStyleSource(
 
   if (!style) {
     console.log(`autoProcessStyleSource: style ${styleId} not found, skipping`);
-    return;
+    return { status: "no_gallery", dispatched: 0, total: 0 };
   }
 
   const { data: images } = await admin
@@ -199,18 +216,20 @@ export async function autoProcessStyleSource(
     .eq("gallery_id", galleryId)
     .neq("status", "deleted");
 
-  if (!images || images.length === 0) {
-    console.log(`autoProcessStyleSource: no images in source gallery for style ${styleId}, skipping`);
-    return;
+  const total = images?.length ?? 0;
+  if (total === 0) {
+    // Nothing editable — typically an all-RAW before set (RAW isn't materialized).
+    console.log(`autoProcessStyleSource: no editable source images for style ${styleId}, skipping`);
+    return { status: "no_editable_source", dispatched: 0, total: 0 };
   }
 
   // Guard against runaway cost — don't auto-run the engine on a huge source
-  // set without an explicit admin click (style-source-edit/index.ts).
-  if (images.length > MAX_AUTO_DISPATCH_IMAGES) {
+  // set without an explicit admin click (opts.force from style-source-edit).
+  if (!opts?.force && total > MAX_AUTO_DISPATCH_IMAGES) {
     console.log(
-      `autoProcessStyleSource: source gallery for style ${styleId} has ${images.length} images (> ${MAX_AUTO_DISPATCH_IMAGES}), skipping automatic dispatch`,
+      `autoProcessStyleSource: source gallery for style ${styleId} has ${total} images (> ${MAX_AUTO_DISPATCH_IMAGES}), skipping automatic dispatch`,
     );
-    return;
+    return { status: "skipped_too_many", dispatched: 0, total };
   }
 
   const imageIds = images.map((img: any) => img.id);
@@ -226,7 +245,7 @@ export async function autoProcessStyleSource(
 
   if (unprocessedIds.length === 0) {
     console.log(`autoProcessStyleSource: all source images already processed for style ${styleId}`);
-    return;
+    return { status: "already_done", dispatched: 0, total };
   }
 
   console.log(`autoProcessStyleSource: processing ${unprocessedIds.length} source images for style ${styleId}`);
@@ -248,7 +267,9 @@ export async function autoProcessStyleSource(
   if (!response.ok) {
     const errorText = await response.text();
     console.error(`autoProcessStyleSource: process-images dispatch failed for style ${styleId}:`, errorText);
-  } else {
-    console.log(`autoProcessStyleSource: process-images dispatched for style ${styleId}`);
+    return { status: "error", dispatched: 0, total };
   }
+
+  console.log(`autoProcessStyleSource: process-images dispatched for style ${styleId}`);
+  return { status: "dispatched", dispatched: unprocessedIds.length, total };
 }
