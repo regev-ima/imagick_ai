@@ -127,6 +127,53 @@ export function getPreviewUrl(originalUrl: string): string {
 }
 
 /**
+ * Rebuild the bucket-relative key (e.g. `styles/u/s/before/x.JPG`) from any
+ * stored url — raw S3 host, CDN host, or friendly download url all collapse
+ * to the same key.
+ */
+function bucketKey(url: string): string | null {
+  const parsed = parseB2Url(url);
+  if (!parsed) return null;
+  const ext = parsed.extension ? `.${parsed.extension}` : "";
+  return parsed.basePath ? `${parsed.basePath}/${parsed.filename}${ext}` : `${parsed.filename}${ext}`;
+}
+
+/**
+ * Route any stored image url through the Cloudflare CDN host (edge-cached)
+ * instead of the raw S3/B2 host. Safe for every path — the Cloudflare
+ * Transform Rule maps the bucket-relative key onto B2. Used as the always-
+ * works fallback when on-the-fly resizing isn't available.
+ */
+export function toCdnUrl(url: string): string {
+  const key = bucketKey(url);
+  return key ? `${OUTPUT_BASE}/${key}` : url;
+}
+
+/**
+ * On-the-fly resized/re-encoded variant via Cloudflare Image Resizing
+ * (`/cdn-cgi/image/...`). This is the ONLY way to get a lightweight thumbnail
+ * for `styles/...` training files — they have no pre-generated
+ * thumbnail/compressed derivatives (the compression pipeline runs for gallery
+ * uploads only). Returns a small WebP so a 200-image grid loads fast instead
+ * of pulling full-res originals.
+ *
+ * NOTE: requires Cloudflare Image Resizing enabled on the zone. Callers must
+ * probe once (load a tiny variant, watch for onerror) and fall back to
+ * `toCdnUrl` when it isn't — see StyleTrainingGalleryDialog's probe.
+ */
+export function getCdnResizedUrl(
+  url: string,
+  opts?: { width?: number; quality?: number; fit?: "cover" | "scale-down" | "contain" },
+): string {
+  const key = bucketKey(url);
+  if (!key) return url;
+  const width = opts?.width ?? 400;
+  const quality = opts?.quality ?? 72;
+  const fit = opts?.fit ?? "cover";
+  return `${OUTPUT_BASE}/cdn-cgi/image/width=${width},quality=${quality},format=auto,fit=${fit}/${key}`;
+}
+
+/**
  * Generate edited image URL for a specific style
  * galleries/{userId}/{galleryId}/{filename}.ext -> galleries/{userId}/{galleryId}/{styleId}/{filename}.jpeg
  */
