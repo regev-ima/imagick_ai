@@ -56,7 +56,8 @@ import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
 import { useOnboardingQuestionnaire } from "@/hooks/useOnboardingQuestionnaire";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
 import { LookGrid } from "@/components/gallery/LookGrid";
-import { IMAGE_ACCEPT, isImageFile, canPreviewInBrowser } from "@/lib/imageFileTypes";
+import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
+import { LazyThumb } from "@/components/gallery/LazyThumb";
 import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 import { BuyCreditsModal } from "@/components/billing/BuyCreditsModal";
@@ -70,10 +71,6 @@ import { useCreditPricing, estimateGalleryCredits } from "@/hooks/useCreditPrici
 // useCreateGalleryFlow (upload + AI editing + culling + Google Drive import).
 
 const MAX_LOOKS = 3;
-
-// How many preview object URLs to build up front. Generous enough to fully
-// review a typical shoot; larger selections show the rest as removable tiles.
-const PREVIEW_CAP = 500;
 
 const galleryTypes: { value: string; label: string; icon: LucideIcon }[] = [
   { value: "wedding", label: "Wedding", icon: Heart },
@@ -107,14 +104,10 @@ const ONBOARDING_TO_GALLERY_TYPE: Record<string, string> = {
 
 type StyleRow = ReturnType<typeof useCreateGalleryFlow>["styles"][number];
 
-// One selected photo: the File plus a preview object URL (null for RAW/HEIC the
-// browser can't render, or beyond the preview cap).
-interface SelImg { file: File; url: string | null }
-
-// RAW/HEIC/TIFF can't render as <img> — only build object-URL previews from
-// files the browser can actually decode (canPreviewInBrowser). RAW frequently
-// arrives with an image/* MIME (image/tiff, image/x-canon-cr2, …), so a naive
-// type.startsWith("image/") check would pass and then show a BROKEN image.
+// One selected photo. Previews are built lazily per-tile by <LazyThumb> as it
+// scrolls into view (RAW/HEIC show an extension placeholder) — so queuing
+// thousands of files stays instant and memory-light.
+interface SelImg { file: File }
 
 const curatedTags = (type: string, lang: LanguageCode) => getCullingLabels(type || "wedding", lang);
 
@@ -200,8 +193,6 @@ export default function CreateGalleryPage() {
   const creditPricing = useCreditPricing();
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const objectUrls = useRef<string[]>([]);
-  useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
 
   // ── Prefills ───────────────────────────────────────────────────────────────
@@ -280,26 +271,16 @@ export default function CreateGalleryPage() {
 
     setItems((prev) => {
       const base = append ? prev : [];
-      if (!append) {
-        // Replacing — drop the old previews we own before rebuilding.
-        objectUrls.current.forEach((u) => URL.revokeObjectURL(u));
-        objectUrls.current = [];
-      }
       // Dedup by identity so re-adding the same folder can't double-count.
+      // No object URLs here — LazyThumb builds them per-tile on scroll, so
+      // queuing thousands of files stays instant and light.
       const seen = new Set(base.map((it) => `${it.file.name}|${it.file.size}|${it.file.lastModified}`));
-      let made = objectUrls.current.length;
       const added: SelImg[] = [];
       for (const f of imgs) {
         const key = `${f.name}|${f.size}|${f.lastModified}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        let url: string | null = null;
-        if (canPreviewInBrowser(f) && made < PREVIEW_CAP) {
-          url = URL.createObjectURL(f);
-          objectUrls.current.push(url);
-          made++;
-        }
-        added.push({ file: f, url });
+        added.push({ file: f });
       }
       return [...base, ...added];
     });
@@ -320,11 +301,9 @@ export default function CreateGalleryPage() {
   };
 
   const removeAt = (index: number) => {
-    setItems((prev) => {
-      const target = prev[index];
-      if (target?.url) URL.revokeObjectURL(target.url);
-      return prev.filter((_, i) => i !== index);
-    });
+    // No URL to revoke — LazyThumb owns each tile's object URL and revokes it
+    // on unmount when the tile is removed.
+    setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const changeType = (value: string) => {
@@ -514,18 +493,7 @@ export default function CreateGalleryPage() {
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {items.slice(0, 6).map((it, i) => (
                       <button key={i} type="button" onClick={() => setReviewOpen(true)} className="relative block h-12 w-12 overflow-hidden rounded-md ring-1 ring-border transition hover:ring-primary/60" aria-label="Review selected photos">
-                        {/* RAW/TIFF/HEIC placeholder sits behind; a decodable
-                            preview covers it, and onError reveals it again if a
-                            frame turns out to be unrenderable. */}
-                        <span className="absolute inset-0 grid place-items-center bg-surface-2 text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
-                        {it.url && (
-                          <img
-                            src={it.url}
-                            alt=""
-                            className="absolute inset-0 h-12 w-12 object-cover"
-                            onError={(e) => { e.currentTarget.style.display = "none"; }}
-                          />
-                        )}
+                        <LazyThumb file={it.file} />
                       </button>
                     ))}
                     {photos > 6 && (
@@ -892,18 +860,7 @@ function SelectedPhotosModal({ items, count, onRemove, onClose }: {
         <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5 overflow-y-auto pr-1">
           {items.map((it, i) => (
             <div key={`${it.file.name}-${it.file.size}-${it.file.lastModified}`} className="group relative aspect-square overflow-hidden rounded-[5px] bg-surface-2">
-              {/* RAW placeholder behind; a decodable preview covers it, and
-                  onError reveals it again if a frame won't render. */}
-              <div className="absolute inset-0 grid place-items-center text-center text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</div>
-              {it.url && (
-                <img
-                  src={it.url}
-                  alt=""
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  onError={(e) => { e.currentTarget.style.display = "none"; }}
-                />
-              )}
+              <LazyThumb file={it.file} />
               <button
                 type="button"
                 onClick={() => onRemove(i)}
