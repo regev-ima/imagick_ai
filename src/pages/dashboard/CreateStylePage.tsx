@@ -176,6 +176,20 @@ interface LocalFile {
 const UNPREVIEWABLE_EXT =
   /\.(cr2|cr3|nef|arw|dng|raf|orf|rw2|srw|pef|x3f|3fr|erf|kdc|dcr|mos|nrw|iiq|sr2|srf|tif|tiff|heic|heif)$/i;
 
+// Any image the app accepts for training — standard web formats plus RAW/TIFF/
+// HEIC. RAW files often arrive with an empty MIME type, so we also match by
+// extension (this is why `accept="image/*"` alone silently dropped them).
+const IMAGE_EXT =
+  /\.(jpe?g|jfif|png|gif|webp|avif|bmp|svg|cr2|cr3|nef|arw|dng|raf|orf|rw2|srw|pef|x3f|3fr|erf|kdc|dcr|mos|nrw|iiq|sr2|srf|tif|tiff|heic|heif)$/i;
+
+/** File-picker `accept` — web images + RAW so the OS dialog doesn't hide them. */
+const IMAGE_ACCEPT =
+  "image/*,.cr2,.cr3,.nef,.arw,.dng,.raf,.orf,.rw2,.srw,.pef,.x3f,.3fr,.erf,.kdc,.dcr,.mos,.nrw,.iiq,.sr2,.srf,.tif,.tiff,.heic,.heif";
+
+function isImageFile(file: File): boolean {
+  return (file.type || "").startsWith("image/") || IMAGE_EXT.test(file.name);
+}
+
 function canPreview(file: File): boolean {
   if (UNPREVIEWABLE_EXT.test(file.name)) return false;
   return (file.type || "").startsWith("image/");
@@ -299,7 +313,7 @@ export default function CreateStylePage() {
     e.preventDefault();
     if (type === "before") setIsDraggingBefore(false);
     else setIsDraggingAfter(false);
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+    const files = Array.from(e.dataTransfer.files).filter(isImageFile);
     if (files.length > 0) {
       setShimmerZone(type);
       setTimeout(() => setShimmerZone(null), 600);
@@ -938,7 +952,7 @@ export default function CreateStylePage() {
                             <input
                               type="file"
                               multiple
-                              accept="image/*"
+                              accept={IMAGE_ACCEPT}
                               onChange={(e) => handleFileSelect(e, "before")}
                               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                             />
@@ -1038,7 +1052,7 @@ export default function CreateStylePage() {
                             <input
                               type="file"
                               multiple
-                              accept="image/*"
+                              accept={IMAGE_ACCEPT}
                               onChange={(e) => handleFileSelect(e, "after")}
                               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                             />
