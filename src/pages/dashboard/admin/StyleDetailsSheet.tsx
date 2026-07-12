@@ -224,6 +224,119 @@ function LiveTrainingDuration({ startIso }: { startIso: string }) {
 }
 
 /**
+ * Post-training source edits — after a style finishes training, the model is
+ * run over the style's OWN source photos (the `__style_source__` gallery). This
+ * surfaces that status (which the admin otherwise couldn't see) and lets them
+ * (re)trigger it — the manual run forces past the auto-dispatch size cap, so a
+ * large source set that was skipped on completion can still be edited here.
+ */
+function StyleSourceStatus({ style }: { style: StyleFull }) {
+  const queryClient = useQueryClient();
+  const [running, setRunning] = useState(false);
+  const galleryId = style.source_gallery_id;
+  const isReady = style.status === "ready";
+
+  const { data: sourceImages = [] } = useQuery({
+    queryKey: ["style-source-images", galleryId],
+    enabled: !!galleryId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("gallery_images")
+        .select("id")
+        .eq("gallery_id", galleryId as string)
+        .neq("status", "deleted");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: sourceEdits = [] } = useQuery({
+    queryKey: ["style-source-edits", style.id, galleryId],
+    enabled: !!galleryId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("image_edits")
+        .select("image_id")
+        .eq("style_id", style.id)
+        .eq("gallery_id", galleryId as string);
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: running ? 4000 : false,
+  });
+
+  const total = sourceImages.length;
+  const done = sourceEdits.length;
+
+  useEffect(() => {
+    if (running && total > 0 && done >= total) {
+      setRunning(false);
+      toast.success("Source edits ready");
+      queryClient.invalidateQueries({ queryKey: ["showcase-covers"] });
+    }
+  }, [running, done, total, queryClient]);
+
+  const runSourceEdit = async () => {
+    setRunning(true);
+    try {
+      const { error } = await supabase.functions.invoke("style-source-edit", { body: { styleId: style.id } });
+      if (error) throw error;
+      toast.success("Editing the style's source photos…");
+      queryClient.invalidateQueries({ queryKey: ["style-source-images", galleryId] });
+    } catch (err) {
+      console.error("Source edit failed:", err);
+      toast.error("Failed to start source edit");
+      setRunning(false);
+    }
+  };
+
+  // Derive a human status for the badge.
+  let badge: { label: string; className: string } | null = null;
+  if (galleryId && total > 0) {
+    if (done >= total) badge = { label: "Ready", className: "border-secondary/40 bg-secondary/15 text-secondary" };
+    else if (running || done > 0) badge = { label: `Editing ${done}/${total}`, className: "border-rating/40 bg-rating/15 text-rating" };
+    else badge = { label: "Not started", className: "text-muted-foreground" };
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="aura-microlabel text-primary">Source edits</div>
+          <p className="mt-0.5 text-xs text-muted-foreground">The trained model run over this style's own source photos.</p>
+        </div>
+        <Button size="sm" variant="outline" disabled={running || !isReady} onClick={runSourceEdit}>
+          {running ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+          {done > 0 ? "Re-edit source" : "Edit source"}
+        </Button>
+      </div>
+
+      {!isReady ? (
+        <p className="text-xs text-muted-foreground/60">Available once training is complete.</p>
+      ) : !galleryId || total === 0 ? (
+        <p className="text-xs text-muted-foreground/60">
+          {galleryId
+            ? "No editable source photos (RAW originals can't be run through the engine)."
+            : "Not started yet — click “Edit source” to run the model over the style's source photos."}
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="aura-microlabel text-muted-foreground">{done} / {total} source photos edited</span>
+            {badge && <Badge variant="outline" className={`text-[10px] ${badge.className}`}>{badge.label}</Badge>}
+          </div>
+          {total > 500 && done === 0 && !running && (
+            <p className="text-xs text-rating">
+              Large source set ({total}) — the automatic edit on training completion was skipped. Click "Edit source" to run it now.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
  * Demo preview — runs THIS style over the shared, reusable demo gallery
  * (SHOWCASE_GALLERY_ID) so a style with no training photos still gets a
  * before/after showcase. The demo photos are uploaded once (Showcase Manager)
@@ -758,6 +871,11 @@ export function StyleDetailsSheet({ style, users, open, onOpenChange, onOpenPare
               </Field>
             )}
           </section>
+
+          <Separator />
+
+          {/* ── Post-training source edits — status + manual (re)run ── */}
+          <StyleSourceStatus style={style} />
 
           <Separator />
 

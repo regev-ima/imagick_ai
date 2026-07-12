@@ -67,9 +67,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    await autoProcessStyleSource(adminClient, supabaseUrl, serviceRoleKey, styleId);
+    // Manual admin trigger — force past the auto-dispatch size cap so large
+    // source sets (e.g. > 500 images) can still be edited on demand.
+    const result = await autoProcessStyleSource(adminClient, supabaseUrl, serviceRoleKey, styleId, { force: true });
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, ...result }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
