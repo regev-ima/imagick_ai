@@ -20,12 +20,12 @@ import type { StyleFull } from "@/pages/dashboard/admin/StyleDetailsSheet";
 
 /**
  * Resolve a lightweight display url — the pre-generated compressed webp, never
- * the full original. RAW sources (which have no browser-decodable original) are
- * passed through so the caller's RAW file-card / onError fallback handles them.
+ * the full original. RAW originals get the same compressed webp sibling (the
+ * transfer worker converts RAW → webp), so a RAW source still DISPLAYS here;
+ * if that sibling is missing, ImagePane's onError falls back to the file-card.
  */
 function displayUrl(url: string | undefined): string | undefined {
   if (!url) return url;
-  if (parseStyleFile(url).kind === "raw") return url;
   return getPreviewUrl(url);
 }
 
@@ -95,13 +95,15 @@ function ImagePane({
   allowRawCard?: boolean;
 }) {
   const parsed = useMemo(() => (url ? parseStyleFile(url) : null), [url]);
-  // 0 = compressed preview, 1 = raw stored url, 2+ = "Failed to load".
-  const [stage, setStage] = useState(0);
-  useEffect(() => setStage(0), [url]);
+  const [errored, setErrored] = useState(false);
+  useEffect(() => setErrored(false), [url]);
 
   const isRaw = parsed?.kind === "raw";
-  const showFileCard = !!(allowRawCard && isRaw);
-  const src = stage === 0 ? displayUrl(url) : url;
+  // Try the converted preview (works for RAW too — the compressed webp sibling);
+  // only fall back to the RAW file-card if that preview fails to load.
+  const showFileCard = errored && !!allowRawCard && isRaw;
+  const showFailed = errored && !showFileCard;
+  const src = displayUrl(url);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5">
@@ -111,7 +113,7 @@ function ImagePane({
           <span className="px-3 text-center text-xs text-muted-foreground/50">Not available</span>
         ) : showFileCard && parsed ? (
           <FileCard filename={parsed.filename} ext={parsed.ext} size="lg" />
-        ) : stage >= 2 ? (
+        ) : showFailed ? (
           <div className="flex flex-col items-center gap-1.5 text-muted-foreground/50">
             <ImageIcon className="h-8 w-8" />
             <span className="text-[10px]">Failed to load</span>
@@ -121,7 +123,7 @@ function ImagePane({
             src={src}
             alt={label}
             decoding="async"
-            onError={() => setStage((s) => s + 1)}
+            onError={() => setErrored(true)}
             className="max-h-full max-w-full object-contain"
           />
         )}

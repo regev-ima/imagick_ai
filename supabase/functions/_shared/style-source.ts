@@ -15,8 +15,15 @@
 // renderable, so the compare's SOURCE pane shows a file-card — the model's
 // edit output is a normal raster and displays fine.
 
-/** Parse `{ filename }` out of a stored B2 url (handles query strings + URL-encoded names). */
-function parseUrl(url: string): { filename: string } {
+// RAW extensions — RAW originals aren't fed to the engine directly; we point
+// at the pipeline's converted preview instead (see toEditableUrl).
+const RAW_EXTENSIONS = new Set([
+  "cr2", "cr3", "crw", "nef", "nrw", "arw", "srf", "sr2", "raf", "dng",
+  "orf", "rw2", "pef", "srw", "raw", "rwl", "3fr", "fff", "iiq", "x3f",
+]);
+
+/** Parse `{ filename, ext }` out of a stored B2 url (handles query strings + URL-encoded names). */
+function parseUrl(url: string): { filename: string; ext: string } {
   const raw = url || "";
   // Strip hash/query BEFORE decoding — the delimiters are literal, unencoded characters.
   let path = raw.split("#")[0].split("?")[0];
@@ -27,7 +34,30 @@ function parseUrl(url: string): { filename: string } {
   }
   const lastSlash = path.lastIndexOf("/");
   const filename = lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
-  return { filename };
+  const lastDot = filename.lastIndexOf(".");
+  const ext = lastDot > 0 ? filename.slice(lastDot + 1).toLowerCase() : "";
+  return { filename, ext };
+}
+
+/**
+ * The URL the ENGINE should edit for a given before-file. RAW can't be edited
+ * directly, so we point at the pipeline's converted preview — the same
+ * `{basePath}/compressed/{name}_reduced.webp` sibling the transfer worker
+ * generates and that culling / hero images already use (see
+ * gd-transfer-webhook, process-pipeline). Raster befores are edited as-is.
+ */
+function toEditableUrl(url: string): string {
+  const { ext } = parseUrl(url);
+  if (!RAW_EXTENSIONS.has(ext)) return url;
+  if (url.includes("/compressed/") && url.includes("_reduced")) return url;
+  const q = url.split("?")[0];
+  const lastSlash = q.lastIndexOf("/");
+  if (lastSlash < 0) return url;
+  const dir = q.slice(0, lastSlash);
+  const file = q.slice(lastSlash + 1);
+  const dot = file.lastIndexOf(".");
+  const nameNoExt = dot > 0 ? file.slice(0, dot) : file;
+  return `${dir}/compressed/${nameNoExt}_reduced.webp`;
 }
 
 const INSERT_BATCH_SIZE = 500;
@@ -128,11 +158,13 @@ export async function ensureStyleSourceGallery(
 
   const toInsert = editableUrls
     .map((url, index) => {
+      // Keep the ORIGINAL filename (RAW stem) so before↔after pair by stem in
+      // the three-way compare, but edit the converted preview for RAW.
       const { filename } = parseUrl(url);
       return {
         gallery_id: galleryId,
         user_id: userId,
-        original_url: url,
+        original_url: toEditableUrl(url),
         filename,
         status: "ready",
         sort_order: index,
