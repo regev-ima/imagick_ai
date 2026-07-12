@@ -559,21 +559,6 @@ export default function StyleDetailsPage() {
                     </Button>
                   )}
 
-                  {/* Before · After · Compare — the same training-gallery view
-                      the admin has, for the style's owner. Shows when the style
-                      carries training photos. */}
-                  {isOwner && ((style.before_image_urls?.length ?? 0) > 0 || (style.after_image_urls?.length ?? 0) > 0) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setTrainingGalleryOpen(true)}
-                      className="gap-1.5"
-                    >
-                      <ImageIcon className="w-3.5 h-3.5" />
-                      Before · After · Compare
-                    </Button>
-                  )}
-
                   {style.status === "ready" && (
                     <Button
                       variant="glow"
@@ -681,14 +666,27 @@ export default function StyleDetailsPage() {
               <div className="glass-card overflow-hidden rounded-[--radius]">
                 <PanelHeader
                   icon={<ImageIcon className="h-3.5 w-3.5" />}
-                  label="Samples — develop grid"
+                  label="Before &amp; After"
                   trailing={
-                    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "after" | "before")}>
-                      <TabsList>
-                        <TabsTrigger value="after">After ({afterImages.length})</TabsTrigger>
-                        <TabsTrigger value="before">Before ({beforeImages.length})</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {isOwner && (
+                        <Button
+                          variant="glow"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => setTrainingGalleryOpen(true)}
+                        >
+                          <Sparkle size={12} />
+                          See how it edits
+                        </Button>
+                      )}
+                      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "after" | "before")}>
+                        <TabsList>
+                          <TabsTrigger value="after">After ({afterImages.length})</TabsTrigger>
+                          <TabsTrigger value="before">Before ({beforeImages.length})</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
                   }
                 />
 
