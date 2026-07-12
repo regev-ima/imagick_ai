@@ -23,7 +23,7 @@ import {
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { getThumbnailUrl } from "@/lib/imageUrls";
 import { cn } from "@/lib/utils";
 import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
@@ -70,11 +70,18 @@ export default function ShowcaseManager() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isProcessing, setIsProcessing] = useState(false);
+  // Styles whose edits are dispatched and still landing (drives the live
+  // "processing now" state; cleared automatically when a style's edits reach
+  // the image count).
   const [processingStyleIds, setProcessingStyleIds] = useState<Set<string>>(new Set());
+  // Which styles the admin has ticked for a bulk run.
+  const [selectedStyleIds, setSelectedStyleIds] = useState<Set<string>>(new Set());
+  // How many image×style edits the last dispatch sent per style (this session)
+  // — answers "how many were sent to editing".
+  const [sentCounts, setSentCounts] = useState<Record<string, number>>({});
   const [isApplying, setIsApplying] = useState(false);
   const [hiddenMap, setHiddenMap] = useState<HiddenMap>(loadHiddenMap);
   const [expandedStyles, setExpandedStyles] = useState<Set<string>>(new Set());
-  // processNewOnly removed — now using unprocessedImageIds logic directly
 
   // Fetch the fixed showcase gallery
   const { data: showcaseGallery, isLoading: galleryLoading } = useQuery({
@@ -135,24 +142,40 @@ export default function ShowcaseManager() {
       return data || [];
     },
     enabled: !!showcaseGallery?.id,
-    refetchInterval: isProcessing ? 5000 : false,
+    refetchInterval: (isProcessing || processingStyleIds.size > 0) ? 4000 : false,
   });
 
-  // Style status
+  // Style status. "processing" is authoritative from processingStyleIds (a
+  // style we actually dispatched and is still landing) — NOT merely
+  // "partially done", which would pin a half-finished historic style as
+  // "processing" forever.
   const styleStatus = useMemo(() => {
-    const map: Record<string, { completed: number; total: number; status: "pending" | "processing" | "complete" }> = {};
+    const map: Record<string, { completed: number; total: number; status: "idle" | "processing" | "complete" }> = {};
     const imageCount = showcaseImages.length;
 
     presetStyles.forEach((style) => {
-      const editsForStyle = imageEdits.filter((e) => e.style_id === style.id);
-      const completed = editsForStyle.length;
-      let status: "pending" | "processing" | "complete" = "pending";
-      if (completed > 0 && completed >= imageCount) status = "complete";
-      else if (completed > 0) status = "processing";
+      const completed = imageEdits.filter((e) => e.style_id === style.id).length;
+      let status: "idle" | "processing" | "complete" = "idle";
+      if (processingStyleIds.has(style.id)) status = "processing";
+      else if (imageCount > 0 && completed >= imageCount) status = "complete";
       map[style.id] = { completed, total: imageCount, status };
     });
     return map;
-  }, [presetStyles, imageEdits, showcaseImages]);
+  }, [presetStyles, imageEdits, showcaseImages, processingStyleIds]);
+
+  // Clear a style from the in-flight set once its edits reach the image count.
+  useEffect(() => {
+    if (processingStyleIds.size === 0 || showcaseImages.length === 0) return;
+    setProcessingStyleIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const sid of prev) {
+        const completed = imageEdits.filter((e) => e.style_id === sid).length;
+        if (completed >= showcaseImages.length) { next.delete(sid); changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [imageEdits, showcaseImages, processingStyleIds]);
 
   const overallProgress = useMemo(() => {
     const totalExpected = showcaseImages.length * presetStyles.length;
@@ -168,74 +191,87 @@ export default function ShowcaseManager() {
     }
   }, [isProcessing, overallProgress.allComplete]);
 
-  // Compute which images are unprocessed (missing edits for at least one style)
-  const unprocessedImageIds = useMemo(() => {
-    return showcaseImages
-      .filter((img) => {
-        const editsForImg = imageEdits.filter((e) => e.image_id === img.id);
-        const stylesWithEdits = new Set(editsForImg.map((e) => e.style_id));
-        return presetStyles.some((s) => !stylesWithEdits.has(s.id));
-      })
-      .map((img) => img.id);
-  }, [showcaseImages, imageEdits, presetStyles]);
-
-  const handleProcessAll = async (onlyNew = false) => {
-    if (!showcaseGallery?.id || showcaseImages.length === 0 || presetStyles.length === 0) return;
-
-    setIsProcessing(true);
-
-    const imageIds = onlyNew
-      ? unprocessedImageIds
-      : showcaseImages.map((img) => img.id);
-
-    if (imageIds.length === 0) {
-      toast.info("All images already processed for all styles!");
-      setIsProcessing(false);
-      return;
-    }
-
-    const styleIds = presetStyles.map((s) => s.id);
-
-    try {
-      const { error } = await supabase.functions.invoke("process-images", {
-        body: { galleryId: showcaseGallery.id, imageIds, styleIds },
-      });
-      if (error) throw error;
-      toast.success(`Processing ${imageIds.length} images × ${styleIds.length} styles`);
-      queryClient.invalidateQueries({ queryKey: ["showcase-edits"] });
-    } catch (err: any) {
-      console.error("Process error:", err);
-      toast.error("Failed to start processing");
-      setIsProcessing(false);
-    }
-  };
+  // Images this style still needs an edit for. This is THE smart filter — the
+  // engine only ever receives photos it hasn't edited in this style, so no
+  // photo is ever re-edited (the backend also dedups per (image,style), a
+  // second guard).
+  const unprocessedForStyle = useCallback((styleId: string) => {
+    const processed = new Set(imageEdits.filter((e) => e.style_id === styleId).map((e) => e.image_id));
+    return showcaseImages.filter((img) => !processed.has(img.id));
+  }, [imageEdits, showcaseImages]);
 
   const handleProcessSingleStyle = async (styleId: string) => {
     if (!showcaseGallery?.id || showcaseImages.length === 0) return;
 
-    // Find images not yet processed for this style
-    const processedForStyle = new Set(imageEdits.filter((e) => e.style_id === styleId).map((e) => e.image_id));
-    const imageIds = showcaseImages.filter((img) => !processedForStyle.has(img.id)).map((img) => img.id);
-
+    const imageIds = unprocessedForStyle(styleId).map((img) => img.id);
     if (imageIds.length === 0) {
-      toast.info("All images already processed for this style");
+      toast.info("All images already edited for this style");
       return;
     }
 
     setProcessingStyleIds((prev) => new Set(prev).add(styleId));
+    setSentCounts((prev) => ({ ...prev, [styleId]: imageIds.length }));
 
     try {
       const { error } = await supabase.functions.invoke("process-images", {
         body: { galleryId: showcaseGallery.id, imageIds, styleIds: [styleId] },
       });
       if (error) throw error;
-      toast.success(`Processing ${imageIds.length} new images for this style`);
+      toast.success(`Sent ${imageIds.length} new image(s) to editing for this style`);
       queryClient.invalidateQueries({ queryKey: ["showcase-edits"] });
     } catch {
       toast.error("Failed to start processing");
       setProcessingStyleIds((prev) => { const n = new Set(prev); n.delete(styleId); return n; });
     }
   };
+
+  // ── Bulk: process only the SELECTED styles, only their new images ──
+  const processSelected = async () => {
+    if (!showcaseGallery?.id) return;
+    const styleIds = [...selectedStyleIds];
+    if (styleIds.length === 0) { toast.info("Tick at least one style first"); return; }
+
+    // Union of images that need at least one of the selected styles, plus a
+    // per-style "will send" count. The engine skips any (image,style) already
+    // edited, so a photo already done in style A but new to style B is sent
+    // once and only edited for B.
+    const imageIdSet = new Set<string>();
+    const perStyleSent: Record<string, number> = {};
+    for (const sid of styleIds) {
+      const todo = unprocessedForStyle(sid);
+      perStyleSent[sid] = todo.length;
+      todo.forEach((img) => imageIdSet.add(img.id));
+    }
+    const imageIds = [...imageIdSet];
+    if (imageIds.length === 0) {
+      toast.info("Everything selected is already edited — nothing new to send.");
+      return;
+    }
+
+    setProcessingStyleIds((prev) => new Set([...prev, ...styleIds.filter((s) => perStyleSent[s] > 0)]));
+    setSentCounts((prev) => ({ ...prev, ...perStyleSent }));
+
+    try {
+      const { error } = await supabase.functions.invoke("process-images", {
+        body: { galleryId: showcaseGallery.id, imageIds, styleIds },
+      });
+      if (error) throw error;
+      const totalPairs = Object.values(perStyleSent).reduce((a, b) => a + b, 0);
+      toast.success(`Sent ${totalPairs} new image×style edit(s) across ${styleIds.filter((s) => perStyleSent[s] > 0).length} style(s)`);
+      queryClient.invalidateQueries({ queryKey: ["showcase-edits"] });
+    } catch {
+      toast.error("Failed to start processing");
+      setProcessingStyleIds((prev) => { const n = new Set(prev); styleIds.forEach((s) => n.delete(s)); return n; });
+    }
+  };
+
+  const toggleSelect = useCallback((styleId: string) => {
+    setSelectedStyleIds((prev) => {
+      const n = new Set(prev);
+      n.has(styleId) ? n.delete(styleId) : n.add(styleId);
+      return n;
+    });
+  }, []);
 
   // Per-style unprocessed count
   const unprocessedPerStyle = useMemo(() => {
@@ -406,9 +442,65 @@ export default function ShowcaseManager() {
             </div>
             <Button onClick={handleApplyToStyles} disabled={isApplying} variant="glow" size="sm">
               {isApplying ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
-              {isApplying ? "Applying..." : "Apply to Styles"}
+              {isApplying ? "Applying..." : "Save previews to styles"}
             </Button>
           </div>
+
+          {/* Selection toolbar — tick styles, then process only their NEW images */}
+          {(() => {
+            const allSelected = presetStyles.length > 0 && presetStyles.every((s) => selectedStyleIds.has(s.id));
+            const stylesWithNew = presetStyles.filter((s) => (unprocessedPerStyle[s.id] || 0) > 0);
+            const selectedNewTotal = [...selectedStyleIds].reduce((sum, id) => sum + (unprocessedPerStyle[id] || 0), 0);
+            const processingNames = presetStyles.filter((s) => processingStyleIds.has(s.id)).map((s) => s.name);
+            return (
+              <div className="space-y-2 border-b border-border bg-background/40 px-4 py-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={() => setSelectedStyleIds(allSelected ? new Set() : new Set(presetStyles.map((s) => s.id)))}
+                    />
+                    Select all
+                  </label>
+                  <span className="text-xs text-muted-foreground">{selectedStyleIds.size} selected</span>
+                  {stylesWithNew.length > 0 && (
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline"
+                      onClick={() => setSelectedStyleIds(new Set(stylesWithNew.map((s) => s.id)))}
+                    >
+                      Select {stylesWithNew.length} with new images
+                    </button>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    {selectedStyleIds.size > 0 && (
+                      <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setSelectedStyleIds(new Set())}>
+                        Clear
+                      </button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={selectedStyleIds.size === 0 || selectedNewTotal === 0}
+                      onClick={processSelected}
+                      title="Sends only images not yet edited in each selected style — never re-edits."
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                      Process selected{selectedNewTotal > 0 ? ` (${selectedNewTotal} new)` : ""}
+                    </Button>
+                  </div>
+                </div>
+                {processingNames.length > 0 && (
+                  <p className="flex items-center gap-1.5 text-xs text-accent">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Processing now: {processingNames.slice(0, 4).join(", ")}{processingNames.length > 4 ? ` +${processingNames.length - 4}` : ""}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="space-y-2 p-4">
             {presetStyles.map((style) => {
               const status = styleStatus[style.id];
@@ -418,9 +510,17 @@ export default function ShowcaseManager() {
               const hiddenCount = editsForStyle.filter((e) => hiddenIds.has(e.image_id)).length;
 
               return (
-                <div key={style.id} className="border border-border rounded-lg overflow-hidden">
+                <div key={style.id} className={cn("border rounded-lg overflow-hidden transition-colors", selectedStyleIds.has(style.id) ? "border-primary/50 bg-primary/[0.04]" : "border-border")}>
                   {/* Style Row */}
                   <div className="flex items-center">
+                  {/* Real selection checkbox (was a non-interactive status dot). */}
+                  <div className="pl-3" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedStyleIds.has(style.id)}
+                      onCheckedChange={() => toggleSelect(style.id)}
+                      aria-label={`Select ${style.name}`}
+                    />
+                  </div>
                   <button
                     onClick={() => toggleExpanded(style.id)}
                     className="flex-1 flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left min-w-0"
@@ -439,13 +539,17 @@ export default function ShowcaseManager() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{style.name}</p>
                       <p className="font-mono text-xs text-muted-foreground">
-                        {editsForStyle.length} / {status?.total || 0} images
+                        {editsForStyle.length} / {status?.total || 0} edited
+                        {(unprocessedPerStyle[style.id] || 0) > 0 && <span className="ml-1 text-[hsl(var(--rating))]">· {unprocessedPerStyle[style.id]} new</span>}
+                        {sentCounts[style.id] > 0 && <span className="ml-1 text-accent">· sent {sentCounts[style.id]}</span>}
                         {hiddenCount > 0 && <span className="ml-1 text-[hsl(var(--rating))]">· {hiddenCount} hidden</span>}
                       </p>
                     </div>
-                    {status?.status === "complete" && <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />}
-                    {status?.status === "processing" && <Loader2 className="w-4 h-4 animate-spin text-accent shrink-0" />}
-                    {status?.status === "pending" && <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 shrink-0" />}
+                    {status?.status === "processing"
+                      ? <span className="flex items-center gap-1 text-[10px] font-medium text-accent shrink-0"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing</span>
+                      : status?.status === "complete"
+                        ? <span className="flex items-center gap-1 text-[10px] font-medium text-secondary shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Complete</span>
+                        : <span className="text-[10px] font-medium text-muted-foreground/60 shrink-0">Idle</span>}
                   </button>
                   {(() => {
                     const newCount = unprocessedPerStyle[style.id] || 0;
