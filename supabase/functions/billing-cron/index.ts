@@ -22,6 +22,7 @@ import {
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { captureException } from "../_shared/sentry.ts";
+import { purgeUser } from "../_shared/purge-user.ts";
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -341,6 +342,32 @@ serve(async (req: Request) => {
         console.error(`Error archiving gallery ${gallery.id}:`, err);
         stats.errors++;
       }
+    }
+
+    // ── 6. Purge accounts suspended 60+ days (GDPR data-minimisation) ─────
+    // The welcome_grant_claims ledger is intentionally NOT purged, so a
+    // returning user still can't re-farm the one-time welcome credits.
+    try {
+      const cutoff = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: toPurge } = await supabase
+        .from("user_subscriptions")
+        .select("user_id")
+        .eq("status", "suspended")
+        .not("suspended_at", "is", null)
+        .lte("suspended_at", cutoff);
+      for (const row of toPurge ?? []) {
+        try {
+          const res = await purgeUser(supabase, row.user_id as string);
+          if (res.ok) stats.purgedSuspended = (stats.purgedSuspended || 0) + 1;
+          else stats.errors++;
+        } catch (err) {
+          console.error(`Error purging suspended user ${row.user_id}:`, err);
+          stats.errors++;
+        }
+      }
+    } catch (err) {
+      console.error("Error in suspended-account purge:", err);
+      stats.errors++;
     }
 
     console.log("Billing cron completed:", stats);
