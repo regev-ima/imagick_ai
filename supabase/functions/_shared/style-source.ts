@@ -8,19 +8,15 @@
 // This file is DENO-only (imported by edge functions under
 // supabase/functions/). Do NOT import src/lib/styleFiles.ts here — that
 // module lives in the frontend's Vite module graph (`@/` alias) and is not
-// resolvable from Deno. The tiny bit of RAW-extension logic needed here is
-// duplicated locally instead.
+// resolvable from Deno.
+//
+// RAW befores ARE materialized and edited: the engine processes RAW (customer
+// galleries accept RAW and are edited identically). RAW isn't browser-
+// renderable, so the compare's SOURCE pane shows a file-card — the model's
+// edit output is a normal raster and displays fine.
 
-// Kept in sync with RAW_EXTENSIONS in src/lib/styleFiles.ts — the engine and
-// every viewer only handle JPEG/PNG/WebP-ish rasters; RAW befores are still
-// counted in stats elsewhere (styleFiles.ts, frontend) but are not editable.
-const RAW_EXTENSIONS = new Set([
-  "cr2", "cr3", "crw", "nef", "nrw", "arw", "srf", "sr2", "raf", "dng",
-  "orf", "rw2", "pef", "srw", "raw", "rwl", "3fr", "fff", "iiq", "x3f",
-]);
-
-/** Parse `{ filename, ext }` out of a stored B2 url (handles query strings + URL-encoded names). */
-function parseUrl(url: string): { filename: string; ext: string } {
+/** Parse `{ filename }` out of a stored B2 url (handles query strings + URL-encoded names). */
+function parseUrl(url: string): { filename: string } {
   const raw = url || "";
   // Strip hash/query BEFORE decoding — the delimiters are literal, unencoded characters.
   let path = raw.split("#")[0].split("?")[0];
@@ -31,14 +27,7 @@ function parseUrl(url: string): { filename: string; ext: string } {
   }
   const lastSlash = path.lastIndexOf("/");
   const filename = lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
-  const lastDot = filename.lastIndexOf(".");
-  const ext = lastDot > 0 ? filename.slice(lastDot + 1).toLowerCase() : "";
-  return { filename, ext };
-}
-
-function isRawUrl(url: string): boolean {
-  const { ext } = parseUrl(url);
-  return RAW_EXTENSIONS.has(ext);
+  return { filename };
 }
 
 const INSERT_BATCH_SIZE = 500;
@@ -121,10 +110,13 @@ export async function ensureStyleSourceGallery(
     galleryId = newGallery.id as string;
   }
 
-  // Skip RAW befores — not browser-renderable / not engine-editable. Still
-  // counted in stats elsewhere (styleFiles.ts on the frontend), just not
-  // materialized as editable gallery_images rows here.
-  const editableUrls = beforeUrls.filter((u) => !isRawUrl(u));
+  // Materialize ALL befores — including RAW. The editing engine processes RAW
+  // (customer galleries accept CR2/CR3/NEF/... uploads and are edited the same
+  // way), so a RAW-source style like a Drive import must still get its
+  // "model's edit" for the three-way compare. RAW just isn't browser-
+  // renderable, so viewers show a file-card for the SOURCE pane — the model's
+  // edit output is a normal raster and displays fine.
+  const editableUrls = beforeUrls;
 
   // Idempotency for a second/backfill call: don't duplicate rows for
   // filenames already inserted.
