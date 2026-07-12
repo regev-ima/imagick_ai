@@ -21,7 +21,7 @@ import {
   Mountain,
   MapPin,
   Trophy,
-  AlertTriangle,
+  Lightbulb,
   Lock,
   Sparkles,
   type LucideIcon,
@@ -45,7 +45,7 @@ import { toast } from "sonner";
 import { UploadSourceSelector, type UploadSource } from "@/components/gallery/UploadSourceSelector";
 import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/GoogleDriveInput";
 import { Progress } from "@/components/ui/progress";
-import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
+import { IMAGE_ACCEPT, isImageFile, canPreviewInBrowser } from "@/lib/imageFileTypes";
 import { uploadStyleFiles, type UploadStyleFileEvent } from "@/lib/uploadStyleFiles";
 import { useStyleQuota } from "@/hooks/useStyleQuota";
 
@@ -110,9 +110,6 @@ interface LocalFile {
   /** Object URL for an <img> preview, or null for RAW/HEIC the browser can't render. */
   preview: string | null;
 }
-
-// RAW/HEIC can't render as <img>; only build previews from web-renderable files.
-const isPreviewable = (f: File) => f.type.startsWith("image/") && !/heic|heif/i.test(f.type);
 
 export default function CreateStylePage() {
   const navigate = useNavigate();
@@ -210,10 +207,14 @@ export default function CreateStylePage() {
   };
 
   const addFiles = (files: File[], type: "before" | "after") => {
+    // RAW/HEIC/TIFF can't render in an <img>; only build object-URL previews
+    // for files the browser can actually decode (canPreviewInBrowser). RAW
+    // often arrives with an image/* MIME (image/tiff, image/x-canon-cr2, …),
+    // so a naive type.startsWith("image/") check would show a BROKEN image.
     const newFiles: LocalFile[] = files.map((file) => ({
       id: Math.random().toString(36).substr(2, 9),
       file,
-      preview: isPreviewable(file) ? URL.createObjectURL(file) : null,
+      preview: canPreviewInBrowser(file) ? URL.createObjectURL(file) : null,
     }));
     if (type === "before") setBeforeFiles((prev) => [...prev, ...newFiles]);
     else setAfterFiles((prev) => [...prev, ...newFiles]);
@@ -516,12 +517,19 @@ export default function CreateStylePage() {
                     aria-label="Review images"
                     className="relative aspect-square overflow-hidden rounded-sm plate-keyline transition-opacity hover:opacity-90"
                   >
-                    {file.preview ? (
-                      <img src={file.preview} alt="" loading="lazy" className={cn("h-full w-full object-cover", isActive && "opacity-60")} />
-                    ) : (
-                      <div className={cn("grid h-full w-full place-items-center bg-surface-2", isActive && "opacity-60")}>
-                        <span className="font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
-                      </div>
+                    {/* RAW placeholder sits behind; a decodable preview covers
+                        it, and onError reveals it again if a frame won't render. */}
+                    <div className={cn("absolute inset-0 grid place-items-center bg-surface-2", isActive && "opacity-60")}>
+                      <span className="font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</span>
+                    </div>
+                    {file.preview && (
+                      <img
+                        src={file.preview}
+                        alt=""
+                        loading="lazy"
+                        className={cn("absolute inset-0 h-full w-full object-cover", isActive && "opacity-60")}
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      />
                     )}
                     {isActive && (
                       <div className="absolute inset-0 grid place-items-center bg-background/40">
@@ -739,11 +747,12 @@ export default function CreateStylePage() {
             )}
 
             {localCountMismatch && (
-              <div role="alert" className="mt-4 flex items-start gap-2.5 rounded-[--radius] border border-rating/30 bg-rating/[0.08] p-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rating" />
+              <div className="mt-4 flex items-start gap-2.5 rounded-[--radius] border border-primary/20 bg-primary/[0.05] p-3">
+                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <p className="text-xs leading-snug text-muted-foreground">
-                  <span className="font-medium text-rating">Counts don't match — {beforeFiles.length} before vs {afterFiles.length} after.</span>{" "}
-                  Training works best with an equal number of matched pairs.
+                  <span className="font-medium text-foreground">Tip:</span>{" "}
+                  you have {beforeFiles.length} before and {afterFiles.length} after — training works best
+                  with an equal number of matched before/after pairs. You can still continue.
                 </p>
               </div>
             )}
@@ -905,10 +914,17 @@ function ReviewFilesModal({
         <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5 overflow-y-auto pr-1">
           {files.map((file) => (
             <div key={file.id} className="group relative aspect-square overflow-hidden rounded-[5px] bg-surface-2">
-              {file.preview ? (
-                <img src={file.preview} alt="" loading="lazy" className="h-full w-full object-cover" />
-              ) : (
-                <div className="grid h-full w-full place-items-center text-center font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</div>
+              {/* RAW placeholder behind; a decodable preview covers it, and
+                  onError reveals it again if a frame won't render. */}
+              <div className="absolute inset-0 grid place-items-center text-center font-mono text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">RAW</div>
+              {file.preview && (
+                <img
+                  src={file.preview}
+                  alt=""
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
               )}
               {canEdit && (
                 <button
