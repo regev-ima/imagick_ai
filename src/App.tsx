@@ -46,7 +46,6 @@ const PlansManagement = lazy(() => import("./pages/dashboard/admin/PlansManageme
 const StylesManagement = lazy(() => import("./pages/dashboard/admin/StylesManagement"));
 const GalleriesManagement = lazy(() => import("./pages/dashboard/admin/GalleriesManagement"));
 const BrandingManagement = lazy(() => import("./pages/dashboard/admin/BrandingManagement"));
-const ShowcaseManager = lazy(() => import("./pages/dashboard/admin/ShowcaseManager"));
 const EmailLogsPage = lazy(() => import("./pages/dashboard/admin/EmailLogsPage"));
 const EmailTemplatesPage = lazy(() => import("./pages/dashboard/admin/EmailTemplatesPage"));
 const NotificationsSettingsPage = lazy(() => import("./pages/dashboard/admin/NotificationsSettingsPage"));
@@ -161,7 +160,6 @@ const App = () => (
                   <Route path="admin/styles" element={<AdminRoute><StylesManagement /></AdminRoute>} />
                   <Route path="admin/galleries" element={<AdminRoute><GalleriesManagement /></AdminRoute>} />
                   <Route path="admin/branding" element={<AdminRoute><BrandingManagement /></AdminRoute>} />
-                  <Route path="admin/showcase" element={<AdminRoute><ShowcaseManager /></AdminRoute>} />
                   <Route path="admin/email-logs" element={<AdminRoute><EmailLogsPage /></AdminRoute>} />
                   <Route path="admin/email-templates" element={<AdminRoute><EmailTemplatesPage /></AdminRoute>} />
                   <Route path="admin/notifications" element={<AdminRoute><NotificationsSettingsPage /></AdminRoute>} />

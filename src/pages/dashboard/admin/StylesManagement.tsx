@@ -14,13 +14,13 @@ import {
   Plus,
   Power,
   PowerOff,
-  ExternalLink
+  ExternalLink,
+  Image as ImageIcon
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -56,7 +56,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import ShowcaseManager from "./ShowcaseManager";
+import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 import { StyleDetailsSheet, type StyleFull, type AdminUserLite } from "./StyleDetailsSheet";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminLoading } from "@/components/admin/AdminLoading";
@@ -192,25 +192,27 @@ export default function StylesManagement() {
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Styles & Showcase</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Styles</h1>
           <p className="caption mt-1 flex items-center gap-1.5">
             <Sparkles className="h-3 w-3" />
-            Manage styles, presets, and before/after previews
+            Manage styles, presets, sharing, and demo before/after previews
           </p>
         </div>
-        <Button onClick={() => navigate("/dashboard/styles/new")}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Style
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link to={`/dashboard/galleries/${SHOWCASE_GALLERY_ID}`}>
+              <ImageIcon className="w-4 h-4 mr-2" />
+              Manage demo photos
+            </Link>
+          </Button>
+          <Button onClick={() => navigate("/dashboard/styles/new")}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Style
+          </Button>
+        </div>
       </div>
 
-      <Tabs defaultValue="styles" className="space-y-5">
-        <TabsList>
-          <TabsTrigger value="styles">Manage Styles</TabsTrigger>
-          <TabsTrigger value="showcase">Showcase Manager</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="styles">
+      <div className="space-y-5">
           <div className="glass-card overflow-hidden rounded-[--radius]">
             <div className="flex flex-col justify-between gap-3 border-b border-border bg-background/40 p-3 sm:flex-row">
               <div className="flex max-w-md flex-1 items-center gap-2 rounded-[--radius] border border-border bg-background px-3">
@@ -392,12 +394,7 @@ export default function StylesManagement() {
               )}
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="showcase">
-          <ShowcaseManager />
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* Full details & controls — engine id, training data, timings, errors,
           allowed accounts, public toggle. Everything for one style. */}
