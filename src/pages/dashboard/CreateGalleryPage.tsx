@@ -53,6 +53,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useCreateGalleryFlow } from "@/hooks/useCreateGalleryFlow";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useOnboardingQuestionnaire } from "@/hooks/useOnboardingQuestionnaire";
 import { getCullingLabels, supportedLanguages, type LanguageCode } from "@/lib/cullingLabels";
 import { LookGrid } from "@/components/gallery/LookGrid";
@@ -167,6 +168,10 @@ export default function CreateGalleryPage() {
     setCullingLanguage,
   } = useCreateGalleryFlow();
   const { answers: onboardingAnswers, allQuestions: onboardingQuestions } = useOnboardingQuestionnaire();
+  // Admins aren't capped at MAX_LOOKS when building a collection — they can
+  // apply as many distinct-engine looks as exist (same-engine presets still
+  // lock, since the engine can only apply one of those per collection).
+  const { isAdmin } = useUserRole();
 
   const [name, setName] = useState("");
   // Set true when Create is pressed with an empty name — highlights the field.
@@ -240,6 +245,8 @@ export default function CreateGalleryPage() {
     [styleIds, styles],
   );
   const looksCount = styleIds.length;
+  // Effective cap: admins may pick every available look; everyone else MAX_LOOKS.
+  const maxLooks = isAdmin ? Math.max(styles.length, MAX_LOOKS) : MAX_LOOKS;
   // Full credit cost of the run — edits AND the metered AI steps (culling,
   // faces), so the plan the user approves is what the backend will charge.
   const editsNeeded = estimateGalleryCredits(creditPricing, photos, looksCount, cull, cull && cullFaces);
@@ -315,7 +322,7 @@ export default function CreateGalleryPage() {
     setStyleTouched(true);
     setStyleIds((prev) => {
       if (prev.includes(id)) return prev.filter((s) => s !== id);
-      if (prev.length >= MAX_LOOKS) return prev;
+      if (prev.length >= maxLooks) return prev;
       return [...prev, id];
     });
   };
@@ -619,9 +626,15 @@ export default function CreateGalleryPage() {
                 <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                   <Sparkle size={13} className="text-primary" /> Choose your AI look
                 </div>
-                <p className="caption mt-1">A trained AI model edits every photo in this look — pick up to {MAX_LOOKS}.</p>
+                <p className="caption mt-1">
+                  A trained AI model edits every photo in this look — {isAdmin ? "pick any (admin)" : `pick up to ${MAX_LOOKS}`}.
+                </p>
               </div>
-              {looksCount > 0 && <span className="aura-microlabel shrink-0 text-primary">{looksCount}/{MAX_LOOKS}</span>}
+              {looksCount > 0 && (
+                <span className="aura-microlabel shrink-0 text-primary">
+                  {isAdmin ? looksCount : `${looksCount}/${MAX_LOOKS}`}
+                </span>
+              )}
             </div>
             <LookGrid
               styles={rankedStyles}
@@ -630,7 +643,7 @@ export default function CreateGalleryPage() {
               ownerId={user?.id}
               onToggle={toggleStyle}
               onHosting={pickHosting}
-              max={MAX_LOOKS}
+              max={maxLooks}
             />
             {looksCount >= 1 && (
               <p className="caption mt-3 shrink-0">{photos.toLocaleString()} photos × {looksCount} look{looksCount > 1 ? "s" : ""}{cull ? " + culling" : ""}{cull && cullFaces ? " + faces" : ""} = {editsNeeded.toLocaleString()} credits</p>
