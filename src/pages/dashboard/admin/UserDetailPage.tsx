@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -43,6 +44,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ManageUserPanel } from "./ManageUserPanel";
+import { toCdnUrl } from "@/lib/imageUrls";
+
+/** Collection thumbnail — routes the stored hero through the edge-cached CDN
+ * and falls back to a placeholder if it 404s (e.g. no compressed sibling yet),
+ * instead of rendering a broken image. */
+function GalleryThumb({ src, alt }: { src: string | null | undefined; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div className="flex min-h-[120px] w-full items-center justify-center sm:min-h-[160px]">
+        <Image className="h-10 w-10 text-muted-foreground/30" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={toCdnUrl(src)}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="absolute inset-0 h-full w-full object-cover"
+    />
+  );
+}
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
@@ -172,15 +197,24 @@ export default function UserDetailPage() {
                   <span className="aura-microlabel">Subscription</span>
                 </div>
                 <div className="p-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     <InfoCard icon={CreditCard} label="Plan" value={data.subscription.plan_name} color="" bg="" />
                     <InfoCard icon={Activity} label="Status" value={data.subscription.status} color="" bg="" />
                     <InfoCard
                       icon={Zap}
-                      label="Edits"
+                      label="Credits left this period"
                       color=""
                       bg=""
                       value={`${data.subscription.edits_remaining === -1 ? "Unlimited" : data.subscription.edits_remaining + " remaining"} (${data.subscription.edits_used} used)`}
+                    />
+                    <InfoCard
+                      icon={Calendar}
+                      label={data.subscription.cancel_at_period_end ? "Ends (won't renew)" : "Renews"}
+                      color=""
+                      bg=""
+                      value={data.subscription.renews_at
+                        ? `${fmtDate(data.subscription.renews_at)}${data.subscription.billing_cycle ? ` · ${data.subscription.billing_cycle}` : ""}`
+                        : "—"}
                     />
                     <InfoCard
                       icon={HardDrive}
@@ -221,13 +255,7 @@ export default function UserDetailPage() {
                       <div className="flex flex-col sm:flex-row">
                         {/* Thumbnail */}
                         <div className="relative h-32 shrink-0 bg-muted plate-keyline sm:h-auto sm:w-32 md:w-40">
-                          {g.hero_image_url ? (
-                            <img src={g.hero_image_url} alt={g.name} className="absolute inset-0 h-full w-full object-cover" />
-                          ) : (
-                            <div className="flex min-h-[120px] w-full items-center justify-center sm:min-h-[160px]">
-                              <Image className="h-10 w-10 text-muted-foreground/30" />
-                            </div>
-                          )}
+                          <GalleryThumb src={g.hero_image_url} alt={g.name} />
                         </div>
 
                         {/* Right content */}
@@ -236,7 +264,21 @@ export default function UserDetailPage() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <h3 className="truncate font-semibold">{g.name}</h3>
-                              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">Created {fmtDate(g.created_at)}</p>
+                              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] text-muted-foreground">
+                                <span>Created {fmtDate(g.created_at)}</span>
+                                <span className="text-muted-foreground/40">·</span>
+                                <span className="inline-flex items-center gap-1">
+                                  {g.upload_method === "google_drive"
+                                    ? <><Globe className="h-3 w-3" /> Google Drive</>
+                                    : <><Upload className="h-3 w-3" /> Local upload</>}
+                                </span>
+                                {(g.status === "uploading" || g.status === "processing") && g.total_images > 0 && (
+                                  <>
+                                    <span className="text-muted-foreground/40">·</span>
+                                    <span className="text-[hsl(var(--rating))]">{g.processed_images || 0} / {g.total_images} uploaded</span>
+                                  </>
+                                )}
+                              </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
                               {(cullingDone || g.culling_status === "processing") && (
@@ -382,10 +424,10 @@ export default function UserDetailPage() {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="aura-microlabel">Type</TableHead>
+                        <TableHead className="aura-microlabel">Granted</TableHead>
                         <TableHead className="aura-microlabel">Initial</TableHead>
                         <TableHead className="aura-microlabel">Remaining</TableHead>
                         <TableHead className="aura-microlabel">Status</TableHead>
-                        <TableHead className="aura-microlabel">Expires</TableHead>
                         <TableHead className="aura-microlabel">Note</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -395,6 +437,7 @@ export default function UserDetailPage() {
                           <TableCell>
                             <Badge variant="outline" className="capitalize">{grant.grant_type}</Badge>
                           </TableCell>
+                          <TableCell className="folio text-muted-foreground">{fmt(grant.created_at)}</TableCell>
                           <TableCell className="folio">{grant.credits_initial}</TableCell>
                           <TableCell className="folio">{grant.credits_remaining}</TableCell>
                           <TableCell>
@@ -404,9 +447,42 @@ export default function UserDetailPage() {
                               "outline"
                             }>{grant.status}</Badge>
                           </TableCell>
-                          <TableCell className="folio">{fmtDate(grant.expires_at)}</TableCell>
                           <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
                             {grant.reason || "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table></div>
+                )}
+              </div>
+            </div>
+
+            {/* Extra style slots granted (model add-ons) */}
+            <div className="glass-card overflow-hidden rounded-[--radius]">
+              <div className="flex items-center gap-2 border-b border-border bg-background/40 px-4 py-2.5">
+                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="aura-microlabel">Extra style slots granted</span>
+              </div>
+              <div className="p-4">
+                {!data.model_grants || data.model_grants.length === 0 ? (
+                  <p className="caption py-2">No extra style slots granted</p>
+                ) : (
+                  <div className="-mx-4 overflow-x-auto sm:mx-0"><Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="aura-microlabel">Granted</TableHead>
+                        <TableHead className="aura-microlabel">Slots</TableHead>
+                        <TableHead className="aura-microlabel">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.model_grants.map((grant: any) => (
+                        <TableRow key={grant.id}>
+                          <TableCell className="folio text-muted-foreground">{fmt(grant.created_at)}</TableCell>
+                          <TableCell className="folio">+{grant.quantity}</TableCell>
+                          <TableCell>
+                            <Badge variant={grant.status === "active" ? "secondary" : "outline"}>{grant.status}</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
