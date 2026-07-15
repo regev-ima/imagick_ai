@@ -54,11 +54,11 @@ interface Props {
 
 function ProgressDots({ current, total }: { current: number; total: number }) {
   return (
-    <div className="flex items-center justify-center gap-3 mb-8">
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 mb-6">
       <span className="aura-microlabel">
         {String(current).padStart(2, "0")} / {String(total).padStart(2, "0")}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-2">
         {Array.from({ length: total }, (_, i) => i + 1).map((s) => (
           <div key={s} className="flex items-center gap-2">
             <motion.div
@@ -153,7 +153,7 @@ export default function OnboardingQuestionnaire({ isOpen, questions, onSaveAnswe
   const renderOptions = () => {
     if (question.question_type === "grid_select") {
       return (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {options.map(({ id, label, icon }) => {
             const Icon = icon ? ICON_MAP[icon] ?? Camera : Camera;
             return (
@@ -227,18 +227,21 @@ export default function OnboardingQuestionnaire({ isOpen, questions, onSaveAnswe
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: "spring", duration: 0.4 }}
-          className="glass-card w-full max-w-2xl rounded-[--radius] p-8 shadow-2xl"
+          // Flex column capped to the (dynamic) viewport height so a short/low-res
+          // screen can never clip the card — the question area scrolls, header +
+          // progress + footer stay pinned.
+          className="glass-card flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col rounded-[--radius] p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-8"
           style={{ boxShadow: "var(--elevation-3)" }}
         >
           {/* Header — royal-blue sparkle mark */}
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex shrink-0 items-center gap-3 mb-2">
             <div className="grid h-10 w-10 place-items-center rounded-[--radius] border border-primary/30 bg-primary/[0.12] text-accent">
               <Sparkle size={18} className="text-accent" />
             </div>
@@ -250,27 +253,32 @@ export default function OnboardingQuestionnaire({ isOpen, questions, onSaveAnswe
             </div>
           </div>
 
-          <ProgressDots current={stepIndex + 1} total={total} />
+          <div className="shrink-0">
+            <ProgressDots current={stepIndex + 1} total={total} />
+          </div>
 
-          {/* Question content */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={question.id}
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -30 }}
-              transition={{ duration: 0.2 }}
-            >
-              <h3 className="text-lg font-semibold mb-1">{question.title}</h3>
-              {question.subtitle && (
-                <p className="text-sm text-muted-foreground mb-4">{question.subtitle}</p>
-              )}
-              {renderOptions()}
-            </motion.div>
-          </AnimatePresence>
+          {/* Question content — the only scrollable region, so long option
+              lists on a short screen stay reachable. */}
+          <div className="-mr-1 min-h-0 flex-1 overflow-y-auto pr-1">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={question.id}
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -30 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h3 className="text-lg font-semibold mb-1">{question.title}</h3>
+                {question.subtitle && (
+                  <p className="text-sm text-muted-foreground mb-4">{question.subtitle}</p>
+                )}
+                {renderOptions()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
+          <div className="flex shrink-0 items-center justify-between mt-6 pt-4 border-t border-border">
             <Button
               variant="ghost"
               size="sm"
