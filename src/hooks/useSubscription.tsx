@@ -262,6 +262,9 @@ export function useSubscription() {
     editsReserved,
     availableEdits,
     creditGrants,
+    // Extra-style-slot gifts (admin "grant models") — surfaced so the gift
+    // celebration can congratulate on them too.
+    modelGrants: activeAddons.filter((a: any) => a.addon_type === "extra_model"),
     giftCreditsTotal,
     planCreditsRemaining,
     isUnlimited,

@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
         { data: galleryEdits },
         { data: galleryUploadTimes },
         { data: galleryCreditLogs },
+        { data: modelGrants },
       ] = await Promise.all([
         adminClient.auth.admin.getUserById(userId),
         adminClient.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
           .maybeSingle(),
         adminClient
           .from("galleries")
-          .select("id, name, status, total_images, processed_images, created_at, hero_image_url, culling_status, culling_labels")
+          .select("id, name, status, total_images, processed_images, created_at, hero_image_url, culling_status, culling_labels, upload_method")
           .eq("user_id", userId)
           .order("created_at", { ascending: false }),
         adminClient
@@ -156,6 +157,12 @@ Deno.serve(async (req) => {
           .from("edit_usage_logs")
           .select("gallery_id, edits_spent")
           .eq("user_id", userId),
+        // Model-slot ("extra style") grants — the log of extra-editing gifts.
+        adminClient
+          .from("user_addons")
+          .select("id, addon_type, quantity, status, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
       ]);
 
       const au = authUser?.user;
@@ -230,6 +237,10 @@ Deno.serve(async (req) => {
                 edits_used: subscription.credits_used,
                 edits_remaining: subscription.credits_remaining,
                 storage_used_mb: subscription.storage_used_mb,
+                billing_cycle: (subscription as any).billing_cycle ?? null,
+                // When the monthly/annual quota resets (renewal date).
+                renews_at: (subscription as any).current_period_end ?? null,
+                cancel_at_period_end: (subscription as any).cancel_at_period_end ?? false,
               }
             : null,
           galleries: enrichedGalleries,
@@ -245,6 +256,7 @@ Deno.serve(async (req) => {
             answers: onboardingAnswers || [],
           },
           credit_grants: creditGrants || [],
+          model_grants: modelGrants || [],
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

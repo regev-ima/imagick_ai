@@ -18,7 +18,7 @@ function markGrantsSeen(ids: string[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
 }
 
-function fireConfetti(): () => void {
+export function fireConfetti(): () => void {
   // Respect users who prefer no motion — skip the visual entirely.
   if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
     return () => {};

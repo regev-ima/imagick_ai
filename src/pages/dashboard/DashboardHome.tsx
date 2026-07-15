@@ -28,7 +28,7 @@ import { openAuraCommand } from "@/components/aura/AuraCommand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/hooks/useSubscription";
-import { useGiftCreditsCelebration } from "@/hooks/useGiftCreditsCelebration";
+import { GiftRewardDialog } from "@/components/dashboard/GiftRewardDialog";
 import { useOnboardingQuestionnaire } from "@/hooks/useOnboardingQuestionnaire";
 import { useEffectiveUser } from "@/hooks/useImpersonation";
 import { getThumbnailUrl } from "@/lib/imageUrls";
@@ -140,10 +140,10 @@ export default function DashboardHome() {
     storageUsedMb,
     maxStorageGb,
     creditGrants,
+    modelGrants,
     giftCreditsTotal,
   } = useSubscription();
 
-  useGiftCreditsCelebration(creditGrants);
   const hasGiftCredits = giftCreditsTotal > 0 && !isUnlimited;
 
   const storagePercent = maxStorageGb > 0 ? (storageUsedMb / (maxStorageGb * 1024)) * 100 : 0;
@@ -248,6 +248,8 @@ export default function DashboardHome() {
 
   return (
     <div className="relative min-h-full bg-background px-5 py-7 lg:px-10 lg:py-10">
+      <GiftRewardDialog creditGrants={creditGrants} modelGrants={modelGrants} />
+
       <OnboardingQuestionnaire
         isOpen={showQuestionnaire}
         questions={unansweredQuestions}
