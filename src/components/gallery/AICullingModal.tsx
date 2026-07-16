@@ -266,7 +266,7 @@ export function AICullingModal({
         className="w-full max-w-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <Card className="glass-card border-border rounded-[--radius] p-6">
+        <Card className="glass-card border-border rounded-[--radius] p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
