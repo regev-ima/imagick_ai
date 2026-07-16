@@ -6,7 +6,6 @@ import {
   Upload,
   X,
   Loader2,
-  CloudIcon,
   Pencil,
   Zap,
   Heart,
@@ -459,21 +458,27 @@ export default function CreateStylePage() {
   // manage modal. All images live in the modal, so any count stays on-screen.
   const PREVIEW_CAP = 11;
   const renderLocalZone = (type: "before" | "after") => {
-    const files = type === "before" ? beforeFiles : afterFiles;
-    const dragging = type === "before" ? isDraggingBefore : isDraggingAfter;
+    const isBefore = type === "before";
+    const files = isBefore ? beforeFiles : afterFiles;
+    const dragging = isBefore ? isDraggingBefore : isDraggingAfter;
 
     const hasFiles = files.length > 0;
-    const accept = type === "before" ? IMAGE_ACCEPT : "image/*";
+    const accept = isBefore ? IMAGE_ACCEPT : "image/*";
     const extra = files.length - PREVIEW_CAP;
 
     return (
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="caption flex items-center gap-1.5">
-            <Upload className="h-3 w-3" />
-            {type === "before" ? "Before · originals" : "After · edited"}
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 font-mono text-[10px] font-semibold text-muted-foreground ring-1 ring-inset ring-border">
+              {isBefore ? "1" : "2"}
+            </span>
+            <span className="flex items-baseline gap-1.5">
+              <span className="text-sm font-semibold text-foreground">{isBefore ? "Before" : "After"}</span>
+              <span className="caption">{isBefore ? "originals" : "your edits"}</span>
+            </span>
           </span>
-          <span className="aura-chip">{files.length} {files.length === 1 ? "file" : "files"}</span>
+          <span className="aura-chip shrink-0">{files.length} {files.length === 1 ? "file" : "files"}</span>
         </div>
 
         {hasFiles ? (
@@ -555,8 +560,11 @@ export default function CreateStylePage() {
               <input type="file" multiple accept={accept} onChange={(e) => handleFileSelect(e, type)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label={`Upload ${type} images`} />
             )}
             <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Drag &amp; drop or click</p>
-            <p className="caption mt-1">{type === "before" ? "Min 5 · RAW ok" : "Matched by filename"}</p>
+            <p className="text-sm font-medium text-foreground">
+              {isBefore ? "Drop your original photos" : "Drop your edited versions"}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Drag &amp; drop or click to browse</p>
+            <p className="caption mt-2">{isBefore ? "Min 5 · RAW ok" : "Match originals by filename"}</p>
           </label>
         )}
       </div>
@@ -632,14 +640,14 @@ export default function CreateStylePage() {
               aria-label="Style name"
               aria-invalid={nameError}
               className={cn(
-                "w-full rounded-md bg-surface-2/40 py-1 pl-2.5 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset transition-colors placeholder:text-muted-foreground/40 hover:bg-surface-2/70 focus:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60",
+                "w-full rounded-md bg-surface-2/60 py-1.5 pl-3 pr-10 text-2xl font-bold tracking-tight outline-none ring-1 ring-inset transition-colors placeholder:font-medium placeholder:text-muted-foreground/55 hover:bg-surface-2/80 focus:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60",
                 nameError
-                  ? "ring-destructive/70 focus:ring-destructive placeholder:text-destructive/50"
-                  : "ring-border/60 hover:ring-border focus:ring-primary/60",
+                  ? "ring-destructive/70 focus:ring-destructive placeholder:text-destructive/60"
+                  : "ring-border hover:ring-muted-foreground/50 focus:ring-primary/60",
               )}
-              placeholder={nameError ? "Name your look to continue…" : "Untitled look"}
+              placeholder={nameError ? "Name your look to continue…" : "Name your look…"}
             />
-            <Pencil className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 transition-colors group-hover:text-foreground/70" />
+            <Pencil className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70 transition-colors group-hover:text-foreground/80" />
           </div>
           <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
             <Pill><Upload className="h-3 w-3" /> {beforeCount} before</Pill>
@@ -709,14 +717,26 @@ export default function CreateStylePage() {
             ) : (
               <div className="mt-4 grid gap-5 sm:grid-cols-2">
                 <div className="space-y-2.5">
-                  <span className="caption flex items-center gap-1.5"><CloudIcon className="h-3 w-3" /> Before · originals</span>
+                  <span className="flex items-center gap-2">
+                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 font-mono text-[10px] font-semibold text-muted-foreground ring-1 ring-inset ring-border">1</span>
+                    <span className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-semibold text-foreground">Before</span>
+                      <span className="caption">originals</span>
+                    </span>
+                  </span>
                   <GoogleDriveInput
                     folderInfo={beforeFolderInfo}
                     onUpdate={(info, links) => { setBeforeFolderInfo(info); setBeforeDriveLinks(links); }}
                   />
                 </div>
                 <div className="space-y-2.5">
-                  <span className="caption flex items-center gap-1.5"><CloudIcon className="h-3 w-3" /> After · edited</span>
+                  <span className="flex items-center gap-2">
+                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 font-mono text-[10px] font-semibold text-muted-foreground ring-1 ring-inset ring-border">2</span>
+                    <span className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-semibold text-foreground">After</span>
+                      <span className="caption">your edits</span>
+                    </span>
+                  </span>
                   <GoogleDriveInput
                     folderInfo={afterFolderInfo}
                     onUpdate={(info, links) => { setAfterFolderInfo(info); setAfterDriveLinks(links); }}
