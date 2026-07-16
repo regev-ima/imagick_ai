@@ -4,7 +4,6 @@ import { styleReadyTemplate } from "../_shared/email-templates.ts";
 import { sendWhatsAppNotification } from "../_shared/whatsapp.ts";
 import { captureException } from "../_shared/sentry.ts";
 import { verifyWebhookSecret } from "../_shared/imagick-webhook-auth.ts";
-import { autoProcessStyleSource } from "../_shared/style-source.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -294,43 +293,11 @@ Deno.serve(async (req) => {
           // Non-fatal — don't fail the webhook
         }
 
-        // === Auto-edit the style's own SOURCE collection (req 2) ===
-        // Materializes the style's BEFORE set as a hidden gallery and runs
-        // the freshly trained model over it, so the three-way compare
-        // (source · photographer's edit · model's edit) has data to show.
-        // Notify on WhatsApp so the admin knows the post-training status —
-        // especially when a large source set is skipped and needs a manual run.
-        try {
-          const srcResult = await autoProcessStyleSource(
-            supabase,
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-            callbackStyleId,
-          );
-
-          try {
-            const { data: srcStyle } = await supabase
-              .from("styles")
-              .select("name")
-              .eq("id", callbackStyleId)
-              .maybeSingle();
-            const styleName = srcStyle?.name || callbackStyleId;
-            let msg: string | null = null;
-            if (srcResult.status === "dispatched") {
-              msg = `🎨 Source auto-edit started\nStyle: ${styleName}\nEditing ${srcResult.dispatched}/${srcResult.total} source photos with the new model.`;
-            } else if (srcResult.status === "dispatched_sampled") {
-              msg = `🎨 Source auto-edit started (sampled)\nStyle: ${styleName}\n${srcResult.total} source photos — editing a random ${srcResult.dispatched} of them. Open the style and click "Edit source" to run all.`;
-            } else if (srcResult.status === "error") {
-              msg = `❌ Source auto-edit failed to start\nStyle: ${styleName}\nRun it manually from the admin style panel.`;
-            }
-            if (msg) await sendWhatsAppNotification(msg);
-          } catch (notifyErr) {
-            console.error("Source-edit WhatsApp notify error:", notifyErr);
-          }
-        } catch (sourceErr) {
-          console.error("Error in auto-process style source:", sourceErr);
-          // Non-fatal — don't fail the webhook
-        }
+        // NOTE: The style's own SOURCE collection is intentionally NOT
+        // auto-edited here. Source editing is a manual, on-demand action the
+        // admin triggers per style from the admin style panel ("Edit source",
+        // style-source-edit fn). It exists purely for internal QA — to gauge how
+        // close a freshly trained style is — and must never fire automatically.
       }
     }
 

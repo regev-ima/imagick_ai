@@ -1,8 +1,9 @@
-// Admin-only: manually (re-)run the style's SOURCE-collection auto-edit
-// (see supabase/functions/_shared/style-source.ts). Backfills legacy styles
-// that finished training before this feature existed, and gives the admin
-// panel a "Generate model edits" button for source sets too large to
-// auto-dispatch on training completion (see MAX_AUTO_DISPATCH_IMAGES).
+// Admin-only: manually run the style's SOURCE-collection edit
+// (see supabase/functions/_shared/style-source.ts). Source editing is a
+// deliberate, on-demand action — it is NOT triggered automatically when a
+// style finishes training. It runs the trained model over the style's own
+// source photos purely for internal QA (to gauge how close a style is) and
+// goes out as a service-role call, so no customer credits are ever charged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { autoProcessStyleSource } from "../_shared/style-source.ts";
