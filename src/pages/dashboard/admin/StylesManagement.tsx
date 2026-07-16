@@ -68,10 +68,37 @@ export default function StylesManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [deleteStyleId, setDeleteStyleId] = useState<string | null>(null);
+  const [backfillOpen, setBackfillOpen] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   // Full-details drawer.
   const [detailStyle, setDetailStyle] = useState<Style | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Run the post-training source-edit for every eligible style that hasn't had
+  // it done yet (random 500 for large sets). Server does the work in the
+  // background and WhatsApps a summary when finished; no customer credits are
+  // charged (source edits go out as service-role calls).
+  const runBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-backfill-source-edits", { body: {} });
+      if (error) throw error;
+      if (data?.started) {
+        toast.success(`Backfill started for ${data.count} style${data.count === 1 ? "" : "s"}`, {
+          description: "You'll get a WhatsApp summary when it finishes.",
+        });
+      } else {
+        toast.info(data?.message || "No eligible styles to backfill.");
+      }
+      setBackfillOpen(false);
+    } catch (err) {
+      console.error("Source-edit backfill failed:", err);
+      toast.error("Failed to start backfill");
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   // Accounts, for resolving owner/allowed emails and the sharing picker.
   const { data: users = [] } = useQuery<AdminUserLite[]>({
@@ -208,6 +235,10 @@ export default function StylesManagement() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setBackfillOpen(true)}>
+            <Sparkles className="w-4 h-4 mr-2" />
+            Backfill source edits
+          </Button>
           <Button variant="outline" asChild>
             <Link to={`/dashboard/galleries/${SHOWCASE_GALLERY_ID}`}>
               <ImageIcon className="w-4 h-4 mr-2" />
@@ -435,6 +466,31 @@ export default function StylesManagement() {
               onClick={() => deleteStyleId && deleteStyleMutation.mutate(deleteStyleId)}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Backfill source edits — run the post-training source-edit for every
+          eligible style that hasn't had it done yet. */}
+      <AlertDialog open={backfillOpen} onOpenChange={(o) => !backfilling && setBackfillOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Backfill source edits?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Runs the trained model over each ready style's own source photos so the three-way
+              compare has data. Styles already done are skipped; for a source set larger than 500,
+              a random 500 is edited. This uses the editing engine but does <strong>not</strong>{" "}
+              charge any customer's credits. You'll get a WhatsApp summary when it finishes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={backfilling}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runBackfill(); }}
+              disabled={backfilling}
+            >
+              {backfilling ? "Starting…" : "Run backfill"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

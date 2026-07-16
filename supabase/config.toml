@@ -127,3 +127,6 @@ verify_jwt = false
 
 [functions.style-source-edit]
 verify_jwt = false
+
+[functions.admin-backfill-source-edits]
+verify_jwt = false

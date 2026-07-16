@@ -318,8 +318,8 @@ Deno.serve(async (req) => {
             let msg: string | null = null;
             if (srcResult.status === "dispatched") {
               msg = `🎨 Source auto-edit started\nStyle: ${styleName}\nEditing ${srcResult.dispatched}/${srcResult.total} source photos with the new model.`;
-            } else if (srcResult.status === "skipped_too_many") {
-              msg = `⚠️ Source auto-edit skipped\nStyle: ${styleName}\n${srcResult.total} source photos (over the auto limit). Open the style in admin and click "Edit source" to run it.`;
+            } else if (srcResult.status === "dispatched_sampled") {
+              msg = `🎨 Source auto-edit started (sampled)\nStyle: ${styleName}\n${srcResult.total} source photos — editing a random ${srcResult.dispatched} of them. Open the style and click "Edit source" to run all.`;
             } else if (srcResult.status === "error") {
               msg = `❌ Source auto-edit failed to start\nStyle: ${styleName}\nRun it manually from the admin style panel.`;
             }
