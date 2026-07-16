@@ -191,14 +191,25 @@ export async function ensureStyleSourceGallery(
 /** Outcome of a source-edit attempt, so callers can surface a status/notify. */
 export interface SourceEditResult {
   status:
-    | "dispatched" // process-images was kicked off for `dispatched` images
+    | "dispatched" // process-images was kicked off for all `dispatched` images
+    | "dispatched_sampled" // over the auto cap — a RANDOM `dispatched` of `total` was sent
     | "already_done" // every source image already has an edit for this style
-    | "skipped_too_many" // over the auto cap and not forced — needs a manual run
     | "no_editable_source" // source gallery has 0 editable (e.g. all-RAW befores)
     | "no_gallery" // no trained model / couldn't materialize the gallery
     | "error"; // process-images dispatch failed
   dispatched: number;
   total: number;
+}
+
+/** Fisher-Yates: return `n` RANDOM elements (a fresh copy), or all if fewer. */
+function sampleRandom<T>(arr: T[], n: number): T[] {
+  if (arr.length <= n) return arr.slice();
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
 }
 
 /**
@@ -207,8 +218,10 @@ export interface SourceEditResult {
  * `autoProcessShowcase` in train-webhook/index.ts. Non-fatal — logs and
  * returns a result on any failure, never throws.
  *
- * Pass `{ force: true }` (manual admin trigger) to bypass the auto-dispatch
- * size cap so large source sets can still be edited on demand.
+ * When the source set is larger than the auto cap, a RANDOM subset of
+ * MAX_AUTO_DISPATCH_IMAGES is edited (representative, not just the first N)
+ * instead of skipping entirely. Pass `{ force: true }` (manual admin trigger)
+ * to edit the FULL set regardless of size.
  */
 export async function autoProcessStyleSource(
   admin: any,
@@ -247,15 +260,6 @@ export async function autoProcessStyleSource(
     return { status: "no_editable_source", dispatched: 0, total: 0 };
   }
 
-  // Guard against runaway cost — don't auto-run the engine on a huge source
-  // set without an explicit admin click (opts.force from style-source-edit).
-  if (!opts?.force && total > MAX_AUTO_DISPATCH_IMAGES) {
-    console.log(
-      `autoProcessStyleSource: source gallery for style ${styleId} has ${total} images (> ${MAX_AUTO_DISPATCH_IMAGES}), skipping automatic dispatch`,
-    );
-    return { status: "skipped_too_many", dispatched: 0, total };
-  }
-
   const imageIds = images.map((img: any) => img.id);
 
   const { data: existingEdits } = await admin
@@ -265,14 +269,22 @@ export async function autoProcessStyleSource(
     .in("image_id", imageIds);
 
   const processedSet = new Set((existingEdits || []).map((e: any) => e.image_id));
-  const unprocessedIds = imageIds.filter((id: string) => !processedSet.has(id));
+  const allUnprocessed = imageIds.filter((id: string) => !processedSet.has(id));
 
-  if (unprocessedIds.length === 0) {
+  if (allUnprocessed.length === 0) {
     console.log(`autoProcessStyleSource: all source images already processed for style ${styleId}`);
     return { status: "already_done", dispatched: 0, total };
   }
 
-  console.log(`autoProcessStyleSource: processing ${unprocessedIds.length} source images for style ${styleId}`);
+  // Cap the AUTO run to a RANDOM sample (not the first N) so a huge source set
+  // still gets a representative subset edited instead of being skipped. The
+  // manual/force path edits the full set.
+  const overCap = !opts?.force && allUnprocessed.length > MAX_AUTO_DISPATCH_IMAGES;
+  const unprocessedIds = overCap ? sampleRandom(allUnprocessed, MAX_AUTO_DISPATCH_IMAGES) : allUnprocessed;
+
+  console.log(
+    `autoProcessStyleSource: processing ${unprocessedIds.length}${overCap ? ` (random of ${allUnprocessed.length})` : ""} source images for style ${styleId}`,
+  );
 
   const response = await fetch(`${supabaseUrl}/functions/v1/process-images`, {
     method: "POST",
@@ -295,5 +307,9 @@ export async function autoProcessStyleSource(
   }
 
   console.log(`autoProcessStyleSource: process-images dispatched for style ${styleId}`);
-  return { status: "dispatched", dispatched: unprocessedIds.length, total };
+  return {
+    status: overCap ? "dispatched_sampled" : "dispatched",
+    dispatched: unprocessedIds.length,
+    total,
+  };
 }
