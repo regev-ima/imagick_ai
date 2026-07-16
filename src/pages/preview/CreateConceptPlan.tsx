@@ -283,8 +283,10 @@ export default function CreateConceptPlan() {
                     <div className="flex flex-wrap gap-1.5">
                       {TYPES.map((t) => (
                         <button key={t.value} type="button" onClick={() => changeType(t.value)}
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                            galleryType === t.value ? "bg-primary text-primary-foreground" : "border border-border bg-surface-2 text-muted-foreground hover:text-foreground"
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 ${
+                            galleryType === t.value
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "border border-border bg-surface-2 text-foreground/80 hover:border-primary/50 hover:text-foreground"
                           }`}>
                           {t.label}
                         </button>
@@ -344,8 +346,8 @@ export default function CreateConceptPlan() {
                       <Scissors className="h-4 w-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold">Cull first {culling ? "· on" : "· off"}</div>
-                      <div className="caption">{culling ? "Aura surfaces the keepers first" : "edit everything"}</div>
+                      <div className="text-sm font-semibold">Cull {culling ? "· on" : "· off"}</div>
+                      <div className="caption">{culling ? "Aura ranks every frame & surfaces your best shots" : "no culling — keep every frame"}</div>
                     </div>
                   </button>
                   <div className="glass-card flex items-center gap-3 rounded-[--radius] p-4">

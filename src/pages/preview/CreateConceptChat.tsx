@@ -69,6 +69,24 @@ async function filesFromDataTransfer(dt: DataTransfer): Promise<File[]> {
   return out;
 }
 
+// Minimal File System Access API shapes (not in the default TS DOM lib).
+interface FsFileHandle { kind: "file"; getFile(): Promise<File>; }
+interface FsDirHandle { kind: "directory"; values(): AsyncIterableIterator<FsFileHandle | FsDirHandle>; }
+type DirectoryPicker = () => Promise<FsDirHandle>;
+
+// Recursively read every file out of a directory handle (showDirectoryPicker).
+async function filesFromDirHandle(dir: FsDirHandle): Promise<File[]> {
+  const out: File[] = [];
+  const walk = async (d: FsDirHandle): Promise<void> => {
+    for await (const entry of d.values()) {
+      if (entry.kind === "file") out.push(await entry.getFile());
+      else await walk(entry);
+    }
+  };
+  await walk(dir);
+  return out;
+}
+
 // Rank styles for the chosen shoot type: tag/category matches first, then
 // presets, then the rest — so Aura's first suggestions are relevant.
 function rankStyles(styles: StyleRow[], type: string): StyleRow[] {
@@ -148,6 +166,20 @@ export default function CreateConceptChat() {
     setStep("type");
   };
 
+  // Pick a folder without the browser's "Upload N files?" prompt: use the
+  // File System Access API where available (Chrome/Edge), and fall back to the
+  // <input webkitdirectory> picker (which does prompt) elsewhere.
+  const pickFolder = async () => {
+    const picker = (window as unknown as { showDirectoryPicker?: DirectoryPicker }).showDirectoryPicker;
+    if (!picker) { folderRef.current?.click(); return; }
+    try {
+      const dir = await picker();
+      ingest(await filesFromDirHandle(dir));
+    } catch {
+      /* user dismissed the picker — ignore */
+    }
+  };
+
   // Best-guess name from whichever source is active.
   const derivedName = () =>
     uploadSource === "drive"
@@ -179,7 +211,7 @@ export default function CreateConceptChat() {
       say("aura", `“${finalName}” it is. Since it's a ${typeLabel.toLowerCase()} shoot, here are the AI looks I'd start with — each one edits every photo in a trained style. Tap one to apply it, browse more, or skip editing. You can also train your own look from your past edits.`);
       setStep("style");
     } else {
-      say("aura", "“" + finalName + "” it is. You haven't trained a look yet, so I'll host these as-is for now — you can train your own AI look anytime and re-edit. Want me to cull first so you only keep the best frames?");
+      say("aura", "“" + finalName + "” it is. You haven't trained a look yet, so I'll host these as-is for now — you can train your own AI look anytime and re-edit. Want me to cull this set? I'll rank every frame and surface your strongest shots so the keepers are easy to find.");
       setStep("cull");
     }
     setInput("");
@@ -188,20 +220,20 @@ export default function CreateConceptChat() {
   const pickStyle = (label: string, id: string | null) => {
     setStyleId(id);
     say("user", label);
-    say("aura", "Good pick. Want me to cull first? I'll rank every frame and surface the keepers before any editing, so you only spend edits on the shots worth keeping.");
+    say("aura", "Good pick. Want me to cull this set too? I'll rank every frame and surface your strongest shots so the keepers are easy to find — separate from editing, which runs once your photos finish uploading.");
     setStep("cull");
   };
 
   const pickCull = (on: boolean) => {
     setCulling(on);
-    say("user", on ? "Yes, cull first" : "Edit everything");
+    say("user", on ? "Yes, cull them" : "No culling");
     if (on) {
       const typeLabel = TYPES.find((t) => t.value === galleryType)?.label ?? "this";
       setCategories(defaultCullingTags(galleryType, cullingLanguage));
       say("aura", `Here's what I'll look for in a ${typeLabel.toLowerCase()} — tap to add or remove anything, then we're set.`);
       setStep("cullTags");
     } else {
-      say("aura", "No problem — I'll keep every frame. Here's the plan; review and create when you're ready.");
+      say("aura", "No problem — I'll skip culling. Here's the plan; review and create when you're ready.");
       setStep("done");
     }
   };
@@ -314,7 +346,7 @@ export default function CreateConceptChat() {
                 <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {TYPES.find((t) => t.value === galleryType)?.label} · {photoCount.toLocaleString()} photos{uploadSource === "drive" ? " · from Drive" : ""}</li>
                   <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> Look: {selectedStyleName}{styleId ? ` · ${photoCount.toLocaleString()} edits` : ""}</li>
-                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Cull first — Aura keeps the best${categories.length ? ` · ${categories.length} tags` : ""}` : "Edit everything"}</li>
+                  <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-primary" /> {culling ? `Culling on${categories.length ? ` · ${categories.length} tags` : ""}` : "No culling"}</li>
                 </ul>
 
                 {busy ? (
@@ -343,7 +375,7 @@ export default function CreateConceptChat() {
                   <Button variant="glow" className="gap-2" onClick={() => photosRef.current?.click()}>
                     <UploadCloud className="h-4 w-4" /> Photos
                   </Button>
-                  <Button variant="outline" className="gap-2" onClick={() => folderRef.current?.click()}>
+                  <Button variant="outline" className="gap-2" onClick={pickFolder}>
                     <FolderOpen className="h-4 w-4" /> Folder
                   </Button>
                   <Button variant="outline" className="gap-2" onClick={() => setUploadSource("drive")}>
@@ -351,7 +383,7 @@ export default function CreateConceptChat() {
                   </Button>
                 </div>
                 <p className="mt-2 text-center text-xs text-muted-foreground/70">
-                  Best: <span className="text-foreground/80">drag a folder right into this chat</span> — no browser prompt. The “Folder” button uses Chrome's picker, which always shows a confirmation.
+                  Pick a folder in-app — no browser prompt on Chrome/Edge. You can also just drag a folder into the chat.
                 </p>
               </>
             )}
@@ -409,8 +441,8 @@ export default function CreateConceptChat() {
 
             {step === "cull" && (
               <div className="flex flex-wrap gap-2">
-                <Chip onClick={() => pickCull(true)}>Yes, cull first</Chip>
-                <Chip muted onClick={() => pickCull(false)}>Edit everything</Chip>
+                <Chip onClick={() => pickCull(true)}>Yes, cull them</Chip>
+                <Chip muted onClick={() => pickCull(false)}>No culling</Chip>
               </div>
             )}
 
@@ -460,8 +492,8 @@ function Chip({ children, onClick, muted = false }: { children: React.ReactNode;
       type="button"
       onClick={onClick}
       className={muted
-        ? "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        : "rounded-full border border-primary/30 bg-primary/5 px-3.5 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"}
+        ? "inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-4 py-2.5 text-sm font-medium text-foreground/80 transition-all hover:border-foreground/40 hover:text-foreground active:scale-95"
+        : "rounded-full border border-primary/60 bg-primary/15 px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all hover:bg-primary hover:text-primary-foreground hover:shadow-[0_0_18px_-6px_hsl(var(--primary)/0.7)] active:scale-95"}
     >
       {children}
     </button>

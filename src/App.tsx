@@ -64,6 +64,8 @@ const CreateConceptIndex = lazy(() => import("./pages/preview/CreateConceptIndex
 const CreateConceptPlan = lazy(() => import("./pages/preview/CreateConceptPlan"));
 const CreateConceptChat = lazy(() => import("./pages/preview/CreateConceptChat"));
 const CreateConceptCanvas = lazy(() => import("./pages/preview/CreateConceptCanvas"));
+const CreateConceptCanvas2 = lazy(() => import("./pages/preview/CreateConceptCanvas2"));
+const CreateConceptCanvas3 = lazy(() => import("./pages/preview/CreateConceptCanvas3"));
 // Internal design exploration — "compose the client collection" (DELIVER).
 const DeliverConcept = lazy(() => import("./pages/preview/DeliverConcept"));
 // In-browser AI image-scoring proof-of-concept (no backend; public preview).
@@ -129,6 +131,8 @@ const App = () => (
                 <Route path="/preview/create-a" element={<ProtectedRoute><CreateConceptPlan /></ProtectedRoute>} />
                 <Route path="/preview/create-b" element={<ProtectedRoute><CreateConceptChat /></ProtectedRoute>} />
                 <Route path="/preview/create-c" element={<ProtectedRoute><CreateConceptCanvas /></ProtectedRoute>} />
+                <Route path="/preview/create-c2" element={<ProtectedRoute><CreateConceptCanvas2 /></ProtectedRoute>} />
+                <Route path="/preview/create-c3" element={<ProtectedRoute><CreateConceptCanvas3 /></ProtectedRoute>} />
                 <Route path="/preview/deliver" element={<ProtectedRoute><DeliverConcept /></ProtectedRoute>} />
                 {/* In-browser AI scoring demo — public so it's clickable in the Vercel preview without login. */}
                 <Route path="/preview/aesthetic" element={<AestheticScoreDemo />} />
