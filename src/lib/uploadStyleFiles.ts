@@ -46,13 +46,30 @@ export async function uploadStyleFiles(
   }
 
   const B2_PROXY_URL = "https://cloudflare-b2-proxy.rx8rq49b5c.workers.dev";
-  const CONCURRENCY = 6;
-  const MAX_RETRIES = 3;
+  // Lower concurrency (was 6) — huge RAW batches on slow uplinks were saturating
+  // the connection and the B2 proxy, surfacing as "Load failed". Fewer parallel
+  // PUTs each get more bandwidth and are far likelier to complete.
+  const CONCURRENCY = 3;
+  // More attempts with exponential backoff so a transient proxy/network blip on
+  // one file doesn't fail the whole (thousands-of-files) training upload.
+  const MAX_RETRIES = 5;
+  // Per-PUT ceiling — a 50 MB RAW forwarded through the Worker to B2 can take
+  // minutes on a slow line, but a stuck socket must eventually abort + retry
+  // instead of hanging a worker slot forever.
+  const PER_FILE_TIMEOUT_MS = 5 * 60 * 1000;
 
-  const uploadOne = async (file: File, signedUrl: string, fileId: string): Promise<string> => {
+  const backoff = (attempt: number) => Math.min(30_000, 1000 * 2 ** attempt);
+
+  // Returns the uploaded url, or null if the file failed every attempt. A few
+  // failures out of thousands must NOT nuke the whole training upload, so we
+  // skip the stragglers rather than throwing (training pairs by filename stem
+  // downstream, so partial before/after sets still line up).
+  const uploadOne = async (file: File, signedUrl: string, fileId: string): Promise<string | null> => {
     onProgress?.({ type: "active", fileId });
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PER_FILE_TIMEOUT_MS);
       try {
         // Stream the File directly (Blob body) rather than reading the whole
         // file into an ArrayBuffer first — with many concurrent uploads of
@@ -66,28 +83,34 @@ export async function uploadStyleFiles(
             "Content-Type": file.type || "image/jpeg",
           },
           body: file,
+          signal: controller.signal,
         });
+        clearTimeout(timer);
         if (response.ok) {
           onProgress?.({ type: "done", fileId });
           return signedUrl.split("?")[0];
         }
         if (attempt < MAX_RETRIES - 1) {
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          await new Promise((r) => setTimeout(r, backoff(attempt)));
           continue;
         }
-        throw new Error(`Failed to upload ${file.name}`);
+        onProgress?.({ type: "failed", fileId });
+        return null;
       } catch (err) {
+        clearTimeout(timer);
         if (attempt >= MAX_RETRIES - 1) {
+          console.error(`uploadStyleFiles: giving up on ${file.name}`, err);
           onProgress?.({ type: "failed", fileId });
-          throw err;
+          return null;
         }
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, backoff(attempt)));
       }
     }
-    throw new Error(`Failed to upload ${file.name}`);
+    onProgress?.({ type: "failed", fileId });
+    return null;
   };
 
-  const results: string[] = new Array(files.length);
+  const results: (string | null)[] = new Array(files.length).fill(null);
   let idx = 0;
 
   const worker = async () => {
@@ -98,5 +121,15 @@ export async function uploadStyleFiles(
   };
 
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()));
-  return results;
+
+  const uploaded = results.filter((u): u is string => !!u);
+  // Only hard-fail when NOTHING made it — otherwise proceed with whatever
+  // uploaded so a handful of stragglers don't cost the user the whole run.
+  if (files.length > 0 && uploaded.length === 0) {
+    throw new Error("All uploads failed — check your connection and try again.");
+  }
+  if (uploaded.length < files.length) {
+    console.warn(`uploadStyleFiles: ${files.length - uploaded.length}/${files.length} file(s) failed to upload for style ${styleId}/${subDir}`);
+  }
+  return uploaded;
 }
