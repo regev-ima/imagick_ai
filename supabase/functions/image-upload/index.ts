@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { captureException } from "../_shared/sentry.ts";
  
  const IMAGICK_API_URL = "https://imagick-api-endpoint.rx8rq49b5c.workers.dev";
 const B2_PROXY_URL = "https://cloudflare-b2-proxy.rx8rq49b5c.workers.dev";
@@ -118,6 +119,19 @@ const B2_PROXY_URL = "https://cloudflare-b2-proxy.rx8rq49b5c.workers.dev";
      if (!signUrlResponse.ok) {
        const errorText = await signUrlResponse.text();
        console.error("Sign URL API error:", signUrlResponse.status, errorText);
+       // This is the single-point-of-failure that fails a whole upload side —
+       // keep a backend trail so we can tell a sign-urls API outage apart from
+       // client-side network loss.
+       await captureException(new Error(`sign-urls API ${signUrlResponse.status}`), {
+         tags: { fn: "image-upload", stage: "sign-urls" },
+         extra: {
+           status: signUrlResponse.status,
+           details: errorText?.slice(0, 500),
+           prefix: normalizedPrefix,
+           nameCount: names.length,
+           userId,
+         },
+       });
        return new Response(
          JSON.stringify({ error: "Failed to get signed URLs", details: errorText }),
          { status: signUrlResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -139,6 +153,7 @@ const B2_PROXY_URL = "https://cloudflare-b2-proxy.rx8rq49b5c.workers.dev";
  
    } catch (error: unknown) {
      console.error("Error in image-upload:", error);
+     await captureException(error, { tags: { fn: "image-upload", stage: "handler" } });
      const errorMessage = error instanceof Error ? error.message : "Internal server error";
      return new Response(
        JSON.stringify({ error: errorMessage }),
