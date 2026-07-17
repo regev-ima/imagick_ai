@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { Sentry } from "@/lib/sentry";
 import {
   createAdaptiveUploadController,
   type AdaptiveUploadController,
@@ -78,6 +79,15 @@ export async function uploadStyleFiles(
   }
   if (!urls) {
     console.error(`uploadStyleFiles: sign-urls failed for ${styleId}/${subDir}`, lastSignError);
+    // Telemetry — this is the "whole side failed before any upload" case. Keep
+    // a trail so the next incident is diagnosable instead of a silent failure.
+    Sentry.captureException(
+      lastSignError instanceof Error ? lastSignError : new Error("style-upload sign-urls failed"),
+      {
+        tags: { area: "style-upload", stage: "sign-urls", side: subDir },
+        extra: { styleId, side: subDir, fileCount: files.length, attempts: SIGN_URL_RETRIES },
+      },
+    );
     throw new Error("Failed to get upload URLs");
   }
 
@@ -93,6 +103,16 @@ export async function uploadStyleFiles(
   // minutes on a slow line, but a stuck socket must eventually abort + retry
   // instead of hanging a slot forever.
   const PER_FILE_TIMEOUT_MS = 5 * 60 * 1000;
+
+  // Telemetry counters — surfaced to Sentry once the side finishes so a bad
+  // run leaves a diagnosable trail (how many attempts failed, what the errors
+  // were, where the adaptive ceiling settled).
+  let attemptFailures = 0;
+  const sampleErrors: string[] = [];
+  const noteError = (reason: string) => {
+    attemptFailures += 1;
+    if (sampleErrors.length < 5 && !sampleErrors.includes(reason)) sampleErrors.push(reason);
+  };
 
   // Returns the uploaded url, or null if the file failed every attempt. A few
   // failures out of thousands must NOT nuke the whole training upload, so we
@@ -129,6 +149,7 @@ export async function uploadStyleFiles(
             return signedUrl.split("?")[0];
           }
           conc.reportCongestion();
+          noteError(`http_${response.status}`);
           if (attempt < MAX_RETRIES - 1) {
             await sleep(backoff(attempt));
             continue;
@@ -138,6 +159,7 @@ export async function uploadStyleFiles(
         } catch (err) {
           clearTimeout(timer);
           conc.reportCongestion();
+          noteError(err instanceof DOMException && err.name === "AbortError" ? "timeout" : (err instanceof Error ? err.name || err.message : "network"));
           if (attempt >= MAX_RETRIES - 1) {
             console.error(`uploadStyleFiles: giving up on ${file.name}`, err);
             onProgress?.({ type: "failed", fileId });
@@ -160,13 +182,39 @@ export async function uploadStyleFiles(
   );
 
   const uploaded = results.filter((u): u is string => !!u);
+  const failedCount = files.length - uploaded.length;
+
+  // === Telemetry ===
+  // Shared context for whatever we report below.
+  const stats = {
+    styleId,
+    side: subDir,
+    total: files.length,
+    uploaded: uploaded.length,
+    failed: failedCount,
+    attemptFailures,          // total failed PUT attempts (retries included)
+    finalConcurrency: conc.current(),
+    sampleErrors,             // e.g. ["http_502","timeout","network"]
+  };
+
   // Only hard-fail when NOTHING made it — otherwise proceed with whatever
   // uploaded so a handful of stragglers don't cost the user the whole run.
   if (files.length > 0 && uploaded.length === 0) {
+    Sentry.captureException(new Error("style-upload all-failed"), {
+      tags: { area: "style-upload", stage: "all-failed", side: subDir },
+      extra: stats,
+    });
     throw new Error("All uploads failed — check your connection and try again.");
   }
-  if (uploaded.length < files.length) {
-    console.warn(`uploadStyleFiles: ${files.length - uploaded.length}/${files.length} file(s) failed to upload for style ${styleId}/${subDir}`);
+  if (failedCount > 0) {
+    console.warn(`uploadStyleFiles: ${failedCount}/${files.length} file(s) failed to upload for style ${styleId}/${subDir}`);
+    // Partial loss — a warning, not an exception, so it doesn't page anyone but
+    // is searchable if a style trains on fewer pairs than expected.
+    Sentry.captureMessage(`style-upload partial: ${failedCount}/${files.length} failed (${subDir})`, {
+      level: "warning",
+      tags: { area: "style-upload", stage: "partial", side: subDir },
+      extra: stats,
+    });
   }
   return uploaded;
 }
