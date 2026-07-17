@@ -46,7 +46,7 @@ import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/Goo
 import { Progress } from "@/components/ui/progress";
 import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
 import { LazyThumb } from "@/components/gallery/LazyThumb";
-import { uploadStyleFiles, type UploadStyleFileEvent } from "@/lib/uploadStyleFiles";
+import { uploadStyleFiles, createAdaptiveUploadController, type UploadStyleFileEvent } from "@/lib/uploadStyleFiles";
 import { useStyleQuota } from "@/hooks/useStyleQuota";
 
 interface UploadProgress {
@@ -158,6 +158,8 @@ export default function CreateStylePage() {
 
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  // Live parallelism from the adaptive controller (warm-up hint in the footer).
+  const [uploadParallelism, setUploadParallelism] = useState(0);
 
   // Combined upload progress (before + after) — drives the single "uploading"
   // window in the footer, mirroring the New Collection create flow.
@@ -355,9 +357,15 @@ export default function CreateStylePage() {
           .eq("id", styleId);
 
         phase = "upload";
+        // One adaptive controller shared by both sides: start gentle (≈1 per
+        // side), warm up while uploads flow cleanly, back off on failures.
+        const uploadController = createAdaptiveUploadController({
+          onChange: (n) => setUploadParallelism(n),
+        });
+        setUploadParallelism(uploadController.current());
         const [beforeUrls, afterUrls] = await Promise.all([
-          uploadStyleFiles(beforeFiles, user.id, styleId, "before", applyUploadProgress("before")),
-          uploadStyleFiles(afterFiles, user.id, styleId, "after", applyUploadProgress("after")),
+          uploadStyleFiles(beforeFiles, user.id, styleId, "before", applyUploadProgress("before"), uploadController),
+          uploadStyleFiles(afterFiles, user.id, styleId, "after", applyUploadProgress("after"), uploadController),
         ]);
 
         // Training pairs before↔after by filename, so a side that lost every
@@ -859,6 +867,9 @@ export default function CreateStylePage() {
                 <Progress value={uploadPct} className="h-1.5" />
                 {activeUploadName && (
                   <p className="truncate text-xs text-muted-foreground">Receiving {activeUploadName} · {uploadPct}%</p>
+                )}
+                {uploadProgress && uploadParallelism > 0 && (
+                  <p className="caption">Adapting to your connection · {uploadParallelism} in parallel</p>
                 )}
               </div>
             ) : (
