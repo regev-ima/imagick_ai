@@ -120,6 +120,11 @@ export default function CreateStylePage() {
   // Set true when Create is pressed with an empty name — highlights the field.
   const [nameError, setNameError] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  // The style row is created up-front (uploads need its id in the B2 path).
+  // If a later step fails we keep the row's id here so a retry REUSES it
+  // instead of piling up orphaned half-created styles — the staged File
+  // objects only live on this page, so re-uploading must happen from here.
+  const createdStyleIdRef = useRef<string | null>(null);
 
   // Subscription gate — a top-level custom model consumes a plan "slot"
   // (Free = 0). The DB trigger enforce_style_quota is the hard backstop;
@@ -247,33 +252,51 @@ export default function CreateStylePage() {
     }
 
     setIsCreating(true);
+    const isGoogleDrive = uploadSource === "drive";
+    // "create" = row insert/reset · "upload" = pushing files · "train" = kickoff.
+    // Lets the catch below tailor the message and decide whether a half-created
+    // style needs flagging.
+    let phase: "create" | "upload" | "train" = "create";
+    // Reuse the row from a previous failed attempt (see createdStyleIdRef).
+    let styleId = createdStyleIdRef.current;
     try {
-      const isGoogleDrive = uploadSource === "drive";
       const initialStatus = isGoogleDrive ? "importing" : "uploading";
+      const styleFields = {
+        name: name.trim(),
+        category: selectedModelTypes[0] || null,
+        associated_tags: selectedModelTypes,
+        status: initialStatus,
+        upload_method: isGoogleDrive ? "google_drive" : "direct",
+        google_before_urls: isGoogleDrive ? beforeDriveLinks : null,
+        google_after_urls: isGoogleDrive ? afterDriveLinks : null,
+        google_before_metadata: isGoogleDrive && beforeFolderInfo ? beforeFolderInfo as any : null,
+        google_after_metadata: isGoogleDrive && afterFolderInfo ? afterFolderInfo as any : null,
+      };
 
-      const { data: style, error: insertError } = await supabase
-        .from("styles")
-        .insert({
-          name: name.trim(),
-          description: null,
-          category: selectedModelTypes[0] || null,
-          associated_tags: selectedModelTypes,
-          user_id: user.id,
-          status: initialStatus,
-          visibility: "private",
-          is_preset: false,
-          upload_method: isGoogleDrive ? "google_drive" : "direct",
-          google_before_urls: isGoogleDrive ? beforeDriveLinks : null,
-          google_after_urls: isGoogleDrive ? afterDriveLinks : null,
-          google_before_metadata: isGoogleDrive && beforeFolderInfo ? beforeFolderInfo as any : null,
-          google_after_metadata: isGoogleDrive && afterFolderInfo ? afterFolderInfo as any : null,
-        })
-        .select("id")
-        .single();
+      if (styleId) {
+        // Retry — reset the existing row instead of creating a new one.
+        const { error: resetError } = await supabase
+          .from("styles")
+          .update({ ...styleFields, error_details: null })
+          .eq("id", styleId);
+        if (resetError) throw resetError;
+      } else {
+        const { data: style, error: insertError } = await supabase
+          .from("styles")
+          .insert({
+            ...styleFields,
+            description: null,
+            user_id: user.id,
+            visibility: "private",
+            is_preset: false,
+          })
+          .select("id")
+          .single();
 
-      if (insertError || !style) throw insertError || new Error("Failed to create style");
-
-      const styleId = style.id;
+        if (insertError || !style) throw insertError || new Error("Failed to create style");
+        styleId = style.id;
+        createdStyleIdRef.current = styleId;
+      }
 
       if (isGoogleDrive) {
         const transferCount = beforeDriveLinks.length + afterDriveLinks.length;
@@ -331,10 +354,17 @@ export default function CreateStylePage() {
           })
           .eq("id", styleId);
 
+        phase = "upload";
         const [beforeUrls, afterUrls] = await Promise.all([
           uploadStyleFiles(beforeFiles, user.id, styleId, "before", applyUploadProgress("before")),
           uploadStyleFiles(afterFiles, user.id, styleId, "after", applyUploadProgress("after")),
         ]);
+
+        // Training pairs before↔after by filename, so a side that lost every
+        // image can't train — surface it instead of kicking off a doomed run.
+        if (beforeUrls.length === 0 || afterUrls.length === 0) {
+          throw new Error("style_upload_incomplete");
+        }
 
         await supabase
           .from("styles")
@@ -346,6 +376,7 @@ export default function CreateStylePage() {
           })
           .eq("id", styleId);
 
+        phase = "train";
         const { error: trainError } = await supabase.functions.invoke("train-style", {
           body: {
             styleId,
@@ -357,22 +388,63 @@ export default function CreateStylePage() {
 
         if (trainError) {
           console.error("Failed to start training:", trainError);
-          toast.error("Images uploaded but training failed to start. Please try again from the style page.");
+          // Images are safely uploaded — mark errored so the style page shows
+          // its "Retry training" action (which re-invokes train-style, no
+          // re-upload needed) instead of spinning in 'uploading'.
+          await supabase
+            .from("styles")
+            .update({ status: "error", error_details: ["Images uploaded but training didn't start. Use Retry to start it."] })
+            .eq("id", styleId)
+            .then(undefined, (e) => console.error("Failed to flag errored style:", e));
+          toast.error("Images uploaded, but training didn't start", {
+            description: "Open the style and press Retry to start training — your images are saved.",
+          });
         } else {
           toast.success("Style created! Training has started.");
         }
       }
 
+      // Made it through — this row is no longer a retry candidate.
+      createdStyleIdRef.current = null;
       navigate(`/dashboard/styles/${styleId}`);
     } catch (error: any) {
       console.error("Create style error:", error);
+
+      const isQuota = typeof error?.message === "string" && error.message.includes("style_quota_exceeded");
+      const isUploadFailure =
+        phase === "upload" ||
+        (typeof error?.message === "string" &&
+          (error.message.includes("style_upload_incomplete") || error.message.toLowerCase().includes("upload")));
+
+      // Don't strand a half-created style spinning in 'uploading' forever —
+      // flag it as errored so it's visible to the user (and the admin panel /
+      // watchdog) and clearly recoverable. The row is kept, not deleted, so a
+      // retry reuses it (createdStyleIdRef) rather than orphaning another.
+      if (styleId && phase !== "create" && !isQuota) {
+        const detail = isUploadFailure
+          ? "Some images didn't finish uploading — often a slow or unstable connection. Open this style and try again."
+          : (typeof error?.message === "string" ? error.message : "Failed to start training");
+        await supabase
+          .from("styles")
+          .update({ status: "error", error_details: [detail] })
+          .eq("id", styleId)
+          .then(undefined, (e) => console.error("Failed to flag errored style:", e));
+      }
+
       // The DB quota trigger raises this if the client gate was bypassed or
       // the plan changed mid-flow — steer the user to billing instead of
       // showing a raw Postgres error.
-      if (typeof error?.message === "string" && error.message.includes("style_quota_exceeded")) {
+      if (isQuota) {
         toast.error("You've reached your plan's custom model limit.", {
           description: "Upgrade your plan or remove a model to train a new one.",
           action: { label: "View plans", onClick: () => navigate("/dashboard/billing") },
+        });
+      } else if (isUploadFailure) {
+        // The exact complaint we're fixing: uploads dropped, and the user was
+        // silently dumped back on the form. Say what happened and that their
+        // staged photos are still here to retry.
+        toast.error("Some images couldn't be uploaded", {
+          description: "This is usually a slow or unstable connection. Your photos are still here — please press Create to try again.",
         });
       } else {
         toast.error(error.message || "Failed to create style");
