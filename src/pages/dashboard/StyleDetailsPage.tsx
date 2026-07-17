@@ -55,9 +55,10 @@ import { getThumbnailUrl, getPreviewUrl } from "@/lib/imageUrls";
 import { SHOWCASE_GALLERY_ID } from "@/lib/constants";
 import { formatDuration } from "@/lib/cullingEta";
 
-type StyleStatus = "importing" | "training" | "ready" | "error";
+type StyleStatus = "uploading" | "importing" | "training" | "ready" | "error";
 
 const statusConfig: Record<StyleStatus, { label: string; token: string }> = {
+  uploading: { label: "Uploading", token: "var(--accent)" },
   importing: { label: "Importing", token: "var(--accent)" },
   training: { label: "Training", token: "var(--rating)" },
   ready: { label: "Ready", token: "var(--secondary)" },
@@ -177,7 +178,7 @@ export default function StyleDetailsPage() {
     enabled: !!styleId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "importing" || status === "training" ? 5000 : 30000;
+      return status === "importing" || status === "training" || status === "uploading" ? 5000 : 30000;
     },
   });
 
@@ -399,7 +400,7 @@ export default function StyleDetailsPage() {
   const isOwner = user?.id === style.user_id;
   const isReady = style.status === "ready";
   const isErrored = style.status === "error";
-  const isBusy = style.status === "training" || style.status === "importing";
+  const isBusy = style.status === "training" || style.status === "importing" || style.status === "uploading";
   const isPublic = style.visibility === "public";
 
   const openRename = () => {
@@ -455,7 +456,7 @@ export default function StyleDetailsPage() {
               </span>
               <span className="caption flex items-center gap-1.5" style={{ color: `hsl(${status.token})` }}>
                 <span
-                  className={cn("aura-led", (style.status === "training" || style.status === "importing") && "aura-led-pulse")}
+                  className={cn("aura-led", isBusy && "aura-led-pulse")}
                   style={{ "--led": status.token } as CSSProperties}
                 />
                 {status.label}
