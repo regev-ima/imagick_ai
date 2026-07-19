@@ -46,7 +46,7 @@ import { GoogleDriveInput, type DriveFolderInfo } from "@/components/gallery/Goo
 import { Progress } from "@/components/ui/progress";
 import { IMAGE_ACCEPT, isImageFile } from "@/lib/imageFileTypes";
 import { LazyThumb } from "@/components/gallery/LazyThumb";
-import { uploadStyleFiles, createAdaptiveUploadController, type UploadStyleFileEvent } from "@/lib/uploadStyleFiles";
+import { uploadStyleFiles, createAdaptiveUploadController, type UploadStyleFileEvent, type AdaptiveUploadController } from "@/lib/uploadStyleFiles";
 import { useStyleQuota } from "@/hooks/useStyleQuota";
 
 interface UploadProgress {
@@ -109,6 +109,14 @@ interface LocalFile {
   file: File;
 }
 
+/** Human-readable upload speed from a bytes/sec rate (null when idle). */
+function formatSpeed(bps: number): string | null {
+  if (!bps || bps <= 0) return null;
+  const mb = bps / (1024 * 1024);
+  if (mb >= 1) return `${mb.toFixed(1)} MB/s`;
+  return `${Math.max(1, Math.round(bps / 1024))} KB/s`;
+}
+
 export default function CreateStylePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -160,6 +168,9 @@ export default function CreateStylePage() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   // Live parallelism from the adaptive controller (warm-up hint in the footer).
   const [uploadParallelism, setUploadParallelism] = useState(0);
+  // Live upload throughput (bytes/sec), polled from the controller's meter.
+  const [uploadSpeedBps, setUploadSpeedBps] = useState(0);
+  const uploadControllerRef = useRef<AdaptiveUploadController | null>(null);
 
   // Combined upload progress (before + after) — drives the single "uploading"
   // window in the footer, mirroring the New Collection create flow.
@@ -360,8 +371,10 @@ export default function CreateStylePage() {
         // One adaptive controller shared by both sides: start gentle (≈1 per
         // side), warm up while uploads flow cleanly, back off on failures.
         const uploadController = createAdaptiveUploadController({
+          groups: ["before", "after"],
           onChange: (n) => setUploadParallelism(n),
         });
+        uploadControllerRef.current = uploadController;
         setUploadParallelism(uploadController.current());
         const [beforeUrls, afterUrls] = await Promise.all([
           uploadStyleFiles(beforeFiles, user.id, styleId, "before", applyUploadProgress("before"), uploadController),
@@ -530,6 +543,20 @@ export default function CreateStylePage() {
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isCreating]);
+
+  // Poll the adaptive controller's throughput meter while uploading so the
+  // footer shows a live MB/s readout. Cleared once the upload window closes.
+  const isUploading = !!uploadProgress;
+  useEffect(() => {
+    if (!isUploading) {
+      setUploadSpeedBps(0);
+      return;
+    }
+    const id = window.setInterval(() => {
+      setUploadSpeedBps(uploadControllerRef.current?.throughputBps() ?? 0);
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [isUploading]);
 
   // ── One reusable local upload column (before / after) ────────────────────────
   // Bounded so it NEVER grows the page (same pattern as the New Collection
@@ -865,11 +892,17 @@ export default function CreateStylePage() {
                   <span className="font-mono text-primary">{uploadProgress ? `${totalUploaded}/${totalToUpload}` : ""}</span>
                 </div>
                 <Progress value={uploadPct} className="h-1.5" />
-                {activeUploadName && (
-                  <p className="truncate text-xs text-muted-foreground">Receiving {activeUploadName} · {uploadPct}%</p>
+                {uploadProgress && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="caption">
+                      {formatSpeed(uploadSpeedBps) ?? "Measuring speed…"}
+                      {uploadParallelism > 0 && ` · ${uploadParallelism} in parallel`}
+                    </span>
+                    <span className="caption">{uploadPct}%</span>
+                  </div>
                 )}
-                {uploadProgress && uploadParallelism > 0 && (
-                  <p className="caption">Adapting to your connection · {uploadParallelism} in parallel</p>
+                {activeUploadName && (
+                  <p className="truncate text-xs text-muted-foreground">Receiving {activeUploadName}</p>
                 )}
               </div>
             ) : (
