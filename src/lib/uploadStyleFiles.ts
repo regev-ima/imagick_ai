@@ -120,8 +120,10 @@ export async function uploadStyleFiles(
   // downstream, so partial before/after sets still line up).
   const uploadOne = async (file: File, signedUrl: string, fileId: string): Promise<string | null> => {
     // Wait for an adaptive slot BEFORE marking the file active, so "active"
-    // reflects files that are truly in-flight, not queued.
-    await conc.acquire();
+    // reflects files that are truly in-flight, not queued. The side is the
+    // round-robin group, so before/after upload in parallel (1 each) instead
+    // of one side grabbing every slot.
+    await conc.acquire(subDir);
     onProgress?.({ type: "active", fileId });
     try {
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -145,6 +147,7 @@ export async function uploadStyleFiles(
           clearTimeout(timer);
           if (response.ok) {
             conc.reportSuccess(attempt === 0);
+            conc.recordBytes(file.size);
             onProgress?.({ type: "done", fileId });
             return signedUrl.split("?")[0];
           }
@@ -171,7 +174,7 @@ export async function uploadStyleFiles(
       onProgress?.({ type: "failed", fileId });
       return null;
     } finally {
-      conc.release();
+      conc.release(subDir);
     }
   };
 
