@@ -23,6 +23,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { getEditedUrl } from "@/lib/imageUrls";
+import { ZIP_DOWNLOAD_URL } from "@/lib/constants";
 
 type DownloadSubset = "selected" | "all" | "liked" | "top-picks";
 
@@ -104,10 +105,13 @@ export function DownloadGalleryModal({
       });
 
       // Use a hidden form POST so the browser handles the download natively
-      // (streams directly to disk instead of buffering in RAM)
+      // (streams directly to disk instead of buffering in RAM). The new
+      // Cloudflare Worker returns a real streamed ZIP, so keeping the native
+      // form POST — not fetch()+blob() — is what preserves the instant,
+      // low-memory download.
       const form = document.createElement("form");
       form.method = "POST";
-      form.action = "https://downloadfiles.fly.dev/download";
+      form.action = ZIP_DOWNLOAD_URL;
       form.style.display = "none";
 
       const filenameInput = document.createElement("input");
