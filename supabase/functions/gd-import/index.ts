@@ -7,10 +7,15 @@ import { corsHeaders } from "../_shared/cors.ts";
 // the core functions — a heavy module here was crashing the worker at boot
 // (503 on the OPTIONS preflight, no execution), which broke Drive imports.
 
-// File-transfer service (Google Drive ↔ B2). Lives on Fly alongside the
-// /download service used by DownloadGalleryModal. B2 credentials are stored
-// as Fly secrets, so we never send them in the request body.
-const FILE_TRANSFER_URL = "https://downloadfiles.fly.dev/file-transfer";
+// Jobs API (Google Drive ↔ B2 transfer + the /download ZIP builder used by
+// DownloadGalleryModal). Migrated off Fly (downloadfiles.fly.dev) to the
+// Cloudflare Worker. B2 credentials live on the Worker side, so we never send
+// them in the request body. The request/response contract is unchanged — only
+// the host moved. Base is overridable via IMAGICK_JOBS_API_URL; the other jobs
+// endpoints (/file-transfer/jobs/:jobId, /read-exifs, /convert-ogg-to-mp3)
+// share this same base if ever called from here.
+const JOBS_API_BASE = (Deno.env.get("IMAGICK_JOBS_API_URL") || "https://imagick-jobs-api.rx8rq49b5c.workers.dev").replace(/\/+$/, "");
+const FILE_TRANSFER_URL = `${JOBS_API_BASE}/file-transfer`;
 
 // Photo + RAW extensions we process; everything else (and any hidden dotfile
 // like .DS_Store) is junk that rides along from Drive folders. Kept in sync
